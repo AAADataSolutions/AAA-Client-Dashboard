@@ -713,108 +713,108 @@ export default function AdminOrganizationsPage() {
       {/* 2. Top Summary KPI Cards (Reference Screenshot Match) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Organizations */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Organizations
             </span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
               <Building2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalOrgsCount}</span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalOrgsCount}</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                 All Active
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>Franchises & Groups</span>
-              <span className="font-semibold text-slate-700">100% SLA OK</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-200">100% SLA OK</span>
             </div>
           </div>
         </div>
 
         {/* Managed Properties */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Managed Properties
             </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
               <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalProperties}</span>
-              <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalProperties}</span>
+              <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/40">
                 +14 this month
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>Across 42 regions</span>
-              <span className="font-semibold text-emerald-600">99.98% Up</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">99.98% Up</span>
             </div>
           </div>
         </div>
 
         {/* Provisioned Services */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Provisioned Services
             </span>
-            <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600">
+            <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
               <Network className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalSipLines.toLocaleString()}</span>
-              <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalSipLines.toLocaleString()}</span>
+              <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-[#20222a] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#2e313e]">
                 PBX & SIP
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>Trunks & Extensions</span>
-              <span className="font-semibold text-slate-700">Zero Carrier Latency</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-200">Zero Carrier Latency</span>
             </div>
           </div>
         </div>
 
         {/* Action Required */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Action Required
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Pending Actions
             </span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <AlertCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalUrgentOrAction}</span>
-              <span className="text-[11px] font-medium text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
-                Escalations
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalUrgentOrAction}</span>
+              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
+                Action Req.
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
-              <span>Carrier port approvals</span>
-              <span className="font-semibold text-rose-600">&lt; 4h SLA</span>
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <span>Onboarding / Porting</span>
+              <span className="font-semibold text-amber-700 dark:text-amber-400">Review LOA</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* 3. Search & Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
@@ -822,10 +822,10 @@ export default function AdminOrganizationsPage() {
               setSearchQuery(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="Search organizations, codes, emails..."
-            className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all"
+            placeholder="Search by organization name, domain, slug, city..."
+            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded">
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
             ⌘F
           </div>
         </div>
@@ -931,21 +931,21 @@ export default function AdminOrganizationsPage() {
 
       {/* 4. Table / Grid Representation */}
       {viewMode === 'LIST' ? (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[#f8fafc] border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3 px-4">Organization & Contact</th>
-                  <th className="py-3 px-4">Properties</th>
-                  <th className="py-3 px-4">Admin Users</th>
-                  <th className="py-3 px-4">SIP Services</th>
-                  <th className="py-3 px-4">Open Tickets</th>
-                  <th className="py-3 px-4">Status</th>
+                <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4">Organization &amp; Domain</th>
+                  <th className="py-3 px-4">Portfolio Properties</th>
+                  <th className="py-3 px-4">Active Voice Lines</th>
+                  <th className="py-3 px-4">Primary Contact</th>
+                  <th className="py-3 px-4">E911 Status</th>
+                  <th className="py-3 px-4">Operational Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
                 {paginatedOrgs.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-500">

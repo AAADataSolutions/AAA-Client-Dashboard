@@ -30,10 +30,10 @@ export default function AdminOverviewPage() {
     <div className="space-y-6 pb-12">
       {/* 1. Greeting Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#181c22]">
+        <h1 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">
           Hello {userName}
         </h1>
-        <p className="text-xs text-[#64748b] mt-0.5">
+        <p className="text-xs text-[#64748b] dark:text-slate-400 mt-0.5">
           Take an overview of your operations across all hospitality portfolios.
         </p>
       </div>
@@ -41,96 +41,96 @@ export default function AdminOverviewPage() {
       {/* 2. Top KPI Cards Row (6 Cards) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {/* Card 1: Organizations */}
-        <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] shadow-2xs flex flex-col justify-between space-y-2">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-[#e2e8f0] dark:border-[#222430] shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b]">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b] dark:text-slate-400">
               Organizations
             </span>
-            <Building2 className="w-3.5 h-3.5 text-[#c05900]" />
+            <Building2 className="w-3.5 h-3.5 text-[#f97316]" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">42</h2>
-            <span className="inline-block text-[10.5px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
+            <h2 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">42</h2>
+            <span className="inline-block text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
               ↑ 4 this month
             </span>
           </div>
         </div>
 
         {/* Card 2: Properties */}
-        <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] shadow-2xs flex flex-col justify-between space-y-2">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-[#e2e8f0] dark:border-[#222430] shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b]">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b] dark:text-slate-400">
               Properties
             </span>
-            <Hotel className="w-3.5 h-3.5 text-emerald-600" />
+            <Hotel className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">186</h2>
-            <span className="inline-block text-[10.5px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
+            <h2 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">186</h2>
+            <span className="inline-block text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
               ↑ 12 this month
             </span>
           </div>
         </div>
 
         {/* Card 3: Services & Lines */}
-        <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] shadow-2xs flex flex-col justify-between space-y-2">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-[#e2e8f0] dark:border-[#222430] shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b]">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b] dark:text-slate-400">
               Services &amp; Lines
             </span>
-            <PhoneCall className="w-3.5 h-3.5 text-[#1275e2]" />
+            <PhoneCall className="w-3.5 h-3.5 text-[#1275e2] dark:text-sky-400" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">1,248</h2>
-            <span className="inline-block text-[10.5px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
+            <h2 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">1,248</h2>
+            <span className="inline-block text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
               ↑ 36 this month
             </span>
           </div>
         </div>
 
         {/* Card 4: Active Onboardings */}
-        <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] shadow-2xs flex flex-col justify-between space-y-2">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-[#e2e8f0] dark:border-[#222430] shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b]">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b] dark:text-slate-400">
               Active Onboardings
             </span>
-            <Send className="w-3.5 h-3.5 text-[#ea580c]" />
+            <Send className="w-3.5 h-3.5 text-[#ea580c] dark:text-[#f97316]" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">18</h2>
-            <span className="inline-block text-[10.5px] font-medium text-[#ea580c] bg-orange-50 px-1.5 py-0.2 rounded">
+            <h2 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">18</h2>
+            <span className="inline-block text-[10.5px] font-medium text-[#ea580c] dark:text-[#f97316] bg-orange-50 dark:bg-orange-950/40 px-1.5 py-0.2 rounded border border-orange-200 dark:border-orange-800/40">
               4 due this week
             </span>
           </div>
         </div>
 
         {/* Card 5: Active Porting */}
-        <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] shadow-2xs flex flex-col justify-between space-y-2">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-[#e2e8f0] dark:border-[#222430] shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b]">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b] dark:text-slate-400">
               Active Porting
             </span>
-            <GitBranch className="w-3.5 h-3.5 text-purple-600" />
+            <GitBranch className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">27</h2>
-            <span className="inline-block text-[10.5px] font-medium text-purple-600 bg-purple-50 px-1.5 py-0.2 rounded">
+            <h2 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">27</h2>
+            <span className="inline-block text-[10.5px] font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-800/40">
               7 due this week
             </span>
           </div>
         </div>
 
         {/* Card 6: Open Tickets */}
-        <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] shadow-2xs flex flex-col justify-between space-y-2">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-[#e2e8f0] dark:border-[#222430] shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b]">
+            <span className="text-[10.5px] font-bold tracking-wider uppercase text-[#64748b] dark:text-slate-400">
               Open Tickets
             </span>
-            <LifeBuoy className="w-3.5 h-3.5 text-rose-500" />
+            <LifeBuoy className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">14</h2>
-            <span className="inline-block text-[10.5px] font-medium text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded">
+            <h2 className="text-2xl font-bold tracking-tight text-[#181c22] dark:text-white">14</h2>
+            <span className="inline-block text-[10.5px] font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-800/40">
               2 Last 24 hours
             </span>
           </div>

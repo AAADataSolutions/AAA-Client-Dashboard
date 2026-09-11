@@ -1,49 +1,64 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  /* Light Theme Workspace (Fidelity Modern Design Tokens) */
+  /* Light Theme Workspace */
   --background: #f8f9fa;
   --foreground: #181c22;
   --surface: #ffffff;
-  --surface-dim: #d7dae3;
-  --surface-container-lowest: #ffffff;
-  --surface-container-low: #f1f3fc;
-  --surface-container: #ebedf7;
-  --surface-container-high: #e6e8f1;
-  --surface-container-highest: #e0e2eb;
-  --on-surface: #181c22;
-  --on-surface-variant: #64748b;
-  --outline: #e2e8f0;
-  --outline-variant: #cbd5e1;
-  
-  --primary: #1275e2;
-  --primary-hover: #005cb8;
-  --secondary: #465f88;
-  --tertiary: #c05900;
-  --error: #ba1a1a;
-  --success: #16a34a;
-  --warning: #d97706;
+  --surface-dim: #f1f3f6;
+  --surface-border: #e2e8f0;
+  --surface-border-subtle: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --primary-accent: #4338ca;
+  --primary-accent-hover: #3730a3;
+  --brand-orange: #ea580c;
 
-  /* Sidebar Dark Tone Tokens */
-  --sidebar-bg: #18181b;
-  --sidebar-surface: #202024;
+  /* Sidebar Tokens */
+  --sidebar-bg: #1c1c1f;
+  --sidebar-surface: #242429;
   --sidebar-border: #27272a;
   --sidebar-text: #f4f4f5;
   --sidebar-muted: #a1a1aa;
-  --sidebar-faint: #71717a;
-  --sidebar-active: #27272a;
 
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
+}
+
+html.dark {
+  /* High-End Enterprise Dark Theme */
+  --background: #0d0e12;
+  --foreground: #f4f4f6;
+  --surface: #14151b;
+  --surface-dim: #181a22;
+  --surface-border: #222430;
+  --surface-border-subtle: #1a1b24;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --primary-accent: #ea580c;
+  --primary-accent-hover: #f97316;
+  --brand-orange: #f97316;
+
+  /* Sidebar Tokens in Dark */
+  --sidebar-bg: #0f1014;
+  --sidebar-surface: #181920;
+  --sidebar-border: #1f2129;
+  --sidebar-text: #f4f4f5;
+  --sidebar-muted: #9ca3af;
+
+  color-scheme: dark;
 }
 
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
-  --color-outline: var(--outline);
-  --color-primary: var(--primary);
-  --color-secondary: var(--secondary);
+  --color-outline: var(--surface-border);
+  --color-primary: var(--primary-accent);
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -59,6 +74,7 @@ html, body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Custom crisp scrollbars */
@@ -73,6 +89,12 @@ html, body {
   background: #cbd5e1;
   border-radius: 4px;
 }
+html.dark ::-webkit-scrollbar-thumb {
+  background: #2d303e;
+}
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #45495e;
 }

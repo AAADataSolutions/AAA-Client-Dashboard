@@ -382,144 +382,144 @@ export default function AdminE911Page() {
       {/* 2. Top Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* PSAP Verified */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               PSAP Verified Locations
             </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalVerified}</span>
-              <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalVerified}</span>
+              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
                 100% Ray Baum
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>Direct Emergency Routing</span>
-              <span className="font-semibold text-emerald-600">Active</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
             </div>
           </div>
         </div>
 
         {/* Pending Verification */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Pending Validation
             </span>
-            <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
+            <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/40 flex items-center justify-center text-sky-600 dark:text-sky-400">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalPending}</span>
-              <span className="text-[11px] font-medium text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalPending}</span>
+              <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/40">
                 Carrier Review
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>PSAP Dispatch Test</span>
-              <span className="font-semibold text-sky-700">&lt; 24h SLA</span>
+              <span className="font-semibold text-sky-700 dark:text-sky-300">&lt; 24h SLA</span>
             </div>
           </div>
         </div>
 
         {/* Correction Required */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Corrections Required
             </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalCorrection}</span>
-              <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalCorrection}</span>
+              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
                 Action Required
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>Postal / Sub-location</span>
-              <span className="font-semibold text-amber-600">Mismatch</span>
+              <span className="font-semibold text-amber-600 dark:text-amber-400">Mismatch</span>
             </div>
           </div>
         </div>
 
         {/* Failed PSAP Test */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
+        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Failed Audit / Overrides
             </span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
+            <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-600 dark:text-rose-400">
               <AlertCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900">{totalFailed}</span>
-              <span className="text-[11px] font-medium text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalFailed}</span>
+              <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800/40">
                 Critical SLA
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
               <span>Trunk Signaling Hold</span>
-              <span className="font-semibold text-rose-600">&lt; 4h SLA</span>
+              <span className="font-semibold text-rose-600 dark:text-rose-400">&lt; 4h SLA</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* 3. Search & Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Search */}
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search hotel property, address, PSAP ID, city..."
-            className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all"
+            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded">
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
             ⌘F
           </div>
         </div>
 
         {/* Dropdowns */}
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Status:</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] rounded-lg px-2.5 py-1.5">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Status:</span>
             <select
               value={selectedStatusFilter}
               onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer"
             >
-              <option value="ALL">All Statuses</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="PENDING">Pending</option>
-              <option value="CORRECTION_REQUIRED">Correction Required</option>
-              <option value="FAILED">Failed</option>
+              <option value="ALL" className="dark:bg-[#15161c]">All Statuses</option>
+              <option value="VERIFIED" className="dark:bg-[#15161c]">Verified</option>
+              <option value="PENDING" className="dark:bg-[#15161c]">Pending</option>
+              <option value="CORRECTION_REQUIRED" className="dark:bg-[#15161c]">Correction Required</option>
+              <option value="FAILED" className="dark:bg-[#15161c]">Failed</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* 4. Table Representation */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#f8fafc] border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <th className="py-3 px-4">Property &amp; Organization</th>
                 <th className="py-3 px-4">Dispatchable Physical Address</th>
                 <th className="py-3 px-4">PSAP ID &amp; Laws</th>
@@ -528,7 +528,7 @@ export default function AdminE911Page() {
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
+            <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">

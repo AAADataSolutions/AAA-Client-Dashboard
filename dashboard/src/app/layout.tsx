@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/lib/theme/theme-context";
 
 export const metadata: Metadata = {
   title: "AAA Data Solutions — Telecom Operations Platform",
@@ -12,9 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full bg-[#f8f9fa]">
-      <body className="min-h-full flex flex-col bg-[#f8f9fa] text-[#181c22] antialiased selection:bg-[#1275e2]/15 selection:text-[#1275e2]">
-        {children}
+    <html lang="en" className="h-full dark">
+      <body className="min-h-full flex flex-col bg-background text-foreground antialiased selection:bg-orange-500/20 selection:text-orange-400">
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

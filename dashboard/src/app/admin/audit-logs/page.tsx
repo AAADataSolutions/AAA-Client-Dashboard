@@ -164,52 +164,52 @@ export default function AdminAuditLogsPage() {
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] hover:bg-slate-50 dark:hover:bg-[#1e1f27] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors shadow-sm"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span>Export Audit Trail (CSV)</span>
           </button>
         </div>
       </div>
 
       {/* 2. Search & Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search actor email, action, entity, IP address..."
-            className="w-full bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500 rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none transition-all"
+            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Action:</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] rounded-lg px-2.5 py-1.5">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Action:</span>
             <select
               value={selectedActionFilter}
               onChange={(e) => setSelectedActionFilter(e.target.value)}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer"
             >
-              <option value="ALL">All Actions</option>
-              <option value="E911">E911 Events</option>
-              <option value="PORTING">Porting Events</option>
-              <option value="ORGANIZATION">Organization Events</option>
-              <option value="INVITATION">Invitation Approvals</option>
-              <option value="TICKET">Ticket Events</option>
+              <option value="ALL" className="dark:bg-[#15161c]">All Actions</option>
+              <option value="E911" className="dark:bg-[#15161c]">E911 Events</option>
+              <option value="PORTING" className="dark:bg-[#15161c]">Porting Events</option>
+              <option value="ORGANIZATION" className="dark:bg-[#15161c]">Organization Events</option>
+              <option value="INVITATION" className="dark:bg-[#15161c]">Invitation Approvals</option>
+              <option value="TICKET" className="dark:bg-[#15161c]">Ticket Events</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* 3. Audit Log Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#f8fafc] border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <th className="py-3 px-4">Timestamp &amp; Actor</th>
                 <th className="py-3 px-4">Action Event</th>
                 <th className="py-3 px-4">Target Entity</th>
@@ -217,7 +217,7 @@ export default function AdminAuditLogsPage() {
                 <th className="py-3 px-4 text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
+            <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
               {filteredLogs.map((log) => (
                 <tr
                   key={log.id}

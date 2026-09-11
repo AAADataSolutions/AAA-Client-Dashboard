@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-[#f8f9fa] text-[#181c22] flex flex-col font-sans">
+      <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#0d0e12] text-[#181c22] dark:text-[#f4f4f6] flex flex-col font-sans transition-colors duration-200">
         {/* Sidebar */}
         <AdminSidebar
           isOpen={isSidebarOpen}
