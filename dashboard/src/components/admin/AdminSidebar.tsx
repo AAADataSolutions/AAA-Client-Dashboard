@@ -19,6 +19,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  PhoneCall,
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -33,6 +34,7 @@ const navItems = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Organizations', href: '/admin/organizations', icon: Building2 },
   { label: 'Properties', href: '/admin/properties', icon: Hotel, badge: '186' },
+  { label: 'Services & Lines', href: '/admin/services', icon: PhoneCall, badge: '1,842' },
   { label: 'Onboarding & Porting', href: '/admin/onboarding-porting', icon: GitBranch },
   { label: 'E911 Compliance', href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badge: '14', badgeColor: 'bg-[#f43f5e] text-white' },
