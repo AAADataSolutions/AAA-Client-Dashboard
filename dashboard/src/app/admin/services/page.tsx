@@ -64,196 +64,12 @@ interface OrgPropertyOption {
   property_name: string;
 }
 
-const INITIAL_SERVICES: ServiceItem[] = [
-  {
-    id: 'srv-1',
-    phone_number: '+1 (804) 555-0144',
-    service_type_name: 'DID / Main Frontdesk',
-    description: 'Main Incoming Hotel DID & Auto-Attendant Hunt Group',
-    status: 'ACTIVE',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    property_id: 'prop-courtyard-richmond',
-    property_name: 'Courtyard Richmond Downtown',
-    property_city: 'Richmond',
-    property_state: 'VA',
-    sip_trunk_name: 'US-East-SipMesh-01',
-    carrier_latency: '12ms',
-    e911_bound: true,
-    created_at: '2025-01-15T09:00:00Z',
-  },
-  {
-    id: 'srv-2',
-    phone_number: '+1 (804) 555-0145',
-    service_type_name: 'eFax Dedicated Line',
-    description: 'Corporate Frontdesk eFax Line & Night PDF Archive',
-    status: 'ACTIVE',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    property_id: 'prop-courtyard-richmond',
-    property_name: 'Courtyard Richmond Downtown',
-    property_city: 'Richmond',
-    property_state: 'VA',
-    sip_trunk_name: 'US-East-FaxCore-02',
-    carrier_latency: '14ms',
-    e911_bound: false,
-    created_at: '2025-01-15T09:05:00Z',
-  },
-  {
-    id: 'srv-3',
-    phone_number: '+1 (415) 555-0899',
-    service_type_name: 'SIP Trunk (Primary PBX)',
-    description: '24-Channel SIP Trunking Array for Guest PBX & Valet',
-    status: 'ACTIVE',
-    organization_id: 'org-abc',
-    organization_name: 'ABC Hospitality',
-    property_id: 'prop-marriott-sf-marquis',
-    property_name: 'Marriott Marquis San Francisco',
-    property_city: 'San Francisco',
-    property_state: 'CA',
-    sip_trunk_name: 'US-West-CorePBX-09',
-    carrier_latency: '16ms',
-    e911_bound: true,
-    created_at: '2025-02-04T14:10:00Z',
-  },
-  {
-    id: 'srv-4',
-    phone_number: '+1 (512) 555-0322',
-    service_type_name: 'DID / Direct Extension',
-    description: 'General Manager Dedicated Direct Inward Dial',
-    status: 'PORTING',
-    organization_id: 'org-summit',
-    organization_name: 'Summit Hospitality Partners',
-    property_id: 'prop-residence-inn-austin',
-    property_name: 'Residence Inn Austin Downtown',
-    property_city: 'Austin',
-    property_state: 'TX',
-    sip_trunk_name: 'US-Central-PortGateway',
-    carrier_latency: 'Pending Port',
-    e911_bound: true,
-    created_at: '2025-03-01T10:00:00Z',
-  },
-  {
-    id: 'srv-5',
-    phone_number: '+1 (312) 555-0750',
-    service_type_name: 'Cloud PBX Trunk',
-    description: 'Executive Suites IVR and Call Center Routing Table',
-    status: 'ACTIVE',
-    organization_id: 'org-xyz',
-    organization_name: 'XYZ Hotel Management',
-    property_id: 'prop-hyatt-regency-chicago',
-    property_name: 'Hyatt Regency Chicago Loop',
-    property_city: 'Chicago',
-    property_state: 'IL',
-    sip_trunk_name: 'US-East-SipMesh-04',
-    carrier_latency: '11ms',
-    e911_bound: true,
-    created_at: '2025-02-12T16:20:00Z',
-  },
-  {
-    id: 'srv-6',
-    phone_number: '+1 (305) 555-0911',
-    service_type_name: 'Emergency Dispatch PRI',
-    description: 'Emergency PSAP Override & Kari&apos;s Law Compliant Trunk',
-    status: 'ACTIVE',
-    organization_id: 'org-crestview',
-    organization_name: 'Crestview Luxury Resorts',
-    property_id: 'prop-crestview-ocean-resort',
-    property_name: 'Crestview Ocean Grand Resort',
-    property_city: 'Miami Beach',
-    property_state: 'FL',
-    sip_trunk_name: 'US-South-E911Direct',
-    carrier_latency: '8ms',
-    e911_bound: true,
-    created_at: '2025-02-22T13:45:00Z',
-  },
-  {
-    id: 'srv-7',
-    phone_number: '+1 (206) 555-0610',
-    service_type_name: 'Analog Elevator Alarm Line',
-    description: 'Emergency Elevator & Fire Alarm Backup Line',
-    status: 'PENDING_PORT',
-    organization_id: 'org-pacific',
-    organization_name: 'Pacific West Hospitality',
-    property_id: 'prop-westin-seattle-waterfront',
-    property_name: 'Westin Seattle Waterfront',
-    property_city: 'Seattle',
-    property_state: 'WA',
-    sip_trunk_name: 'US-West-AnalogGateway',
-    carrier_latency: 'Pending LOA',
-    e911_bound: false,
-    created_at: '2025-01-30T15:00:00Z',
-  },
-  {
-    id: 'srv-8',
-    phone_number: '+1 (800) 555-0199',
-    service_type_name: 'Toll-Free Reservation Line',
-    description: 'Multi-Tenant Toll-Free Routing with Geo-Location Filter',
-    status: 'RESERVED',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    property_id: 'prop-courtyard-richmond',
-    property_name: 'Courtyard Richmond Downtown',
-    property_city: 'Richmond',
-    property_state: 'VA',
-    sip_trunk_name: 'TollFree-NationalCore',
-    carrier_latency: 'Standby',
-    e911_bound: false,
-    created_at: '2025-02-10T11:00:00Z',
-  },
-];
-
-const INITIAL_ORG_PROPERTIES: OrgPropertyOption[] = [
-  {
-    org_property_id: 'op-1',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    property_id: 'prop-courtyard-richmond',
-    property_name: 'Courtyard Richmond Downtown',
-  },
-  {
-    org_property_id: 'op-2',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    property_id: 'prop-hilton-garden-glenallen',
-    property_name: 'Hilton Garden Inn Glen Allen',
-  },
-  {
-    org_property_id: 'op-3',
-    organization_id: 'org-abc',
-    organization_name: 'ABC Hospitality',
-    property_id: 'prop-marriott-sf-marquis',
-    property_name: 'Marriott Marquis San Francisco',
-  },
-  {
-    org_property_id: 'op-4',
-    organization_id: 'org-summit',
-    organization_name: 'Summit Hospitality Partners',
-    property_id: 'prop-residence-inn-austin',
-    property_name: 'Residence Inn Austin Downtown',
-  },
-  {
-    org_property_id: 'op-5',
-    organization_id: 'org-xyz',
-    organization_name: 'XYZ Hotel Management',
-    property_id: 'prop-hyatt-regency-chicago',
-    property_name: 'Hyatt Regency Chicago Loop',
-  },
-  {
-    org_property_id: 'op-6',
-    organization_id: 'org-crestview',
-    organization_name: 'Crestview Luxury Resorts',
-    property_id: 'prop-crestview-ocean-resort',
-    property_name: 'Crestview Ocean Grand Resort',
-  },
-];
-
 export default function AdminServicesPage() {
   const supabase = createClient();
 
-  const [services, setServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
-  const [orgPropOptions, setOrgPropOptions] = useState<OrgPropertyOption[]>(INITIAL_ORG_PROPERTIES);
-  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [orgPropOptions, setOrgPropOptions] = useState<OrgPropertyOption[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -281,62 +97,76 @@ export default function AdminServicesPage() {
     phone_number: '',
     service_type_name: 'DID / Main Frontdesk',
     description: '',
-    org_property_id: INITIAL_ORG_PROPERTIES[0]?.org_property_id || '',
+    org_property_id: '',
     status: 'ACTIVE' as ServiceItem['status'],
   });
 
-  // Load from DB if connected
-  useEffect(() => {
-    async function loadServices() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('services')
-          .select(`
-            *,
-            service_type:service_types(id, name, description),
-            property_links:organization_property_services(
-              id,
-              org_property:organization_properties(
-                id,
-                property:properties(id, name, city, state),
-                organization:organizations(id, name)
-              )
-            )
-          `)
-          .order('created_at', { ascending: false });
+  // Load from DB via live API
+  const loadServices = async () => {
+    try {
+      setLoading(true);
 
-        if (data && data.length > 0) {
-          const mapped: ServiceItem[] = data.map((item: any, idx: number) => {
-            const link = item.property_links?.[0]?.org_property;
-            return {
-              id: item.id,
-              phone_number: item.phone_number,
-              service_type_name: item.service_type?.name || 'Voice Line / DID',
-              description: item.description || 'Enterprise Telephony Voice Line',
-              status: (item.status as any) || 'ACTIVE',
-              organization_id: link?.organization?.id || 'org-shamin',
-              organization_name: link?.organization?.name || 'Assigned Organization',
-              property_id: link?.property?.id || 'prop-courtyard-richmond',
-              property_name: link?.property?.name || 'Assigned Property',
-              property_city: link?.property?.city || 'Richmond',
-              property_state: link?.property?.state || 'VA',
-              sip_trunk_name: `US-East-Trunk-${10 + idx}`,
-              carrier_latency: '14ms',
-              e911_bound: true,
-              created_at: item.created_at,
-            };
+      // Load organization property links for dropdown
+      const propRes = await fetch('/api/admin/properties');
+      const propJson = await propRes.json();
+      if (propJson.success && Array.isArray(propJson.data)) {
+        const options: OrgPropertyOption[] = [];
+        propJson.data.forEach((p: any) => {
+          const links = Array.isArray(p.org_links) ? p.org_links : [p.org_links].filter(Boolean);
+          links.forEach((l: any) => {
+            if (l && l.organization) {
+              options.push({
+                org_property_id: l.id,
+                organization_id: l.organization.id,
+                organization_name: l.organization.name,
+                property_id: p.id,
+                property_name: p.name,
+              });
+            }
           });
-
-          setServices(mapped);
-        }
-      } catch (err) {
-        console.error('Error fetching services:', err);
-      } finally {
-        setLoading(false);
+        });
+        setOrgPropOptions(options);
       }
-    }
 
+      // Load services from API
+      const srvRes = await fetch('/api/admin/services');
+      const srvJson = await srvRes.json();
+
+      if (srvJson.success && Array.isArray(srvJson.data)) {
+        const mapped: ServiceItem[] = srvJson.data.map((item: any, idx: number) => {
+          const link = Array.isArray(item.property_links) ? item.property_links[0]?.org_property : item.property_links?.org_property;
+          return {
+            id: item.id,
+            phone_number: item.phone_number,
+            service_type_name: item.service_type?.name || 'Voice Line / DID',
+            description: item.description || 'Enterprise Telephony Voice Line',
+            status: (item.status as any) || 'ACTIVE',
+            organization_id: link?.organization?.id || '',
+            organization_name: link?.organization?.name || 'Unassigned',
+            property_id: link?.property?.id || '',
+            property_name: link?.property?.name || 'Unassigned Property',
+            property_city: link?.property?.city || '',
+            property_state: link?.property?.state || '',
+            sip_trunk_name: `US-Core-Trunk-${10 + idx}`,
+            carrier_latency: '12ms',
+            e911_bound: true,
+            created_at: item.created_at,
+          };
+        });
+
+        setServices(mapped);
+      } else {
+        setServices([]);
+      }
+    } catch (err) {
+      console.error('Error fetching services:', err);
+      setServices([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadServices();
   }, []);
 

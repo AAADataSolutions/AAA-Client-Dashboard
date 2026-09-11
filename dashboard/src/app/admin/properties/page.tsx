@@ -75,202 +75,6 @@ interface OrgOption {
   name: string;
 }
 
-const INITIAL_ORGS_OPTIONS: OrgOption[] = [
-  { id: 'org-shamin', name: 'Shamin Hotels' },
-  { id: 'org-abc', name: 'ABC Hospitality' },
-  { id: 'org-marriott', name: 'Marriott Franchise Group' },
-  { id: 'org-xyz', name: 'XYZ Hotel Management' },
-  { id: 'org-crestview', name: 'Crestview Luxury Resorts' },
-  { id: 'org-summit', name: 'Summit Hospitality Partners' },
-  { id: 'org-pacific', name: 'Pacific West Hospitality' },
-  { id: 'org-horizon', name: 'Horizon Heritage Inns' },
-];
-
-const INITIAL_PROPERTIES: PropertyRecord[] = [
-  {
-    id: 'prop-courtyard-richmond',
-    code: 'CY-RIC-101',
-    name: 'Courtyard Richmond Downtown',
-    brand: 'Courtyard by Marriott',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    address: '100 South 14th Street',
-    city: 'Richmond',
-    state: 'VA',
-    zip_code: '23219',
-    country: 'USA',
-    main_phone: '+1 (804) 555-0144',
-    fax: '+1 (804) 555-0145',
-    contact_person_name: 'David Wright',
-    contact_person_email: 'dwright@shaminhotels.com',
-    general_manager_name: 'Michael Robinson',
-    ray_baud_and_logs_enabled: true,
-    status: 'ACTIVE',
-    sip_trunks_count: 8,
-    did_count: 36,
-    e911_status: 'VERIFIED',
-    open_tickets_count: 1,
-    onboarding_stage: 'Completed (Production)',
-    created_at: '2025-01-15T09:00:00Z',
-  },
-  {
-    id: 'prop-hilton-garden-glenallen',
-    code: 'HGI-GLN-204',
-    name: 'Hilton Garden Inn Glen Allen',
-    brand: 'Hilton Garden Inn',
-    organization_id: 'org-shamin',
-    organization_name: 'Shamin Hotels',
-    address: '4050 Cox Road',
-    city: 'Glen Allen',
-    state: 'VA',
-    zip_code: '23060',
-    country: 'USA',
-    main_phone: '+1 (804) 555-0188',
-    fax: '+1 (804) 555-0189',
-    contact_person_name: 'Sarah Jenkins',
-    contact_person_email: 'sjenkins@shaminhotels.com',
-    general_manager_name: 'Amanda Hayes',
-    ray_baud_and_logs_enabled: true,
-    status: 'ACTIVE',
-    sip_trunks_count: 12,
-    did_count: 48,
-    e911_status: 'VERIFIED',
-    open_tickets_count: 0,
-    onboarding_stage: 'Completed (Production)',
-    created_at: '2025-01-20T11:30:00Z',
-  },
-  {
-    id: 'prop-marriott-sf-marquis',
-    code: 'MM-SFO-300',
-    name: 'Marriott Marquis San Francisco',
-    brand: 'Marriott Hotels',
-    organization_id: 'org-abc',
-    organization_name: 'ABC Hospitality',
-    address: '780 Mission Street',
-    city: 'San Francisco',
-    state: 'CA',
-    zip_code: '94103',
-    country: 'USA',
-    main_phone: '+1 (415) 555-0899',
-    fax: '+1 (415) 555-0890',
-    contact_person_name: 'David Ross',
-    contact_person_email: 'd.ross@abchospitality.com',
-    general_manager_name: 'Jonathan Sterling',
-    ray_baud_and_logs_enabled: true,
-    status: 'ACTIVE',
-    sip_trunks_count: 24,
-    did_count: 120,
-    e911_status: 'VERIFIED',
-    open_tickets_count: 2,
-    onboarding_stage: 'Completed (Production)',
-    created_at: '2025-02-04T14:10:00Z',
-  },
-  {
-    id: 'prop-residence-inn-austin',
-    code: 'RI-ATX-405',
-    name: 'Residence Inn Austin Downtown',
-    brand: 'Residence Inn',
-    organization_id: 'org-summit',
-    organization_name: 'Summit Hospitality Partners',
-    address: '300 East 4th Street',
-    city: 'Austin',
-    state: 'TX',
-    zip_code: '78701',
-    country: 'USA',
-    main_phone: '+1 (512) 555-0322',
-    fax: '+1 (512) 555-0323',
-    contact_person_name: 'Kevin Miller',
-    contact_person_email: 'kmiller@summithp.com',
-    general_manager_name: 'Jessica Ramos',
-    ray_baud_and_logs_enabled: true,
-    status: 'ONBOARDING',
-    sip_trunks_count: 6,
-    did_count: 24,
-    e911_status: 'PENDING',
-    open_tickets_count: 0,
-    onboarding_stage: 'FOC Received (Porting 03/18)',
-    created_at: '2025-03-01T10:00:00Z',
-  },
-  {
-    id: 'prop-hyatt-regency-chicago',
-    code: 'HR-CHI-502',
-    name: 'Hyatt Regency Chicago Loop',
-    brand: 'Hyatt Regency',
-    organization_id: 'org-xyz',
-    organization_name: 'XYZ Hotel Management',
-    address: '151 East Wacker Drive',
-    city: 'Chicago',
-    state: 'IL',
-    zip_code: '60601',
-    country: 'USA',
-    main_phone: '+1 (312) 555-0750',
-    fax: '+1 (312) 555-0751',
-    contact_person_name: 'Marcus Vance',
-    contact_person_email: 'mvance@xyzmgmt.com',
-    general_manager_name: 'Robert Chen',
-    ray_baud_and_logs_enabled: true,
-    status: 'ACTIVE',
-    sip_trunks_count: 18,
-    did_count: 85,
-    e911_status: 'VERIFIED',
-    open_tickets_count: 0,
-    onboarding_stage: 'Completed (Production)',
-    created_at: '2025-02-12T16:20:00Z',
-  },
-  {
-    id: 'prop-crestview-ocean-resort',
-    code: 'COR-MIA-610',
-    name: 'Crestview Ocean Grand Resort',
-    brand: 'Independent Luxury',
-    organization_id: 'org-crestview',
-    organization_name: 'Crestview Luxury Resorts',
-    address: '4401 Collins Avenue',
-    city: 'Miami Beach',
-    state: 'FL',
-    zip_code: '33140',
-    country: 'USA',
-    main_phone: '+1 (305) 555-0911',
-    fax: '+1 (305) 555-0912',
-    contact_person_name: 'Rachel Adams',
-    contact_person_email: 'radams@crestview.io',
-    general_manager_name: 'Victoria De La Cruz',
-    ray_baud_and_logs_enabled: true,
-    status: 'ACTIVE',
-    sip_trunks_count: 16,
-    did_count: 70,
-    e911_status: 'VERIFIED',
-    open_tickets_count: 1,
-    onboarding_stage: 'Completed (Production)',
-    created_at: '2025-02-22T13:45:00Z',
-  },
-  {
-    id: 'prop-westin-seattle-waterfront',
-    code: 'WS-SEA-715',
-    name: 'Westin Seattle Waterfront',
-    brand: 'Westin Hotels',
-    organization_id: 'org-pacific',
-    organization_name: 'Pacific West Hospitality',
-    address: '1900 5th Avenue',
-    city: 'Seattle',
-    state: 'WA',
-    zip_code: '98101',
-    country: 'USA',
-    main_phone: '+1 (206) 555-0610',
-    fax: '+1 (206) 555-0611',
-    contact_person_name: 'Chloe Lin',
-    contact_person_email: 'operations@pacwesthotels.com',
-    general_manager_name: 'Brian Kowalski',
-    ray_baud_and_logs_enabled: false,
-    status: 'ACTIVE',
-    sip_trunks_count: 14,
-    did_count: 60,
-    e911_status: 'AUDIT_REQUIRED',
-    open_tickets_count: 1,
-    onboarding_stage: 'Completed (E911 Audit Pending)',
-    created_at: '2025-01-30T15:00:00Z',
-  },
-];
-
 function getBrandBadge(brand: string = 'Hotel'): { bg: string; text: string; initial: string } {
   if (brand.includes('Courtyard') || brand.includes('Marriott') || brand.includes('Residence')) {
     return { bg: 'bg-indigo-100', text: 'text-indigo-700', initial: 'M' };
@@ -290,9 +94,9 @@ function getBrandBadge(brand: string = 'Hotel'): { bg: string; text: string; ini
 export default function AdminPropertiesPage() {
   const supabase = createClient();
 
-  const [properties, setProperties] = useState<PropertyRecord[]>(INITIAL_PROPERTIES);
-  const [orgOptions, setOrgOptions] = useState<OrgOption[]>(INITIAL_ORGS_OPTIONS);
-  const [loading, setLoading] = useState(false);
+  const [properties, setProperties] = useState<PropertyRecord[]>([]);
+  const [orgOptions, setOrgOptions] = useState<OrgOption[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -321,7 +125,7 @@ export default function AdminPropertiesPage() {
   const [formData, setFormData] = useState({
     name: '',
     brand: 'Courtyard by Marriott',
-    organization_id: 'org-shamin',
+    organization_id: '',
     address: '',
     city: '',
     state: '',
@@ -336,74 +140,70 @@ export default function AdminPropertiesPage() {
     status: 'ACTIVE' as PropertyRecord['status'],
   });
 
-  // Load from DB if connected
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
+  // Load from DB via live API
+  const loadData = async () => {
+    try {
+      setLoading(true);
 
-        // Fetch Organizations for dropdown
-        const { data: orgs } = await supabase.from('organizations').select('id, name');
-        if (orgs && orgs.length > 0) {
-          setOrgOptions(orgs);
-        }
-
-        // Fetch Properties
-        const { data: propData } = await supabase
-          .from('properties')
-          .select(`
-            *,
-            org_links:organization_properties(
-              organization_id,
-              organization:organizations(id, name)
-            )
-          `)
-          .order('created_at', { ascending: false });
-
-        if (propData && propData.length > 0) {
-          const mapped: PropertyRecord[] = propData.map((item: any, idx: number) => {
-            const orgLink = item.org_links?.[0];
-            const orgId = orgLink?.organization_id || 'org-shamin';
-            const orgName = orgLink?.organization?.name || 'Assigned Organization';
-
-            const initials = item.name.substring(0, 2).toUpperCase();
-            return {
-              id: item.id,
-              code: `${initials}-${item.city ? item.city.slice(0, 3).toUpperCase() : 'LOC'}-${100 + idx}`,
-              name: item.name,
-              brand: item.brand || 'Hospitality Location',
-              organization_id: orgId,
-              organization_name: orgName,
-              address: item.address,
-              city: item.city,
-              state: item.state,
-              zip_code: item.zip_code,
-              country: item.country || 'USA',
-              main_phone: item.main_phone || '+1 (800) 555-0100',
-              fax: item.fax || null,
-              contact_person_name: item.contact_person_name || 'Property Operations',
-              contact_person_email: item.contact_person_email || 'frontdesk@hotel.com',
-              general_manager_name: item.general_manager_name || 'General Manager',
-              ray_baud_and_logs_enabled: item.ray_baud_and_logs_enabled ?? true,
-              status: (item.status as any) || 'ACTIVE',
-              sip_trunks_count: Math.floor(Math.random() * 16) + 4,
-              did_count: Math.floor(Math.random() * 50) + 20,
-              e911_status: item.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
-              open_tickets_count: Math.floor(Math.random() * 2),
-              onboarding_stage: 'Completed (Production)',
-              created_at: item.created_at,
-            };
-          });
-
-          setProperties(mapped);
-        }
-      } catch (err) {
-        console.error('Error fetching properties:', err);
-      } finally {
-        setLoading(false);
+      // Fetch Organizations for dropdown
+      const orgsRes = await fetch('/api/admin/organizations');
+      const orgsJson = await orgsRes.json();
+      if (orgsJson.success && Array.isArray(orgsJson.data)) {
+        setOrgOptions(orgsJson.data.map((o: any) => ({ id: o.id, name: o.name })));
       }
-    }
 
+      // Fetch Properties from API
+      const propRes = await fetch('/api/admin/properties');
+      const propJson = await propRes.json();
+
+      if (propJson.success && Array.isArray(propJson.data)) {
+        const mapped: PropertyRecord[] = propJson.data.map((item: any, idx: number) => {
+          const orgLink = Array.isArray(item.org_links) ? item.org_links[0] : item.org_links;
+          const orgId = orgLink?.organization_id || orgLink?.organization?.id || '';
+          const orgName = orgLink?.organization?.name || 'Unassigned';
+
+          const initials = (item.name || 'PR').substring(0, 2).toUpperCase();
+          return {
+            id: item.id,
+            code: item.code || `${initials}-${item.city ? item.city.slice(0, 3).toUpperCase() : 'LOC'}-${100 + idx}`,
+            name: item.name,
+            brand: item.brand || 'Hospitality Asset',
+            organization_id: orgId,
+            organization_name: orgName,
+            address: item.address || '',
+            city: item.city || '',
+            state: item.state || '',
+            zip_code: item.zip_code || '',
+            country: item.country || 'USA',
+            main_phone: item.main_phone || null,
+            fax: item.fax || null,
+            contact_person_name: item.contact_person_name || null,
+            contact_person_email: item.contact_person_email || null,
+            general_manager_name: item.general_manager_name || null,
+            ray_baud_and_logs_enabled: item.ray_baud_and_logs_enabled ?? true,
+            status: (item.status as any) || 'ACTIVE',
+            sip_trunks_count: item.sip_trunks_count || 0,
+            did_count: item.did_count || 0,
+            e911_status: item.e911_status || (item.ray_baud_and_logs_enabled ? 'VERIFIED' : 'PENDING'),
+            open_tickets_count: item.open_tickets_count || 0,
+            onboarding_stage: item.onboarding_stage || 'Live Cutover',
+            created_at: item.created_at,
+          };
+        });
+
+        setProperties(mapped);
+      } else {
+        setProperties([]);
+      }
+    } catch (err) {
+      console.error('Error fetching properties:', err);
+      setProperties([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 

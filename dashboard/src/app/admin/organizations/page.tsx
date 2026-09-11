@@ -63,194 +63,6 @@ interface OrgRecord {
   created_at: string;
 }
 
-// Initial realistic default portfolios matching enterprise dashboard reference
-const INITIAL_ORGS: OrgRecord[] = [
-  {
-    id: 'org-shamin',
-    code: 'SH-409',
-    name: 'Shamin Hotels',
-    type: 'Franchise Portfolio',
-    email: 'sjenkins@shaminhotels.com',
-    phone: '+1 (804) 555-0192',
-    address: '2000 Midlothian Turnpike',
-    city: 'Richmond',
-    state: 'VA',
-    zip_code: '23235',
-    country: 'USA',
-    status: 'ACTIVE',
-    contact_name: 'Sarah Jenkins',
-    properties_count: 50,
-    admin_count: 8,
-    admin_note: '2 MFA pending',
-    sip_lines: 420,
-    sip_architecture: 'Cloud PBX Active',
-    open_tickets_count: 4,
-    urgent_tickets_count: 1,
-    created_at: '2025-01-14T08:00:00Z',
-  },
-  {
-    id: 'org-abc',
-    code: 'ABC-102',
-    name: 'ABC Hospitality',
-    type: 'Regional Hotel Group',
-    email: 'd.ross@abchospitality.com',
-    phone: '+1 (415) 555-0814',
-    address: '742 Market Street, Suite 400',
-    city: 'San Francisco',
-    state: 'CA',
-    zip_code: '94102',
-    country: 'USA',
-    status: 'ACTIVE',
-    contact_name: 'David Ross',
-    properties_count: 25,
-    admin_count: 4,
-    admin_note: 'All verified',
-    sip_lines: 190,
-    sip_architecture: 'SIP Mesh Primary',
-    open_tickets_count: 2,
-    urgent_tickets_count: 0,
-    created_at: '2025-02-01T10:30:00Z',
-  },
-  {
-    id: 'org-marriott',
-    code: 'MFG-800',
-    name: 'Marriott Franchise Group',
-    type: 'Enterprise Franchise',
-    email: 'elena.vance@marriott-fg.com',
-    phone: '+1 (301) 555-9021',
-    address: '10400 Fernwood Road',
-    city: 'Bethesda',
-    state: 'MD',
-    zip_code: '20817',
-    country: 'USA',
-    status: 'ACTIVE',
-    contact_name: 'Elena Vance',
-    properties_count: 112,
-    admin_count: 24,
-    admin_note: 'Global Access',
-    sip_lines: 840,
-    sip_architecture: 'Dual Redundancy',
-    open_tickets_count: 7,
-    urgent_tickets_count: 0,
-    created_at: '2024-11-10T14:15:00Z',
-  },
-  {
-    id: 'org-xyz',
-    code: 'XYZ-340',
-    name: 'XYZ Hotel Management',
-    type: 'Third-Party Management',
-    email: 'mvance@xyzmgmt.com',
-    phone: '+1 (312) 555-4421',
-    address: '333 North Michigan Ave',
-    city: 'Chicago',
-    state: 'IL',
-    zip_code: '60601',
-    country: 'USA',
-    status: 'ACTIVE',
-    contact_name: 'Marcus Vance',
-    properties_count: 34,
-    admin_count: 6,
-    admin_note: 'All verified',
-    sip_lines: 210,
-    sip_architecture: 'Cloud PBX Active',
-    open_tickets_count: 0,
-    urgent_tickets_count: 0,
-    created_at: '2025-03-05T09:00:00Z',
-  },
-  {
-    id: 'org-crestview',
-    code: 'CLR-550',
-    name: 'Crestview Luxury Resorts',
-    type: 'Independent Luxury',
-    email: 'radams@crestview.io',
-    phone: '+1 (305) 555-8833',
-    address: '4400 Collins Avenue',
-    city: 'Miami Beach',
-    state: 'FL',
-    zip_code: '33140',
-    country: 'USA',
-    status: 'ACTIVE',
-    contact_name: 'Rachel Adams',
-    properties_count: 16,
-    admin_count: 5,
-    admin_note: 'E911 Superusers',
-    sip_lines: 120,
-    sip_architecture: 'Hospitality IVR',
-    open_tickets_count: 1,
-    urgent_tickets_count: 0,
-    created_at: '2025-02-18T16:40:00Z',
-  },
-  {
-    id: 'org-summit',
-    code: 'SHP-118',
-    name: 'Summit Hospitality Partners',
-    type: 'Asset Owner',
-    email: 'kmiller@summithp.com',
-    phone: '+1 (512) 555-2309',
-    address: '1100 Congress Avenue',
-    city: 'Austin',
-    state: 'TX',
-    zip_code: '78701',
-    country: 'USA',
-    status: 'PENDING_ONBOARDING',
-    contact_name: 'Kevin Miller',
-    properties_count: 8,
-    admin_count: 2,
-    admin_note: 'Provisioning',
-    sip_lines: 62,
-    sip_architecture: 'Carrier Port Pending',
-    open_tickets_count: 0,
-    urgent_tickets_count: 0,
-    created_at: '2025-04-02T11:20:00Z',
-  },
-  {
-    id: 'org-pacific',
-    code: 'PW-220',
-    name: 'Pacific West Hospitality',
-    type: 'Regional Hotel Group',
-    email: 'operations@pacwesthotels.com',
-    phone: '+1 (206) 555-7711',
-    address: '1201 Third Avenue',
-    city: 'Seattle',
-    state: 'WA',
-    zip_code: '98101',
-    country: 'USA',
-    status: 'ACTIVE',
-    contact_name: 'Chloe Lin',
-    properties_count: 19,
-    admin_count: 3,
-    admin_note: 'All verified',
-    sip_lines: 145,
-    sip_architecture: 'SIP Mesh Primary',
-    open_tickets_count: 1,
-    urgent_tickets_count: 0,
-    created_at: '2025-01-28T12:00:00Z',
-  },
-  {
-    id: 'org-horizon',
-    code: 'HH-604',
-    name: 'Horizon Heritage Inns',
-    type: 'Franchise Portfolio',
-    email: 'admin@horizonheritage.com',
-    phone: '+1 (615) 555-4920',
-    address: '501 Broadway',
-    city: 'Nashville',
-    state: 'TN',
-    zip_code: '37203',
-    country: 'USA',
-    status: 'SUSPENDED',
-    contact_name: 'Brandon Ward',
-    properties_count: 12,
-    admin_count: 2,
-    admin_note: 'Billing Hold',
-    sip_lines: 94,
-    sip_architecture: 'Cloud PBX Suspended',
-    open_tickets_count: 3,
-    urgent_tickets_count: 1,
-    created_at: '2024-10-15T09:45:00Z',
-  },
-];
-
 // Helper for Initials color
 function getAvatarBg(initials: string): { bg: string; text: string } {
   const map: Record<string, { bg: string; text: string }> = {
@@ -268,8 +80,8 @@ function getAvatarBg(initials: string): { bg: string; text: string } {
 export default function AdminOrganizationsPage() {
   const supabase = createClient();
 
-  const [organizations, setOrganizations] = useState<OrgRecord[]>(INITIAL_ORGS);
-  const [loading, setLoading] = useState(false);
+  const [organizations, setOrganizations] = useState<OrgRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -307,60 +119,74 @@ export default function AdminOrganizationsPage() {
     status: 'ACTIVE' as OrgRecord['status'],
   });
 
-  // Fetch from DB if available
-  useEffect(() => {
-    async function loadOrgs() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('organizations')
-          .select('*')
-          .order('created_at', { ascending: false });
+  // Fetch actual data from DB API
+  const loadOrgs = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/organizations');
+      const result = await res.json();
 
-        if (data && data.length > 0) {
-          // Merge database records with telemetry view
-          const mapped: OrgRecord[] = data.map((item: any, idx: number) => {
-            const words = (item.name || 'Org').split(' ');
-            const initials =
-              words.length > 1
-                ? `${words[0][0]}${words[1][0]}`.toUpperCase()
-                : item.name.substring(0, 2).toUpperCase();
+      if (result.success && Array.isArray(result.data)) {
+        const mapped: OrgRecord[] = result.data.map((item: any, idx: number) => {
+          const words = (item.name || 'Org').split(' ');
+          const initials =
+            words.length > 1
+              ? `${words[0][0]}${words[1][0]}`.toUpperCase()
+              : item.name.substring(0, 2).toUpperCase();
 
-            return {
-              id: item.id,
-              code: `${initials}-${100 + idx}`,
-              name: item.name,
-              type: item.type || 'Franchise Portfolio',
-              email: item.email || 'admin@' + item.name.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com',
-              phone: item.phone || '+1 (800) 555-0100',
-              address: item.address || 'Corporate Headquarters',
-              city: item.city || 'Dallas',
-              state: item.state || 'TX',
-              zip_code: item.zip_code || '75001',
-              country: item.country || 'USA',
-              status: (item.status as any) || 'ACTIVE',
-              contact_name: item.contact_name || 'Operations Director',
-              properties_count: Math.floor(Math.random() * 30) + 5,
-              admin_count: Math.floor(Math.random() * 6) + 2,
-              admin_note: 'All verified',
-              sip_lines: Math.floor(Math.random() * 300) + 40,
-              sip_architecture: 'SIP Mesh Primary',
-              open_tickets_count: Math.floor(Math.random() * 3),
-              urgent_tickets_count: 0,
-              created_at: item.created_at,
-            };
-          });
+          const propCount = Array.isArray(item.properties)
+            ? item.properties.length
+            : (item.properties?.[0]?.count ?? 0);
+          const memberCount = Array.isArray(item.members)
+            ? item.members.length
+            : (item.members?.[0]?.count ?? 1);
+          const tickets = Array.isArray(item.tickets) ? item.tickets : [];
+          const openTickets = tickets.filter(
+            (t: any) => t.status !== 'CLOSED' && t.status !== 'RESOLVED'
+          ).length;
+          const urgentTickets = tickets.filter(
+            (t: any) =>
+              t.priority === 'URGENT' && t.status !== 'CLOSED' && t.status !== 'RESOLVED'
+          ).length;
 
-          // Prepend or use live DB data
-          setOrganizations(mapped);
-        }
-      } catch (err) {
-        console.error('Error fetching organizations:', err);
-      } finally {
-        setLoading(false);
+          return {
+            id: item.id,
+            code: item.code || `${initials}-${100 + idx}`,
+            name: item.name,
+            type: item.type || 'Franchise Portfolio',
+            email: item.email || null,
+            phone: item.phone || null,
+            address: item.address || null,
+            city: item.city || null,
+            state: item.state || null,
+            zip_code: item.zip_code || null,
+            country: item.country || 'USA',
+            status: (item.status as any) || 'ACTIVE',
+            contact_name: item.contact_name || item.name + ' Admin',
+            properties_count: propCount,
+            admin_count: memberCount,
+            admin_note: item.admin_note || 'Direct Portfolio',
+            sip_lines: item.sip_lines || 0,
+            sip_architecture: item.sip_architecture || 'SIP Mesh Primary',
+            open_tickets_count: openTickets,
+            urgent_tickets_count: urgentTickets,
+            created_at: item.created_at,
+          };
+        });
+
+        setOrganizations(mapped);
+      } else {
+        setOrganizations([]);
       }
+    } catch (err) {
+      console.error('Error fetching organizations:', err);
+      setOrganizations([]);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadOrgs();
   }, []);
 

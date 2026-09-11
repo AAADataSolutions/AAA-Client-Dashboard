@@ -55,135 +55,17 @@ interface E911Record {
   created_at: string;
 }
 
-const INITIAL_E911_RECORDS: E911Record[] = [
-  {
-    id: 'e911-1',
-    property_name: 'Courtyard Richmond Downtown',
-    property_city: 'Richmond',
-    property_state: 'VA',
-    organization_name: 'Shamin Hotels',
-    emergency_address: '100 South 14th Street, Richmond, VA 23219',
-    psap_id: 'PSAP-VA-RIC-911',
-    status: 'VERIFIED',
-    correction_notes: null,
-    verified_at: '2025-01-16T10:00:00Z',
-    ray_baum_compliant: true,
-    karis_law_direct_dial: true,
-    last_audit_date: '2025-01-16',
-    created_at: '2025-01-15T09:00:00Z',
-  },
-  {
-    id: 'e911-2',
-    property_name: 'Westin Seattle Waterfront',
-    property_city: 'Seattle',
-    property_state: 'WA',
-    organization_name: 'Pacific West Hospitality',
-    emergency_address: '1900 5th Avenue, Seattle, WA 98101',
-    psap_id: 'PSAP-WA-SEA-911',
-    status: 'CORRECTION_REQUIRED',
-    correction_notes: 'Postal address missing North Tower / South Tower dispatchable sub-location tag.',
-    verified_at: null,
-    ray_baum_compliant: false,
-    karis_law_direct_dial: true,
-    last_audit_date: '2025-02-18',
-    created_at: '2025-01-30T15:00:00Z',
-  },
-  {
-    id: 'e911-3',
-    property_name: 'Marriott Marquis San Francisco',
-    property_city: 'San Francisco',
-    property_state: 'CA',
-    organization_name: 'ABC Hospitality',
-    emergency_address: '780 Mission Street, San Francisco, CA 94103',
-    psap_id: 'PSAP-CA-SFO-911',
-    status: 'VERIFIED',
-    correction_notes: null,
-    verified_at: '2025-02-05T14:00:00Z',
-    ray_baum_compliant: true,
-    karis_law_direct_dial: true,
-    last_audit_date: '2025-02-05',
-    created_at: '2025-02-04T14:10:00Z',
-  },
-  {
-    id: 'e911-4',
-    property_name: 'Residence Inn Austin Downtown',
-    property_city: 'Austin',
-    property_state: 'TX',
-    organization_name: 'Summit Hospitality Partners',
-    emergency_address: '300 East 4th Street, Austin, TX 78701',
-    psap_id: 'PSAP-TX-ATX-911',
-    status: 'PENDING',
-    correction_notes: 'Initial carrier PSAP route validation test in progress.',
-    verified_at: null,
-    ray_baum_compliant: true,
-    karis_law_direct_dial: true,
-    last_audit_date: '2025-03-02',
-    created_at: '2025-03-01T10:00:00Z',
-  },
-  {
-    id: 'e911-5',
-    property_name: 'Hyatt Regency Chicago Loop',
-    property_city: 'Chicago',
-    property_state: 'IL',
-    organization_name: 'XYZ Hotel Management',
-    emergency_address: '151 East Wacker Drive, Chicago, IL 60601',
-    psap_id: 'PSAP-IL-CHI-911',
-    status: 'VERIFIED',
-    correction_notes: null,
-    verified_at: '2025-02-14T11:30:00Z',
-    ray_baum_compliant: true,
-    karis_law_direct_dial: true,
-    last_audit_date: '2025-02-14',
-    created_at: '2025-02-12T16:20:00Z',
-  },
-  {
-    id: 'e911-6',
-    property_name: 'Crestview Ocean Grand Resort',
-    property_city: 'Miami Beach',
-    property_state: 'FL',
-    organization_name: 'Crestview Luxury Resorts',
-    emergency_address: '4401 Collins Avenue, Miami Beach, FL 33140',
-    psap_id: 'PSAP-FL-MIA-911',
-    status: 'VERIFIED',
-    correction_notes: null,
-    verified_at: '2025-02-24T16:00:00Z',
-    ray_baum_compliant: true,
-    karis_law_direct_dial: true,
-    last_audit_date: '2025-02-24',
-    created_at: '2025-02-22T13:45:00Z',
-  },
-  {
-    id: 'e911-7',
-    property_name: 'Horizon Heritage Inns',
-    property_city: 'Nashville',
-    property_state: 'TN',
-    organization_name: 'Horizon Heritage Inns',
-    emergency_address: '501 Broadway, Nashville, TN 37203',
-    psap_id: 'PSAP-TN-NSH-911',
-    status: 'FAILED',
-    correction_notes: 'Emergency carrier test rejected: Trunk signaling mismatch on primary line.',
-    verified_at: null,
-    ray_baum_compliant: false,
-    karis_law_direct_dial: false,
-    last_audit_date: '2025-01-20',
-    created_at: '2024-10-15T09:45:00Z',
-  },
-];
-
 export default function AdminE911Page() {
   const supabase = createClient();
 
-  const [records, setRecords] = useState<E911Record[]>(INITIAL_E911_RECORDS);
-  const [loading, setLoading] = useState(false);
+  const [records, setRecords] = useState<E911Record[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
-  const [selectedOrgFilter, setSelectedOrgFilter] = useState('ALL');
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [selectedComplianceFilter, setSelectedComplianceFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState<'NAME' | 'STATUS' | 'DATE'>('STATUS');
 
   // Modals & Drawers
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -192,30 +74,85 @@ export default function AdminE911Page() {
   const [drawerRecord, setDrawerRecord] = useState<E911Record | null>(null);
 
   // Form State
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     emergency_address: '',
     correction_notes: '',
-    status: 'VERIFIED' as E911Status,
+    status: 'PENDING' as E911Status,
   });
 
-  // Filtered
+  const loadE911Records = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/e911');
+      const result = await res.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        const mapped: E911Record[] = result.data.map((item: any) => {
+          const orgProp = item.org_property;
+          const prop = orgProp?.property;
+          const org = orgProp?.organization;
+
+          return {
+            id: item.id,
+            property_name: prop?.name || item.property_name || 'Assigned Property',
+            property_city: prop?.city || '',
+            property_state: prop?.state || '',
+            organization_name: org?.name || item.organization_name || 'Assigned Organization',
+            emergency_address: item.emergency_address || prop?.address || '',
+            psap_id: item.psap_id || `PSAP-${prop?.state || 'US'}-${prop?.city ? prop.city.slice(0, 3).toUpperCase() : '911'}`,
+            status: (item.status as E911Status) || 'PENDING',
+            correction_notes: item.correction_notes || null,
+            verified_at: item.verified_at || null,
+            ray_baum_compliant: prop?.ray_baud_and_logs_enabled ?? true,
+            karis_law_direct_dial: true,
+            last_audit_date: item.verified_at ? item.verified_at.slice(0, 10) : item.created_at.slice(0, 10),
+            created_at: item.created_at,
+          };
+        });
+
+        setRecords(mapped);
+      } else {
+        setRecords([]);
+      }
+    } catch (err) {
+      console.error('Error fetching E911 records:', err);
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadE911Records();
+  }, []);
+
+  // Filtered & Sorted
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
-      const matchesSearch =
-        r.property_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.organization_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.emergency_address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.psap_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.property_city.toLowerCase().includes(searchQuery.toLowerCase());
+    return records
+      .filter((rec) => {
+        const matchesSearch =
+          rec.property_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          rec.organization_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          rec.emergency_address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          rec.psap_id.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesStatus = selectedStatusFilter === 'ALL' || r.status === selectedStatusFilter;
-      const matchesOrg = selectedOrgFilter === 'ALL' || r.organization_name.includes(selectedOrgFilter);
+        const matchesStatus =
+          selectedStatusFilter === 'ALL' || rec.status === selectedStatusFilter;
 
-      return matchesSearch && matchesStatus && matchesOrg;
-    });
-  }, [records, searchQuery, selectedStatusFilter, selectedOrgFilter]);
+        let matchesCompliance = true;
+        if (selectedComplianceFilter === 'RAY_BAUM') matchesCompliance = rec.ray_baum_compliant;
+        if (selectedComplianceFilter === 'NON_COMPLIANT')
+          matchesCompliance = !rec.ray_baum_compliant || !rec.karis_law_direct_dial;
+
+        return matchesSearch && matchesStatus && matchesCompliance;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'NAME') return a.property_name.localeCompare(b.property_name);
+        if (sortBy === 'DATE')
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return a.status.localeCompare(b.status);
+      });
+  }, [records, searchQuery, selectedStatusFilter, selectedComplianceFilter, sortBy]);
 
   // KPIs
   const totalVerified = records.filter((r) => r.status === 'VERIFIED').length;

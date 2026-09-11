@@ -34,80 +34,46 @@ interface AuditLogRecord {
   created_at: string;
 }
 
-const INITIAL_AUDIT_LOGS: AuditLogRecord[] = [
-  {
-    id: 'aud-1',
-    actor_email: 'binoy@aaasolutions.com',
-    actor_role: 'SUPER_ADMIN',
-    action: 'E911_VERIFIED',
-    entity_type: 'E911_RECORD',
-    entity_name: 'Courtyard Richmond Downtown',
-    ip_address: '73.149.201.88',
-    changes: { status: { from: 'PENDING', to: 'VERIFIED' } },
-    created_at: '2025-03-11T16:20:00Z',
-  },
-  {
-    id: 'aud-2',
-    actor_email: 'alex.rivera@aaasolutions.com',
-    actor_role: 'SUB_SUPER_ADMIN',
-    action: 'PORTING_ADVANCED',
-    entity_type: 'PORTING_ORDER',
-    entity_name: 'Residence Inn Austin Downtown',
-    ip_address: '104.28.211.14',
-    changes: { status: { from: 'SOF_WAITING', to: 'FOC_RECEIVED' }, target_date: '2025-03-24' },
-    created_at: '2025-03-11T14:45:00Z',
-  },
-  {
-    id: 'aud-3',
-    actor_email: 'binoy@aaasolutions.com',
-    actor_role: 'SUPER_ADMIN',
-    action: 'ORGANIZATION_CREATED',
-    entity_type: 'ORGANIZATION',
-    entity_name: 'Pacific West Hospitality',
-    ip_address: '73.149.201.88',
-    changes: { name: 'Pacific West Hospitality', status: 'ACTIVE' },
-    created_at: '2025-03-10T11:30:00Z',
-  },
-  {
-    id: 'aud-4',
-    actor_email: 'sjenkins@shaminhotels.com',
-    actor_role: 'CLIENT_ADMIN',
-    action: 'TICKET_CREATED',
-    entity_type: 'TICKET',
-    entity_name: 'TCK-8901 (CNAM Display Mismatch)',
-    ip_address: '162.247.74.200',
-    changes: { priority: 'URGENT', status: 'OPEN' },
-    created_at: '2025-03-10T09:15:00Z',
-  },
-  {
-    id: 'aud-5',
-    actor_email: 'binoy@aaasolutions.com',
-    actor_role: 'SUPER_ADMIN',
-    action: 'INTERNAL_INVITATION_APPROVED',
-    entity_type: 'INVITATION',
-    entity_name: 'alex.rivera@aaasolutions.com (SUB_SUPER_ADMIN)',
-    ip_address: '73.149.201.88',
-    changes: { status: 'APPROVED' },
-    created_at: '2025-03-08T18:00:00Z',
-  },
-  {
-    id: 'aud-6',
-    actor_email: 'alex.rivera@aaasolutions.com',
-    actor_role: 'SUB_SUPER_ADMIN',
-    action: 'VOICE_LINE_PROVISIONED',
-    entity_type: 'SERVICE',
-    entity_name: '+1 (415) 555-0899 (SIP Trunk Primary)',
-    ip_address: '104.28.211.14',
-    changes: { status: 'ACTIVE' },
-    created_at: '2025-03-07T13:10:00Z',
-  },
-];
-
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState<AuditLogRecord[]>(INITIAL_AUDIT_LOGS);
+  const [logs, setLogs] = useState<AuditLogRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedActionFilter, setSelectedActionFilter] = useState('ALL');
   const [selectedLog, setSelectedLog] = useState<AuditLogRecord | null>(null);
+
+  const loadAuditLogs = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/audit-logs');
+      const result = await res.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        const mapped: AuditLogRecord[] = result.data.map((item: any) => ({
+          id: item.id,
+          actor_email: item.actor?.email || item.actor_email || 'admin@aaasolutions.com',
+          actor_role: item.actor?.role || item.actor_role || 'SUPER_ADMIN',
+          action: item.action || 'ACTIVITY_LOGGED',
+          entity_type: item.entity_type || 'SYSTEM',
+          entity_name: item.entity_name || item.organization?.name || 'Mesh Entity',
+          ip_address: item.ip_address || '127.0.0.1',
+          changes: item.changes || undefined,
+          created_at: item.created_at,
+        }));
+        setLogs(mapped);
+      } else {
+        setLogs([]);
+      }
+    } catch (err) {
+      console.error('Error fetching audit logs:', err);
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAuditLogs();
+  }, []);
 
   const filteredLogs = useMemo(() => {
     return logs.filter((l) => {

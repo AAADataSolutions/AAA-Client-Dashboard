@@ -67,6 +67,63 @@ export default function AdminOverviewPage() {
   const { profile } = useAuth();
   const userName = profile?.full_name || 'Jason Smith';
 
+  const [stats, setStats] = React.useState({
+    orgsCount: 0,
+    propsCount: 0,
+    servicesCount: 0,
+    onboardingsCount: 0,
+    portingCount: 0,
+    ticketsCount: 0,
+    urgentTicketsCount: 0,
+  });
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function loadStats() {
+      try {
+        setLoading(true);
+        const [orgsRes, propsRes, srvRes, obRes, tktRes] = await Promise.all([
+          fetch('/api/admin/organizations').then((r) => r.json()).catch(() => ({ success: false })),
+          fetch('/api/admin/properties').then((r) => r.json()).catch(() => ({ success: false })),
+          fetch('/api/admin/services').then((r) => r.json()).catch(() => ({ success: false })),
+          fetch('/api/admin/onboarding').then((r) => r.json()).catch(() => ({ success: false })),
+          fetch('/api/admin/tickets').then((r) => r.json()).catch(() => ({ success: false })),
+        ]);
+
+        const orgs = orgsRes.success && Array.isArray(orgsRes.data) ? orgsRes.data : [];
+        const props = propsRes.success && Array.isArray(propsRes.data) ? propsRes.data : [];
+        const services = srvRes.success && Array.isArray(srvRes.data) ? srvRes.data : [];
+        const onboardings = obRes.success && Array.isArray(obRes.data) ? obRes.data : [];
+        const tickets = tktRes.success && Array.isArray(tktRes.data) ? tktRes.data : [];
+
+        const activeOnboardings = onboardings.filter((o: any) => o.status !== 'COMPLETED');
+        const portingCount = services.filter(
+          (s: any) => s.status === 'PORTING' || s.status === 'PENDING_PORT'
+        ).length;
+        const openTickets = tickets.filter(
+          (t: any) => t.status !== 'CLOSED' && t.status !== 'RESOLVED'
+        );
+        const urgentTickets = openTickets.filter((t: any) => t.priority === 'URGENT');
+
+        setStats({
+          orgsCount: orgs.length,
+          propsCount: props.length,
+          servicesCount: services.length,
+          onboardingsCount: activeOnboardings.length,
+          portingCount: portingCount,
+          ticketsCount: openTickets.length,
+          urgentTicketsCount: urgentTickets.length,
+        });
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadStats();
+  }, []);
+
   return (
     <div className="space-y-6 pb-12 overflow-hidden">
       {/* 1. Greeting Header with Spring Fade In */}
@@ -121,10 +178,10 @@ export default function AdminOverviewPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-[#f97316] transition-colors">
-              42
+              {stats.orgsCount}
             </h2>
             <span className="inline-block text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
-              ↑ 4 this month
+              Active Portfolios
             </span>
           </div>
         </motion.div>
@@ -146,10 +203,10 @@ export default function AdminOverviewPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
-              186
+              {stats.propsCount}
             </h2>
             <span className="inline-block text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
-              ↑ 12 this month
+              Managed Assets
             </span>
           </div>
         </motion.div>
@@ -171,10 +228,10 @@ export default function AdminOverviewPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition-colors">
-              1,248
+              {stats.servicesCount}
             </h2>
             <span className="inline-block text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
-              ↑ 36 this month
+              Active DIDs
             </span>
           </div>
         </motion.div>
@@ -196,10 +253,10 @@ export default function AdminOverviewPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-[#f97316] transition-colors">
-              18
+              {stats.onboardingsCount}
             </h2>
             <span className="inline-block text-[10.5px] font-semibold text-[#ea580c] dark:text-[#f97316] bg-orange-50 dark:bg-orange-950/40 px-1.5 py-0.2 rounded border border-orange-200 dark:border-orange-800/40">
-              4 due this week
+              Active In Progress
             </span>
           </div>
         </motion.div>
@@ -221,10 +278,10 @@ export default function AdminOverviewPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-purple-400 transition-colors">
-              27
+              {stats.portingCount}
             </h2>
             <span className="inline-block text-[10.5px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-800/40">
-              7 due this week
+              Carrier Orders
             </span>
           </div>
         </motion.div>
@@ -246,10 +303,10 @@ export default function AdminOverviewPage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-rose-500 transition-colors">
-              14
+              {stats.ticketsCount}
             </h2>
             <span className="inline-block text-[10.5px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-800/40">
-              2 Last 24 hours
+              {stats.urgentTicketsCount > 0 ? `${stats.urgentTicketsCount} Urgent` : 'All Normal Priority'}
             </span>
           </div>
         </motion.div>

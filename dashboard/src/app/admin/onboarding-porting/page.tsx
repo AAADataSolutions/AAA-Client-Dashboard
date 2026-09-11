@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   GitBranch,
   Search,
@@ -70,96 +70,6 @@ const STAGES: { key: OnboardingStatus; label: string; pct: number; color: string
   { key: 'COMPLETED', label: 'Live Cutover', pct: 100, color: 'bg-emerald-500' },
 ];
 
-const INITIAL_ONBOARDINGS: OnboardingRecord[] = [
-  {
-    id: 'ob-1',
-    organization_name: 'Shamin Hotels',
-    property_name: 'Courtyard Richmond Downtown',
-    property_city: 'Richmond',
-    property_state: 'VA',
-    brand: 'Courtyard by Marriott',
-    status: 'COMPLETED',
-    target_date: '2025-02-15',
-    contract_sent_at: '2025-01-15T09:00:00Z',
-    signed_at: '2025-01-18T14:30:00Z',
-    porting_submitted_at: '2025-01-22T10:00:00Z',
-    foc_received_at: '2025-02-05T16:00:00Z',
-    completed_at: '2025-02-14T11:00:00Z',
-    progress_pct: 100,
-    open_tickets_count: 0,
-    dids_count: 36,
-    created_at: '2025-01-15T09:00:00Z',
-  },
-  {
-    id: 'ob-2',
-    organization_name: 'Summit Hospitality Partners',
-    property_name: 'Residence Inn Austin Downtown',
-    property_city: 'Austin',
-    property_state: 'TX',
-    brand: 'Residence Inn',
-    status: 'FOC_RECEIVED',
-    target_date: '2025-03-24',
-    contract_sent_at: '2025-02-28T10:00:00Z',
-    signed_at: '2025-03-02T11:30:00Z',
-    porting_submitted_at: '2025-03-05T15:00:00Z',
-    foc_received_at: '2025-03-12T09:00:00Z',
-    progress_pct: 90,
-    open_tickets_count: 0,
-    dids_count: 24,
-    created_at: '2025-02-28T10:00:00Z',
-  },
-  {
-    id: 'ob-3',
-    organization_name: 'Pacific West Hospitality',
-    property_name: 'Westin Seattle Waterfront',
-    property_city: 'Seattle',
-    property_state: 'WA',
-    brand: 'Westin Hotels',
-    status: 'PORTING_SUBMITTED',
-    target_date: '2025-03-30',
-    contract_sent_at: '2025-03-01T14:00:00Z',
-    signed_at: '2025-03-04T16:00:00Z',
-    porting_submitted_at: '2025-03-10T12:00:00Z',
-    progress_pct: 70,
-    open_tickets_count: 1,
-    dids_count: 60,
-    created_at: '2025-03-01T14:00:00Z',
-  },
-  {
-    id: 'ob-4',
-    organization_name: 'XYZ Hotel Management',
-    property_name: 'Hyatt Regency Chicago Loop',
-    property_city: 'Chicago',
-    property_state: 'IL',
-    brand: 'Hyatt Regency',
-    status: 'SOF_WAITING',
-    target_date: '2025-04-05',
-    contract_sent_at: '2025-03-05T11:00:00Z',
-    signed_at: '2025-03-08T09:30:00Z',
-    porting_submitted_at: '2025-03-11T14:00:00Z',
-    sof_waiting_at: '2025-03-11T14:00:00Z',
-    progress_pct: 80,
-    open_tickets_count: 0,
-    dids_count: 85,
-    created_at: '2025-03-05T11:00:00Z',
-  },
-  {
-    id: 'ob-5',
-    organization_name: 'ABC Hospitality',
-    property_name: 'Marriott Marquis San Francisco',
-    property_city: 'San Francisco',
-    property_state: 'CA',
-    brand: 'Marriott Hotels',
-    status: 'CONTRACT_SENT',
-    target_date: '2025-04-18',
-    contract_sent_at: '2025-03-11T15:30:00Z',
-    progress_pct: 25,
-    open_tickets_count: 0,
-    dids_count: 120,
-    created_at: '2025-03-11T15:30:00Z',
-  },
-];
-
 function getStageBadge(status: OnboardingStatus): { label: string; bg: string; text: string; border: string; pct: number } {
   switch (status) {
     case 'DRAFT':
@@ -184,7 +94,8 @@ function getStageBadge(status: OnboardingStatus): { label: string; bg: string; t
 }
 
 export default function AdminOnboardingPortingPage() {
-  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>(INITIAL_ONBOARDINGS);
+  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState<'LIST' | 'KANBAN'>('LIST');
@@ -200,12 +111,62 @@ export default function AdminOnboardingPortingPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     property_name: '',
-    organization_name: 'Shamin Hotels',
+    organization_name: '',
     brand: 'Courtyard by Marriott',
     status: 'CONTRACT_SENT' as OnboardingStatus,
     target_date: '',
     dids_count: 24,
   });
+
+  const loadOnboardings = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/onboarding');
+      const result = await res.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        const mapped: OnboardingRecord[] = result.data.map((item: any) => {
+          const orgProp = item.org_property;
+          const stageInfo = getStageBadge(item.status || 'DRAFT');
+
+          return {
+            id: item.id,
+            property_name: orgProp?.property?.name || item.property_name || 'Assigned Property',
+            organization_name: orgProp?.organization?.name || item.organization_name || 'Assigned Organization',
+            property_city: orgProp?.property?.city || '',
+            property_state: orgProp?.property?.state || '',
+            brand: orgProp?.property?.brand || 'Hospitality Location',
+            status: item.status || 'DRAFT',
+            target_date: item.target_date || null,
+            contract_sent_at: item.contract_sent_at,
+            signed_at: item.signed_at,
+            porting_waiting_at: item.porting_waiting_at,
+            porting_submitted_at: item.porting_submitted_at,
+            sof_waiting_at: item.sof_waiting_at,
+            foc_received_at: item.foc_received_at,
+            completed_at: item.completed_at,
+            progress_pct: stageInfo.pct,
+            open_tickets_count: 0,
+            dids_count: item.dids_count || 12,
+            created_at: item.created_at,
+          };
+        });
+
+        setOnboardings(mapped);
+      } else {
+        setOnboardings([]);
+      }
+    } catch (err) {
+      console.error('Error fetching onboardings:', err);
+      setOnboardings([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOnboardings();
+  }, []);
 
   const filteredOnboardings = useMemo(() => {
     return onboardings.filter((ob) => {
@@ -228,7 +189,7 @@ export default function AdminOnboardingPortingPage() {
   const handleOpenCreate = () => {
     setFormData({
       property_name: '',
-      organization_name: 'Shamin Hotels',
+      organization_name: '',
       brand: 'Courtyard by Marriott',
       status: 'CONTRACT_SENT',
       target_date: new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10),
@@ -243,38 +204,55 @@ export default function AdminOnboardingPortingPage() {
     setShowAdvanceModal(true);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.property_name.trim()) {
       setFormError('Property name is required.');
       return;
     }
 
-    const stageInfo = getStageBadge(formData.status);
-    const newOb: OnboardingRecord = {
-      id: `ob-${Date.now()}`,
-      property_name: formData.property_name.trim(),
-      organization_name: formData.organization_name,
-      brand: formData.brand,
-      property_city: 'Richmond',
-      property_state: 'VA',
-      status: formData.status,
-      target_date: formData.target_date || null,
-      contract_sent_at: new Date().toISOString(),
-      progress_pct: stageInfo.pct,
-      open_tickets_count: 0,
-      dids_count: Number(formData.dids_count) || 12,
-      created_at: new Date().toISOString(),
-    };
+    try {
+      setFormLoading(true);
+      const stageInfo = getStageBadge(formData.status);
+      const newOb: OnboardingRecord = {
+        id: `ob-${Date.now()}`,
+        property_name: formData.property_name.trim(),
+        organization_name: formData.organization_name || 'Direct Organization',
+        brand: formData.brand,
+        property_city: '',
+        property_state: '',
+        status: formData.status,
+        target_date: formData.target_date || null,
+        contract_sent_at: new Date().toISOString(),
+        progress_pct: stageInfo.pct,
+        open_tickets_count: 0,
+        dids_count: Number(formData.dids_count) || 12,
+        created_at: new Date().toISOString(),
+      };
 
-    setOnboardings([newOb, ...onboardings]);
-    setShowCreateModal(false);
+      setOnboardings([newOb, ...onboardings]);
+      setShowCreateModal(false);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to create onboarding');
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleAdvanceStatus = (targetStatus: OnboardingStatus) => {
+  const handleAdvanceStatus = async (targetStatus: OnboardingStatus) => {
     if (!selectedOnboarding) return;
     const stageInfo = getStageBadge(targetStatus);
     const now = new Date().toISOString();
+
+    try {
+      await fetch(`/api/admin/onboarding/${selectedOnboarding.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+    } catch (e) {
+      console.error('Error advancing onboarding status:', e);
+    }
 
     setOnboardings((prev) =>
       prev.map((o) =>

@@ -68,117 +68,11 @@ interface TicketRecord {
   updated_at: string;
 }
 
-const INITIAL_TICKETS: TicketRecord[] = [
-  {
-    id: 'tkt-1',
-    ticket_number: 'TCK-8901',
-    subject: 'Inbound Caller ID Name (CNAM) Display Mismatch on Primary Frontdesk DID',
-    description: 'Callers to hotel frontdesk are seeing previous hotel brand name on their mobile displays instead of Courtyard Richmond.',
-    organization_name: 'Shamin Hotels',
-    property_name: 'Courtyard Richmond Downtown',
-    property_city: 'Richmond, VA',
-    created_by_name: 'Sarah Jenkins',
-    assigned_to_name: 'Binoy (Super Admin)',
-    priority: 'URGENT',
-    status: 'OPEN',
-    comments_count: 3,
-    comments: [
-      {
-        id: 'c-1',
-        author_name: 'Sarah Jenkins',
-        author_role: 'Client Admin',
-        content: 'Guests checking in are reporting the wrong hotel name appearing on their caller IDs.',
-        is_internal: false,
-        created_at: '2025-03-11T14:00:00Z',
-      },
-      {
-        id: 'c-2',
-        author_name: 'Binoy',
-        author_role: 'Super Admin',
-        content: 'CNAM dip query updated in Neustar database. Carrier propagation window is 4 hours.',
-        is_internal: true,
-        created_at: '2025-03-11T14:30:00Z',
-      },
-    ],
-    created_at: '2025-03-11T14:00:00Z',
-    updated_at: '2025-03-11T14:30:00Z',
-  },
-  {
-    id: 'tkt-2',
-    ticket_number: 'TCK-8902',
-    subject: 'Request for Additional 8 DID Range Block for New Spa / Concierge Desk',
-    description: 'We need to provision 8 new sequential direct extensions for the newly renovated spa facility.',
-    organization_name: 'ABC Hospitality',
-    property_name: 'Marriott Marquis San Francisco',
-    property_city: 'San Francisco, CA',
-    created_by_name: 'David Ross',
-    assigned_to_name: 'Alex Rivera (Support Lead)',
-    priority: 'MEDIUM',
-    status: 'IN_PROGRESS',
-    comments_count: 2,
-    comments: [
-      {
-        id: 'c-3',
-        author_name: 'David Ross',
-        author_role: 'Client Admin',
-        content: 'Please provision 8 DIDs in the (415) NPA-NXX range.',
-        is_internal: false,
-        created_at: '2025-03-10T11:00:00Z',
-      },
-    ],
-    created_at: '2025-03-10T11:00:00Z',
-    updated_at: '2025-03-10T16:00:00Z',
-  },
-  {
-    id: 'tkt-3',
-    ticket_number: 'TCK-8903',
-    subject: 'Kari&apos;s Law 911 Test Call Notification Email Dispatch Verification',
-    description: 'Confirm that frontdesk security receives immediate popup alerts when emergency calls are placed from guestrooms.',
-    organization_name: 'Crestview Luxury Resorts',
-    property_name: 'Crestview Ocean Grand Resort',
-    property_city: 'Miami Beach, FL',
-    created_by_name: 'Rachel Adams',
-    assigned_to_name: 'Binoy (Super Admin)',
-    priority: 'HIGH',
-    status: 'WAITING_ON_CLIENT',
-    comments_count: 2,
-    comments: [
-      {
-        id: 'c-4',
-        author_name: 'Rachel Adams',
-        author_role: 'Client Admin',
-        content: 'Test completed on room 402, waiting for security log receipt.',
-        is_internal: false,
-        created_at: '2025-03-09T10:00:00Z',
-      },
-    ],
-    created_at: '2025-03-09T10:00:00Z',
-    updated_at: '2025-03-09T15:00:00Z',
-  },
-  {
-    id: 'tkt-4',
-    ticket_number: 'TCK-8904',
-    subject: 'Porting LOA Signature Verification Completed for Austin Location',
-    description: 'Carrier accepted the Letter of Authorization without signature rejection.',
-    organization_name: 'Summit Hospitality Partners',
-    property_name: 'Residence Inn Austin Downtown',
-    property_city: 'Austin, TX',
-    created_by_name: 'Kevin Miller',
-    assigned_to_name: 'Alex Rivera (Support Lead)',
-    priority: 'LOW',
-    status: 'RESOLVED',
-    comments_count: 1,
-    comments: [],
-    created_at: '2025-03-05T09:00:00Z',
-    updated_at: '2025-03-08T12:00:00Z',
-  },
-];
-
 export default function AdminTicketsPage() {
   const supabase = createClient();
 
-  const [tickets, setTickets] = useState<TicketRecord[]>(INITIAL_TICKETS);
-  const [loading, setLoading] = useState(false);
+  const [tickets, setTickets] = useState<TicketRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -200,11 +94,67 @@ export default function AdminTicketsPage() {
   const [createData, setCreateData] = useState({
     subject: '',
     description: '',
-    organization_name: 'Shamin Hotels',
-    property_name: 'Courtyard Richmond Downtown',
+    organization_name: '',
+    property_name: '',
     priority: 'MEDIUM' as TicketPriority,
-    assigned_to_name: 'Binoy (Super Admin)',
+    assigned_to_name: 'Admin Support',
   });
+
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/tickets');
+      const result = await res.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        const mapped: TicketRecord[] = result.data.map((item: any) => {
+          const orgProp = item.org_property;
+          const prop = orgProp?.property;
+          const org = orgProp?.organization;
+
+          const commentsList: TicketComment[] = (item.comments || []).map((c: any) => ({
+            id: c.id,
+            author_name: c.author?.full_name || 'Admin',
+            author_role: 'Operations Support',
+            content: c.content,
+            is_internal: !!c.is_internal,
+            created_at: c.created_at,
+          }));
+
+          return {
+            id: item.id,
+            ticket_number: item.ticket_number || `TCK-${item.id.slice(0, 4).toUpperCase()}`,
+            subject: item.subject,
+            description: item.description || '',
+            organization_name: org?.name || item.organization_name || 'Assigned Organization',
+            property_name: prop?.name || item.property_name || 'Assigned Property',
+            property_city: prop?.city ? `${prop.city}, ${prop.state || ''}` : undefined,
+            created_by_name: item.creator?.full_name || 'Client Admin',
+            assigned_to_name: item.assignee?.full_name || null,
+            priority: (item.priority as TicketPriority) || 'MEDIUM',
+            status: (item.status as TicketStatus) || 'OPEN',
+            comments_count: commentsList.length,
+            comments: commentsList,
+            created_at: item.created_at,
+            updated_at: item.updated_at || item.created_at,
+          };
+        });
+
+        setTickets(mapped);
+      } else {
+        setTickets([]);
+      }
+    } catch (err) {
+      console.error('Error fetching tickets:', err);
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTickets();
+  }, []);
 
   // Filtered
   const filteredTickets = useMemo(() => {
