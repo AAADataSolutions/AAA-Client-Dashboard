@@ -16,7 +16,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'USER'>('USER');
+  const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'USER'>('ADMIN');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           data: {
             full_name: fullName.trim(),
             initial_org_role: selectedRole,
-            role: 'CLIENT_USER', // Explicitly keep client users in CLIENT_USER global role
+            role: 'CLIENT_USER',
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -57,9 +57,9 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         return;
       }
 
-      // Check if session was immediately established or email confirmation is required
+      // After user signup, route directly to onboarding to set up organization
       if (data?.session) {
-        router.push('/dashboard');
+        router.push('/onboarding');
         router.refresh();
       } else if (data?.user) {
         setNeedsEmailConfirmation(true);
@@ -74,19 +74,19 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
   if (needsEmailConfirmation) {
     return (
       <div className="w-full space-y-6 text-center py-4">
-        <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 mx-auto flex items-center justify-center border border-emerald-500/25">
+        <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 mx-auto flex items-center justify-center border border-emerald-500/25">
           <CheckCircle2 className="w-7 h-7" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-[#e8ecf2]">Check your email</h3>
-          <p className="text-[14px] text-[#8d97a8] max-w-sm mx-auto leading-relaxed">
-            We sent a verification link to <strong className="text-[#e8ecf2]">{email}</strong>. Please confirm your email to activate your AAA Data Solutions account.
+          <h3 className="text-xl font-semibold text-[#181c22]">Check your email</h3>
+          <p className="text-[14px] text-[#64748b] max-w-sm mx-auto leading-relaxed">
+            We sent a verification link to <strong className="text-[#181c22]">{email}</strong>. Please confirm your email to activate your account and proceed to Organization setup.
           </p>
         </div>
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="h-10 px-6 rounded-lg bg-[#4c7cf3] hover:bg-[#6e96f8] text-white font-medium text-sm transition-colors"
+          className="h-10 px-6 rounded-lg bg-[#1275e2] hover:bg-[#005cb8] text-white font-medium text-sm transition-colors shadow-2xs"
         >
           Proceed to Sign in
         </button>
@@ -96,18 +96,18 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
 
   return (
     <div className="w-full">
-      <div className="space-y-2">
-        <h2 className="text-2xl sm:text-[1.7rem] font-semibold tracking-[-0.01em] text-[#e8ecf2]">
+      <div className="space-y-1.5">
+        <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">
           Create your account
         </h2>
-        <p className="text-[14.5px] text-[#8d97a8]">
+        <p className="text-[14px] text-[#64748b]">
           Get started with AAA Data Solutions.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         {error && (
-          <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/25 flex items-start gap-2.5 text-[13px] text-red-400">
+          <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-[13px] text-rose-700">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span className="leading-snug">{error}</span>
           </div>
@@ -115,7 +115,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
 
         {/* Full Name Field */}
         <div className="space-y-1.5">
-          <label htmlFor="signup-name" className="block text-[13px] font-medium text-[#8d97a8]">
+          <label htmlFor="signup-name" className="block text-[12.5px] font-semibold text-[#181c22]">
             Full name
           </label>
           <input
@@ -126,13 +126,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             placeholder="Jordan Blake"
             autoComplete="name"
             required
-            className="w-full bg-[#151b24] border border-[#212833] focus:border-[#4c7cf3] focus:ring-2 focus:ring-[#4c7cf3]/25 rounded-lg px-3.5 py-2.5 text-[14.5px] text-[#e8ecf2] placeholder-[#5b6472] outline-none transition-all"
+            className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white focus:ring-2 focus:ring-[#1275e2]/15 rounded-lg px-3.5 py-2.5 text-[13.5px] text-[#181c22] placeholder-[#94a3b8] outline-none transition-all"
           />
         </div>
 
         {/* Email Field */}
         <div className="space-y-1.5">
-          <label htmlFor="signup-email" className="block text-[13px] font-medium text-[#8d97a8]">
+          <label htmlFor="signup-email" className="block text-[12.5px] font-semibold text-[#181c22]">
             Email
           </label>
           <input
@@ -143,13 +143,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             placeholder="you@company.com"
             autoComplete="email"
             required
-            className="w-full bg-[#151b24] border border-[#212833] focus:border-[#4c7cf3] focus:ring-2 focus:ring-[#4c7cf3]/25 rounded-lg px-3.5 py-2.5 text-[14.5px] text-[#e8ecf2] placeholder-[#5b6472] outline-none transition-all"
+            className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white focus:ring-2 focus:ring-[#1275e2]/15 rounded-lg px-3.5 py-2.5 text-[13.5px] text-[#181c22] placeholder-[#94a3b8] outline-none transition-all"
           />
         </div>
 
         {/* Password Field */}
         <div className="space-y-1.5">
-          <label htmlFor="signup-password" className="block text-[13px] font-medium text-[#8d97a8]">
+          <label htmlFor="signup-password" className="block text-[12.5px] font-semibold text-[#181c22]">
             Password
           </label>
           <div className="relative">
@@ -161,12 +161,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               placeholder="At least 8 characters"
               autoComplete="new-password"
               required
-              className="w-full bg-[#151b24] border border-[#212833] focus:border-[#4c7cf3] focus:ring-2 focus:ring-[#4c7cf3]/25 rounded-lg px-3.5 py-2.5 pr-11 text-[14.5px] text-[#e8ecf2] placeholder-[#5b6472] outline-none transition-all"
+              className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white focus:ring-2 focus:ring-[#1275e2]/15 rounded-lg px-3.5 py-2.5 pr-11 text-[13.5px] text-[#181c22] placeholder-[#94a3b8] outline-none transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center text-[#5b6472] hover:text-[#8d97a8] transition-colors"
+              className="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center text-[#94a3b8] hover:text-[#181c22] transition-colors"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -174,39 +174,37 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           </div>
         </div>
 
-        {/* Role Selector Pill */}
-        <div className="space-y-2 pt-1">
-          <label className="block text-[13px] font-medium text-[#8d97a8]">
+        {/* Role Selector */}
+        <div className="space-y-1.5 pt-1">
+          <label className="block text-[12.5px] font-semibold text-[#181c22]">
             Role
           </label>
-          <div className="relative grid grid-cols-2 bg-[#151b24] border border-[#212833] rounded-lg p-1 select-none">
-            {/* Sliding Pill Background */}
-            <div
-              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-[#4c7cf3] rounded-md transition-all duration-300 ease-out shadow-sm ${
-                selectedRole === 'ADMIN' ? 'left-1' : 'left-[calc(50%+2px)]'
-              }`}
-            />
+          <div className="grid grid-cols-2 gap-2 bg-[#f1f3fc] p-1 rounded-lg border border-[#e2e8f0]">
             <button
               type="button"
               onClick={() => setSelectedRole('ADMIN')}
-              className={`relative z-10 py-2 text-[13.5px] font-medium rounded-md transition-colors text-center ${
-                selectedRole === 'ADMIN' ? 'text-[#0a0d12] font-semibold' : 'text-[#8d97a8] hover:text-[#e8ecf2]'
+              className={`py-2 text-xs font-semibold rounded-md transition-all ${
+                selectedRole === 'ADMIN'
+                  ? 'bg-white text-[#1275e2] shadow-xs'
+                  : 'text-[#64748b] hover:text-[#181c22]'
               }`}
             >
-              Admin
+              Admin (Create Organization)
             </button>
             <button
               type="button"
               onClick={() => setSelectedRole('USER')}
-              className={`relative z-10 py-2 text-[13.5px] font-medium rounded-md transition-colors text-center ${
-                selectedRole === 'USER' ? 'text-[#0a0d12] font-semibold' : 'text-[#8d97a8] hover:text-[#e8ecf2]'
+              className={`py-2 text-xs font-semibold rounded-md transition-all ${
+                selectedRole === 'USER'
+                  ? 'bg-white text-[#1275e2] shadow-xs'
+                  : 'text-[#64748b] hover:text-[#181c22]'
               }`}
             >
-              User
+              User (Join Organization)
             </button>
           </div>
-          <p className="text-[12px] leading-normal text-[#5b6472]">
-            Determines your permissions in the workspace. This can be adjusted by organization administrators.
+          <p className="text-[11px] text-[#64748b]">
+            Admins will proceed directly to create and register their company profile.
           </p>
         </div>
 
@@ -214,7 +212,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 mt-2 rounded-lg bg-[#4c7cf3] hover:bg-[#6e96f8] active:scale-[0.99] text-white font-medium text-[14.5px] flex items-center justify-center gap-2 transition-all shadow-md shadow-[#4c7cf3]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full h-11 mt-2 rounded-lg bg-[#1275e2] hover:bg-[#005cb8] active:scale-[0.99] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? (
             <>
@@ -222,18 +220,18 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               <span>Creating account...</span>
             </>
           ) : (
-            'Create account'
+            'Continue to Organization Setup'
           )}
         </button>
       </form>
 
       {/* Switch to Login */}
-      <p className="mt-6 text-center text-[13.5px] text-[#8d97a8]">
+      <p className="mt-6 text-center text-[13px] text-[#64748b]">
         Already have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="font-medium text-[#6e96f8] hover:underline"
+          className="font-semibold text-[#1275e2] hover:underline"
         >
           Sign in
         </button>

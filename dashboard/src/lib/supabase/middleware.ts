@@ -36,48 +36,59 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Protect /admin and /dashboard routes
   const isAuthRoute = pathname === '/auth' || pathname.startsWith('/auth/');
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const isDashboardRoute = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+  const isOnboardingRoute = pathname === '/onboarding' || pathname.startsWith('/onboarding/');
 
-  if (!user && (isAdminRoute || isDashboardRoute)) {
+  // 1. If not authenticated and visiting protected areas
+  if (!user && (isAdminRoute || isDashboardRoute || isOnboardingRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth';
     url.searchParams.set('redirectTo', pathname);
     return NextResponse.redirect(url);
   }
 
-  // If user is authenticated and visits /auth or root /, redirect them to their workspace
+  // 2. If authenticated and visiting /auth or root /
   if (user && (isAuthRoute || pathname === '/')) {
-    // Check user's profile role from Supabase
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     const isInternal = profile?.role === 'SUPER_ADMIN' || profile?.role === 'SUB_SUPER_ADMIN';
-    const redirectTarget = isInternal ? '/admin' : '/dashboard';
+
+    if (isInternal) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/admin';
+      return NextResponse.redirect(url);
+    }
+
+    // Check if client user has an active organization
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('profile_id', user.id)
+      .maybeSingle();
 
     const url = request.nextUrl.clone();
-    url.pathname = redirectTarget;
+    url.pathname = membership?.organization_id ? '/dashboard' : '/onboarding';
     return NextResponse.redirect(url);
   }
 
-  // If client user attempts to visit /admin, check role and deny access
+  // 3. If client user visits /admin, block them
   if (user && isAdminRoute) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     const isInternal = profile?.role === 'SUPER_ADMIN' || profile?.role === 'SUB_SUPER_ADMIN';
     if (!isInternal) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
-      url.searchParams.set('error', 'unauthorized_admin_access');
       return NextResponse.redirect(url);
     }
   }
