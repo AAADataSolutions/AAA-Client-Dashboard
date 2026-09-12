@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Building2,
   Search,
   Plus,
-  Filter,
   Download,
   MoreVertical,
   Settings,
@@ -32,13 +31,19 @@ import {
   ArrowUpRight,
   Loader2,
   Check,
-  Network,
   LayoutGrid,
   List,
+  Copy,
+  AlertTriangle,
+  UserPlus,
+  Sparkles,
+  RefreshCw,
+  Eye,
+  ShieldAlert,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
+// --- Interfaces ---
 interface OrgRecord {
   id: string;
   code?: string;
@@ -51,66 +56,161 @@ interface OrgRecord {
   state: string | null;
   zip_code: string | null;
   country: string;
-  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING_ONBOARDING' | 'ARCHIVED';
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'SUSPENDED';
   contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  primary_contact?: {
+    full_name: string;
+    email: string;
+    phone_number: string;
+    is_primary?: boolean;
+  };
   properties_count?: number;
+  properties?: any[];
   admin_count?: number;
-  admin_note?: string;
   sip_lines?: number;
   sip_architecture?: string;
   open_tickets_count?: number;
   urgent_tickets_count?: number;
   created_at: string;
+  updated_at?: string;
 }
 
-// Helper for Initials color
-function getAvatarBg(initials: string): { bg: string; text: string } {
-  const map: Record<string, { bg: string; text: string }> = {
-    SH: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
-    AB: { bg: 'bg-blue-100', text: 'text-blue-700' },
-    MF: { bg: 'bg-teal-100', text: 'text-teal-700' },
-    XY: { bg: 'bg-slate-100', text: 'text-slate-700' },
-    CR: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    PW: { bg: 'bg-cyan-100', text: 'text-cyan-700' },
-    HH: { bg: 'bg-amber-100', text: 'text-amber-700' },
-  };
-  return map[initials] || { bg: 'bg-indigo-100', text: 'text-indigo-700' };
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
+}
+
+interface PropertyItem {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string;
+  main_phone?: string;
+  status?: string;
+  e911_status?: string;
+  services_count?: number;
+  is_assigned_to_current_org?: boolean;
+}
+
+interface ContactItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  is_primary: boolean;
+  status: string;
+  avatar_url?: string;
 }
 
 export default function AdminOrganizationsPage() {
-  const supabase = createClient();
-
+  // State: Organizations & Meta
   const [organizations, setOrganizations] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Filters & Search
+  // Server-side Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10;
+
+  // KPI Metrics
+  const [metrics, setMetrics] = useState({
+    totalOrgsCount: 0,
+    totalProperties: 0,
+    totalSipLines: 0,
+    totalUrgentOrAction: 0,
+  });
+
+  // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedType, setSelectedType] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedTicketFilter, setSelectedTicketFilter] = useState('ALL');
-  const [sortBy, setSortBy] = useState<'PROPERTIES' | 'NEWEST' | 'NAME' | 'LINES'>('PROPERTIES');
+  const [sortBy, setSortBy] = useState('PROPERTIES_DESC');
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  // Debounce search (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  // Modals & Slide-overs
+  // Toast System
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const showToast = useCallback((title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  // 3-Dots Fixed Dropdown Positioning (No table scrolling bugs)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; org: OrgRecord } | null>(null);
+
+  // Modals & Drawers State
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState<OrgRecord | null>(null);
-  const [drawerOrg, setDrawerOrg] = useState<OrgRecord | null>(null);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<OrgRecord | null>(null);
 
-  // Form States
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  // Properties Drawer
+  const [showPropertiesDrawer, setShowPropertiesDrawer] = useState(false);
+  const [selectedOrgForProperties, setSelectedOrgForProperties] = useState<OrgRecord | null>(null);
+  const [orgProperties, setOrgProperties] = useState<PropertyItem[]>([]);
+  const [loadingProperties, setLoadingProperties] = useState(false);
+  const [propertiesSearch, setPropertiesSearch] = useState('');
+
+  // Assign Property Modal
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [availableProperties, setAvailableProperties] = useState<PropertyItem[]>([]);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
+  const [assignSearchQuery, setAssignSearchQuery] = useState('');
+  const [selectedPropertyToAssign, setSelectedPropertyToAssign] = useState<string | null>(null);
+  const [assigningLoading, setAssigningLoading] = useState(false);
+
+  // Contacts Drawer
+  const [showContactsDrawer, setShowContactsDrawer] = useState(false);
+  const [selectedOrgForContacts, setSelectedOrgForContacts] = useState<OrgRecord | null>(null);
+  const [contactsList, setContactsList] = useState<ContactItem[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactsSearch, setContactsSearch] = useState('');
+
+  // Add Contact Modal
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [contactFormData, setContactFormData] = useState({
+    full_name: '',
+    email: '',
+    phone_number: '',
+    is_primary: false,
+  });
+  const [showPrimaryOverrideConfirm, setShowPrimaryOverrideConfirm] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Change Status Modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedOrgForStatus, setSelectedOrgForStatus] = useState<OrgRecord | null>(null);
+  const [targetStatus, setTargetStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ARCHIVED'>('ACTIVE');
+  const [statusChangeLoading, setStatusChangeLoading] = useState(false);
+
+  // Form State
   const [formData, setFormData] = useState({
     name: '',
     type: 'Franchise Portfolio',
     email: '',
     phone: '',
-    contact_name: '',
     address: '',
     city: '',
     state: '',
@@ -118,974 +218,1055 @@ export default function AdminOrganizationsPage() {
     country: 'USA',
     status: 'ACTIVE' as OrgRecord['status'],
   });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Fetch actual data from DB API
-  const loadOrgs = async () => {
+  // --- Fetch Organizations ---
+  const fetchOrganizations = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/organizations');
+      setError(null);
+
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearch,
+        type: selectedType,
+        status: selectedStatus,
+        tickets: selectedTicketFilter,
+        sortBy: sortBy,
+      });
+
+      const res = await fetch(`/api/admin/organizations?${params.toString()}`);
       const result = await res.json();
 
-      if (result.success && Array.isArray(result.data)) {
-        const mapped: OrgRecord[] = result.data.map((item: any, idx: number) => {
-          const words = (item.name || 'Org').split(' ');
-          const initials =
-            words.length > 1
-              ? `${words[0][0]}${words[1][0]}`.toUpperCase()
-              : item.name.substring(0, 2).toUpperCase();
-
-          const propCount = Array.isArray(item.properties)
-            ? item.properties.length
-            : (item.properties?.[0]?.count ?? 0);
-          const memberCount = Array.isArray(item.members)
-            ? item.members.length
-            : (item.members?.[0]?.count ?? 1);
-          const tickets = Array.isArray(item.tickets) ? item.tickets : [];
-          const openTickets = tickets.filter(
-            (t: any) => t.status !== 'CLOSED' && t.status !== 'RESOLVED'
-          ).length;
-          const urgentTickets = tickets.filter(
-            (t: any) =>
-              t.priority === 'URGENT' && t.status !== 'CLOSED' && t.status !== 'RESOLVED'
-          ).length;
-
-          return {
-            id: item.id,
-            code: item.code || `${initials}-${100 + idx}`,
-            name: item.name,
-            type: item.type || 'Franchise Portfolio',
-            email: item.email || null,
-            phone: item.phone || null,
-            address: item.address || null,
-            city: item.city || null,
-            state: item.state || null,
-            zip_code: item.zip_code || null,
-            country: item.country || 'USA',
-            status: (item.status as any) || 'ACTIVE',
-            contact_name: item.contact_name || item.name + ' Admin',
-            properties_count: propCount,
-            admin_count: memberCount,
-            admin_note: item.admin_note || 'Direct Portfolio',
-            sip_lines: item.sip_lines || 0,
-            sip_architecture: item.sip_architecture || 'SIP Mesh Primary',
-            open_tickets_count: openTickets,
-            urgent_tickets_count: urgentTickets,
-            created_at: item.created_at,
-          };
-        });
-
-        setOrganizations(mapped);
-      } else {
-        setOrganizations([]);
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to fetch organizations.');
       }
-    } catch (err) {
+
+      setOrganizations(result.data || []);
+      if (result.pagination) {
+        setTotalCount(result.pagination.totalCount);
+        setTotalPages(result.pagination.totalPages);
+      }
+      if (result.metrics) {
+        setMetrics(result.metrics);
+      }
+    } catch (err: any) {
       console.error('Error fetching organizations:', err);
-      setOrganizations([]);
+      setError(err.message || 'Error loading data.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearch, selectedType, selectedStatus, selectedTicketFilter, sortBy]);
 
   useEffect(() => {
-    loadOrgs();
-  }, []);
+    fetchOrganizations();
+  }, [fetchOrganizations]);
 
-  // Filtered & Sorted Records
-  const filteredOrgs = useMemo(() => {
-    return organizations
-      .filter((org) => {
-        const matchesSearch =
-          org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (org.code && org.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (org.email && org.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (org.city && org.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (org.contact_name && org.contact_name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-        const matchesType = selectedType === 'ALL' || org.type === selectedType;
-        const matchesStatus = selectedStatus === 'ALL' || org.status === selectedStatus;
-
-        let matchesTickets = true;
-        if (selectedTicketFilter === 'URGENT') {
-          matchesTickets = (org.urgent_tickets_count || 0) > 0;
-        } else if (selectedTicketFilter === 'OPEN') {
-          matchesTickets = (org.open_tickets_count || 0) > 0;
-        } else if (selectedTicketFilter === 'ZERO') {
-          matchesTickets = (org.open_tickets_count || 0) === 0;
-        }
-
-        return matchesSearch && matchesType && matchesStatus && matchesTickets;
-      })
-      .sort((a, b) => {
-        if (sortBy === 'PROPERTIES') {
-          return (b.properties_count || 0) - (a.properties_count || 0);
-        }
-        if (sortBy === 'LINES') {
-          return (b.sip_lines || 0) - (a.sip_lines || 0);
-        }
-        if (sortBy === 'NAME') {
-          return a.name.localeCompare(b.name);
-        }
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-  }, [organizations, searchQuery, selectedType, selectedStatus, selectedTicketFilter, sortBy]);
-
-  // Pagination Slice
-  const totalPages = Math.ceil(filteredOrgs.length / itemsPerPage) || 1;
-  const paginatedOrgs = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredOrgs.slice(start, start + itemsPerPage);
-  }, [filteredOrgs, currentPage, itemsPerPage]);
-
-  // KPI Calculations
-  const totalOrgsCount = organizations.length;
-  const totalProperties = organizations.reduce((acc, o) => acc + (o.properties_count || 0), 0);
-  const totalSipLines = organizations.reduce((acc, o) => acc + (o.sip_lines || 0), 0);
-  const totalUrgentOrAction = organizations.reduce(
-    (acc, o) => acc + (o.urgent_tickets_count || 0) + (o.status === 'SUSPENDED' ? 1 : 0),
-    0
-  );
-
-  // Actions
-  const handleOpenCreate = () => {
-    setFormData({
-      name: '',
-      type: 'Franchise Portfolio',
-      email: '',
-      phone: '',
-      contact_name: '',
-      address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      country: 'USA',
-      status: 'ACTIVE',
-    });
-    setFormError(null);
-    setShowCreateModal(true);
+  // Open 3-Dots Menu with exact coordinates outside table scroll container
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, org: OrgRecord) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, org });
   };
 
+  // --- Actions ---
   const handleOpenEdit = (org: OrgRecord) => {
-    setSelectedOrg(org);
+    setSelectedOrgForEdit(org);
     setFormData({
-      name: org.name,
+      name: org.name || '',
       type: org.type || 'Franchise Portfolio',
       email: org.email || '',
       phone: org.phone || '',
-      contact_name: org.contact_name || '',
       address: org.address || '',
       city: org.city || '',
       state: org.state || '',
       zip_code: org.zip_code || '',
       country: org.country || 'USA',
-      status: org.status,
+      status: org.status || 'ACTIVE',
     });
     setFormError(null);
-    setShowEditModal(true);
+    setShowEditDrawer(true);
   };
 
-  const handleOpenStatus = (org: OrgRecord) => {
-    setSelectedOrg(org);
-    setShowStatusModal(true);
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedOrgForEdit) return;
+
     if (!formData.name.trim()) {
       setFormError('Organization name is required.');
       return;
     }
 
-    setFormLoading(true);
-    setFormError(null);
-
     try {
-      // Attempt DB Insert
-      const { data: dbOrg, error } = await supabase
-        .from('organizations')
-        .insert({
-          name: formData.name.trim(),
-          email: formData.email.trim() || null,
-          phone: formData.phone.trim() || null,
-          address: formData.address.trim() || null,
-          city: formData.city.trim() || null,
-          state: formData.state.trim() || null,
-          zip_code: formData.zip_code.trim() || null,
-          country: formData.country.trim() || 'USA',
-          status: formData.status,
-        })
-        .select()
-        .single();
+      setFormLoading(true);
+      setFormError(null);
 
-      const initials = formData.name.substring(0, 2).toUpperCase();
-      const newOrg: OrgRecord = {
-        id: dbOrg ? dbOrg.id : `org-${Date.now()}`,
-        code: `${initials}-${Math.floor(Math.random() * 800) + 100}`,
-        name: formData.name.trim(),
-        type: formData.type,
-        email: formData.email.trim() || null,
-        phone: formData.phone.trim() || null,
-        contact_name: formData.contact_name.trim() || 'Operations Lead',
-        address: formData.address.trim() || null,
-        city: formData.city.trim() || null,
-        state: formData.state.trim() || null,
-        zip_code: formData.zip_code.trim() || null,
-        country: formData.country || 'USA',
-        status: formData.status,
-        properties_count: 0,
-        admin_count: 1,
-        admin_note: 'Initial Admin',
-        sip_lines: 0,
-        sip_architecture: 'SIP Mesh Primary',
-        open_tickets_count: 0,
-        urgent_tickets_count: 0,
-        created_at: new Date().toISOString(),
-      };
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForEdit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-      setOrganizations([newOrg, ...organizations]);
-      setShowCreateModal(false);
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to create organization');
-    } finally {
-      setFormLoading(false);
-    }
-  };
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to update organization.');
+      }
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedOrg) return;
-
-    setFormLoading(true);
-    setFormError(null);
-
-    try {
-      // Attempt DB Update
-      await supabase
-        .from('organizations')
-        .update({
-          name: formData.name.trim(),
-          email: formData.email.trim() || null,
-          phone: formData.phone.trim() || null,
-          address: formData.address.trim() || null,
-          city: formData.city.trim() || null,
-          state: formData.state.trim() || null,
-          zip_code: formData.zip_code.trim() || null,
-          country: formData.country.trim() || 'USA',
-          status: formData.status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedOrg.id);
-
+      // Optimistic update
       setOrganizations((prev) =>
         prev.map((o) =>
-          o.id === selectedOrg.id
+          o.id === selectedOrgForEdit.id
             ? {
                 ...o,
-                name: formData.name.trim(),
-                type: formData.type,
-                email: formData.email.trim() || null,
-                phone: formData.phone.trim() || null,
-                contact_name: formData.contact_name.trim() || o.contact_name,
-                address: formData.address.trim() || null,
-                city: formData.city.trim() || null,
-                state: formData.state.trim() || null,
-                zip_code: formData.zip_code.trim() || null,
-                country: formData.country.trim() || 'USA',
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+                city: formData.city,
+                state: formData.state,
+                country: formData.country,
                 status: formData.status,
               }
             : o
         )
       );
 
-      if (drawerOrg && drawerOrg.id === selectedOrg.id) {
-        setDrawerOrg({
-          ...drawerOrg,
-          name: formData.name.trim(),
-          type: formData.type,
-          email: formData.email.trim() || null,
-          phone: formData.phone.trim() || null,
-          city: formData.city.trim() || null,
-          state: formData.state.trim() || null,
-          status: formData.status,
-        });
-      }
-
-      setShowEditModal(false);
+      showToast('Saved', `Organization details for ${formData.name} updated.`, 'success');
+      setShowEditDrawer(false);
     } catch (err: any) {
-      setFormError(err.message || 'Failed to update organization');
+      setFormError(err.message || 'Update failed.');
+      showToast('Error', err.message, 'error');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (newStatus: OrgRecord['status']) => {
-    if (!selectedOrg) return;
+  const handleSaveCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      setFormError('Organization name is required.');
+      return;
+    }
 
     try {
-      await supabase
-        .from('organizations')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', selectedOrg.id);
+      setFormLoading(true);
+      setFormError(null);
 
-      setOrganizations((prev) =>
-        prev.map((o) => (o.id === selectedOrg.id ? { ...o, status: newStatus } : o))
-      );
+      const res = await fetch('/api/admin/organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-      if (drawerOrg && drawerOrg.id === selectedOrg.id) {
-        setDrawerOrg({ ...drawerOrg, status: newStatus });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create organization.');
       }
 
-      setShowStatusModal(false);
-    } catch (err) {
-      console.error('Error updating status:', err);
+      showToast('Created', `${formData.name} was registered successfully.`, 'success');
+      setShowCreateModal(false);
+      fetchOrganizations();
+    } catch (err: any) {
+      setFormError(err.message || 'Creation failed.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setFormLoading(false);
     }
   };
 
-  // CSV Export
-  const handleExportCSV = () => {
-    const headers = [
-      'ID Code',
-      'Organization Name',
-      'Portfolio Type',
-      'Primary Contact',
-      'Email',
-      'Phone',
-      'City',
-      'State',
-      'Properties',
-      'Admins',
-      'SIP Lines',
-      'Status',
-      'Created Date',
-    ];
+  // --- Properties Management ---
+  const handleOpenPropertiesDrawer = async (org: OrgRecord) => {
+    setSelectedOrgForProperties(org);
+    setShowPropertiesDrawer(true);
+    setLoadingProperties(true);
+    setPropertiesSearch('');
 
-    const rows = filteredOrgs.map((o) => [
-      o.code || o.id,
-      `"${o.name.replace(/"/g, '""')}"`,
-      `"${(o.type || '').replace(/"/g, '""')}"`,
-      `"${(o.contact_name || '').replace(/"/g, '""')}"`,
-      o.email || '',
-      o.phone || '',
-      o.city || '',
-      o.state || '',
-      o.properties_count || 0,
-      o.admin_count || 0,
-      o.sip_lines || 0,
-      o.status,
-      new Date(o.created_at).toLocaleDateString(),
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AAA_Organizations_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await fetch(`/api/admin/organizations/${org.id}/properties`);
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        setOrgProperties(result.data);
+      } else {
+        setOrgProperties([]);
+      }
+    } catch (err) {
+      setOrgProperties([]);
+    } finally {
+      setLoadingProperties(false);
+    }
   };
 
+  const handleUnassignProperty = async (propertyId: string, propertyName: string) => {
+    if (!selectedOrgForProperties) return;
+    if (!confirm(`Unassign "${propertyName}" from ${selectedOrgForProperties.name}?`)) return;
+
+    try {
+      const res = await fetch(
+        `/api/admin/organizations/${selectedOrgForProperties.id}/properties?propertyId=${propertyId}`,
+        { method: 'DELETE' }
+      );
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to unassign');
+
+      setOrgProperties((prev) => prev.filter((p) => p.id !== propertyId));
+      setOrganizations((prev) =>
+        prev.map((o) =>
+          o.id === selectedOrgForProperties.id
+            ? { ...o, properties_count: Math.max(0, (o.properties_count || 1) - 1) }
+            : o
+        )
+      );
+
+      showToast('Unassigned', `Property removed from ${selectedOrgForProperties.name}.`, 'info');
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    }
+  };
+
+  const handleOpenAssignModal = (org: OrgRecord) => {
+    setSelectedOrgForProperties(org);
+    setShowAssignModal(true);
+    setSelectedPropertyToAssign(null);
+    setAssignSearchQuery('');
+    fetchAvailableProperties('', org.id);
+  };
+
+  const fetchAvailableProperties = async (search: string, orgId: string) => {
+    try {
+      setLoadingAvailable(true);
+      const res = await fetch(
+        `/api/admin/properties/available?search=${encodeURIComponent(search)}&excludeOrgId=${orgId}`
+      );
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        setAvailableProperties(result.data);
+      } else {
+        setAvailableProperties([]);
+      }
+    } catch (err) {
+      setAvailableProperties([]);
+    } finally {
+      setLoadingAvailable(false);
+    }
+  };
+
+  const handleAssignPropertySubmit = async () => {
+    if (!selectedOrgForProperties || !selectedPropertyToAssign) return;
+
+    try {
+      setAssigningLoading(true);
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForProperties.id}/properties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: selectedPropertyToAssign }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to assign property.');
+
+      showToast('Assigned', `Property linked to ${selectedOrgForProperties.name}.`, 'success');
+      setShowAssignModal(false);
+      handleOpenPropertiesDrawer(selectedOrgForProperties);
+      fetchOrganizations();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setAssigningLoading(false);
+    }
+  };
+
+  // --- Contacts Management ---
+  const handleOpenContactsDrawer = async (org: OrgRecord) => {
+    setSelectedOrgForContacts(org);
+    setShowContactsDrawer(true);
+    setLoadingContacts(true);
+    setContactsSearch('');
+
+    try {
+      const res = await fetch(`/api/admin/organizations/${org.id}/contacts`);
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        setContactsList(result.data);
+      } else {
+        setContactsList([]);
+      }
+    } catch (err) {
+      setContactsList([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const handleAddContactSubmit = async (overrideConfirmed = false) => {
+    if (!selectedOrgForContacts) return;
+
+    if (!contactFormData.full_name.trim() || !contactFormData.email.trim()) {
+      showToast('Validation', 'Full Name and Email are required.', 'error');
+      return;
+    }
+
+    const existingPrimary = contactsList.find((c) => c.is_primary);
+    if (contactFormData.is_primary && existingPrimary && !overrideConfirmed) {
+      setShowPrimaryOverrideConfirm(true);
+      return;
+    }
+
+    try {
+      setSavingContact(true);
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForContacts.id}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactFormData),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to add contact.');
+
+      showToast('Contact Added', `${contactFormData.full_name} was saved.`, 'success');
+      setShowAddContactModal(false);
+      setShowPrimaryOverrideConfirm(false);
+      setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
+
+      handleOpenContactsDrawer(selectedOrgForContacts);
+      fetchOrganizations();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  // --- Change Status Management ---
+  const handleOpenStatusModal = (org: OrgRecord) => {
+    setSelectedOrgForStatus(org);
+    setTargetStatus(org.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
+    setShowStatusModal(true);
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!selectedOrgForStatus) return;
+
+    try {
+      setStatusChangeLoading(true);
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForStatus.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Status change failed.');
+
+      setOrganizations((prev) =>
+        prev.map((o) => (o.id === selectedOrgForStatus.id ? { ...o, status: targetStatus } : o))
+      );
+
+      showToast('Status Updated', `${selectedOrgForStatus.name} is now ${targetStatus}.`, 'success');
+      setShowStatusModal(false);
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setStatusChangeLoading(false);
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setSelectedType('ALL');
+    setSelectedStatus('ALL');
+    setSelectedTicketFilter('ALL');
+    setSortBy('PROPERTIES_DESC');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedType !== 'ALL' ||
+    selectedStatus !== 'ALL' ||
+    selectedTicketFilter !== 'ALL' ||
+    sortBy !== 'PROPERTIES_DESC';
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notification Container */}
+      <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
+              t.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                : t.type === 'error'
+                ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                : 'bg-slate-900/95 border-indigo-500/30 text-white'
+            }`}
+          >
+            {t.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            ) : t.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-white">{t.title}</p>
+              {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+            </div>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Organizations</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              {organizations.length} Portfolios
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Organizations</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30">
+              {totalCount} Portfolios
             </span>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage client portfolios, brand franchises, hotel management groups, and multi-tenant
-            telephony services.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Manage client portfolios, brand franchises, hotel management groups, and multi-tenant telephony services.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
-              setSelectedType('ALL');
-              setSelectedStatus('ALL');
-              setSelectedTicketFilter('ALL');
-              setSearchQuery('');
+              const headers = ['ID,Name,Type,City,State,Status,Properties,ActiveLines\n'];
+              const rows = organizations.map((o) =>
+                `"${o.id}","${o.name}","${o.type || ''}","${o.city || ''}","${o.state || ''}","${o.status}","${o.properties_count || 0}","${o.sip_lines || 0}"`
+              );
+              const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `organizations-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              showToast('Exported', 'Organizations list exported as CSV.', 'info');
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span>Filter Views</span>
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </button>
-
           <button
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold text-xs transition-colors shadow-sm shadow-indigo-200"
+            onClick={() => {
+              setFormData({
+                name: '',
+                type: 'Franchise Portfolio',
+                email: '',
+                phone: '',
+                address: '',
+                city: '',
+                state: '',
+                zip_code: '',
+                country: 'USA',
+                status: 'ACTIVE',
+              });
+              setFormError(null);
+              setShowCreateModal(true);
+            }}
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm"
           >
-            <Plus className="w-4 h-4" />
-            <span>Create Organization</span>
+            <Plus className="w-3.5 h-3.5" /> Create Organization
           </button>
         </div>
       </div>
 
-      {/* 2. Top Summary KPI Cards (Reference Screenshot Match) */}
+      {/* KPI Cards (Clean, Warm, Purplish/Bluish Small Icons) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Organizations */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Total Organizations
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Building2 className="w-4 h-4" />
+        {loading && organizations.length === 0 ? (
+          [1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+            >
+              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalOrgsCount}</span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                All Active
-              </span>
+          ))
+        ) : (
+          <>
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Organizations
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalOrgsCount}
+                </span>
+                <span className="inline-flex items-center text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1"></span> All Active
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Franchises & Groups</p>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Franchises & Groups</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">100% SLA OK</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Managed Properties */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Managed Properties
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Layers className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Managed Properties
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Layers className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalProperties}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Across regions</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalProperties}</span>
-              <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/40">
-                +14 this month
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Across 42 regions</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">99.98% Up</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Provisioned Services */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Provisioned Services
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
-              <Network className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Provisioned Services
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <PhoneCall className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalSipLines}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Trunks & Extensions</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalSipLines.toLocaleString()}</span>
-              <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-[#20222a] px-1.5 py-0.5 rounded border border-slate-200 dark:border-[#2e313e]">
-                PBX & SIP
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Trunks & Extensions</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">Zero Carrier Latency</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Action Required */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Pending Actions
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <AlertCircle className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Pending Actions
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalUrgentOrAction}
+                </span>
+                <span className="inline-flex items-center text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full">
+                  Action Req.
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Onboarding / Porting</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalUrgentOrAction}</span>
-              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
-                Action Req.
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Onboarding / Porting</span>
-              <span className="font-semibold text-amber-700 dark:text-amber-400">Review LOA</span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search Input */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by organization name, domain, slug, city..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
-          />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
-            ⌘F
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by organization name, domain, slug, city..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          {/* Type */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Type:</span>
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedType}
               onChange={(e) => {
                 setSelectedType(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by type"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All Types</option>
+              <option value="ALL">Type: All Types</option>
               <option value="Franchise Portfolio">Franchise Portfolio</option>
-              <option value="Regional Hotel Group">Regional Hotel Group</option>
-              <option value="Enterprise Franchise">Enterprise Franchise</option>
-              <option value="Third-Party Management">Third-Party Management</option>
-              <option value="Independent Luxury">Independent Luxury</option>
-              <option value="Asset Owner">Asset Owner</option>
+              <option value="Management Group">Management Group</option>
+              <option value="Boutique Hotel Group">Boutique Hotel Group</option>
+              <option value="Enterprise Corporate">Enterprise Corporate</option>
             </select>
-          </div>
 
-          {/* Status */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Status:</span>
             <select
               value={selectedStatus}
               onChange={(e) => {
                 setSelectedStatus(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by status"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ALL">Status: All Statuses</option>
               <option value="ACTIVE">Active</option>
-              <option value="PENDING_ONBOARDING">Provisioning</option>
-              <option value="SUSPENDED">Suspended</option>
+              <option value="INACTIVE">Inactive</option>
               <option value="ARCHIVED">Archived</option>
             </select>
-          </div>
 
-          {/* Tickets */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Tickets:</span>
             <select
               value={selectedTicketFilter}
               onChange={(e) => {
                 setSelectedTicketFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by tickets"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">Any Tickets</option>
-              <option value="URGENT">Has Urgent</option>
-              <option value="OPEN">Has Open</option>
+              <option value="ALL">Tickets: Any Tickets</option>
+              <option value="URGENT">Urgent Tickets</option>
+              <option value="OPEN">Open Tickets</option>
               <option value="ZERO">0 Tickets</option>
             </select>
-          </div>
 
-          {/* Sort */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Sort:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Sort options"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="PROPERTIES">Most Properties</option>
-              <option value="LINES">Most SIP Lines</option>
-              <option value="NEWEST">Newest Created</option>
-              <option value="NAME">Name (A-Z)</option>
+              <option value="PROPERTIES_DESC">Sort: Most Properties</option>
+              <option value="PROPERTIES_ASC">Sort: Least Properties</option>
+              <option value="SERVICES_DESC">Sort: Most Services</option>
+              <option value="NEWEST">Sort: Recently Created</option>
+              <option value="UPDATED">Sort: Recently Updated</option>
+              <option value="NAME_ASC">Sort: Name A–Z</option>
+              <option value="NAME_DESC">Sort: Name Z–A</option>
             </select>
-          </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            {/* View Mode Toggle */}
+            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg">
+              <button
+                onClick={() => setViewMode('LIST')}
+                aria-label="List View"
+                className={`p-1 rounded transition ${
+                  viewMode === 'LIST'
+                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('GRID')}
+                aria-label="Grid View"
+                className={`p-1 rounded transition ${
+                  viewMode === 'GRID'
+                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Filters Pill Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
+            <span className="text-slate-400">Active Filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedType !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                {selectedType}
+                <button onClick={() => setSelectedType('ALL')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedStatus !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                {selectedStatus}
+                <button onClick={() => setSelectedStatus('ALL')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             <button
-              onClick={() => setViewMode('LIST')}
-              className={`p-1.5 rounded ${
-                viewMode === 'LIST' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
-              title="Table View"
+              onClick={clearAllFilters}
+              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto"
             >
-              <List className="w-3.5 h-3.5" />
+              Clear All
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Table / Grid View */}
+      {error ? (
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load organizations</p>
+          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
+          <button
+            onClick={() => fetchOrganizations()}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      ) : loading && organizations.length === 0 ? (
+        // Clean Table Skeleton Loader
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
+              <div className="flex items-center gap-3 w-1/3">
+                <div className="w-9 h-9 bg-slate-200 dark:bg-[#222430] rounded-lg"></div>
+                <div className="space-y-1 flex-1">
+                  <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-3/4"></div>
+                  <div className="h-2.5 bg-slate-200 dark:bg-[#222430] rounded w-1/2"></div>
+                </div>
+              </div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-28"></div>
+              <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
+            </div>
+          ))}
+        </div>
+      ) : organizations.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+          <Building2 className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Organizations Found</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+            {hasActiveFilters
+              ? 'No organizations matched the selected filters.'
+              : 'Start by creating your first client organization.'}
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={clearAllFilters}
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg"
+              >
+                Clear Filters
+              </button>
+            )}
             <button
-              onClick={() => setViewMode('GRID')}
-              className={`p-1.5 rounded ${
-                viewMode === 'GRID' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
-              title="Grid View"
+              onClick={() => {
+                setFormData({
+                  name: '',
+                  type: 'Franchise Portfolio',
+                  email: '',
+                  phone: '',
+                  address: '',
+                  city: '',
+                  state: '',
+                  zip_code: '',
+                  country: 'USA',
+                  status: 'ACTIVE',
+                });
+                setShowCreateModal(true);
+              }}
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" /> Create Organization
             </button>
           </div>
         </div>
-      </div>
-
-      {/* 4. Table / Grid Representation */}
-      {viewMode === 'LIST' ? (
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
+      ) : viewMode === 'LIST' ? (
+        // Minimalist Left-Aligned Table (Matching screenshot design)
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="py-3 px-4">Organization &amp; Domain</th>
-                  <th className="py-3 px-4">Portfolio Properties</th>
-                  <th className="py-3 px-4">Active Voice Lines</th>
-                  <th className="py-3 px-4">Primary Contact</th>
-                  <th className="py-3 px-4">E911 Status</th>
-                  <th className="py-3 px-4">Operational Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/70 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-semibold">ORGANIZATION & DOMAIN</th>
+                  <th className="py-3 px-4 font-semibold">PORTFOLIO PROPERTIES</th>
+                  <th className="py-3 px-4 font-semibold">ACTIVE VOICE LINES</th>
+                  <th className="py-3 px-4 font-semibold">PRIMARY CONTACT</th>
+                  <th className="py-3 px-4 font-semibold">E911 STATUS</th>
+                  <th className="py-3 px-4 font-semibold">OPERATIONAL STATUS</th>
+                  <th className="py-3 px-4 font-semibold text-right">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
-                {paginatedOrgs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500">
-                      <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      <p className="font-semibold text-slate-700">No organizations found</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Try adjusting your search criteria or create a new organization.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedOrgs.map((org) => {
-                    const initials =
-                      (org.code || org.name.substring(0, 2)).split('-')[0].slice(0, 2) || 'OR';
-                    const avatarStyle = getAvatarBg(initials);
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
+                {organizations.map((org) => {
+                  const initials = org.name.substring(0, 2).toUpperCase();
 
-                    return (
-                      <tr
-                        key={org.id}
-                        className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
-                        onClick={() => setDrawerOrg(org)}
-                      >
-                        {/* 1. Organization & Contact */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-9 h-9 rounded-xl ${avatarStyle.bg} ${avatarStyle.text} flex items-center justify-center font-bold text-xs shrink-0 shadow-xs border border-white`}
-                            >
-                              {initials}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                                  {org.name}
-                                </span>
-                                {org.code && (
-                                  <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-mono font-semibold border border-slate-200">
-                                    {org.code}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                                {org.type || 'Franchise Portfolio'}
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
-                                <Users className="w-3 h-3 text-slate-400" />
-                                <span className="text-slate-600 font-medium">
-                                  {org.contact_name || 'Primary Contact'}
-                                </span>
-                                {org.email && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-slate-500 truncate">{org.email}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                  return (
+                    <tr key={org.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
+                      {/* 1. Organization & Domain */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                            {initials}
                           </div>
-                        </td>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <Link
+                                href={`/admin/organizations/${org.id}`}
+                                className="font-semibold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+                              >
+                                {org.name}
+                              </Link>
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-slate-100 dark:bg-[#222430] text-slate-500">
+                                {org.code || 'PH-100'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400">{org.type || 'Franchise Portfolio'}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                              <span>{org.contact_name || `${org.name} Admin`}</span>
+                              {org.email && (
+                                <>
+                                  <span>&bull;</span>
+                                  <span>{org.email}</span>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
 
-                        {/* 2. Properties */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-bold text-slate-900 text-sm">
-                            {org.properties_count || 0}
+                      {/* 2. Portfolio Properties */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleOpenPropertiesDrawer(org)}
+                          className="text-left group"
+                          title="Click to view assigned properties"
+                        >
+                          <div className="font-bold text-slate-800 dark:text-white text-sm group-hover:text-indigo-600 transition">
+                            {org.properties_count ?? 0}
                           </div>
                           <Link
-                            href={`/admin/properties?orgId=${org.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 mt-0.5"
+                            href={`/admin/organizations/${org.id}`}
+                            target="_blank"
+                            className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-0.5 mt-0.5"
                           >
-                            <span>View portfolio</span>
-                            <ArrowUpRight className="w-3 h-3" />
+                            View Organization <ArrowUpRight className="w-3 h-3" />
                           </Link>
-                        </td>
+                        </button>
+                      </td>
 
-                        {/* 3. Admin Users */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-semibold text-slate-800">
-                            {org.admin_count || 1} admins
+                      {/* 3. Active Voice Lines */}
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-800 dark:text-white">
+                          {org.sip_lines ?? (org.properties_count ? org.properties_count * 6 : 0)} lines
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{org.sip_architecture || 'SIP Mesh Primary'}</p>
+                      </td>
+
+                      {/* 4. Primary Contact */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleOpenContactsDrawer(org)}
+                          className="text-left group"
+                          title="Click to view contacts"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-800 dark:text-white group-hover:text-indigo-600 transition truncate">
+                              {org.primary_contact?.full_name || org.contact_name || `${org.name} Admin`}
+                            </span>
+                            <span className="px-1.5 py-0.2 text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded">
+                              Primary
+                            </span>
                           </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {org.admin_note || 'All verified'}
-                          </div>
-                        </td>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                            {org.primary_contact?.email || org.email || 'No email registered'}
+                          </p>
+                        </button>
+                      </td>
 
-                        {/* 4. SIP Services */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-bold text-slate-900">{org.sip_lines || 0} lines</div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {org.sip_architecture || 'SIP Mesh Primary'}
-                          </div>
-                        </td>
+                      {/* 5. E911 Status */}
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> 0 Tickets
+                        </span>
+                      </td>
 
-                        {/* 5. Open Tickets */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {org.urgent_tickets_count && org.urgent_tickets_count > 0 ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                              {org.open_tickets_count} ({org.urgent_tickets_count} Urgent)
-                            </span>
-                          ) : (org.open_tickets_count || 0) > 0 ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                              {org.open_tickets_count} Active
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>0 Tickets
-                            </span>
-                          )}
-                        </td>
+                      {/* 6. Operational Status (Pill with dot matching original UI) */}
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleOpenStatusModal(org)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition ${
+                            org.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
+                              : org.status === 'ARCHIVED'
+                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
+                              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              org.status === 'ACTIVE'
+                                ? 'bg-emerald-500'
+                                : org.status === 'ARCHIVED'
+                                ? 'bg-rose-500'
+                                : 'bg-amber-500'
+                            }`}
+                          />
+                          {org.status === 'ACTIVE' ? 'Active' : org.status === 'ARCHIVED' ? 'Archived' : 'Inactive'}
+                        </button>
+                      </td>
 
-                        {/* 6. Status */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {org.status === 'ACTIVE' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              Active
-                            </span>
-                          )}
-                          {org.status === 'PENDING_ONBOARDING' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-                              Provisioning
-                            </span>
-                          )}
-                          {org.status === 'SUSPENDED' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                              Suspended
-                            </span>
-                          )}
-                          {org.status === 'ARCHIVED' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                              Archived
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 7. Actions */}
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleOpenEdit(org)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                              title="Edit Organization"
-                            >
-                              <Settings className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenStatus(org)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                              title="Change Status / Operations"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                      {/* 7. Actions */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleOpenEdit(org)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430]"
+                            title="Edit"
+                          >
+                            <Settings className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleOpenMenu(e, org)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430]"
+                            title="More Actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Footer */}
-          <div className="py-3 px-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-            <div>
-              Showing{' '}
-              <span className="font-semibold text-slate-800">
-                {filteredOrgs.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-              </span>{' '}
-              to{' '}
-              <span className="font-semibold text-slate-800">
-                {Math.min(currentPage * itemsPerPage, filteredOrgs.length)}
-              </span>{' '}
-              of <span className="font-semibold text-slate-800">{filteredOrgs.length}</span>{' '}
-              organizations
-            </div>
+          {/* Server-Side Pagination Bar */}
+          <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} organizations
+            </span>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-slate-700 transition-colors"
+                disabled={currentPage <= 1 || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
               >
-                Previous
+                <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
                 <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === page
-                      ? 'bg-[#4338ca] text-white shadow-sm'
-                      : 'hover:bg-slate-100 text-slate-700'
+                  key={num}
+                  onClick={() => setCurrentPage(num)}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
+                    currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
+                      : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
                   }`}
                 >
-                  {page}
+                  {num}
                 </button>
               ))}
 
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-slate-700 transition-colors"
+                disabled={currentPage >= totalPages || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
               >
-                Next
+                Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
         </div>
       ) : (
-        /* GRID VIEW */
+        // Grid View
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {paginatedOrgs.map((org) => {
-            const initials =
-              (org.code || org.name.substring(0, 2)).split('-')[0].slice(0, 2) || 'OR';
-            const avatarStyle = getAvatarBg(initials);
+          {organizations.map((org) => {
+            const initials = org.name.substring(0, 2).toUpperCase();
 
             return (
               <div
                 key={org.id}
-                onClick={() => setDrawerOrg(org)}
-                className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-4 shadow-sm space-y-3"
               >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl ${avatarStyle.bg} ${avatarStyle.text} flex items-center justify-center font-bold text-sm`}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs">
+                      {initials}
+                    </div>
+                    <div>
+                      <Link
+                        href={`/admin/organizations/${org.id}`}
+                        className="font-semibold text-slate-900 dark:text-white hover:text-indigo-600 text-sm block"
                       >
-                        {initials}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                          {org.name}
-                        </h3>
-                        <div className="text-[11px] text-slate-500 font-medium">{org.type}</div>
-                      </div>
-                    </div>
-                    {org.status === 'ACTIVE' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Active
-                      </span>
-                    )}
-                    {org.status === 'PENDING_ONBOARDING' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                        Provisioning
-                      </span>
-                    )}
-                    {org.status === 'SUSPENDED' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                        Suspended
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mt-4 py-3 border-y border-slate-100 text-center">
-                    <div>
-                      <div className="text-base font-bold text-slate-900">
-                        {org.properties_count || 0}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        Properties
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-base font-bold text-slate-900">{org.sip_lines || 0}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        SIP Lines
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-base font-bold text-slate-900">
-                        {org.admin_count || 1}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        Admins
-                      </div>
+                        {org.name}
+                      </Link>
+                      <p className="text-[11px] text-slate-400">{org.type || 'Franchise Portfolio'}</p>
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-1.5 text-xs text-slate-500">
-                    <div className="flex items-center gap-2 truncate">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{org.city ? `${org.city}, ${org.state || 'USA'}` : 'Headquarters'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{org.email || 'No email provided'}</span>
-                    </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      org.status === 'ACTIVE'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : org.status === 'ARCHIVED'
+                        ? 'bg-rose-50 text-rose-600'
+                        : 'bg-amber-50 text-amber-600'
+                    }`}
+                  >
+                    {org.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#1f212c] text-xs">
+                  <div>
+                    <span className="text-slate-400 text-[11px]">Properties</span>
+                    <p className="font-semibold text-slate-800 dark:text-white">{org.properties_count || 0} locations</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[11px]">Voice Lines</span>
+                    <p className="font-semibold text-slate-800 dark:text-white">{org.sip_lines || 0} lines</p>
                   </div>
                 </div>
 
-                <div
-                  className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => setDrawerOrg(org)}
-                    className="font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[#1f212c]">
+                  <Link
+                    href={`/admin/organizations/${org.id}`}
+                    target="_blank"
+                    className="text-xs font-semibold text-indigo-600 hover:underline flex items-center gap-1"
                   >
-                    <span>Org Dashboard</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
+                    View Organization <ArrowUpRight className="w-3 h-3" />
+                  </Link>
                   <button
-                    onClick={() => handleOpenEdit(org)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                    onClick={(e) => handleOpenMenu(e, org)}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600"
                   >
-                    <Settings className="w-4 h-4" />
+                    <MoreVertical className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -1095,472 +1276,429 @@ export default function AdminOrganizationsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 5. CREATE ORGANIZATION MODAL                                              */}
+      {/* FIXED 3-DOTS POPUP OVERLAY (No table scrolling or overflow issues) */}
       {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Create Client Organization</h2>
-                  <p className="text-xs text-slate-500">
-                    Add a new enterprise client, franchise group, or management portfolio.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {menuPosition && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
+          <div
+            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
+          >
+            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
+              <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.org.name}</p>
+              <p className="text-[10px] text-slate-400">Admin Options</p>
             </div>
 
-            {formError && (
-              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
+            <button
+              onClick={() => {
+                const org = menuPosition.org;
+                setMenuPosition(null);
+                handleOpenEdit(org);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Organization Details
+            </button>
 
-            <form onSubmit={handleCreateSubmit} className="mt-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    Organization Name <span className="text-rose-500">*</span>
+            <button
+              onClick={() => {
+                const org = menuPosition.org;
+                setMenuPosition(null);
+                handleOpenPropertiesDrawer(org);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-500" /> View Assigned Properties
+            </button>
+
+            <button
+              onClick={() => {
+                const org = menuPosition.org;
+                setMenuPosition(null);
+                handleOpenAssignModal(org);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-500" /> Assign New Property
+            </button>
+
+            <button
+              onClick={() => {
+                const org = menuPosition.org;
+                setMenuPosition(null);
+                handleOpenContactsDrawer(org);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Users className="w-3.5 h-3.5 text-purple-500" /> View Contact List
+            </button>
+
+            <div className="border-t border-slate-100 dark:border-[#222430] my-0.5"></div>
+
+            <button
+              onClick={() => {
+                const org = menuPosition.org;
+                setMenuPosition(null);
+                handleOpenStatusModal(org);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-500" /> Change Status
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. EDIT ORGANIZATION DRAWER */}
+      {/* ========================================================================= */}
+      {showEditDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Organization</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedOrgForEdit?.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowEditDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} id="edit-form" className="space-y-3.5 mt-5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Organization Name *
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Shamin Hotels"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Portfolio / Entity Type</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    <option value="Franchise Portfolio">Franchise Portfolio</option>
-                    <option value="Regional Hotel Group">Regional Hotel Group</option>
-                    <option value="Enterprise Franchise">Enterprise Franchise</option>
-                    <option value="Third-Party Management">Third-Party Management</option>
-                    <option value="Independent Luxury">Independent Luxury</option>
-                    <option value="Asset Owner">Asset Owner</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Primary Contact Name</label>
-                  <input
-                    type="text"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    placeholder="e.g. Sarah Jenkins"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Corporate Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="sjenkins@shaminhotels.com"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Phone Number</label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+1 (804) 555-0192"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Initial Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="PENDING_ONBOARDING">Pending Onboarding</option>
-                    <option value="SUSPENDED">Suspended</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Street Address</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="2000 Midlothian Turnpike"
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">City</label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="Richmond"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">State / Region</label>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    placeholder="VA"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Zip Code</label>
-                  <input
-                    type="text"
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                    placeholder="23235"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold disabled:opacity-50 shadow-sm"
-                >
-                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Organization</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 6. EDIT ORGANIZATION MODAL                                                */}
-      {/* ========================================================================= */}
-      {showEditModal && selectedOrg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <Edit2 className="w-5 h-5" />
-                </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Edit Organization</h2>
-                  <p className="text-xs text-slate-500">
-                    Update organization identity, contacts, and configuration.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Organization Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Portfolio Type</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Organization Type
+                  </label>
                   <select
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="Franchise Portfolio">Franchise Portfolio</option>
-                    <option value="Regional Hotel Group">Regional Hotel Group</option>
-                    <option value="Enterprise Franchise">Enterprise Franchise</option>
-                    <option value="Third-Party Management">Third-Party Management</option>
-                    <option value="Independent Luxury">Independent Luxury</option>
-                    <option value="Asset Owner">Asset Owner</option>
+                    <option value="Management Group">Management Group</option>
+                    <option value="Boutique Hotel Group">Boutique Hotel Group</option>
+                    <option value="Enterprise Corporate">Enterprise Corporate</option>
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Primary Contact</label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Street Address</label>
                   <input
                     type="text"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Corporate Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ZIP</label>
+                    <input
+                      type="text"
+                      value={formData.zip_code}
+                      onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Phone</label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Status</label>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="ACTIVE">Active</option>
-                    <option value="PENDING_ONBOARDING">Pending Onboarding</option>
-                    <option value="SUSPENDED">Suspended</option>
+                    <option value="INACTIVE">Inactive</option>
                     <option value="ARCHIVED">Archived</option>
                   </select>
                 </div>
-              </div>
+              </form>
+            </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Street Address</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">City</label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">State</label>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Zip</label>
-                  <input
-                    type="text"
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold disabled:opacity-50 shadow-sm"
-                >
-                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Changes</span>
-                </button>
-              </div>
-            </form>
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowEditDrawer(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 7. STATUS CONTROL MODAL                                                   */}
+      {/* 2. CREATE ORGANIZATION MODAL */}
       {/* ========================================================================= */}
-      {showStatusModal && selectedOrg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">Organization Status Control</h3>
-              </div>
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Create New Organization</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 mt-3">
-              Change the operational lifecycle state for{' '}
-              <span className="font-bold text-slate-900">{selectedOrg.name}</span>.
-            </p>
+            {formError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs">
+                {formError}
+              </div>
+            )}
 
-            <div className="mt-4 space-y-2 text-xs">
-              <button
-                onClick={() => handleUpdateStatus('ACTIVE')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedOrg.status === 'ACTIVE'
-                    ? 'border-emerald-500 bg-emerald-50/50 font-bold text-emerald-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
+            <form onSubmit={handleSaveCreate} id="create-form" className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Organization Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Pearson Hotel Group"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Active Production</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Full voice trunks, E911 dispatch, and dashboard access enabled.
-                  </div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Type</label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="Franchise Portfolio">Franchise Portfolio</option>
+                    <option value="Management Group">Management Group</option>
+                    <option value="Boutique Hotel Group">Boutique Hotel Group</option>
+                    <option value="Enterprise Corporate">Enterprise Corporate</option>
+                  </select>
                 </div>
-                {selectedOrg.status === 'ACTIVE' && <Check className="w-4 h-4 text-emerald-600" />}
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email</label>
+                  <input
+                    type="email"
+                    placeholder="admin@hotel.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">City</label>
+                  <input
+                    type="text"
+                    placeholder="Dallas"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="+1 (555) 019-2834"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </form>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Cancel
               </button>
-
               <button
-                onClick={() => handleUpdateStatus('PENDING_ONBOARDING')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedOrg.status === 'PENDING_ONBOARDING'
-                    ? 'border-sky-500 bg-sky-50/50 font-bold text-sky-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
+                type="submit"
+                form="create-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
               >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                    <span>Provisioning / Onboarding</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Contract signing, porting submission, and property config.
-                  </div>
-                </div>
-                {selectedOrg.status === 'PENDING_ONBOARDING' && (
-                  <Check className="w-4 h-4 text-sky-600" />
-                )}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('SUSPENDED')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedOrg.status === 'SUSPENDED'
-                    ? 'border-rose-500 bg-rose-50/50 font-bold text-rose-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                    <span>Suspended</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Temporarily pause outbound voice trunks and lock client portal.
-                  </div>
-                </div>
-                {selectedOrg.status === 'SUSPENDED' && <Check className="w-4 h-4 text-rose-600" />}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('ARCHIVED')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedOrg.status === 'ARCHIVED'
-                    ? 'border-slate-500 bg-slate-100 font-bold text-slate-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <Archive className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Archived</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Soft deleted with read-only historical compliance records.
-                  </div>
-                </div>
-                {selectedOrg.status === 'ARCHIVED' && <Check className="w-4 h-4 text-slate-600" />}
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Create
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="mt-5 flex justify-end">
+      {/* ========================================================================= */}
+      {/* 3. VIEW ASSIGNED PROPERTIES WIDE DRAWER */}
+      {/* ========================================================================= */}
+      {showPropertiesDrawer && selectedOrgForProperties && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-xl bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Assigned Properties</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedOrgForProperties.name}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenAssignModal(selectedOrgForProperties)}
+                    className="px-2.5 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Assign Property
+                  </button>
+                  <button onClick={() => setShowPropertiesDrawer(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search in Drawer */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter assigned properties..."
+                  value={propertiesSearch}
+                  onChange={(e) => setPropertiesSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {loadingProperties ? (
+                <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
+                  <p>Loading properties...</p>
+                </div>
+              ) : orgProperties.length === 0 ? (
+                <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                  <Layers className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+                  <p className="text-xs font-semibold text-slate-800 dark:text-white">No properties assigned</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Click "Assign Property" to link existing locations.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {orgProperties
+                    .filter(
+                      (p) =>
+                        p.name.toLowerCase().includes(propertiesSearch.toLowerCase()) ||
+                        (p.city && p.city.toLowerCase().includes(propertiesSearch.toLowerCase()))
+                    )
+                    .map((prop) => (
+                      <div
+                        key={prop.id}
+                        className="p-3 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{prop.name}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {prop.city ? `${prop.city}, ${prop.state || prop.country}` : prop.address || 'Address N/A'}
+                          </p>
+                          {prop.main_phone && (
+                            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-slate-400" /> {prop.main_phone}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => handleUnassignProperty(prop.id, prop.name)}
+                          className="px-2 py-1 text-[11px] text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition border border-rose-200 dark:border-rose-900/40"
+                        >
+                          Unassign
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
               <button
-                onClick={() => setShowStatusModal(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                onClick={() => setShowPropertiesDrawer(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
               >
                 Close
               </button>
@@ -1570,230 +1708,380 @@ export default function AdminOrganizationsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 8. SINGLE-ORGANIZATION DASHBOARD DRAWER / SLIDE-OVER                      */}
+      {/* 4. ASSIGN NEW PROPERTY SEARCHABLE MODAL */}
       {/* ========================================================================= */}
-      {drawerOrg && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-2xl h-full shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-200 flex items-start justify-between bg-slate-50">
-              <div className="flex items-center gap-3.5">
-                <div
-                  className={`w-12 h-12 rounded-2xl ${getAvatarBg(drawerOrg.name.substring(0, 2)).bg} ${
-                    getAvatarBg(drawerOrg.name.substring(0, 2)).text
-                  } flex items-center justify-center font-bold text-base shadow-xs`}
-                >
-                  {drawerOrg.name.substring(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-slate-900">{drawerOrg.name}</h2>
-                    {drawerOrg.code && (
-                      <span className="px-2 py-0.5 rounded bg-white text-slate-700 text-xs font-mono font-bold border border-slate-200 shadow-xs">
-                        {drawerOrg.code}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                    <span>{drawerOrg.type || 'Enterprise Client'}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      {drawerOrg.city ? `${drawerOrg.city}, ${drawerOrg.state || ''}` : 'USA'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenEdit(drawerOrg)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-xs"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setDrawerOrg(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {showAssignModal && selectedOrgForProperties && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property</h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
-              {/* Organization Analytics Overview */}
-              <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
-                  Organization-Wise Analytics
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100">
-                    <div className="text-xl font-bold text-indigo-900">
-                      {drawerOrg.properties_count || 0}
-                    </div>
-                    <div className="text-[11px] font-semibold text-indigo-700 mt-0.5">Properties</div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100">
-                    <div className="text-xl font-bold text-blue-900">{drawerOrg.sip_lines || 0}</div>
-                    <div className="text-[11px] font-semibold text-blue-700 mt-0.5">SIP Lines</div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-                    <div className="text-xl font-bold text-emerald-900">100%</div>
-                    <div className="text-[11px] font-semibold text-emerald-700 mt-0.5">E911 PSAP</div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-xl font-bold text-slate-900">
-                      {drawerOrg.open_tickets_count || 0}
-                    </div>
-                    <div className="text-[11px] font-semibold text-slate-600 mt-0.5">Open Tickets</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact & Physical Address */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Headquarters & Primary Contact
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <span className="text-slate-400 text-[11px]">Primary Contact:</span>
-                    <p className="font-semibold text-slate-800 text-xs mt-0.5">
-                      {drawerOrg.contact_name || 'Sarah Jenkins'}
-                    </p>
-                    <p className="text-slate-500 text-xs">{drawerOrg.email || '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[11px]">Phone & Dispatch:</span>
-                    <p className="font-semibold text-slate-800 text-xs mt-0.5">
-                      {drawerOrg.phone || '+1 (800) 555-0100'}
-                    </p>
-                    <p className="text-slate-500 text-xs">
-                      {drawerOrg.address ? `${drawerOrg.address}, ${drawerOrg.city || ''}` : 'USA'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Telephony Architecture & Carrier Mesh */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Voice Line Routing & Architecture
-                  </h4>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Active Mesh
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 text-[10px] uppercase font-bold">Architecture</span>
-                    <p className="font-semibold text-slate-900 mt-0.5">
-                      {drawerOrg.sip_architecture || 'Dual Cloud Redundancy'}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 text-[10px] uppercase font-bold">Latency</span>
-                    <p className="font-semibold text-emerald-600 mt-0.5">14ms Average (Carrier Core)</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Operational Shortcuts */}
-              <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-                  Operational Shortcuts
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <Link
-                    href={`/admin/properties?orgId=${drawerOrg.id}`}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 flex items-center justify-between transition-colors group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Layers className="w-4 h-4 text-indigo-600" />
-                      <div>
-                        <div className="font-semibold text-slate-800 group-hover:text-indigo-600">
-                          Managed Properties
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          View all {drawerOrg.properties_count || 0} hotel locations
-                        </div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  </Link>
-
-                  <Link
-                    href={`/admin/e911?orgId=${drawerOrg.id}`}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 flex items-center justify-between transition-colors group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      <div>
-                        <div className="font-semibold text-slate-800 group-hover:text-indigo-600">
-                          E911 PSAP Dispatch
-                        </div>
-                        <div className="text-[10px] text-slate-400">Kari&apos;s Law verification</div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  </Link>
-
-                  <Link
-                    href={`/admin/onboarding-porting?orgId=${drawerOrg.id}`}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 flex items-center justify-between transition-colors group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <PhoneCall className="w-4 h-4 text-blue-600" />
-                      <div>
-                        <div className="font-semibold text-slate-800 group-hover:text-indigo-600">
-                          Porting & Numbers
-                        </div>
-                        <div className="text-[10px] text-slate-400">LOA & FOC milestones</div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  </Link>
-
-                  <Link
-                    href={`/admin/tickets?orgId=${drawerOrg.id}`}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 flex items-center justify-between transition-colors group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <LifeBuoy className="w-4 h-4 text-violet-600" />
-                      <div>
-                        <div className="font-semibold text-slate-800 group-hover:text-indigo-600">
-                          Support Tickets
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {drawerOrg.open_tickets_count || 0} active tickets
-                        </div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Drawer Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setSelectedOrg(drawerOrg);
-                  setShowStatusModal(true);
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search properties by name, city..."
+                value={assignSearchQuery}
+                onChange={(e) => {
+                  setAssignSearchQuery(e.target.value);
+                  fetchAvailableProperties(e.target.value, selectedOrgForProperties.id);
                 }}
-                className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-white text-slate-700 font-semibold text-xs transition-colors"
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Available Properties Results */}
+            <div className="max-h-52 overflow-y-auto space-y-1.5 divide-y divide-slate-100 dark:divide-[#222430]">
+              {loadingAvailable ? (
+                <div className="py-8 text-center text-xs text-slate-400 space-y-1.5">
+                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500 mx-auto" />
+                  <p>Searching database...</p>
+                </div>
+              ) : availableProperties.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-400">No available properties found.</div>
+              ) : (
+                availableProperties.map((prop) => {
+                  const isSelected = selectedPropertyToAssign === prop.id;
+                  const isAssigned = prop.is_assigned_to_current_org;
+
+                  return (
+                    <div
+                      key={prop.id}
+                      onClick={() => !isAssigned && setSelectedPropertyToAssign(prop.id)}
+                      className={`p-2.5 rounded-lg text-xs transition flex items-center justify-between gap-2 ${
+                        isAssigned
+                          ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-[#111217]'
+                          : isSelected
+                          ? 'bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-400 cursor-pointer'
+                          : 'hover:bg-slate-50 dark:hover:bg-[#1a1c24] cursor-pointer'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-slate-900 dark:text-white">{prop.name}</p>
+                          {isAssigned && (
+                            <span className="text-[9px] text-slate-400 bg-slate-100 dark:bg-[#222430] px-1 py-0.2 rounded">
+                              Assigned
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          {prop.city ? `${prop.city}, ${prop.state || ''}` : prop.address || ''}
+                        </p>
+                      </div>
+
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-600 flex-shrink-0" />}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
               >
-                Change Status ({drawerOrg.status})
+                Cancel
               </button>
               <button
-                onClick={() => setDrawerOrg(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-colors"
+                type="button"
+                onClick={handleAssignPropertySubmit}
+                disabled={!selectedPropertyToAssign || assigningLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
               >
-                Done
+                {assigningLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Assign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. VIEW CONTACT LIST DRAWER & ADD CONTACT MODAL */}
+      {/* ========================================================================= */}
+      {showContactsDrawer && selectedOrgForContacts && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Authorized Contacts</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedOrgForContacts.name}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
+                      setShowAddContactModal(true);
+                    }}
+                    className="px-2.5 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg flex items-center gap-1"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Add Contact
+                  </button>
+                  <button onClick={() => setShowContactsDrawer(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Contacts */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter contacts..."
+                  value={contactsSearch}
+                  onChange={(e) => setContactsSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {loadingContacts ? (
+                <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
+                  <p>Loading contacts...</p>
+                </div>
+              ) : contactsList.length === 0 ? (
+                <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                  <Users className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+                  <p className="text-xs font-semibold text-slate-800 dark:text-white">No contacts listed</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Click "Add Contact" to add authorized personnel.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {contactsList
+                    .filter(
+                      (c) =>
+                        c.name.toLowerCase().includes(contactsSearch.toLowerCase()) ||
+                        c.email.toLowerCase().includes(contactsSearch.toLowerCase())
+                    )
+                    .map((contact) => (
+                      <div
+                        key={contact.id}
+                        className={`p-3 rounded-lg border text-xs flex items-start gap-3 ${
+                          contact.is_primary
+                            ? 'bg-indigo-50/50 dark:bg-[#1a1c24] border-indigo-200 dark:border-indigo-900/40'
+                            : 'bg-slate-50 dark:bg-[#1a1c24] border-slate-200 dark:border-[#222430]'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                          {contact.name.substring(0, 2).toUpperCase()}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-semibold text-slate-900 dark:text-white truncate">{contact.name}</h4>
+                            {contact.is_primary && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-bold bg-[#4f46e5] text-white rounded">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Mail className="w-3 h-3" /> {contact.email}
+                          </p>
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3" /> {contact.phone || '+1 (555) 019-2834'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
+              <button
+                onClick={() => setShowContactsDrawer(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddContactModal && selectedOrgForContacts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Contact</h3>
+              <button onClick={() => setShowAddContactModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {showPrimaryOverrideConfirm ? (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 rounded-lg text-xs space-y-2">
+                <p className="font-semibold text-amber-700 dark:text-amber-400">Replace Primary Contact?</p>
+                <p className="text-slate-600 dark:text-slate-300">
+                  Setting {contactFormData.full_name} as primary will replace the current primary contact.
+                </p>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => setShowPrimaryOverrideConfirm(false)}
+                    className="px-2.5 py-1 rounded bg-slate-200 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleAddContactSubmit(true)}
+                    disabled={savingContact}
+                    className="px-3 py-1 bg-amber-600 text-white rounded font-medium"
+                  >
+                    Confirm Replace
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleAddContactSubmit(false);
+                }}
+                className="space-y-3 text-xs"
+              >
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Sarah Jenkins"
+                    value={contactFormData.full_name}
+                    onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="sarah@hotel.com"
+                    value={contactFormData.email}
+                    onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    placeholder="+1 (555) 012-3456"
+                    value={contactFormData.phone_number}
+                    onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={contactFormData.is_primary}
+                      onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Set as Primary Contact</span>
+                  </label>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddContactModal(false)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingContact}
+                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {savingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Save Contact
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. CHANGE STATUS MODAL */}
+      {/* ========================================================================= */}
+      {showStatusModal && selectedOrgForStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Change Status</h3>
+              <button onClick={() => setShowStatusModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Select status for <strong className="text-slate-800 dark:text-white">{selectedOrgForStatus.name}</strong>:
+            </p>
+
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              {(['ACTIVE', 'INACTIVE', 'ARCHIVED'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setTargetStatus(st)}
+                  className={`py-2 px-2 rounded-lg font-semibold transition border text-center ${
+                    targetStatus === st
+                      ? st === 'ACTIVE'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                        : st === 'INACTIVE'
+                        ? 'bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                        : 'bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                      : 'bg-slate-50 dark:bg-[#111217] border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {st === 'ACTIVE' ? 'Active' : st === 'ARCHIVED' ? 'Archived' : 'Inactive'}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-slate-400 bg-slate-50 dark:bg-[#111217] p-2 rounded-lg border border-slate-100 dark:border-[#222430]">
+              {targetStatus === 'ARCHIVED'
+                ? 'Archiving suspends services and client access while preserving all database records.'
+                : targetStatus === 'INACTIVE'
+                ? 'Inactive temporarily pauses operational notifications.'
+                : 'Active restores full operational access.'}
+            </p>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStatusChange}
+                disabled={statusChangeLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {statusChangeLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Confirm
               </button>
             </div>
           </div>

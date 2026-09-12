@@ -1,31 +1,30 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  GitBranch,
   Search,
   Plus,
-  Filter,
   Download,
   MoreVertical,
-  Settings,
-  Hotel,
+  Building2,
   CheckCircle2,
   AlertCircle,
-  Clock,
+  ChevronLeft,
+  ChevronRight,
   SlidersHorizontal,
   X,
   Edit2,
   Calendar,
-  Kanban,
-  CheckCircle,
   Sparkles,
-  PhoneCall,
-  Check,
+  RefreshCw,
+  Info,
+  FileText,
+  Clock,
   Loader2,
-  List,
+  Check,
+  Hotel,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 export type OnboardingStatus =
   | 'DRAFT'
@@ -37,13 +36,32 @@ export type OnboardingStatus =
   | 'FOC_RECEIVED'
   | 'COMPLETED';
 
+interface PropertyDetails {
+  id?: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  zip_code?: string;
+  main_phone?: string;
+  contact_person_name?: string;
+  contact_person_email?: string;
+  general_manager_name?: string;
+}
+
+interface OrganizationDetails {
+  id?: string;
+  name: string;
+  primary_email?: string;
+  primary_phone?: string;
+  address_line1?: string;
+  city?: string;
+  state?: string;
+}
+
 interface OnboardingRecord {
   id: string;
-  organization_name: string;
-  property_name: string;
-  property_city?: string;
-  property_state?: string;
-  brand?: string;
   status: OnboardingStatus;
   target_date: string | null;
   contract_sent_at?: string | null;
@@ -54,625 +72,1194 @@ interface OnboardingRecord {
   foc_received_at?: string | null;
   completed_at?: string | null;
   progress_pct: number;
-  open_tickets_count?: number;
-  dids_count?: number;
+  property_id?: string;
+  property_name: string;
+  organization_id?: string;
+  organization_name: string;
+  property_details?: PropertyDetails | null;
+  organization_details?: OrganizationDetails | null;
   created_at: string;
+  updated_at?: string;
 }
 
-const STAGES: { key: OnboardingStatus; label: string; pct: number; color: string }[] = [
-  { key: 'DRAFT', label: 'Draft', pct: 10, color: 'bg-slate-500' },
-  { key: 'CONTRACT_SENT', label: 'Contract Sent', pct: 25, color: 'bg-indigo-500' },
-  { key: 'SIGNED', label: 'Signed', pct: 40, color: 'bg-blue-500' },
-  { key: 'PORTING_WAITING', label: 'Waiting for LOA', pct: 55, color: 'bg-amber-500' },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', pct: 70, color: 'bg-purple-500' },
-  { key: 'SOF_WAITING', label: 'SOF Review', pct: 80, color: 'bg-amber-500' },
-  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', pct: 90, color: 'bg-sky-500' },
-  { key: 'COMPLETED', label: 'Live Cutover', pct: 100, color: 'bg-emerald-500' },
-];
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
+}
 
 function getStageBadge(status: OnboardingStatus): { label: string; bg: string; text: string; border: string; pct: number } {
   switch (status) {
     case 'DRAFT':
-      return { label: 'Draft', bg: 'bg-slate-100 dark:bg-[#20222a]', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-200 dark:border-[#2e313d]', pct: 10 };
+      return { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]', pct: 10 };
     case 'CONTRACT_SENT':
-      return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/40', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/40', pct: 25 };
+      return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 25 };
     case 'SIGNED':
-      return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/40', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/40', pct: 40 };
+      return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 40 };
     case 'PORTING_WAITING':
-      return { label: 'Waiting for LOA', bg: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/40', pct: 55 };
+      return { label: 'Waiting for LOA', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 55 };
     case 'PORTING_SUBMITTED':
-      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/40', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/40', pct: 70 };
+      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 70 };
     case 'SOF_WAITING':
-      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/40', pct: 80 };
+      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 80 };
     case 'FOC_RECEIVED':
-      return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/40', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/40', pct: 90 };
+      return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 90 };
     case 'COMPLETED':
-      return { label: 'Live Cutover', bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/40', pct: 100 };
+      return { label: 'Live Cutover', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50', pct: 100 };
     default:
-      return { label: status, bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-200 dark:border-slate-700', pct: 0 };
+      return { label: status, bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-slate-700', pct: 0 };
   }
 }
 
 export default function AdminOnboardingPortingPage() {
   const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'LIST' | 'KANBAN'>('LIST');
+  const [error, setError] = useState<string | null>(null);
 
-  // Modals & Drawers
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showAdvanceModal, setShowAdvanceModal] = useState(false);
-  const [selectedOnboarding, setSelectedOnboarding] = useState<OnboardingRecord | null>(null);
-  const [drawerOnboarding, setDrawerOnboarding] = useState<OnboardingRecord | null>(null);
+  // Server-Side Pagination (10 per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10;
 
-  // Form State
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    property_name: '',
-    organization_name: '',
-    brand: 'Courtyard by Marriott',
-    status: 'CONTRACT_SENT' as OnboardingStatus,
-    target_date: '',
-    dids_count: 24,
+  // Real Database Metrics (No fake data)
+  const [metrics, setMetrics] = useState({
+    totalOnboardings: 0,
+    completedCount: 0,
+    inProgressCount: 0,
+    pendingReviewCount: 0,
   });
 
-  const loadOnboardings = async () => {
+  // Search & Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
+
+  // Debounce search (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Toast Notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const showToast = useCallback((title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  // Fixed 3-Dots Action Menu Overlay
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: OnboardingRecord } | null>(null);
+
+  // Drawers & Modals
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<OnboardingRecord | null>(null);
+
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [selectedRecordForDetails, setSelectedRecordForDetails] = useState<OnboardingRecord | null>(null);
+
+  // Form State for creating a brand new property onboarding (NO Organization input needed)
+  const [newPropertyForm, setNewPropertyForm] = useState({
+    property_name: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    general_manager_name: '',
+    contact_person_name: '',
+    contact_person_email: '',
+    main_phone: '',
+    status: 'DRAFT' as OnboardingStatus,
+    target_date: '',
+  });
+
+  // Form State for editing
+  const [editFormData, setEditFormData] = useState({
+    status: 'DRAFT' as OnboardingStatus,
+    target_date: '',
+  });
+
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Fetch Onboardings (Server-Side Paginated)
+  const fetchOnboardings = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/onboarding');
+      setError(null);
+
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearch,
+        stage: selectedStageFilter,
+        sortBy: sortBy,
+      });
+
+      const res = await fetch(`/api/admin/onboarding?${params.toString()}`);
       const result = await res.json();
 
-      if (result.success && Array.isArray(result.data)) {
-        const mapped: OnboardingRecord[] = result.data.map((item: any) => {
-          const orgProp = item.org_property;
-          const stageInfo = getStageBadge(item.status || 'DRAFT');
-
-          return {
-            id: item.id,
-            property_name: orgProp?.property?.name || item.property_name || 'Assigned Property',
-            organization_name: orgProp?.organization?.name || item.organization_name || 'Assigned Organization',
-            property_city: orgProp?.property?.city || '',
-            property_state: orgProp?.property?.state || '',
-            brand: orgProp?.property?.brand || 'Hospitality Location',
-            status: item.status || 'DRAFT',
-            target_date: item.target_date || null,
-            contract_sent_at: item.contract_sent_at,
-            signed_at: item.signed_at,
-            porting_waiting_at: item.porting_waiting_at,
-            porting_submitted_at: item.porting_submitted_at,
-            sof_waiting_at: item.sof_waiting_at,
-            foc_received_at: item.foc_received_at,
-            completed_at: item.completed_at,
-            progress_pct: stageInfo.pct,
-            open_tickets_count: 0,
-            dids_count: item.dids_count || 12,
-            created_at: item.created_at,
-          };
-        });
-
-        setOnboardings(mapped);
-      } else {
-        setOnboardings([]);
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to fetch onboarding records.');
       }
-    } catch (err) {
-      console.error('Error fetching onboardings:', err);
-      setOnboardings([]);
+
+      setOnboardings(result.data || []);
+      if (result.pagination) {
+        setTotalCount(result.pagination.totalCount);
+        setTotalPages(result.pagination.totalPages);
+      }
+      if (result.metrics) {
+        setMetrics(result.metrics);
+      }
+    } catch (err: any) {
+      console.error('Error fetching onboarding:', err);
+      setError(err.message || 'Error loading onboarding records.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearch, selectedStageFilter, sortBy]);
 
   useEffect(() => {
-    loadOnboardings();
-  }, []);
+    fetchOnboardings();
+  }, [fetchOnboardings]);
 
-  const filteredOnboardings = useMemo(() => {
-    return onboardings.filter((ob) => {
-      const matchesSearch =
-        ob.property_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ob.organization_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (ob.brand && ob.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (ob.property_city && ob.property_city.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      const matchesStage = selectedStageFilter === 'ALL' || ob.status === selectedStageFilter;
-      return matchesSearch && matchesStage;
-    });
-  }, [onboardings, searchQuery, selectedStageFilter]);
-
-  const activeCount = onboardings.filter((o) => o.status !== 'COMPLETED').length;
-  const focConfirmedCount = onboardings.filter((o) => o.status === 'FOC_RECEIVED').length;
-  const waitingActionCount = onboardings.filter((o) => o.status === 'PORTING_WAITING' || o.status === 'SOF_WAITING' || o.status === 'CONTRACT_SENT').length;
-  const completedCount = onboardings.filter((o) => o.status === 'COMPLETED').length;
-
-  const handleOpenCreate = () => {
-    setFormData({
-      property_name: '',
-      organization_name: '',
-      brand: 'Courtyard by Marriott',
-      status: 'CONTRACT_SENT',
-      target_date: new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10),
-      dids_count: 24,
-    });
-    setFormError(null);
-    setShowCreateModal(true);
+  // Open 3-Dots Menu
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: OnboardingRecord) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, record });
   };
 
-  const handleOpenAdvance = (ob: OnboardingRecord) => {
-    setSelectedOnboarding(ob);
-    setShowAdvanceModal(true);
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  // --- Handlers: Create Brand New Property Onboarding ---
+  const handleSaveCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.property_name.trim()) {
-      setFormError('Property name is required.');
+    if (!newPropertyForm.property_name.trim()) {
+      setFormError('Please enter the Property Name.');
       return;
     }
 
     try {
       setFormLoading(true);
-      const stageInfo = getStageBadge(formData.status);
-      const newOb: OnboardingRecord = {
-        id: `ob-${Date.now()}`,
-        property_name: formData.property_name.trim(),
-        organization_name: formData.organization_name || 'Direct Organization',
-        brand: formData.brand,
-        property_city: '',
-        property_state: '',
-        status: formData.status,
-        target_date: formData.target_date || null,
-        contract_sent_at: new Date().toISOString(),
-        progress_pct: stageInfo.pct,
-        open_tickets_count: 0,
-        dids_count: Number(formData.dids_count) || 12,
-        created_at: new Date().toISOString(),
-      };
+      setFormError(null);
 
-      setOnboardings([newOb, ...onboardings]);
+      const res = await fetch('/api/admin/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPropertyForm),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to initialize onboarding.');
+
+      showToast('Property Added & Onboarding Started', `${newPropertyForm.property_name} registered in database.`, 'success');
       setShowCreateModal(false);
+      fetchOnboardings();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to create onboarding');
+      setFormError(err.message || 'Creation failed.');
+      showToast('Error', err.message, 'error');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleAdvanceStatus = async (targetStatus: OnboardingStatus) => {
-    if (!selectedOnboarding) return;
-    const stageInfo = getStageBadge(targetStatus);
-    const now = new Date().toISOString();
-
-    try {
-      await fetch(`/api/admin/onboarding/${selectedOnboarding.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: targetStatus }),
-      });
-    } catch (e) {
-      console.error('Error advancing onboarding status:', e);
-    }
-
-    setOnboardings((prev) =>
-      prev.map((o) =>
-        o.id === selectedOnboarding.id
-          ? {
-              ...o,
-              status: targetStatus,
-              progress_pct: stageInfo.pct,
-              signed_at: targetStatus === 'SIGNED' ? now : o.signed_at,
-              porting_submitted_at: targetStatus === 'PORTING_SUBMITTED' ? now : o.porting_submitted_at,
-              foc_received_at: targetStatus === 'FOC_RECEIVED' ? now : o.foc_received_at,
-              completed_at: targetStatus === 'COMPLETED' ? now : o.completed_at,
-            }
-          : o
-      )
-    );
-
-    if (drawerOnboarding && drawerOnboarding.id === selectedOnboarding.id) {
-      setDrawerOnboarding({
-        ...drawerOnboarding,
-        status: targetStatus,
-        progress_pct: stageInfo.pct,
-      });
-    }
-
-    setShowAdvanceModal(false);
+  // --- Handlers: Edit ---
+  const handleOpenEdit = (record: OnboardingRecord) => {
+    setSelectedRecordForEdit(record);
+    setEditFormData({
+      status: record.status,
+      target_date: record.target_date || '',
+    });
+    setFormError(null);
+    setShowEditDrawer(true);
   };
 
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecordForEdit) return;
+
+    try {
+      setFormLoading(true);
+      setFormError(null);
+
+      const res = await fetch('/api/admin/onboarding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedRecordForEdit.id,
+          status: editFormData.status,
+          target_date: editFormData.target_date || null,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update record.');
+
+      showToast('Updated', 'Onboarding status updated.', 'success');
+      setShowEditDrawer(false);
+      fetchOnboardings();
+    } catch (err: any) {
+      setFormError(err.message || 'Update failed.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedStageFilter('ALL');
+    setSortBy('NEWEST');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedStageFilter !== 'ALL' ||
+    sortBy !== 'NEWEST';
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notification Container */}
+      <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${
+                t.type === 'success'
+                  ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                  : t.type === 'error'
+                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                  : 'bg-slate-900/95 border-indigo-500/30 text-white'
+              }`}
+            >
+              {t.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              ) : t.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 text-xs">
+                <p className="font-semibold text-white">{t.title}</p>
+                {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+              </div>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Page Header (Clean: No Subtitle, No Mini Component) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="text-[10.5px] uppercase font-bold tracking-widest text-[#f97316] block">
-            OPERATIONS
-          </span>
-          <div className="flex items-center gap-3 mt-0.5">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Onboarding &amp; Porting Pipelines
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-[#f97316] border border-amber-500/30">
-              {activeCount} Active Workflows
-            </span>
-          </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Track property telecom contract signing, carrier LOA validation, FOC scheduled cutover milestones, and live PBX activation.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Onboarding & Porting</h1>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
+        <div className="flex items-center gap-2.5">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
-              const headers = ['Property Name', 'Organization', 'Status', 'Progress %', 'Target Date'];
-              const rows = filteredOnboardings.map((o) => [`"${o.property_name}"`, `"${o.organization_name}"`, o.status, `${o.progress_pct}%`, o.target_date || 'TBD']);
-              const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-              const link = document.createElement('a');
-              link.setAttribute('href', encodeURI(csvContent));
-              link.setAttribute('download', `AAA_Onboarding_${new Date().toISOString().slice(0, 10)}.csv`);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+              const headers = ['ID,Property,Organization,Status,Progress,TargetDate\n'];
+              const rows = onboardings.map((o) =>
+                `"${o.id}","${o.property_name}","${o.organization_name}","${o.status}","${o.progress_pct}%","${o.target_date || 'N/A'}"`
+              );
+              const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `onboarding-tracker-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              showToast('Exported', 'Onboarding records exported as CSV.', 'info');
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] hover:bg-slate-50 dark:hover:bg-[#1e1f27] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors shadow-sm"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={resetAllFilters}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
-              setSelectedStageFilter('ALL');
-              setSearchQuery('');
+              setNewPropertyForm({
+                property_name: '',
+                address: '',
+                city: '',
+                state: '',
+                zip_code: '',
+                general_manager_name: '',
+                contact_person_name: '',
+                contact_person_email: '',
+                main_phone: '',
+                status: 'DRAFT',
+                target_date: '',
+              });
+              setFormError(null);
+              setShowCreateModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] hover:bg-slate-50 dark:hover:bg-[#1e1f27] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors shadow-sm"
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <span>Reset Filters</span>
-          </button>
-
-          <button
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#ea580c] hover:bg-[#c2410c] dark:bg-[#f97316] dark:hover:bg-[#ea580c] text-white font-semibold text-xs transition-all shadow-sm shadow-orange-500/20"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Property Onboarding</span>
-          </button>
+            <Plus className="w-3.5 h-3.5" /> New Onboarding
+          </motion.button>
         </div>
       </div>
 
-      {/* 2. Top Summary KPI Cards with Sparklines */}
+      {/* Real KPI Cards (No Fake Data) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Active Workflows */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-[#f97316] flex items-center justify-center font-bold">
-                <GitBranch className="w-4 h-4" />
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Active Onboardings
-              </span>
+        {loading && onboardings.length === 0 ? (
+          [1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+            >
+              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
             </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900 dark:text-white">{activeCount}</span>
-                <span className="text-[10.5px] font-semibold text-orange-600 dark:text-[#f97316] bg-orange-500/10 px-1.5 py-0.5 rounded border border-orange-500/20">
-                  4 Due This Week
+          ))
+        ) : (
+          <>
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Onboardings
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Hotel className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalOnboardings}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Pipeline In-Flight • <span className="font-semibold text-slate-700 dark:text-slate-200">100% On-Schedule</span>
-              </div>
-            </div>
-            {/* Sparkline wave */}
-            <svg className="w-16 h-8 text-[#f97316]" viewBox="0 0 64 32" fill="none">
-              <path d="M0 26 C16 26, 24 10, 40 18 C48 24, 56 6, 64 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </div>
-        </div>
+              <p className="text-[11px] text-slate-400 mt-1">Tracked Deployments</p>
+            </motion.div>
 
-        {/* FOC Date Confirmed */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
-                <Calendar className="w-4 h-4" />
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Live Cutover
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                FOC Date Confirmed
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900 dark:text-white">{focConfirmedCount}</span>
-                <span className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                  &lt; 3d Target
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.completedCount}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Carrier Ready • <span className="font-semibold text-emerald-500">Porting Staged</span>
-              </div>
-            </div>
-            <svg className="w-16 h-8 text-emerald-500" viewBox="0 0 64 32" fill="none">
-              <path d="M0 22 C12 28, 28 20, 44 26 C52 28, 58 10, 64 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </div>
-        </div>
+              <p className="text-[11px] text-slate-400 mt-1">Completed Cutover</p>
+            </motion.div>
 
-        {/* Waiting Action / LOA */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-                <Clock className="w-4 h-4" />
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Porting In-Flight
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Clock className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Waiting Action / LOA
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900 dark:text-white">{waitingActionCount}</span>
-                <span className="text-[10.5px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                  Action Pending
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.inProgressCount}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Customer / Carrier • <span className="font-semibold text-amber-500">48h SLA Alert</span>
-              </div>
-            </div>
-            <svg className="w-16 h-8 text-amber-500" viewBox="0 0 64 32" fill="none">
-              <path d="M0 24 C16 20, 32 30, 48 16 C56 10, 60 18, 64 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </div>
-        </div>
+              <p className="text-[11px] text-slate-400 mt-1">Carrier LOA / FOC Stage</p>
+            </motion.div>
 
-        {/* Completed Cutovers */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
-                <CheckCircle className="w-4 h-4" />
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Draft & Contract
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <FileText className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Completed Cutovers
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 flex items-end justify-between">
-            <div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-slate-900 dark:text-white">{completedCount}</span>
-                <span className="text-[10.5px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
-                  14.2d Avg Velocity
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.pendingReviewCount}
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Production Live • <span className="font-semibold text-purple-400">98.2% Ontime</span>
-              </div>
-            </div>
-            <svg className="w-16 h-8 text-purple-400" viewBox="0 0 64 32" fill="none">
-              <path d="M0 26 C16 28, 30 18, 44 22 C52 24, 58 8, 64 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </div>
-        </div>
+              <p className="text-[11px] text-slate-400 mt-1">Pending Signatures</p>
+            </motion.div>
+          </>
+        )}
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search hotel property, franchise organization, city..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
-          />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
-            ⌘F
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by property or organization name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 dark:text-slate-400 font-medium">Stage:</span>
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedStageFilter}
-              onChange={(e) => setSelectedStageFilter(e.target.value)}
-              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer"
+              onChange={(e) => {
+                setSelectedStageFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Filter by stage"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
-              <option value="ALL" className="dark:bg-[#15161c]">All Stages</option>
-              {STAGES.map((s) => (
-                <option key={s.key} value={s.key} className="dark:bg-[#15161c]">
-                  {s.label}
-                </option>
-              ))}
+              <option value="ALL">Stage: All Stages</option>
+              <option value="DRAFT">Draft Initialized</option>
+              <option value="CONTRACT_SENT">Contract Sent</option>
+              <option value="SIGNED">Contract Signed</option>
+              <option value="PORTING_WAITING">Waiting for LOA</option>
+              <option value="PORTING_SUBMITTED">Porting Submitted</option>
+              <option value="SOF_WAITING">SOF Review</option>
+              <option value="FOC_RECEIVED">FOC Confirmed</option>
+              <option value="COMPLETED">Live Cutover</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Sort records"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="NEWEST">Sort: Recently Created</option>
+              <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
+              <option value="ORG_ASC">Sort: Organization (A-Z)</option>
+              <option value="STATUS">Sort: Progress % (High to Low)</option>
             </select>
           </div>
+        </div>
 
-          <div className="flex items-center bg-slate-100 dark:bg-[#111217] p-0.5 rounded-lg border border-slate-200 dark:border-[#232530]">
+        {/* Active Filters Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
+            <span className="text-slate-400">Active Filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedStageFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                {selectedStageFilter}
+                <button onClick={() => setSelectedStageFilter('ALL')} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             <button
-              onClick={() => setViewMode('LIST')}
-              className={`p-1.5 rounded ${
-                viewMode === 'LIST' ? 'bg-white dark:bg-[#1e1f27] text-[#f97316] shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              onClick={resetAllFilters}
+              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto cursor-pointer"
             >
-              <List className="w-3.5 h-3.5" />
+              Clear All
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Table View (Pure Black Headers, Separate Property & Org columns, No Location in table) */}
+      {error ? (
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load onboarding records</p>
+          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
+          <button
+            onClick={() => fetchOnboardings()}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      ) : loading && onboardings.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/5"></div>
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+            </div>
+          ))}
+        </div>
+      ) : onboardings.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+          <Hotel className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Onboarding Records</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+            {hasActiveFilters
+              ? 'No records matched the selected filters.'
+              : 'Add a new property to start its onboarding and porting milestone tracker.'}
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={resetAllFilters}
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
             <button
-              onClick={() => setViewMode('KANBAN')}
-              className={`p-1.5 rounded ${
-                viewMode === 'KANBAN' ? 'bg-white dark:bg-[#1e1f27] text-[#f97316] shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              onClick={() => {
+                setNewPropertyForm({
+                  property_name: '',
+                  address: '',
+                  city: '',
+                  state: '',
+                  zip_code: '',
+                  general_manager_name: '',
+                  contact_person_name: '',
+                  contact_person_email: '',
+                  main_phone: '',
+                  status: 'DRAFT',
+                  target_date: '',
+                });
+                setShowCreateModal(true);
+              }}
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
-              <Kanban className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" /> New Onboarding
             </button>
           </div>
         </div>
-      </div>
-
-      {/* 4. Table View (Matching Screenshot Exact Look) */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <th className="py-3 px-4">Property &amp; Organization</th>
-                <th className="py-3 px-4">Pipeline Milestone Stage</th>
-                <th className="py-3 px-4">Completion Progress</th>
-                <th className="py-3 px-4">Target Cutover Date</th>
-                <th className="py-3 px-4">Phone Lines</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
-              {filteredOnboardings.map((ob) => {
-                const stage = getStageBadge(ob.status);
-
-                return (
-                  <tr
-                    key={ob.id}
-                    className="hover:bg-slate-50/70 dark:hover:bg-[#1a1b22] transition-colors group cursor-pointer"
-                    onClick={() => setDrawerOnboarding(ob)}
-                  >
-                    {/* Property */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#20222a] flex items-center justify-center font-bold text-slate-700 dark:text-slate-300 shrink-0 border border-slate-200 dark:border-[#2d303b]">
-                          <Hotel className="w-5 h-5 text-[#f97316]" />
+      ) : (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">PROPERTY</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">STAGE / MILESTONE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">TARGET CUTOVER</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
+                {onboardings.map((record) => {
+                  const badge = getStageBadge(record.status);
+                  return (
+                    <motion.tr
+                      key={record.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      whileHover={{ backgroundColor: 'rgba(248, 250, 252, 0.6)' }}
+                      className="transition"
+                    >
+                      {/* 1. Property Name (ONLY Name, No Location) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                            <Building2 className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-black dark:text-white text-sm block">
+                              {record.property_name}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-[#f97316] transition-colors block text-xs">
-                            {ob.property_name}
+                      </td>
+
+                      {/* 2. Organization Name (ONLY Name, No Location) */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-black dark:text-white">
+                          {record.organization_name}
+                        </span>
+                      </td>
+
+                      {/* 3. Stage & Progress */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1.5 max-w-[200px]">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
+                          >
+                            {badge.label}
                           </span>
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">
-                            <span className="text-indigo-600 dark:text-[#f97316] font-semibold">{ob.organization_name}</span> • {ob.property_city}, {ob.property_state}
-                          </span>
+                          <div className="w-full bg-slate-100 dark:bg-[#222430] h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${record.progress_pct}%` }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Milestone Stage */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${stage.bg} ${stage.text} border ${stage.border}`}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                        {stage.label}
-                      </span>
-                    </td>
+                      {/* 4. Target Cutover Date */}
+                      <td className="py-3.5 px-4">
+                        {record.target_date ? (
+                          <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{new Date(record.target_date).toLocaleDateString()}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs font-normal">TBD</span>
+                        )}
+                      </td>
 
-                    {/* Progress */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="w-36 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] font-semibold text-slate-600 dark:text-slate-400">
-                          <span>Progress</span>
-                          <span>{stage.pct}%</span>
+                      {/* 5. Actions (3-Dots Trigger) */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(record)}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleOpenMenu(e, record)}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            title="More Actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-[#222430] overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-[#f97316] transition-all duration-300"
-                            style={{ width: `${stage.pct}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                    {/* Target Date */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-semibold">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                        <span>{ob.target_date || 'Target Not Set'}</span>
-                      </div>
-                    </td>
+          {/* Server-Side Pagination Bar (10 items per page) */}
+          <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} records
+            </span>
 
-                    {/* Phone Lines */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="font-bold text-slate-800 dark:text-slate-200">{ob.dids_count || 12} DIDs</span>
-                      <span className="text-[10.5px] text-slate-400 dark:text-slate-500 block">Staged for Port</span>
-                    </td>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1 || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+              >
+                <ChevronLeft className="w-3 h-3" /> Previous
+              </button>
 
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleOpenAdvance(ob)}
-                          className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-[#20222a] hover:bg-slate-200 dark:hover:bg-[#282a36] text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors border border-slate-200 dark:border-[#2e313e]"
-                        >
-                          Advance Stage
-                        </button>
-                        <button
-                          onClick={() => setDrawerOnboarding(ob)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setCurrentPage(num)}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
+                      : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+              >
+                Next <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Advance Modal */}
-      {showAdvanceModal && selectedOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430] shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-[#f97316]" />
-                <h3 className="font-bold text-slate-900 dark:text-white">Advance Milestone Stage</h3>
+      {/* ========================================================================= */}
+      {/* FIXED 3-DOTS ACTION POPUP */}
+      {/* ========================================================================= */}
+      {menuPosition && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200"
+          >
+            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
+              <p className="font-bold text-black dark:text-white truncate">{menuPosition.record.property_name}</p>
+              <p className="text-[10px] text-slate-400">Onboarding Options</p>
+            </div>
+
+            {/* 1. View Details */}
+            <button
+              onClick={() => {
+                const record = menuPosition.record;
+                setMenuPosition(null);
+                setSelectedRecordForDetails(record);
+                setShowDetailsDrawer(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5 text-blue-500" /> View Details
+            </button>
+
+            {/* 2. Edit */}
+            <button
+              onClick={() => {
+                const record = menuPosition.record;
+                setMenuPosition(null);
+                handleOpenEdit(record);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Stage
+            </button>
+          </motion.div>
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. VIEW DETAILS DRAWER (High Contrast, No Light Gray) */}
+      {/* ========================================================================= */}
+      {showDetailsDrawer && selectedRecordForDetails && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-black dark:text-white">Onboarding & Porting Details</h3>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                    {selectedRecordForDetails.property_name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button onClick={() => setShowAdvanceModal(false)} className="text-slate-400">
+
+              <div className="space-y-3.5 text-xs">
+                {/* Status & Timeline */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Stage & Timeline
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Current Milestone</span>
+                    <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                      {getStageBadge(selectedRecordForDetails.status).label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Progress Completion</span>
+                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.progress_pct}%</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Target Cutover Date</span>
+                    <span className="font-bold text-black dark:text-white">
+                      {selectedRecordForDetails.target_date
+                        ? new Date(selectedRecordForDetails.target_date).toLocaleDateString()
+                        : 'Not Set'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Property Details */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Property Specifications
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Property Name</span>
+                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
+                  </div>
+                  {selectedRecordForDetails.property_details && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">General Manager</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {selectedRecordForDetails.property_details.general_manager_name || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">Primary Contact</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {selectedRecordForDetails.property_details.contact_person_name || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">Contact Email</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {selectedRecordForDetails.property_details.contact_person_email || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">Main Phone</span>
+                        <span className="font-bold text-slate-900 dark:text-white font-mono">
+                          {selectedRecordForDetails.property_details.main_phone || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="pt-1">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">Address</span>
+                        <p className="font-medium text-slate-900 dark:text-white mt-0.5">
+                          {selectedRecordForDetails.property_details.address || 'N/A'},{' '}
+                          {selectedRecordForDetails.property_details.city}{' '}
+                          {selectedRecordForDetails.property_details.state}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Organization Details */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Managing Organization
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Organization Name</span>
+                    <span className="font-bold text-black dark:text-white">
+                      {selectedRecordForDetails.organization_name}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowDetailsDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. EDIT ONBOARDING DRAWER */}
+      {/* ========================================================================= */}
+      {showEditDrawer && selectedRecordForEdit && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-black dark:text-white">Edit Onboarding Milestone</h3>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                    {selectedRecordForEdit.property_name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowEditDrawer(false)}
+                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} id="edit-onboarding-form" className="space-y-3.5 mt-5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Onboarding Stage / Milestone *
+                  </label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="DRAFT">Draft Initialized</option>
+                    <option value="CONTRACT_SENT">Contract Sent</option>
+                    <option value="SIGNED">Contract Signed</option>
+                    <option value="PORTING_WAITING">Waiting for LOA</option>
+                    <option value="PORTING_SUBMITTED">Porting Submitted</option>
+                    <option value="SOF_WAITING">SOF Review</option>
+                    <option value="FOC_RECEIVED">FOC Confirmed</option>
+                    <option value="COMPLETED">Live Cutover (Completed)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Target Cutover Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.target_date}
+                    onChange={(e) => setEditFormData({ ...editFormData, target_date: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  />
+                </div>
+              </form>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowEditDrawer(false)}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-onboarding-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Changes
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. START NEW PROPERTY ONBOARDING MODAL (No Organization Dropdown Required) */}
+      {/* ========================================================================= */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <div>
+                <h3 className="text-sm font-bold text-black dark:text-white">Start New Property Onboarding</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  Register a new hotel property to track contract and porting cutover
+                </p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-3">
-              Advance onboarding pipeline for <strong className="text-slate-900 dark:text-white">{selectedOnboarding.property_name}</strong>.
-            </p>
+            {formError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+              </div>
+            )}
 
-            <div className="mt-4 space-y-2 text-xs">
-              {STAGES.map((st) => (
+            <form onSubmit={handleSaveCreate} className="space-y-3.5 text-xs">
+              {/* 1. New Property Name */}
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  Property Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Grand Hyatt Miami Downtown"
+                  value={newPropertyForm.property_name}
+                  onChange={(e) => setNewPropertyForm({ ...newPropertyForm, property_name: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* 2. Physical Address */}
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  Property Address
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 100 Biscayne Boulevard"
+                  value={newPropertyForm.address}
+                  onChange={(e) => setNewPropertyForm({ ...newPropertyForm, address: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* 3. City, State, Zip */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">City</label>
+                  <input
+                    type="text"
+                    placeholder="Miami"
+                    value={newPropertyForm.city}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, city: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">State</label>
+                  <input
+                    type="text"
+                    placeholder="FL"
+                    value={newPropertyForm.state}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, state: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">Zip Code</label>
+                  <input
+                    type="text"
+                    placeholder="33131"
+                    value={newPropertyForm.zip_code}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, zip_code: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Contacts */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">General Manager</label>
+                  <input
+                    type="text"
+                    placeholder="GM Full Name"
+                    value={newPropertyForm.general_manager_name}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, general_manager_name: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">Main Phone</label>
+                  <input
+                    type="text"
+                    placeholder="+1 (305) 555-0100"
+                    value={newPropertyForm.main_phone}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, main_phone: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* 5. Stage & Date */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Initial Stage
+                  </label>
+                  <select
+                    value={newPropertyForm.status}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, status: e.target.value as any })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="DRAFT">Draft Initialized</option>
+                    <option value="CONTRACT_SENT">Contract Sent</option>
+                    <option value="SIGNED">Contract Signed</option>
+                    <option value="PORTING_WAITING">Waiting for LOA</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Target Cutover Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newPropertyForm.target_date}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, target_date: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
                 <button
-                  key={st.key}
-                  onClick={() => handleAdvanceStatus(st.key)}
-                  className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all ${
-                    selectedOnboarding.status === st.key
-                      ? 'border-orange-500 bg-orange-500/10 font-bold text-[#f97316]'
-                      : 'border-slate-200 dark:border-[#252733] hover:border-slate-400 dark:hover:border-slate-600'
-                  }`}
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${st.color}`}></span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">{st.label}</span>
-                  </div>
-                  <span className="text-[11px] font-mono text-slate-500">{st.pct}%</span>
+                  Cancel
                 </button>
-              ))}
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setShowAdvanceModal(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 font-semibold text-xs"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Create Tracker
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

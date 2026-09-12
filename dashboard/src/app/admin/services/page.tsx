@@ -1,932 +1,969 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   PhoneCall,
-  Radio,
   Search,
   Plus,
-  Filter,
   Download,
   MoreVertical,
-  Settings,
-  ShieldCheck,
   Building2,
-  Hotel,
+  Phone,
   CheckCircle2,
   AlertCircle,
-  Clock,
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
   X,
   Edit2,
-  Trash2,
-  Archive,
-  BarChart3,
-  Layers,
   ArrowUpRight,
   Loader2,
   Check,
-  Network,
   LayoutGrid,
   List,
-  PhoneForwarded,
-  Activity,
-  Zap,
+  Sparkles,
+  RefreshCw,
+  Info,
+  Link as LinkIcon,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
-interface ServiceItem {
-  id: string;
-  phone_number: string;
-  service_type_name: string;
-  description: string | null;
-  status: 'ACTIVE' | 'PENDING_PORT' | 'PORTING' | 'DISCONNECTED' | 'RESERVED';
+// --- Interfaces ---
+interface AttachedProperty {
+  link_id?: string;
+  org_property_id?: string;
+  property_id?: string;
+  name: string;
+  city?: string;
+  state?: string;
+  address?: string;
   organization_id?: string;
   organization_name?: string;
-  property_id?: string;
-  property_name?: string;
-  property_city?: string;
-  property_state?: string;
-  sip_trunk_name?: string;
-  carrier_latency?: string;
-  e911_bound?: boolean;
+}
+
+interface ServiceRecord {
+  id: string;
+  phone_number: string;
+  service_type: string;
+  service_type_id?: string;
+  description: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DISCONNECTED';
+  attached_properties: AttachedProperty[];
+  attached_property_name: string;
+  attached_organization_name: string;
   created_at: string;
+  updated_at?: string;
 }
 
 interface OrgPropertyOption {
   org_property_id: string;
-  organization_id: string;
-  organization_name: string;
   property_id: string;
   property_name: string;
+  property_city?: string;
+  property_state?: string;
+  organization_id: string;
+  organization_name: string;
+}
+
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
 }
 
 export default function AdminServicesPage() {
-  const supabase = createClient();
-
-  const [services, setServices] = useState<ServiceItem[]>([]);
+  // Services State
+  const [services, setServices] = useState<ServiceRecord[]>([]);
   const [orgPropOptions, setOrgPropOptions] = useState<OrgPropertyOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Server-Side Pagination (10 per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10;
+
+  // Real Database Metrics (No fake data)
+  const [metrics, setMetrics] = useState({
+    totalServicesCount: 0,
+    activeServicesCount: 0,
+    assignedServicesCount: 0,
+    inactiveOrSuspendedCount: 0,
+  });
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
-  const [selectedOrgFilter, setSelectedOrgFilter] = useState('ALL');
-  const [sortBy, setSortBy] = useState<'NUMBER' | 'TYPE' | 'STATUS' | 'NEWEST'>('NUMBER');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  // Debounce search (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  // Modals & Drawers
+  // Toast Notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const showToast = useCallback((title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  // Fixed 3-Dots Action Menu Overlay
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; service: ServiceRecord } | null>(null);
+
+  // Drawers & Modals State
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
-  const [drawerService, setDrawerService] = useState<ServiceItem | null>(null);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [selectedServiceForEdit, setSelectedServiceForEdit] = useState<ServiceRecord | null>(null);
 
-  // Form State
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [selectedServiceForDetails, setSelectedServiceForDetails] = useState<ServiceRecord | null>(null);
+
+  const [showPropertiesDrawer, setShowPropertiesDrawer] = useState(false);
+  const [selectedServiceForProps, setSelectedServiceForProps] = useState<ServiceRecord | null>(null);
+
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedServiceForAssign, setSelectedServiceForAssign] = useState<ServiceRecord | null>(null);
+  const [selectedOrgPropId, setSelectedOrgPropId] = useState<string>('');
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  // Form State for Provision / Edit
   const [formData, setFormData] = useState({
     phone_number: '',
-    service_type_name: 'DID / Main Frontdesk',
-    description: '',
+    service_type_name: 'Direct Inward Dial (DID)',
     org_property_id: '',
-    status: 'ACTIVE' as ServiceItem['status'],
+    description: '',
+    status: 'ACTIVE',
   });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Load from DB via live API
-  const loadServices = async () => {
+  // Load Property/Org Options for dropdowns
+  const loadOrgPropertyOptions = useCallback(async () => {
     try {
-      setLoading(true);
-
-      // Load organization property links for dropdown
-      const propRes = await fetch('/api/admin/properties');
-      const propJson = await propRes.json();
-      if (propJson.success && Array.isArray(propJson.data)) {
+      const res = await fetch('/api/admin/properties?limit=100');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
         const options: OrgPropertyOption[] = [];
-        propJson.data.forEach((p: any) => {
-          const links = Array.isArray(p.org_links) ? p.org_links : [p.org_links].filter(Boolean);
-          links.forEach((l: any) => {
-            if (l && l.organization) {
-              options.push({
-                org_property_id: l.id,
-                organization_id: l.organization.id,
-                organization_name: l.organization.name,
-                property_id: p.id,
-                property_name: p.name,
-              });
-            }
-          });
+        data.data.forEach((p: any) => {
+          const links = Array.isArray(p.org_links) ? p.org_links : (p.org_links ? [p.org_links] : []);
+          if (links.length > 0) {
+            links.forEach((l: any) => {
+              if (l && l.organization) {
+                options.push({
+                  org_property_id: l.id,
+                  property_id: p.id,
+                  property_name: p.name,
+                  property_city: p.city,
+                  property_state: p.state,
+                  organization_id: l.organization.id,
+                  organization_name: l.organization.name,
+                });
+              }
+            });
+          } else {
+            // Unattached property option
+            options.push({
+              org_property_id: '',
+              property_id: p.id,
+              property_name: p.name,
+              property_city: p.city,
+              property_state: p.state,
+              organization_id: '',
+              organization_name: 'Unassigned',
+            });
+          }
         });
         setOrgPropOptions(options);
       }
-
-      // Load services from API
-      const srvRes = await fetch('/api/admin/services');
-      const srvJson = await srvRes.json();
-
-      if (srvJson.success && Array.isArray(srvJson.data)) {
-        const mapped: ServiceItem[] = srvJson.data.map((item: any, idx: number) => {
-          const link = Array.isArray(item.property_links) ? item.property_links[0]?.org_property : item.property_links?.org_property;
-          return {
-            id: item.id,
-            phone_number: item.phone_number,
-            service_type_name: item.service_type?.name || 'Voice Line / DID',
-            description: item.description || 'Enterprise Telephony Voice Line',
-            status: (item.status as any) || 'ACTIVE',
-            organization_id: link?.organization?.id || '',
-            organization_name: link?.organization?.name || 'Unassigned',
-            property_id: link?.property?.id || '',
-            property_name: link?.property?.name || 'Unassigned Property',
-            property_city: link?.property?.city || '',
-            property_state: link?.property?.state || '',
-            sip_trunk_name: `US-Core-Trunk-${10 + idx}`,
-            carrier_latency: '12ms',
-            e911_bound: true,
-            created_at: item.created_at,
-          };
-        });
-
-        setServices(mapped);
-      } else {
-        setServices([]);
-      }
     } catch (err) {
+      console.warn('Could not load org property options:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrgPropertyOptions();
+  }, [loadOrgPropertyOptions]);
+
+  // Fetch Services (Server-Side Paginated)
+  const fetchServices = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearch,
+        serviceType: selectedTypeFilter,
+        status: selectedStatusFilter,
+        sortBy: sortBy,
+      });
+
+      const res = await fetch(`/api/admin/services?${params.toString()}`);
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to fetch services.');
+      }
+
+      setServices(result.data || []);
+      if (result.pagination) {
+        setTotalCount(result.pagination.totalCount);
+        setTotalPages(result.pagination.totalPages);
+      }
+      if (result.metrics) {
+        setMetrics(result.metrics);
+      }
+    } catch (err: any) {
       console.error('Error fetching services:', err);
-      setServices([]);
+      setError(err.message || 'Error loading services data.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearch, selectedTypeFilter, selectedStatusFilter, sortBy]);
 
   useEffect(() => {
-    loadServices();
-  }, []);
+    fetchServices();
+  }, [fetchServices]);
 
-  // Filtered Services
-  const filteredServices = useMemo(() => {
-    return services
-      .filter((s) => {
-        const matchesSearch =
-          s.phone_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          s.service_type_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.property_name && s.property_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (s.organization_name && s.organization_name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-        const matchesType = selectedTypeFilter === 'ALL' || s.service_type_name.includes(selectedTypeFilter);
-        const matchesStatus = selectedStatusFilter === 'ALL' || s.status === selectedStatusFilter;
-        const matchesOrg = selectedOrgFilter === 'ALL' || s.organization_id === selectedOrgFilter;
-
-        return matchesSearch && matchesType && matchesStatus && matchesOrg;
-      })
-      .sort((a, b) => {
-        if (sortBy === 'TYPE') return a.service_type_name.localeCompare(b.service_type_name);
-        if (sortBy === 'STATUS') return a.status.localeCompare(b.status);
-        if (sortBy === 'NEWEST') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        return a.phone_number.localeCompare(b.phone_number);
-      });
-  }, [services, searchQuery, selectedTypeFilter, selectedStatusFilter, selectedOrgFilter, sortBy]);
-
-  // Pagination Slice
-  const totalPages = Math.ceil(filteredServices.length / itemsPerPage) || 1;
-  const paginatedServices = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredServices.slice(start, start + itemsPerPage);
-  }, [filteredServices, currentPage, itemsPerPage]);
-
-  // KPIs
-  const totalLines = services.length;
-  const activeTrunks = services.filter((s) => s.status === 'ACTIVE').length;
-  const portingLines = services.filter((s) => s.status === 'PORTING' || s.status === 'PENDING_PORT').length;
-  const e911Bound = services.filter((s) => s.e911_bound).length;
-
-  // Actions
-  const handleOpenCreate = () => {
-    setFormData({
-      phone_number: '',
-      service_type_name: 'DID / Main Frontdesk',
-      description: '',
-      org_property_id: orgPropOptions[0]?.org_property_id || '',
-      status: 'ACTIVE',
-    });
-    setFormError(null);
-    setShowCreateModal(true);
+  // Open 3-Dots Fixed Menu
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, service: ServiceRecord) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 230;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, service });
   };
 
-  const handleOpenEdit = (srv: ServiceItem) => {
-    setSelectedService(srv);
-    setFormData({
-      phone_number: srv.phone_number,
-      service_type_name: srv.service_type_name,
-      description: srv.description || '',
-      org_property_id: orgPropOptions[0]?.org_property_id || '',
-      status: srv.status,
-    });
-    setFormError(null);
-    setShowEditModal(true);
-  };
-
-  const handleOpenStatus = (srv: ServiceItem) => {
-    setSelectedService(srv);
-    setShowStatusModal(true);
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  // --- Handlers: Create Service ---
+  const handleSaveCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.phone_number.trim()) {
-      setFormError('Phone number or DID string is required.');
+      setFormError('Phone number / DID identifier is required.');
       return;
     }
 
-    setFormLoading(true);
-    setFormError(null);
-
     try {
-      const selectedOP = orgPropOptions.find((o) => o.org_property_id === formData.org_property_id);
+      setFormLoading(true);
+      setFormError(null);
 
-      // Call API
       const res = await fetch('/api/admin/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone_number: formData.phone_number.trim(),
-          service_type_name: formData.service_type_name,
-          organization_property_id: formData.org_property_id,
-          description: formData.description.trim() || null,
-          status: formData.status,
-        }),
+        body: JSON.stringify(formData),
       });
 
-      const json = await res.json();
-      const newSrv: ServiceItem = {
-        id: json.data ? json.data.id : `srv-${Date.now()}`,
-        phone_number: formData.phone_number.trim(),
-        service_type_name: formData.service_type_name,
-        description: formData.description.trim() || 'Telephony Voice Line',
-        status: formData.status,
-        organization_id: selectedOP?.organization_id || 'org-shamin',
-        organization_name: selectedOP?.organization_name || 'Shamin Hotels',
-        property_id: selectedOP?.property_id || 'prop-courtyard-richmond',
-        property_name: selectedOP?.property_name || 'Courtyard Richmond Downtown',
-        property_city: 'Richmond',
-        property_state: 'VA',
-        sip_trunk_name: 'US-East-Provisioned',
-        carrier_latency: '12ms',
-        e911_bound: true,
-        created_at: new Date().toISOString(),
-      };
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create service.');
 
-      setServices([newSrv, ...services]);
+      showToast('Created', `${formData.phone_number} provisioned successfully.`, 'success');
       setShowCreateModal(false);
+      fetchServices();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to provision service');
+      setFormError(err.message || 'Creation failed.');
+      showToast('Error', err.message, 'error');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedService) return;
-
-    setFormLoading(true);
+  // --- Handlers: Edit Service ---
+  const handleOpenEdit = (service: ServiceRecord) => {
+    setSelectedServiceForEdit(service);
+    const primaryLink = service.attached_properties[0];
+    setFormData({
+      phone_number: service.phone_number,
+      service_type_name: service.service_type,
+      org_property_id: primaryLink?.org_property_id || '',
+      description: service.description || '',
+      status: service.status,
+    });
     setFormError(null);
+    setShowEditDrawer(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedServiceForEdit) return;
 
     try {
-      const selectedOP = orgPropOptions.find((o) => o.org_property_id === formData.org_property_id);
+      setFormLoading(true);
+      setFormError(null);
 
-      await fetch(`/api/admin/services/${selectedService.id}`, {
-        method: 'PATCH',
+      const res = await fetch('/api/admin/services', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phone_number: formData.phone_number.trim(),
-          description: formData.description.trim() || null,
-          status: formData.status,
+          id: selectedServiceForEdit.id,
+          ...formData,
         }),
       });
 
-      setServices((prev) =>
-        prev.map((s) =>
-          s.id === selectedService.id
-            ? {
-                ...s,
-                phone_number: formData.phone_number.trim(),
-                service_type_name: formData.service_type_name,
-                description: formData.description.trim() || null,
-                organization_name: selectedOP?.organization_name || s.organization_name,
-                property_name: selectedOP?.property_name || s.property_name,
-                status: formData.status,
-              }
-            : s
-        )
-      );
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update service.');
 
-      if (drawerService && drawerService.id === selectedService.id) {
-        setDrawerService({
-          ...drawerService,
-          phone_number: formData.phone_number.trim(),
-          service_type_name: formData.service_type_name,
-          description: formData.description.trim() || null,
-          status: formData.status,
-        });
-      }
-
-      setShowEditModal(false);
+      showToast('Saved', `Service updated successfully.`, 'success');
+      setShowEditDrawer(false);
+      fetchServices();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to update service');
+      setFormError(err.message || 'Update failed.');
+      showToast('Error', err.message, 'error');
     } finally {
       setFormLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (newStatus: ServiceItem['status']) => {
-    if (!selectedService) return;
+  // --- Handlers: Assign Service to Property ---
+  const handleOpenAssignModal = (service: ServiceRecord) => {
+    setSelectedServiceForAssign(service);
+    const primaryLink = service.attached_properties[0];
+    setSelectedOrgPropId(primaryLink?.org_property_id || 'UNASSIGNED');
+    setShowAssignModal(true);
+  };
+
+  const handleSaveAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedServiceForAssign) return;
 
     try {
-      await fetch(`/api/admin/services/${selectedService.id}`, {
-        method: 'PATCH',
+      setAssignLoading(true);
+
+      const res = await fetch('/api/admin/services', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          id: selectedServiceForAssign.id,
+          org_property_id: selectedOrgPropId === 'UNASSIGNED' ? '' : selectedOrgPropId,
+        }),
       });
 
-      setServices((prev) =>
-        prev.map((s) => (s.id === selectedService.id ? { ...s, status: newStatus } : s))
-      );
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update property assignment.');
 
-      if (drawerService && drawerService.id === selectedService.id) {
-        setDrawerService({ ...drawerService, status: newStatus });
-      }
-
-      setShowStatusModal(false);
-    } catch (err) {
-      console.error('Error updating status:', err);
+      showToast('Assigned', 'Service property assignment updated.', 'success');
+      setShowAssignModal(false);
+      fetchServices();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setAssignLoading(false);
     }
   };
 
-  // CSV Export
-  const handleExportCSV = () => {
-    const headers = [
-      'Phone Number / DID',
-      'Service Type',
-      'Description',
-      'Organization',
-      'Property Location',
-      'City',
-      'State',
-      'SIP Trunk Gateway',
-      'Latency',
-      'E911 Bound',
-      'Status',
-    ];
-
-    const rows = filteredServices.map((s) => [
-      s.phone_number,
-      `"${s.service_type_name}"`,
-      `"${(s.description || '').replace(/"/g, '""')}"`,
-      `"${(s.organization_name || '').replace(/"/g, '""')}"`,
-      `"${(s.property_name || '').replace(/"/g, '""')}"`,
-      s.property_city || '',
-      s.property_state || '',
-      s.sip_trunk_name || '',
-      s.carrier_latency || '',
-      s.e911_bound ? 'YES' : 'NO',
-      s.status,
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AAA_Services_DIDs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedTypeFilter('ALL');
+    setSelectedStatusFilter('ALL');
+    setSortBy('NEWEST');
+    setCurrentPage(1);
   };
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedTypeFilter !== 'ALL' ||
+    selectedStatusFilter !== 'ALL' ||
+    sortBy !== 'NEWEST';
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Services &amp; Voice Lines</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              {services.length} Provisioned Lines
-            </span>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notification Container */}
+      <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
+              t.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                : t.type === 'error'
+                ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                : 'bg-slate-900/95 border-indigo-500/30 text-white'
+            }`}
+          >
+            {t.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            ) : t.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-white">{t.title}</p>
+              {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+            </div>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage SIP trunks, direct inward dials (DIDs), eFax lines, emergency PRI channels, and carrier mesh bindings.
-          </p>
+        ))}
+      </div>
+
+      {/* Page Header (Clean: No Subtitle, No Mini Component) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Telephony Services</h1>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
-              setSelectedTypeFilter('ALL');
-              setSelectedStatusFilter('ALL');
-              setSelectedOrgFilter('ALL');
-              setSearchQuery('');
+              const headers = ['ID,PhoneNumber,ServiceType,Organization,AttachedProperty,Status\n'];
+              const rows = services.map((s) =>
+                `"${s.id}","${s.phone_number}","${s.service_type}","${s.attached_organization_name}","${s.attached_property_name}","${s.status}"`
+              );
+              const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `services-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              showToast('Exported', 'Services list exported as CSV.', 'info');
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span>Reset Filters</span>
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </button>
-
           <button
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold text-xs transition-colors shadow-sm shadow-indigo-200"
+            onClick={resetAllFilters}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
-            <span>Provision Service / DID</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
+          </button>
+          <button
+            onClick={() => {
+              setFormData({
+                phone_number: '',
+                service_type_name: 'Direct Inward Dial (DID)',
+                org_property_id: '',
+                description: '',
+                status: 'ACTIVE',
+              });
+              setFormError(null);
+              setShowCreateModal(true);
+            }}
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" /> Provision Service
           </button>
         </div>
       </div>
 
-      {/* 2. Top Summary KPI Cards */}
+      {/* Real KPI Cards (No Fake Data) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Voice Lines */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Total Voice Lines
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <PhoneCall className="w-4 h-4" />
+        {loading && services.length === 0 ? (
+          [1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+            >
+              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalLines}</span>
-              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                ● 100% Core Mesh
-              </span>
+          ))
+        ) : (
+          <>
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Services
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <PhoneCall className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalServicesCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Provisioned Voice Lines</p>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Trunks, DIDs &amp; eFax</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">0 Packet Loss</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Active Production */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Active Production Lines
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <Activity className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Active Services
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.activeServicesCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Operational & Connected</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{activeTrunks}</span>
-              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                Live Traffic
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>99.99% PBX Uptime</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">12ms Latency</span>
-            </div>
-          </div>
-        </div>
 
-        {/* In Porting Pipeline */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              In Porting Pipeline
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/40 flex items-center justify-center text-sky-600 dark:text-sky-400">
-              <PhoneForwarded className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Assigned Services
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.assignedServicesCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Bound to Property Locations</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{portingLines}</span>
-              <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/40">
-                FOC Inbound
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Carrier Transfer</span>
-              <span className="font-semibold text-sky-700 dark:text-sky-300">&lt; 48h Cutover</span>
-            </div>
-          </div>
-        </div>
 
-        {/* E911 Emergency Bound */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              E911 PSAP Bound
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-400">
-              <ShieldCheck className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Pending / Suspended
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.inactiveOrSuspendedCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Requires Attention</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{e911Bound}</span>
-              <span className="text-[11px] font-medium text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/40 px-1.5 py-0.5 rounded border border-violet-200 dark:border-violet-800/40">
-                Ray Baum Ready
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Direct Emergency Routing</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">100% PSAP Pass</span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search DID, property name, carrier, type, notes..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
-          />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
-            ⌘F
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search services by phone number, DID, description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          {/* Service Type Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Type:</span>
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedTypeFilter}
               onChange={(e) => {
                 setSelectedTypeFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by service type"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All Types</option>
-              <option value="DID">DID / Direct Inward</option>
+              <option value="ALL">Type: All Types</option>
+              <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
               <option value="SIP Trunk">SIP Trunk</option>
-              <option value="eFax">eFax Line</option>
-              <option value="Cloud PBX">Cloud PBX Trunk</option>
-              <option value="Analog">Analog Line</option>
-              <option value="PRI">PRI Trunk</option>
+              <option value="Emergency PRI">Emergency PRI</option>
+              <option value="Toll-Free DID">Toll-Free DID</option>
             </select>
-          </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Status:</span>
             <select
               value={selectedStatusFilter}
               onChange={(e) => {
                 setSelectedStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by status"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ALL">Status: All Statuses</option>
               <option value="ACTIVE">Active</option>
-              <option value="PORTING">Porting</option>
-              <option value="PENDING_PORT">Pending Port</option>
-              <option value="RESERVED">Reserved</option>
-              <option value="DISCONNECTED">Disconnected</option>
+              <option value="INACTIVE">Inactive</option>
+              <option value="SUSPENDED">Suspended</option>
             </select>
-          </div>
 
-          {/* Sort */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Sort:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Sort services"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="NUMBER">Phone Number</option>
-              <option value="TYPE">Service Type</option>
-              <option value="STATUS">Status</option>
-              <option value="NEWEST">Newest</option>
+              <option value="NEWEST">Sort: Recently Created</option>
+              <option value="NUMBER_ASC">Sort: Phone Number (A-Z)</option>
+              <option value="NUMBER_DESC">Sort: Phone Number (Z-A)</option>
+              <option value="TYPE_ASC">Sort: Service Type</option>
             </select>
-          </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            {/* View Mode Toggle */}
+            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg">
+              <button
+                onClick={() => setViewMode('LIST')}
+                aria-label="List View"
+                className={`p-1 rounded transition ${
+                  viewMode === 'LIST'
+                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('GRID')}
+                aria-label="Grid View"
+                className={`p-1 rounded transition ${
+                  viewMode === 'GRID'
+                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Filters Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
+            <span className="text-slate-400">Active Filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedTypeFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                {selectedTypeFilter}
+                <button onClick={() => setSelectedTypeFilter('ALL')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedStatusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                {selectedStatusFilter}
+                <button onClick={() => setSelectedStatusFilter('ALL')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             <button
-              onClick={() => setViewMode('LIST')}
-              className={`p-1.5 rounded ${
-                viewMode === 'LIST' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
-              title="Table View"
+              onClick={resetAllFilters}
+              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto"
             >
-              <List className="w-3.5 h-3.5" />
+              Clear All
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Table / Grid View */}
+      {error ? (
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load services</p>
+          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
+          <button
+            onClick={() => fetchServices()}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      ) : loading && services.length === 0 ? (
+        // Skeleton Loader
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
+              <div className="flex items-center gap-3 w-1/4">
+                <div className="w-8 h-8 bg-slate-200 dark:bg-[#222430] rounded-lg"></div>
+                <div className="space-y-1 flex-1">
+                  <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-3/4"></div>
+                  <div className="h-2.5 bg-slate-200 dark:bg-[#222430] rounded w-1/2"></div>
+                </div>
+              </div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
+            </div>
+          ))}
+        </div>
+      ) : services.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+          <PhoneCall className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Services Found</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+            {hasActiveFilters
+              ? 'No services matched the selected filters.'
+              : 'Get started by provisioning your first telephony voice line or DID.'}
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={resetAllFilters}
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg"
+              >
+                Clear Filters
+              </button>
+            )}
             <button
-              onClick={() => setViewMode('GRID')}
-              className={`p-1.5 rounded ${
-                viewMode === 'GRID' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
-              title="Grid View"
+              onClick={() => {
+                setFormData({
+                  phone_number: '',
+                  service_type_name: 'Direct Inward Dial (DID)',
+                  org_property_id: '',
+                  description: '',
+                  status: 'ACTIVE',
+                });
+                setShowCreateModal(true);
+              }}
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" /> Provision Service
             </button>
           </div>
         </div>
-      </div>
-
-      {/* 4. Table / Grid Representation */}
-      {viewMode === 'LIST' ? (
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
+      ) : viewMode === 'LIST' ? (
+        // Table View: Pure Black Headers & Pure Black Phone Number & ONLY Org Name
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="py-3 px-4">Voice Line / Number</th>
-                  <th className="py-3 px-4">Service Type &amp; Trunk</th>
-                  <th className="py-3 px-4">Assigned Location &amp; Org</th>
-                  <th className="py-3 px-4">E911 Binding</th>
-                  <th className="py-3 px-4">Mesh Latency</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">SERVICE & PHONE NUMBER</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">SERVICE TYPE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ATTACHED PROPERTY</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
-                {paginatedServices.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500">
-                      <PhoneCall className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      <p className="font-semibold text-slate-700">No services found</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Try adjusting your search criteria or provision a new voice line.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedServices.map((srv) => (
-                    <tr
-                      key={srv.id}
-                      className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
-                      onClick={() => setDrawerService(srv)}
-                    >
-                      {/* 1. Phone Number */}
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
+                {services.map((service) => {
+                  return (
+                    <tr key={service.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
+                      {/* 1. Service & Phone Number (Pure Black Phone Number) */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0 border border-indigo-100 shadow-xs">
-                            <PhoneCall className="w-4 h-4" />
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                            <Phone className="w-3.5 h-3.5" />
                           </div>
                           <div>
-                            <span className="font-bold text-slate-900 font-mono text-xs group-hover:text-indigo-600 transition-colors block">
-                              {srv.phone_number}
+                            <span className="font-semibold text-black dark:text-white text-sm block font-mono">
+                              {service.phone_number}
                             </span>
-                            <span className="text-[11px] text-slate-500 truncate block max-w-xs">
-                              {srv.description || 'Voice Service'}
-                            </span>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[200px]">
+                              {service.description || 'Voice Service Line'}
+                            </p>
                           </div>
                         </div>
                       </td>
 
-                      {/* 2. Service Type & Trunk */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="font-semibold text-slate-800">{srv.service_type_name}</div>
-                        <div className="text-[10.5px] font-mono text-slate-400 mt-0.5">
-                          {srv.sip_trunk_name || 'Carrier Core'}
-                        </div>
-                      </td>
-
-                      {/* 3. Assigned Location & Org */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="font-bold text-slate-800">{srv.property_name}</div>
-                        <div className="text-[11px] text-indigo-600 font-semibold mt-0.5">
-                          {srv.organization_name}
-                        </div>
-                      </td>
-
-                      {/* 4. E911 Binding */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {srv.e911_bound ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                            PSAP Bound
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                            Non-Dispatch
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 5. Latency */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-mono text-xs font-semibold text-emerald-600">
-                          {srv.carrier_latency}
+                      {/* 2. Service Type */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-slate-800 dark:text-white">
+                          {service.service_type}
                         </span>
                       </td>
 
-                      {/* 6. Status */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {srv.status === 'ACTIVE' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            Active
-                          </span>
-                        )}
-                        {srv.status === 'PORTING' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-                            Porting
-                          </span>
-                        )}
-                        {srv.status === 'PENDING_PORT' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                            Pending Port
-                          </span>
-                        )}
-                        {srv.status === 'RESERVED' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                            Reserved
-                          </span>
-                        )}
-                        {srv.status === 'DISCONNECTED' && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                            Disconnected
-                          </span>
+                      {/* 3. Organization (ONLY NAME) */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-black dark:text-white">
+                          {service.attached_organization_name || 'Unassigned'}
+                        </span>
+                      </td>
+
+                      {/* 4. Attached Property */}
+                      <td className="py-3.5 px-4">
+                        {service.attached_property_name !== 'Unassigned' ? (
+                          <div className="space-y-0.5">
+                            <span className="font-medium text-slate-800 dark:text-slate-200 block truncate max-w-[170px]">
+                              {service.attached_property_name}
+                            </span>
+                            {service.attached_properties.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedServiceForProps(service);
+                                  setShowPropertiesDrawer(true);
+                                }}
+                                className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
+                              >
+                                +{service.attached_properties.length - 1} more locations &rarr;
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs font-normal">Unassigned</span>
                         )}
                       </td>
 
-                      {/* 7. Actions */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
+                      {/* 5. Status */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                            service.status === 'ACTIVE'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40'
+                              : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40'
+                          }`}
+                        >
+                          {service.status}
+                        </span>
+                      </td>
+
+                      {/* 6. Actions (3-Dots Trigger) */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => handleOpenEdit(srv)}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                            onClick={() => handleOpenEdit(service)}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition"
                             title="Edit Service"
                           >
-                            <Settings className="w-4 h-4" />
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => handleOpenStatus(srv)}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                            title="Status Control"
+                            onClick={(e) => handleOpenMenu(e, service)}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition"
+                            title="More Actions"
                           >
-                            <MoreVertical className="w-4 h-4" />
+                            <MoreVertical className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Footer */}
-          <div className="py-3 px-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-            <div>
-              Showing{' '}
-              <span className="font-semibold text-slate-800">
-                {filteredServices.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-              </span>{' '}
-              to{' '}
-              <span className="font-semibold text-slate-800">
-                {Math.min(currentPage * itemsPerPage, filteredServices.length)}
-              </span>{' '}
-              of <span className="font-semibold text-slate-800">{filteredServices.length}</span>{' '}
-              services
-            </div>
+          {/* Server-Side Pagination Bar (10 items per page) */}
+          <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} services
+            </span>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-slate-700 transition-colors"
+                disabled={currentPage <= 1 || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
               >
-                Previous
+                <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
                 <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === page
-                      ? 'bg-[#4338ca] text-white shadow-sm'
-                      : 'hover:bg-slate-100 text-slate-700'
+                  key={num}
+                  onClick={() => setCurrentPage(num)}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
+                    currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
+                      : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
                   }`}
                 >
-                  {page}
+                  {num}
                 </button>
               ))}
 
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-slate-700 transition-colors"
+                disabled={currentPage >= totalPages || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
               >
-                Next
+                Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
         </div>
       ) : (
-        /* GRID VIEW */
+        // Grid View
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {paginatedServices.map((srv) => (
+          {services.map((service) => (
             <div
-              key={srv.id}
-              onClick={() => setDrawerService(srv)}
-              className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+              key={service.id}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-4 shadow-sm space-y-3"
             >
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-sm">
-                      <PhoneCall className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold font-mono text-slate-900 group-hover:text-indigo-600 transition-colors">
-                        {srv.phone_number}
-                      </h3>
-                      <div className="text-[11px] text-slate-500 font-medium">
-                        {srv.service_type_name}
-                      </div>
-                    </div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs">
+                    <Phone className="w-4 h-4" />
                   </div>
-                  {srv.status === 'ACTIVE' && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Active
+                  <div>
+                    <span className="font-semibold text-black dark:text-white text-sm block font-mono">
+                      {service.phone_number}
                     </span>
-                  )}
-                  {srv.status === 'PORTING' && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                      Porting
-                    </span>
-                  )}
+                    <p className="text-[11px] text-slate-400">{service.service_type}</p>
+                  </div>
                 </div>
 
-                <p className="text-xs text-slate-600 mt-3 line-clamp-2">
-                  {srv.description || 'Enterprise Telephony Voice Line'}
-                </p>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    service.status === 'ACTIVE'
+                      ? 'bg-emerald-50 text-emerald-600'
+                      : 'bg-amber-50 text-amber-600'
+                  }`}
+                >
+                  {service.status}
+                </span>
+              </div>
 
-                <div className="mt-3 py-2 px-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Location:</span>
-                    <span className="font-bold text-slate-800">{srv.property_name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Organization:</span>
-                    <span className="font-semibold text-indigo-600">{srv.organization_name}</span>
-                  </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#1f212c] text-xs">
+                <div>
+                  <span className="text-slate-400 text-[11px]">Organization</span>
+                  <p className="font-semibold text-black dark:text-white truncate">
+                    {service.attached_organization_name}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[11px]">Attached Property</span>
+                  <p className="font-medium text-slate-700 dark:text-slate-300 truncate">
+                    {service.attached_property_name}
+                  </p>
                 </div>
               </div>
 
-              <div
-                className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs"
-                onClick={(e) => e.stopPropagation()}
-              >
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[#1f212c]">
+                <span className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                  {service.description || 'Voice Service'}
+                </span>
                 <button
-                  onClick={() => setDrawerService(srv)}
-                  className="font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  onClick={(e) => handleOpenMenu(e, service)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
                 >
-                  <span>Line Telemetry</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleOpenEdit(srv)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                >
-                  <Settings className="w-4 h-4" />
+                  <MoreVertical className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -935,342 +972,155 @@ export default function AdminServicesPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 5. PROVISION SERVICE MODAL                                                */}
+      {/* FIXED 3-DOTS ACTION POPUP (4 Specified Options) */}
       {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <PhoneCall className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Provision Voice Line / DID</h2>
-                  <p className="text-xs text-slate-500">
-                    Assign a phone number, trunk, or eFax service to a hotel property.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {menuPosition && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
+          <div
+            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            className="fixed z-50 w-56 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
+          >
+            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
+              <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.service.phone_number}</p>
+              <p className="text-[10px] text-slate-400">Service Options</p>
             </div>
 
-            {formError && (
-              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
+            {/* Option 1: Edit Service */}
+            <button
+              onClick={() => {
+                const service = menuPosition.service;
+                setMenuPosition(null);
+                handleOpenEdit(service);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Service
+            </button>
 
-            <form onSubmit={handleCreateSubmit} className="mt-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    Phone Number / DID <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.phone_number}
-                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                    placeholder="+1 (804) 555-0199"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 font-mono outline-none"
-                  />
-                </div>
+            {/* Option 2: View Details */}
+            <button
+              onClick={() => {
+                const service = menuPosition.service;
+                setMenuPosition(null);
+                setSelectedServiceForDetails(service);
+                setShowDetailsDrawer(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Info className="w-3.5 h-3.5 text-blue-500" /> View Details
+            </button>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Service Type</label>
-                  <select
-                    value={formData.service_type_name}
-                    onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    <option value="DID / Main Frontdesk">DID / Main Frontdesk</option>
-                    <option value="SIP Trunk (Primary PBX)">SIP Trunk (Primary PBX)</option>
-                    <option value="eFax Dedicated Line">eFax Dedicated Line</option>
-                    <option value="Cloud PBX Trunk">Cloud PBX Trunk</option>
-                    <option value="Analog Elevator Alarm Line">Analog Elevator Alarm Line</option>
-                    <option value="Emergency Dispatch PRI">Emergency Dispatch PRI</option>
-                    <option value="Toll-Free Reservation Line">Toll-Free Reservation Line</option>
-                  </select>
-                </div>
-              </div>
+            {/* Option 3: See Properties in which this service is attached */}
+            <button
+              onClick={() => {
+                const service = menuPosition.service;
+                setMenuPosition(null);
+                setSelectedServiceForProps(service);
+                setShowPropertiesDrawer(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Building2 className="w-3.5 h-3.5 text-purple-500" /> See Properties
+            </button>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">
-                  Assign Property Location <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={formData.org_property_id}
-                  onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                >
-                  {orgPropOptions.map((op) => (
-                    <option key={op.org_property_id} value={op.org_property_id}>
-                      {op.property_name} ({op.organization_name})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Description / Routing Purpose</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="e.g. Frontdesk Night Bell & Hunt Group"
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Initial Service Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                >
-                  <option value="ACTIVE">Active (Live Production)</option>
-                  <option value="PORTING">Porting In Progress</option>
-                  <option value="PENDING_PORT">Pending Port LOA</option>
-                  <option value="RESERVED">Reserved In Inventory</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold disabled:opacity-50 shadow-sm"
-                >
-                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Provision Line</span>
-                </button>
-              </div>
-            </form>
+            {/* Option 4: Assign this service to property (dropdown modal) */}
+            <button
+              onClick={() => {
+                const service = menuPosition.service;
+                setMenuPosition(null);
+                handleOpenAssignModal(service);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 border-t border-slate-100 dark:border-[#222430]"
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-emerald-500" /> Assign to Property
+            </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* ========================================================================= */}
-      {/* 6. EDIT SERVICE MODAL                                                     */}
+      {/* 1. VIEW SERVICE DETAILS DRAWER */}
       {/* ========================================================================= */}
-      {showEditModal && selectedService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <Edit2 className="w-5 h-5" />
-                </div>
+      {showDetailsDrawer && selectedServiceForDetails && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Edit Voice Service</h2>
-                  <p className="text-xs text-slate-500">
-                    Update phone routing, description, or assigned property.
-                  </p>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Service Details</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Specifications & configuration</p>
                 </div>
-              </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Phone Number / DID</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.phone_number}
-                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 font-mono outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Service Type</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={formData.service_type_name}
-                    className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-600 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Description / Hunt Group</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Lifecycle Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                >
-                  <option value="ACTIVE">Active (Live Production)</option>
-                  <option value="PORTING">Porting</option>
-                  <option value="PENDING_PORT">Pending Port</option>
-                  <option value="RESERVED">Reserved</option>
-                  <option value="DISCONNECTED">Disconnected</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold disabled:opacity-50 shadow-sm"
-                >
-                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Changes</span>
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* 7. STATUS CONTROL MODAL                                                   */}
-      {/* ========================================================================= */}
-      {showStatusModal && selectedService && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">Service Line Status</h3>
+              <div className="space-y-3.5 text-xs">
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Telephony Identification
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Phone Number / DID</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">
+                      {selectedServiceForDetails.phone_number}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                    <span className="text-slate-400">Service Type</span>
+                    <span className="font-semibold text-slate-800 dark:text-white">
+                      {selectedServiceForDetails.service_type}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Organization & Property Association
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Organization</span>
+                    <span className="font-semibold text-black dark:text-white">
+                      {selectedServiceForDetails.attached_organization_name}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Attached Property</span>
+                    <span className="font-semibold text-slate-800 dark:text-white">
+                      {selectedServiceForDetails.attached_property_name}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Status & Description
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Status</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {selectedServiceForDetails.status}
+                    </span>
+                  </div>
+                  <div className="pt-1">
+                    <span className="text-slate-400">Description</span>
+                    <p className="font-medium text-slate-800 dark:text-white mt-0.5">
+                      {selectedServiceForDetails.description || 'No description provided'}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
 
-            <p className="text-xs text-slate-600 mt-3">
-              Update line state for{' '}
-              <span className="font-bold font-mono text-slate-900">{selectedService.phone_number}</span>.
-            </p>
-
-            <div className="mt-4 space-y-2 text-xs">
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
               <button
-                onClick={() => handleUpdateStatus('ACTIVE')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedService.status === 'ACTIVE'
-                    ? 'border-emerald-500 bg-emerald-50/50 font-bold text-emerald-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Active Production</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Live inbound and outbound SIP traffic.</div>
-                </div>
-                {selectedService.status === 'ACTIVE' && <Check className="w-4 h-4 text-emerald-600" />}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('PORTING')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedService.status === 'PORTING'
-                    ? 'border-sky-500 bg-sky-50/50 font-bold text-sky-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                    <span>Porting In Progress</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Carrier FOC scheduled cutover.</div>
-                </div>
-                {selectedService.status === 'PORTING' && <Check className="w-4 h-4 text-sky-600" />}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('RESERVED')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedService.status === 'RESERVED'
-                    ? 'border-slate-500 bg-slate-100 font-bold text-slate-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                    <span>Reserved Inventory</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Reserved DID block in carrier pool.</div>
-                </div>
-                {selectedService.status === 'RESERVED' && <Check className="w-4 h-4 text-slate-600" />}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('DISCONNECTED')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedService.status === 'DISCONNECTED'
-                    ? 'border-rose-500 bg-rose-50 font-bold text-rose-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <Archive className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Disconnected</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Number released back to telco provider.</div>
-                </div>
-                {selectedService.status === 'DISCONNECTED' && <Check className="w-4 h-4 text-rose-600" />}
-              </button>
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                type="button"
+                onClick={() => setShowDetailsDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
               >
                 Close
               </button>
@@ -1280,114 +1130,369 @@ export default function AdminServicesPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 8. SINGLE-SERVICE TELEMETRY DRAWER                                        */}
+      {/* 2. SEE PROPERTIES DRAWER */}
       {/* ========================================================================= */}
-      {drawerService && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-2xl h-full shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-200 flex items-start justify-between bg-slate-50">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base shadow-xs">
-                  <PhoneCall className="w-6 h-6" />
-                </div>
+      {showPropertiesDrawer && selectedServiceForProps && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
                 <div>
-                  <h2 className="text-xl font-bold font-mono text-slate-900">{drawerService.phone_number}</h2>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                    <span className="font-semibold text-indigo-700">{drawerService.service_type_name}</span>
-                    <span>•</span>
-                    <span>{drawerService.property_name}</span>
-                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Attached Properties</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Properties using <span className="font-semibold text-slate-900 dark:text-white font-mono">{selectedServiceForProps.phone_number}</span>
+                  </p>
                 </div>
+                <button
+                  onClick={() => setShowPropertiesDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenEdit(drawerService)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-xs"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setDrawerService(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              {selectedServiceForProps.attached_properties.length === 0 && selectedServiceForProps.attached_property_name === 'Unassigned' ? (
+                <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                  <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+                  <p className="text-xs font-semibold text-slate-800 dark:text-white">No properties attached</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">This service is currently not assigned to any property.</p>
+                  <button
+                    onClick={() => {
+                      setShowPropertiesDrawer(false);
+                      handleOpenAssignModal(selectedServiceForProps);
+                    }}
+                    className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" /> Assign Property Now
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {(selectedServiceForProps.attached_properties.length > 0
+                    ? selectedServiceForProps.attached_properties
+                    : [{ name: selectedServiceForProps.attached_property_name, organization_name: selectedServiceForProps.attached_organization_name }]
+                  ).map((prop: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                          <Building2 className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{prop.name}</p>
+                          <p className="text-[11px] text-slate-400">
+                            Organization: <span className="font-medium text-slate-700 dark:text-slate-300">{prop.organization_name || 'Unassigned'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <Link
+                        href={`/admin/properties`}
+                        className="px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        View <ArrowUpRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
-              {/* Routing Telemetry */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Live SIP Signaling &amp; Gateway
-                  </h4>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    SIP Trunk Online
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 text-[10px] uppercase font-bold">Trunk Gateway</span>
-                    <p className="font-semibold text-slate-900 mt-0.5">{drawerService.sip_trunk_name}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
-                    <span className="text-slate-400 text-[10px] uppercase font-bold">Roundtrip Latency</span>
-                    <p className="font-semibold text-emerald-600 mt-0.5">{drawerService.carrier_latency}</p>
-                  </div>
-                </div>
-              </div>
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
+              <button
+                onClick={() => setShowPropertiesDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {/* Location & Organization */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Assigned Property &amp; Tenant
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <span className="text-slate-400 text-[11px]">Hotel Property:</span>
-                    <p className="font-semibold text-slate-800 text-xs mt-0.5">{drawerService.property_name}</p>
-                    <p className="text-slate-500 text-xs">
-                      {drawerService.property_city}, {drawerService.property_state}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[11px]">Organization:</span>
-                    <p className="font-semibold text-indigo-700 text-xs mt-0.5">{drawerService.organization_name}</p>
-                  </div>
-                </div>
+      {/* ========================================================================= */}
+      {/* 3. ASSIGN SERVICE TO PROPERTY MODAL */}
+      {/* ========================================================================= */}
+      {showAssignModal && selectedServiceForAssign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Service to Property</h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedServiceForAssign.phone_number}</p>
               </div>
+              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-              {/* Description & Purpose */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-1.5">
-                <span className="text-slate-400 text-[11px] font-bold uppercase">Routing Description</span>
-                <p className="text-slate-800 text-xs leading-relaxed">
-                  {drawerService.description || 'Primary voice trunk line with automated failover routing.'}
+            <form onSubmit={handleSaveAssignment} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Select Property & Organization
+                </label>
+                <select
+                  value={selectedOrgPropId}
+                  onChange={(e) => setSelectedOrgPropId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 text-xs"
+                >
+                  <option value="UNASSIGNED">-- Unassigned (No Property) --</option>
+                  {orgPropOptions.map((opt, idx) => (
+                    <option key={idx} value={opt.org_property_id || opt.property_id}>
+                      {opt.property_name} {opt.property_city ? `(${opt.property_city})` : ''} &bull; {opt.organization_name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Associating this service allows the property's PBX routing and DID allocation to activate.
                 </p>
               </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(false)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assignLoading}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {assignLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save Assignment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. EDIT SERVICE DRAWER */}
+      {/* ========================================================================= */}
+      {showEditDrawer && selectedServiceForEdit && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Service</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedServiceForEdit.phone_number}</p>
+                </div>
+                <button
+                  onClick={() => setShowEditDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} id="edit-service-form" className="space-y-3.5 mt-5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Phone Number / DID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.phone_number}
+                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Service Type
+                  </label>
+                  <select
+                    value={formData.service_type_name}
+                    onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
+                    <option value="SIP Trunk">SIP Trunk</option>
+                    <option value="Emergency PRI">Emergency PRI</option>
+                    <option value="Toll-Free DID">Toll-Free DID</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Attached Property Location
+                  </label>
+                  <select
+                    value={formData.org_property_id}
+                    onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">-- No Property (Unassigned) --</option>
+                    {orgPropOptions.map((opt, idx) => (
+                      <option key={idx} value={opt.org_property_id || opt.property_id}>
+                        {opt.property_name} ({opt.organization_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="e.g. Front Desk Direct Line"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="SUSPENDED">Suspended</option>
+                  </select>
+                </div>
+              </form>
             </div>
 
-            {/* Drawer Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
               <button
-                onClick={() => {
-                  setSelectedService(drawerService);
-                  setShowStatusModal(true);
-                }}
-                className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-white text-slate-700 font-semibold text-xs transition-colors"
+                type="button"
+                onClick={() => setShowEditDrawer(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
               >
-                Change Status ({drawerService.status})
+                Cancel
               </button>
               <button
-                onClick={() => setDrawerService(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-colors"
+                type="submit"
+                form="edit-service-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
               >
-                Done
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. PROVISION SERVICE MODAL */}
+      {/* ========================================================================= */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Provision New Service</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Phone Number / DID *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="+1 (555) 000-0000"
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Service Type
+                </label>
+                <select
+                  value={formData.service_type_name}
+                  onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
+                  <option value="SIP Trunk">SIP Trunk</option>
+                  <option value="Emergency PRI">Emergency PRI</option>
+                  <option value="Toll-Free DID">Toll-Free DID</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Attach to Property
+                </label>
+                <select
+                  value={formData.org_property_id}
+                  onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- Leave Unassigned --</option>
+                  {orgPropOptions.map((opt, idx) => (
+                    <option key={idx} value={opt.org_property_id || opt.property_id}>
+                      {opt.property_name} ({opt.organization_name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Description / Label
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Reservation Line"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Provision Line
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

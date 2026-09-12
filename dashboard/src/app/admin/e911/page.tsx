@@ -1,49 +1,61 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
   Search,
   Plus,
-  Filter,
   Download,
   MoreVertical,
-  Settings,
   Building2,
-  Hotel,
   CheckCircle2,
   AlertCircle,
-  Clock,
+  ChevronLeft,
+  ChevronRight,
   SlidersHorizontal,
   X,
   Edit2,
-  Trash2,
-  Archive,
-  BarChart3,
-  Layers,
-  ArrowUpRight,
+  Sparkles,
+  RefreshCw,
+  Info,
+  FileText,
+  AlertTriangle,
   Loader2,
   Check,
-  Network,
-  LayoutGrid,
-  List,
-  AlertTriangle,
+  Phone,
+  Mail,
   MapPin,
-  FileCheck,
-  Radio,
+  Send,
+  Hotel,
   BadgeCheck,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
 export type E911Status = 'VERIFIED' | 'PENDING' | 'CORRECTION_REQUIRED' | 'FAILED';
 
+interface PropertyDetails {
+  id?: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  main_phone?: string;
+  contact_person_name?: string;
+  contact_person_email?: string;
+  general_manager_name?: string;
+}
+
+interface OrganizationDetails {
+  id?: string;
+  name: string;
+  primary_email?: string;
+  primary_phone?: string;
+}
+
 interface E911Record {
   id: string;
-  property_name: string;
-  property_city: string;
-  property_state: string;
-  organization_name: string;
   emergency_address: string;
   psap_id: string;
   status: E911Status;
@@ -51,598 +63,868 @@ interface E911Record {
   verified_at: string | null;
   ray_baum_compliant: boolean;
   karis_law_direct_dial: boolean;
-  last_audit_date: string;
   created_at: string;
+  updated_at?: string;
+  property_id?: string;
+  property_name: string;
+  organization_id?: string;
+  organization_name: string;
+  property_details?: PropertyDetails | null;
+  organization_details?: OrganizationDetails | null;
+}
+
+interface OrgPropertyOption {
+  org_property_id: string;
+  property_id: string;
+  property_name: string;
+  organization_id: string;
+  organization_name: string;
+  address?: string;
+}
+
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
+}
+
+function getStatusBadge(status: E911Status): { label: string; bg: string; text: string; border: string } {
+  switch (status) {
+    case 'VERIFIED':
+      return {
+        label: 'PSAP Verified',
+        bg: 'bg-emerald-50 dark:bg-emerald-950/50',
+        text: 'text-emerald-700 dark:text-emerald-300',
+        border: 'border-emerald-200 dark:border-emerald-800/50',
+      };
+    case 'CORRECTION_REQUIRED':
+      return {
+        label: 'Correction Required',
+        bg: 'bg-rose-50 dark:bg-rose-950/50',
+        text: 'text-rose-700 dark:text-rose-300',
+        border: 'border-rose-200 dark:border-rose-800/50',
+      };
+    case 'PENDING':
+      return {
+        label: 'Validation Pending',
+        bg: 'bg-amber-50 dark:bg-amber-950/50',
+        text: 'text-amber-700 dark:text-amber-300',
+        border: 'border-amber-200 dark:border-amber-800/50',
+      };
+    case 'FAILED':
+      return {
+        label: 'Routing Failed',
+        bg: 'bg-rose-50 dark:bg-rose-950/50',
+        text: 'text-rose-700 dark:text-rose-300',
+        border: 'border-rose-200 dark:border-rose-800/50',
+      };
+    default:
+      return {
+        label: status,
+        bg: 'bg-slate-100 dark:bg-[#1a1c24]',
+        text: 'text-slate-800 dark:text-slate-200',
+        border: 'border-slate-200 dark:border-[#2a2c3a]',
+      };
+  }
 }
 
 export default function AdminE911Page() {
-  const supabase = createClient();
-
   const [records, setRecords] = useState<E911Record[]>([]);
+  const [orgPropOptions, setOrgPropOptions] = useState<OrgPropertyOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Server-Side Pagination (10 per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10;
+
+  // Real Database Metrics (No fake data)
+  const [metrics, setMetrics] = useState({
+    totalRecordsCount: 0,
+    verifiedCount: 0,
+    correctionRequiredCount: 0,
+    pendingOrFailedCount: 0,
+  });
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
   const [selectedComplianceFilter, setSelectedComplianceFilter] = useState('ALL');
-  const [sortBy, setSortBy] = useState<'NAME' | 'STATUS' | 'DATE'>('STATUS');
+  const [sortBy, setSortBy] = useState('NEWEST');
 
-  // Modals & Drawers
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showAddressModal, setShowAddressModal] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<E911Record | null>(null);
-  const [drawerRecord, setDrawerRecord] = useState<E911Record | null>(null);
+  // Debounce search (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  // Form State
+  // Toast Notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const showToast = useCallback((title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  // Fixed 3-Dots Action Menu Overlay
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: E911Record } | null>(null);
+
+  // Drawers & Modals State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<E911Record | null>(null);
+
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [selectedRecordForDetails, setSelectedRecordForDetails] = useState<E911Record | null>(null);
+
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [selectedRecordForNotes, setSelectedRecordForNotes] = useState<E911Record | null>(null);
+  const [correctionNoteInput, setCorrectionNoteInput] = useState('');
+  const [noteLoading, setNoteLoading] = useState(false);
+
+  // Form State for Create / Edit
   const [formData, setFormData] = useState({
+    org_property_id: '',
     emergency_address: '',
-    correction_notes: '',
+    psap_id: '',
     status: 'PENDING' as E911Status,
+    correction_notes: '',
   });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const loadE911Records = async () => {
+  // Load Org-Property Options
+  const loadOrgPropertyOptions = useCallback(async () => {
     try {
-      setLoading(true);
-      const res = await fetch('/api/admin/e911');
-      const result = await res.json();
-
-      if (result.success && Array.isArray(result.data)) {
-        const mapped: E911Record[] = result.data.map((item: any) => {
-          const orgProp = item.org_property;
-          const prop = orgProp?.property;
-          const org = orgProp?.organization;
-
-          return {
-            id: item.id,
-            property_name: prop?.name || item.property_name || 'Assigned Property',
-            property_city: prop?.city || '',
-            property_state: prop?.state || '',
-            organization_name: org?.name || item.organization_name || 'Assigned Organization',
-            emergency_address: item.emergency_address || prop?.address || '',
-            psap_id: item.psap_id || `PSAP-${prop?.state || 'US'}-${prop?.city ? prop.city.slice(0, 3).toUpperCase() : '911'}`,
-            status: (item.status as E911Status) || 'PENDING',
-            correction_notes: item.correction_notes || null,
-            verified_at: item.verified_at || null,
-            ray_baum_compliant: prop?.ray_baud_and_logs_enabled ?? true,
-            karis_law_direct_dial: true,
-            last_audit_date: item.verified_at ? item.verified_at.slice(0, 10) : item.created_at.slice(0, 10),
-            created_at: item.created_at,
-          };
+      const res = await fetch('/api/admin/properties?limit=100');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        const options: OrgPropertyOption[] = [];
+        data.data.forEach((p: any) => {
+          const links = Array.isArray(p.org_links) ? p.org_links : (p.org_links ? [p.org_links] : []);
+          links.forEach((l: any) => {
+            if (l && l.organization) {
+              options.push({
+                org_property_id: l.id,
+                property_id: p.id,
+                property_name: p.name,
+                organization_id: l.organization.id,
+                organization_name: l.organization.name,
+                address: p.address ? `${p.address}, ${p.city || ''} ${p.state || ''}` : '',
+              });
+            }
+          });
         });
-
-        setRecords(mapped);
-      } else {
-        setRecords([]);
+        setOrgPropOptions(options);
       }
     } catch (err) {
-      console.error('Error fetching E911 records:', err);
-      setRecords([]);
+      console.warn('Could not load org property options:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrgPropertyOptions();
+  }, [loadOrgPropertyOptions]);
+
+  // Fetch E911 Records (Server-Side Paginated)
+  const fetchE911Records = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearch,
+        status: selectedStatusFilter,
+        compliance: selectedComplianceFilter,
+        sortBy: sortBy,
+      });
+
+      const res = await fetch(`/api/admin/e911?${params.toString()}`);
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to fetch E911 records.');
+      }
+
+      setRecords(result.data || []);
+      if (result.pagination) {
+        setTotalCount(result.pagination.totalCount);
+        setTotalPages(result.pagination.totalPages);
+      }
+      if (result.metrics) {
+        setMetrics(result.metrics);
+      }
+    } catch (err: any) {
+      console.error('Error fetching E911:', err);
+      setError(err.message || 'Error loading E911 records.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearch, selectedStatusFilter, selectedComplianceFilter, sortBy]);
 
   useEffect(() => {
-    loadE911Records();
-  }, []);
+    fetchE911Records();
+  }, [fetchE911Records]);
 
-  // Filtered & Sorted
-  const filteredRecords = useMemo(() => {
-    return records
-      .filter((rec) => {
-        const matchesSearch =
-          rec.property_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          rec.organization_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          rec.emergency_address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          rec.psap_id.toLowerCase().includes(searchQuery.toLowerCase());
-
-        const matchesStatus =
-          selectedStatusFilter === 'ALL' || rec.status === selectedStatusFilter;
-
-        let matchesCompliance = true;
-        if (selectedComplianceFilter === 'RAY_BAUM') matchesCompliance = rec.ray_baum_compliant;
-        if (selectedComplianceFilter === 'NON_COMPLIANT')
-          matchesCompliance = !rec.ray_baum_compliant || !rec.karis_law_direct_dial;
-
-        return matchesSearch && matchesStatus && matchesCompliance;
-      })
-      .sort((a, b) => {
-        if (sortBy === 'NAME') return a.property_name.localeCompare(b.property_name);
-        if (sortBy === 'DATE')
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        return a.status.localeCompare(b.status);
-      });
-  }, [records, searchQuery, selectedStatusFilter, selectedComplianceFilter, sortBy]);
-
-  // KPIs
-  const totalVerified = records.filter((r) => r.status === 'VERIFIED').length;
-  const totalPending = records.filter((r) => r.status === 'PENDING').length;
-  const totalCorrection = records.filter((r) => r.status === 'CORRECTION_REQUIRED').length;
-  const totalFailed = records.filter((r) => r.status === 'FAILED').length;
-
-  const handleOpenStatus = (rec: E911Record) => {
-    setSelectedRecord(rec);
-    setFormData({
-      emergency_address: rec.emergency_address,
-      correction_notes: rec.correction_notes || '',
-      status: rec.status,
-    });
-    setShowStatusModal(true);
+  // Open 3-Dots Menu
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: E911Record) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, record });
   };
 
-  const handleOpenAddress = (rec: E911Record) => {
-    setSelectedRecord(rec);
-    setFormData({
-      emergency_address: rec.emergency_address,
-      correction_notes: rec.correction_notes || '',
-      status: rec.status,
-    });
-    setShowAddressModal(true);
-  };
-
-  const handleUpdateStatus = async (newStatus: E911Status) => {
-    if (!selectedRecord) return;
+  // --- Handlers: Create ---
+  const handleSaveCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.org_property_id || !formData.emergency_address.trim()) {
+      setFormError('Please select a Property and enter the Emergency Dispatch Address.');
+      return;
+    }
 
     try {
-      const now = new Date().toISOString();
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.id === selectedRecord.id
-            ? {
-                ...r,
-                status: newStatus,
-                verified_at: newStatus === 'VERIFIED' ? now : null,
-                last_audit_date: now.slice(0, 10),
-              }
-            : r
-        )
-      );
+      setFormLoading(true);
+      setFormError(null);
 
-      if (drawerRecord && drawerRecord.id === selectedRecord.id) {
-        setDrawerRecord({
-          ...drawerRecord,
-          status: newStatus,
-          verified_at: newStatus === 'VERIFIED' ? now : null,
-        });
-      }
-
-      setShowStatusModal(false);
-    } catch (err) {
-      console.error('Error updating E911 verification:', err);
-    }
-  };
-
-  const handleSaveAddress = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRecord) return;
-
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.id === selectedRecord.id
-          ? {
-              ...r,
-              emergency_address: formData.emergency_address.trim(),
-              correction_notes: formData.correction_notes.trim() || null,
-              status: formData.status,
-            }
-          : r
-      )
-    );
-
-    if (drawerRecord && drawerRecord.id === selectedRecord.id) {
-      setDrawerRecord({
-        ...drawerRecord,
-        emergency_address: formData.emergency_address.trim(),
-        correction_notes: formData.correction_notes.trim() || null,
-        status: formData.status,
+      const res = await fetch('/api/admin/e911', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_property_id: formData.org_property_id,
+          emergency_address: formData.emergency_address.trim(),
+          psap_id: formData.psap_id.trim() || null,
+          status: formData.status,
+          correction_notes: formData.correction_notes || null,
+        }),
       });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create E911 record.');
+
+      showToast('Created', 'E911 dispatch record registered successfully.', 'success');
+      setShowCreateModal(false);
+      fetchE911Records();
+    } catch (err: any) {
+      setFormError(err.message || 'Registration failed.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setFormLoading(false);
     }
-
-    setShowAddressModal(false);
   };
 
-  // CSV Export
-  const handleExportCSV = () => {
-    const headers = [
-      'Property Name',
-      'Organization',
-      'Emergency Address',
-      'PSAP Route ID',
-      'Status',
-      'Ray Baum Compliant',
-      'Karis Law Compliant',
-      'Last Audit Date',
-    ];
-
-    const rows = filteredRecords.map((r) => [
-      `"${r.property_name.replace(/"/g, '""')}"`,
-      `"${r.organization_name.replace(/"/g, '""')}"`,
-      `"${r.emergency_address.replace(/"/g, '""')}"`,
-      r.psap_id,
-      r.status,
-      r.ray_baum_compliant ? 'YES' : 'NO',
-      r.karis_law_direct_dial ? 'YES' : 'NO',
-      r.last_audit_date,
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AAA_E911_Compliance_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // --- Handlers: Edit ---
+  const handleOpenEdit = (record: E911Record) => {
+    setSelectedRecordForEdit(record);
+    setFormData({
+      org_property_id: '',
+      emergency_address: record.emergency_address,
+      psap_id: record.psap_id || '',
+      status: record.status,
+      correction_notes: record.correction_notes || '',
+    });
+    setFormError(null);
+    setShowEditDrawer(true);
   };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecordForEdit) return;
+
+    try {
+      setFormLoading(true);
+      setFormError(null);
+
+      const res = await fetch('/api/admin/e911', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedRecordForEdit.id,
+          emergency_address: formData.emergency_address,
+          psap_id: formData.psap_id,
+          status: formData.status,
+          correction_notes: formData.correction_notes,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update E911 record.');
+
+      showToast('Updated', 'E911 record updated.', 'success');
+      setShowEditDrawer(false);
+      fetchE911Records();
+    } catch (err: any) {
+      setFormError(err.message || 'Update failed.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // --- Handlers: Correction Notes ---
+  const handleOpenCorrectionNotes = (record: E911Record) => {
+    setSelectedRecordForNotes(record);
+    setCorrectionNoteInput('');
+    setShowNotesModal(true);
+  };
+
+  const handleSaveCorrectionNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecordForNotes || !correctionNoteInput.trim()) return;
+
+    try {
+      setNoteLoading(true);
+
+      const res = await fetch('/api/admin/e911', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedRecordForNotes.id,
+          append_correction_note: correctionNoteInput.trim(),
+          status: 'CORRECTION_REQUIRED',
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to save correction note.');
+
+      showToast('Note Added', 'Correction note appended and status updated.', 'success');
+      setShowNotesModal(false);
+      fetchE911Records();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setNoteLoading(false);
+    }
+  };
+
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setSelectedStatusFilter('ALL');
+    setSelectedComplianceFilter('ALL');
+    setSortBy('NEWEST');
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedStatusFilter !== 'ALL' ||
+    selectedComplianceFilter !== 'ALL' ||
+    sortBy !== 'NEWEST';
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notification Container */}
+      <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${
+                t.type === 'success'
+                  ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                  : t.type === 'error'
+                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                  : 'bg-slate-900/95 border-indigo-500/30 text-white'
+              }`}
+            >
+              {t.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              ) : t.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 text-xs">
+                <p className="font-semibold text-white">{t.title}</p>
+                {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+              </div>
+              <button
+                onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Page Header (Clean: No Subtitle, No Mini Pill next to Title) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">E911 Compliance Center</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {totalVerified} Verified PSAPs
-            </span>
-          </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage emergency service PSAP dispatchable addresses, Kari&apos;s Law direct 911 dialing, and Ray Baum&apos;s Act dispatch records.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">E911 & Emergency Routing</h1>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-
-          <button
+        <div className="flex items-center gap-2.5">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => {
-              setSelectedStatusFilter('CORRECTION_REQUIRED');
-              setSearchQuery('');
+              const headers = ['ID,Property,Organization,EmergencyAddress,PSAP,Status,RayBaum\n'];
+              const rows = records.map((r) =>
+                `"${r.id}","${r.property_name}","${r.organization_name}","${r.emergency_address}","${r.psap_id}","${r.status}","${r.ray_baum_compliant}"`
+              );
+              const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `e911-records-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              showToast('Exported', 'E911 records exported as CSV.', 'info');
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition-colors shadow-sm"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-            <span>Pending Verification Queue ({totalCorrection + totalFailed})</span>
-          </button>
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={resetAllFilters}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              const firstOpt = orgPropOptions[0];
+              setFormData({
+                org_property_id: firstOpt?.org_property_id || '',
+                emergency_address: firstOpt?.address || '',
+                psap_id: '',
+                status: 'PENDING',
+                correction_notes: '',
+              });
+              setFormError(null);
+              setShowCreateModal(true);
+            }}
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" /> Register E911 Record
+          </motion.button>
         </div>
       </div>
 
-      {/* 2. Top Summary KPI Cards */}
+      {/* Real KPI Cards (No Fake Data) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* PSAP Verified */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              PSAP Verified Locations
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <ShieldCheck className="w-4 h-4" />
+        {loading && records.length === 0 ? (
+          [1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+            >
+              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalVerified}</span>
-              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                100% Ray Baum
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Direct Emergency Routing</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">Active</span>
-            </div>
-          </div>
-        </div>
+          ))
+        ) : (
+          <>
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total E911 Records
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalRecordsCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Registered Dispatch Endpoints</p>
+            </motion.div>
 
-        {/* Pending Verification */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Pending Validation
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/40 flex items-center justify-center text-sky-600 dark:text-sky-400">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalPending}</span>
-              <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/40">
-                Carrier Review
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>PSAP Dispatch Test</span>
-              <span className="font-semibold text-sky-700 dark:text-sky-300">&lt; 24h SLA</span>
-            </div>
-          </div>
-        </div>
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  PSAP Verified
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.verifiedCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Direct Emergency Routing Active</p>
+            </motion.div>
 
-        {/* Correction Required */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Corrections Required
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalCorrection}</span>
-              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
-                Action Required
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Postal / Sub-location</span>
-              <span className="font-semibold text-amber-600 dark:text-amber-400">Mismatch</span>
-            </div>
-          </div>
-        </div>
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Correction Required
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.correctionRequiredCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Address / Suite Audit Flagged</p>
+            </motion.div>
 
-        {/* Failed PSAP Test */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Failed Audit / Overrides
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-600 dark:text-rose-400">
-              <AlertCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalFailed}</span>
-              <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800/40">
-                Critical SLA
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Trunk Signaling Hold</span>
-              <span className="font-semibold text-rose-600 dark:text-rose-400">&lt; 4h SLA</span>
-            </div>
-          </div>
-        </div>
+            <motion.div
+              whileHover={{ y: -2 }}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Pending Validation
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.pendingOrFailedCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Carrier Validation Pending</p>
+            </motion.div>
+          </>
+        )}
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search hotel property, address, PSAP ID, city..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
-          />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
-            ⌘F
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by property, organization, emergency address, PSAP ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 dark:text-slate-400 font-medium">Status:</span>
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedStatusFilter}
-              onChange={(e) => setSelectedStatusFilter(e.target.value)}
-              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer"
+              onChange={(e) => {
+                setSelectedStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Filter by status"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
             >
-              <option value="ALL" className="dark:bg-[#15161c]">All Statuses</option>
-              <option value="VERIFIED" className="dark:bg-[#15161c]">Verified</option>
-              <option value="PENDING" className="dark:bg-[#15161c]">Pending</option>
-              <option value="CORRECTION_REQUIRED" className="dark:bg-[#15161c]">Correction Required</option>
-              <option value="FAILED" className="dark:bg-[#15161c]">Failed</option>
+              <option value="ALL">Status: All Statuses</option>
+              <option value="VERIFIED">PSAP Verified</option>
+              <option value="CORRECTION_REQUIRED">Correction Required</option>
+              <option value="PENDING">Validation Pending</option>
+              <option value="FAILED">Routing Failed</option>
+            </select>
+
+            <select
+              value={selectedComplianceFilter}
+              onChange={(e) => {
+                setSelectedComplianceFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Filter by compliance"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="ALL">Compliance: All</option>
+              <option value="COMPLIANT">Ray Baum Compliant</option>
+              <option value="NON_COMPLIANT">Audit Required</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Sort records"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="NEWEST">Sort: Recently Added</option>
+              <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
+              <option value="ORG_ASC">Sort: Organization (A-Z)</option>
+              <option value="STATUS">Sort: Status</option>
             </select>
           </div>
         </div>
+
+        {/* Active Filters Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
+            <span className="text-slate-400">Active Filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedStatusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                {selectedStatusFilter}
+                <button onClick={() => setSelectedStatusFilter('ALL')} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={resetAllFilters}
+              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto cursor-pointer"
+            >
+              Clear All
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 4. Table Representation */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <th className="py-3 px-4">Property &amp; Organization</th>
-                <th className="py-3 px-4">Dispatchable Physical Address</th>
-                <th className="py-3 px-4">PSAP ID &amp; Laws</th>
-                <th className="py-3 px-4">Verification Status</th>
-                <th className="py-3 px-4">Last Audit</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    <ShieldCheck className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="font-semibold text-slate-700">No E911 records found</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((rec) => (
-                  <tr
-                    key={rec.id}
-                    className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
-                    onClick={() => setDrawerRecord(rec)}
-                  >
-                    {/* 1. Property */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0 border border-indigo-100 shadow-xs">
-                          <Hotel className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors block">
-                            {rec.property_name}
-                          </span>
-                          <span className="text-[11px] text-indigo-600 font-semibold block">
-                            {rec.organization_name}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 2. Emergency Address */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 text-slate-800 font-medium">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate max-w-sm">{rec.emergency_address}</span>
-                      </div>
-                      {rec.correction_notes && (
-                        <span className="text-[11px] text-amber-700 block mt-0.5">
-                          Note: {rec.correction_notes}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* 3. PSAP ID */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="font-mono font-bold text-slate-700 text-[11px] block">{rec.psap_id}</span>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
-                        <span className="text-emerald-600 font-semibold">Ray Baum OK</span>
-                        <span>•</span>
-                        <span>Direct 911</span>
-                      </div>
-                    </td>
-
-                    {/* 4. Verification Status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      {rec.status === 'VERIFIED' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <BadgeCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          PSAP Verified
-                        </span>
-                      )}
-                      {rec.status === 'PENDING' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                          <Clock className="w-3.5 h-3.5 text-sky-600" />
-                          Pending Review
-                        </span>
-                      )}
-                      {rec.status === 'CORRECTION_REQUIRED' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                          Correction Needed
-                        </span>
-                      )}
-                      {rec.status === 'FAILED' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                          <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                          Failed PSAP Test
-                        </span>
-                      )}
-                    </td>
-
-                    {/* 5. Last Audit */}
-                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
-                      {rec.last_audit_date}
-                    </td>
-
-                    {/* 6. Actions */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => handleOpenAddress(rec)}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors"
-                        >
-                          Edit Address
-                        </button>
-                        <button
-                          onClick={() => handleOpenStatus(rec)}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                          title="Manage Verification"
-                        >
-                          <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* Main Table View (Pure Black Headers, Separate Property & Org columns, No Location displayed in table) */}
+      {error ? (
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load E911 records</p>
+          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
+          <button
+            onClick={() => fetchE911Records()}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
         </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 5. STATUS / VERIFICATION CONTROL MODAL                                    */}
-      {/* ========================================================================= */}
-      {showStatusModal && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">E911 PSAP Verification Status</h3>
-              </div>
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
+      ) : loading && records.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/3"></div>
+              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
             </div>
-
-            <p className="text-xs text-slate-600 mt-3">
-              Set PSAP compliance status for <span className="font-bold text-slate-900">{selectedRecord.property_name}</span>.
-            </p>
-
-            <div className="mt-4 space-y-2 text-xs">
+          ))}
+        </div>
+      ) : records.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+          <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No E911 Records Found</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+            {hasActiveFilters
+              ? 'No records matched the selected filters.'
+              : 'Register your first property emergency dispatch address for Kari’s Law and Ray Baum compliance.'}
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            {hasActiveFilters && (
               <button
-                onClick={() => handleUpdateStatus('VERIFIED')}
-                className="w-full p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 text-left flex items-center justify-between"
+                onClick={resetAllFilters}
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
               >
-                <div>
-                  <span className="font-bold text-emerald-800 block">Verified (PSAP Passed)</span>
-                  <span className="text-[11px] text-slate-500">Emergency routing tables certified &amp; active.</span>
-                </div>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Clear Filters
+              </button>
+            )}
+            <button
+              onClick={() => {
+                const firstOpt = orgPropOptions[0];
+                setFormData({
+                  org_property_id: firstOpt?.org_property_id || '',
+                  emergency_address: firstOpt?.address || '',
+                  psap_id: '',
+                  status: 'PENDING',
+                  correction_notes: '',
+                });
+                setShowCreateModal(true);
+              }}
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Register E911 Record
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">PROPERTY</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">EMERGENCY DISPATCH ADDRESS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">RAY BAUM ACT</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
+                {records.map((record) => {
+                  const badge = getStatusBadge(record.status);
+                  return (
+                    <motion.tr
+                      key={record.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      whileHover={{ backgroundColor: 'rgba(248, 250, 252, 0.6)' }}
+                      className="transition"
+                    >
+                      {/* 1. Property Name (ONLY Name, No Location) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-black dark:text-white text-sm block">
+                              {record.property_name}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. Organization Name (ONLY Name, No Location) */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-semibold text-black dark:text-white">
+                          {record.organization_name}
+                        </span>
+                      </td>
+
+                      {/* 3. Emergency Dispatch Address */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-0.5 max-w-[240px]">
+                          <span className="font-medium text-slate-800 dark:text-slate-200 block truncate">
+                            {record.emergency_address}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono block">
+                            PSAP ID: {record.psap_id}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 4. Status Badge */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </td>
+
+                      {/* 5. Ray Baum Compliance */}
+                      <td className="py-3.5 px-4">
+                        {record.ray_baum_compliant ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Compliant
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Audit Needed
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 6. Actions (3-Dots Trigger) */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(record)}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleOpenMenu(e, record)}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            title="More Actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Server-Side Pagination Bar (10 items per page) */}
+          <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} records
+            </span>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1 || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+              >
+                <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              <button
-                onClick={() => handleUpdateStatus('CORRECTION_REQUIRED')}
-                className="w-full p-3 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50/50 text-left flex items-center justify-between"
-              >
-                <div>
-                  <span className="font-bold text-amber-800 block">Correction Required</span>
-                  <span className="text-[11px] text-slate-500">Address mismatch requires customer update.</span>
-                </div>
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => setCurrentPage(num)}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
+                      : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
 
               <button
-                onClick={() => handleUpdateStatus('FAILED')}
-                className="w-full p-3 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50/50 text-left flex items-center justify-between"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
-                <div>
-                  <span className="font-bold text-rose-800 block">Failed Verification</span>
-                  <span className="text-[11px] text-slate-500">Trunk signaling test rejected by PSAP gateway.</span>
-                </div>
-                <AlertCircle className="w-4 h-4 text-rose-600" />
-              </button>
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs"
-              >
-                Close
+                Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -650,148 +932,466 @@ export default function AdminE911Page() {
       )}
 
       {/* ========================================================================= */}
-      {/* 6. EDIT DISPATCHABLE ADDRESS MODAL                                        */}
+      {/* FIXED 3-DOTS ACTION POPUP */}
       {/* ========================================================================= */}
-      {showAddressModal && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">Edit PSAP Dispatchable Address</h3>
+      {menuPosition && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200"
+          >
+            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
+              <p className="font-bold text-black dark:text-white truncate">{menuPosition.record.property_name}</p>
+              <p className="text-[10px] text-slate-400">E911 Options</p>
+            </div>
+
+            {/* 1. View Details */}
+            <button
+              onClick={() => {
+                const record = menuPosition.record;
+                setMenuPosition(null);
+                setSelectedRecordForDetails(record);
+                setShowDetailsDrawer(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5 text-blue-500" /> View Details
+            </button>
+
+            {/* 2. Edit E911 Record */}
+            <button
+              onClick={() => {
+                const record = menuPosition.record;
+                setMenuPosition(null);
+                handleOpenEdit(record);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Record
+            </button>
+
+            {/* 3. Correction Notes */}
+            <button
+              onClick={() => {
+                const record = menuPosition.record;
+                setMenuPosition(null);
+                handleOpenCorrectionNotes(record);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-[#222430]"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Correction Notes
+            </button>
+          </motion.div>
+        </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1. VIEW DETAILS DRAWER (No Light Gray Text, High Contrast) */}
+      {/* ========================================================================= */}
+      {showDetailsDrawer && selectedRecordForDetails && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-black dark:text-white">E911 Record Specifications</h3>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                    {selectedRecordForDetails.property_name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+
+              <div className="space-y-3.5 text-xs">
+                {/* Emergency Address & PSAP */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Emergency Dispatch Configuration
+                  </h4>
+                  <div className="pt-0.5">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Registered Dispatch Address</span>
+                    <p className="font-bold text-black dark:text-white mt-1 text-sm">
+                      {selectedRecordForDetails.emergency_address}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">PSAP Routing ID</span>
+                    <span className="font-mono font-bold text-black dark:text-white">
+                      {selectedRecordForDetails.psap_id}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Validation Status</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                      {getStatusBadge(selectedRecordForDetails.status).label}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Compliance Verification */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Federal Regulatory Compliance
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Ray Baum's Act (Dispatchable Location)</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Compliant
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Kari's Law (Direct 911 Dialing)</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Enabled
+                    </span>
+                  </div>
+                </div>
+
+                {/* Property & Organization Details */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Tenant & Location
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Property</span>
+                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">Organization</span>
+                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.organization_name}</span>
+                  </div>
+                </div>
+
+                {/* Correction Notes History */}
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Correction Notes & Audit Flags
+                  </h4>
+                  {selectedRecordForDetails.correction_notes ? (
+                    <div className="bg-white dark:bg-[#111217] p-3 rounded-lg border border-slate-200 dark:border-[#222430] whitespace-pre-line text-slate-900 dark:text-slate-100 font-sans">
+                      {selectedRecordForDetails.correction_notes}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 font-medium italic">No correction notes or audit flags reported.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
               <button
-                onClick={() => setShowAddressModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                type="button"
+                onClick={() => setShowDetailsDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
               >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 2. EDIT E911 DRAWER */}
+      {/* ========================================================================= */}
+      {showEditDrawer && selectedRecordForEdit && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-black dark:text-white">Edit E911 Record</h3>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                    {selectedRecordForEdit.property_name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowEditDrawer(false)}
+                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} id="edit-e911-form" className="space-y-3.5 mt-5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Emergency Dispatch Address *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.emergency_address}
+                    onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    PSAP Routing ID
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.psap_id}
+                    onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Validation Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="VERIFIED">PSAP Verified</option>
+                    <option value="CORRECTION_REQUIRED">Correction Required</option>
+                    <option value="PENDING">Validation Pending</option>
+                    <option value="FAILED">Routing Failed</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Correction Notes / Audit Details
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={formData.correction_notes}
+                    onChange={(e) => setFormData({ ...formData, correction_notes: e.target.value })}
+                    placeholder="e.g. Suite 400 location verification required by county PSAP."
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </form>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowEditDrawer(false)}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="edit-e911-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Changes
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. CORRECTION NOTES MODAL */}
+      {/* ========================================================================= */}
+      {showNotesModal && selectedRecordForNotes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <div>
+                <h3 className="text-sm font-bold text-black dark:text-white">Add E911 Correction Note</h3>
+                <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                  {selectedRecordForNotes.property_name}
+                </p>
+              </div>
+              <button onClick={() => setShowNotesModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAddress} className="mt-4 space-y-3.5 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Dispatchable Physical Address</label>
+            <form onSubmit={handleSaveCorrectionNote} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  Correction / Audit Note *
+                </label>
                 <textarea
-                  rows={3}
                   required
-                  value={formData.emergency_address}
-                  onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg p-2.5 text-xs text-slate-900 outline-none"
+                  rows={3}
+                  value={correctionNoteInput}
+                  onChange={(e) => setCorrectionNoteInput(e.target.value)}
+                  placeholder="e.g. PSAP mismatch on floor/suite number; property contacted for clarification."
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
                 />
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
+                  Saving will set the record to "Correction Required" and append to the audit log.
+                </p>
               </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Correction Notes / Sub-location Tag</label>
-                <input
-                  type="text"
-                  value={formData.correction_notes}
-                  onChange={(e) => setFormData({ ...formData, correction_notes: e.target.value })}
-                  placeholder="e.g. North Tower, Frontdesk PBX Room 102"
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddressModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
+                  onClick={() => setShowNotesModal(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold shadow-sm"
+                  disabled={noteLoading || !correctionNoteInput.trim()}
+                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
-                  Save Address
+                  {noteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Save Note
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 7. SLIDE-OVER DRAWER                                                      */}
+      {/* 4. CREATE E911 RECORD MODAL */}
       {/* ========================================================================= */}
-      {drawerRecord && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-2xl h-full shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="p-6 border-b border-slate-200 flex items-start justify-between bg-slate-50">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base shadow-xs">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-900">{drawerRecord.property_name}</h2>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                    <span className="font-semibold text-indigo-700">{drawerRecord.organization_name}</span>
-                    <span>•</span>
-                    <span className="font-mono">{drawerRecord.psap_id}</span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setDrawerRecord(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60"
-              >
-                <X className="w-5 h-5" />
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-black dark:text-white">Register E911 Dispatch Endpoint</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
-              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Exact Dispatchable Physical Address
-                </h4>
-                <p className="font-bold text-slate-900 text-sm">{drawerRecord.emergency_address}</p>
-                {drawerRecord.correction_notes && (
-                  <p className="text-amber-700 text-xs bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                    {drawerRecord.correction_notes}
-                  </p>
-                )}
+            {formError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  Select Property & Organization *
+                </label>
+                <select
+                  required
+                  value={formData.org_property_id}
+                  onChange={(e) => {
+                    const selId = e.target.value;
+                    const opt = orgPropOptions.find((o) => o.org_property_id === selId);
+                    setFormData({
+                      ...formData,
+                      org_property_id: selId,
+                      emergency_address: opt?.address || formData.emergency_address,
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value="">-- Choose Property --</option>
+                  {orgPropOptions.map((opt, idx) => (
+                    <option key={idx} value={opt.org_property_id}>
+                      {opt.property_name} &bull; {opt.organization_name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Statutory Telecom Compliance Checks
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200">
-                    <span className="font-semibold text-slate-800">Kari&apos;s Law (Direct 911 Dialing without prefix &apos;9&apos;)</span>
-                    <span className="text-emerald-700 font-bold flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Verified
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200">
-                    <span className="font-semibold text-slate-800">RAY BAUM&apos;S Act (Dispatchable Room/Floor Location)</span>
-                    <span className="text-emerald-700 font-bold flex items-center gap-1">
-                      <Check className="w-3.5 h-3.5" /> Verified
-                    </span>
-                  </div>
-                </div>
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  Emergency Dispatch Address *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 100 Ocean Drive, Suite 200, Miami, FL 33139"
+                  value={formData.emergency_address}
+                  onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                />
               </div>
-            </div>
 
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setSelectedRecord(drawerRecord);
-                  setShowStatusModal(true);
-                }}
-                className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-white text-slate-700 font-semibold text-xs"
-              >
-                Change Status ({drawerRecord.status})
-              </button>
-              <button
-                onClick={() => setDrawerRecord(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs"
-              >
-                Done
-              </button>
-            </div>
-          </div>
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  PSAP Identifier (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. FL-MIA-PSAP-01"
+                  value={formData.psap_id}
+                  onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                  Validation Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value="PENDING">Validation Pending</option>
+                  <option value="VERIFIED">PSAP Verified</option>
+                  <option value="CORRECTION_REQUIRED">Correction Required</option>
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Register Address
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

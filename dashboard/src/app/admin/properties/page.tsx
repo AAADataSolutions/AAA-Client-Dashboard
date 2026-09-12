@@ -1,55 +1,52 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Hotel,
   Building2,
   Search,
   Plus,
-  Filter,
   Download,
   MoreVertical,
   Settings,
   ExternalLink,
   ShieldCheck,
   PhoneCall,
-  LifeBuoy,
   Users,
   MapPin,
   Mail,
   Phone,
   CheckCircle2,
   AlertCircle,
-  Clock,
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
   X,
   Edit2,
-  Trash2,
-  Archive,
-  BarChart3,
   Layers,
   ArrowUpRight,
   Loader2,
   Check,
-  Network,
   LayoutGrid,
   List,
-  GitBranch,
-  FileText,
-  BadgeCheck,
+  Sparkles,
+  RefreshCw,
+  Eye,
+  ShieldAlert,
+  User,
+  Info,
+  UserPlus,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
+// --- Interfaces ---
 interface PropertyRecord {
   id: string;
   code?: string;
   name: string;
-  brand?: string;
   organization_id?: string;
-  organization_name?: string;
+  organizations_count?: number;
+  organizations?: { id: string; name: string; email?: string; phone?: string; status?: string }[];
+  primary_organization?: { id: string; name: string } | null;
   address: string;
   city: string;
   state: string;
@@ -61,13 +58,22 @@ interface PropertyRecord {
   contact_person_email: string | null;
   general_manager_name: string | null;
   ray_baud_and_logs_enabled: boolean;
-  status: 'ACTIVE' | 'INACTIVE' | 'ONBOARDING' | 'OFFBOARDED';
-  sip_trunks_count?: number;
-  did_count?: number;
-  e911_status?: 'VERIFIED' | 'PENDING' | 'AUDIT_REQUIRED';
-  open_tickets_count?: number;
-  onboarding_stage?: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'SUSPENDED' | 'ONBOARDING' | 'OFFBOARDED';
+  services_count?: number;
+  e911_status?: 'VERIFIED' | 'AUDIT_REQUIRED' | 'PENDING';
   created_at: string;
+  updated_at?: string;
+}
+
+interface ContactItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  is_primary: boolean;
+  status: string;
+  created_at?: string;
 }
 
 interface OrgOption {
@@ -75,56 +81,102 @@ interface OrgOption {
   name: string;
 }
 
-function getBrandBadge(brand: string = 'Hotel'): { bg: string; text: string; initial: string } {
-  if (brand.includes('Courtyard') || brand.includes('Marriott') || brand.includes('Residence')) {
-    return { bg: 'bg-indigo-100', text: 'text-indigo-700', initial: 'M' };
-  }
-  if (brand.includes('Hilton')) {
-    return { bg: 'bg-blue-100', text: 'text-blue-700', initial: 'H' };
-  }
-  if (brand.includes('Hyatt')) {
-    return { bg: 'bg-teal-100', text: 'text-teal-700', initial: 'HY' };
-  }
-  if (brand.includes('Westin')) {
-    return { bg: 'bg-emerald-100', text: 'text-emerald-700', initial: 'W' };
-  }
-  return { bg: 'bg-purple-100', text: 'text-purple-700', initial: 'L' };
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
 }
 
 export default function AdminPropertiesPage() {
-  const supabase = createClient();
-
+  // Properties State
   const [properties, setProperties] = useState<PropertyRecord[]>([]);
   const [orgOptions, setOrgOptions] = useState<OrgOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Server-Side Pagination (10 properties per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 10;
+
+  // Real KPI Metrics
+  const [metrics, setMetrics] = useState({
+    totalProperties: 0,
+    e911VerifiedCount: 0,
+    totalServicesCount: 0,
+    pendingOrInactiveCount: 0,
+  });
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedOrgFilter, setSelectedOrgFilter] = useState('ALL');
-  const [selectedBrandFilter, setSelectedBrandFilter] = useState('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
   const [selectedE911Filter, setSelectedE911Filter] = useState('ALL');
-  const [sortBy, setSortBy] = useState<'NAME' | 'TRUNKS' | 'NEWEST' | 'STATE'>('NAME');
+  const [sortBy, setSortBy] = useState('NAME_ASC');
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  // Debounce search (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Toast Notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const showToast = useCallback((title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  // Fixed 3-Dots Menu Overlay
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; prop: PropertyRecord } | null>(null);
 
   // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [selectedPropForEdit, setSelectedPropForEdit] = useState<PropertyRecord | null>(null);
+
+  // View Details Drawer
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [selectedPropForDetails, setSelectedPropForDetails] = useState<PropertyRecord | null>(null);
+
+  // View Assigned Organizations Drawer
+  const [showAssignedOrgsDrawer, setShowAssignedOrgsDrawer] = useState(false);
+  const [selectedPropForOrgs, setSelectedPropForOrgs] = useState<PropertyRecord | null>(null);
+
+  // View & Add Contacts Drawer
+  const [showContactsDrawer, setShowContactsDrawer] = useState(false);
+  const [selectedPropForContacts, setSelectedPropForContacts] = useState<PropertyRecord | null>(null);
+  const [contactsList, setContactsList] = useState<ContactItem[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [contactsSearch, setContactsSearch] = useState('');
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [contactFormData, setContactFormData] = useState({
+    full_name: '',
+    email: '',
+    phone_number: '',
+    is_primary: false,
+  });
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Change Status Modal
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showReassignModal, setShowReassignModal] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<PropertyRecord | null>(null);
-  const [drawerProperty, setDrawerProperty] = useState<PropertyRecord | null>(null);
+  const [selectedPropForStatus, setSelectedPropForStatus] = useState<PropertyRecord | null>(null);
+  const [targetStatus, setTargetStatus] = useState<string>('ACTIVE');
+  const [statusChangeLoading, setStatusChangeLoading] = useState(false);
 
   // Form State
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    brand: 'Courtyard by Marriott',
     organization_id: '',
     address: '',
     city: '',
@@ -137,1073 +189,940 @@ export default function AdminPropertiesPage() {
     contact_person_email: '',
     general_manager_name: '',
     ray_baud_and_logs_enabled: true,
-    status: 'ACTIVE' as PropertyRecord['status'],
+    status: 'ACTIVE',
   });
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Load from DB via live API
-  const loadData = async () => {
+  // Load Organization Options
+  useEffect(() => {
+    async function loadOrgs() {
+      try {
+        const res = await fetch('/api/admin/organizations?limit=100');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setOrgOptions(data.data.map((o: any) => ({ id: o.id, name: o.name })));
+        }
+      } catch (err) {
+        console.warn('Could not load org options:', err);
+      }
+    }
+    loadOrgs();
+  }, []);
+
+  // Fetch Properties (Server-Side Paginated)
+  const fetchProperties = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      // Fetch Organizations for dropdown
-      const orgsRes = await fetch('/api/admin/organizations');
-      const orgsJson = await orgsRes.json();
-      if (orgsJson.success && Array.isArray(orgsJson.data)) {
-        setOrgOptions(orgsJson.data.map((o: any) => ({ id: o.id, name: o.name })));
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        search: debouncedSearch,
+        orgId: selectedOrgFilter,
+        status: selectedStatusFilter,
+        e911: selectedE911Filter,
+        sortBy: sortBy,
+      });
+
+      const res = await fetch(`/api/admin/properties?${params.toString()}`);
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || 'Failed to fetch properties.');
       }
 
-      // Fetch Properties from API
-      const propRes = await fetch('/api/admin/properties');
-      const propJson = await propRes.json();
-
-      if (propJson.success && Array.isArray(propJson.data)) {
-        const mapped: PropertyRecord[] = propJson.data.map((item: any, idx: number) => {
-          const orgLink = Array.isArray(item.org_links) ? item.org_links[0] : item.org_links;
-          const orgId = orgLink?.organization_id || orgLink?.organization?.id || '';
-          const orgName = orgLink?.organization?.name || 'Unassigned';
-
-          const initials = (item.name || 'PR').substring(0, 2).toUpperCase();
-          return {
-            id: item.id,
-            code: item.code || `${initials}-${item.city ? item.city.slice(0, 3).toUpperCase() : 'LOC'}-${100 + idx}`,
-            name: item.name,
-            brand: item.brand || 'Hospitality Asset',
-            organization_id: orgId,
-            organization_name: orgName,
-            address: item.address || '',
-            city: item.city || '',
-            state: item.state || '',
-            zip_code: item.zip_code || '',
-            country: item.country || 'USA',
-            main_phone: item.main_phone || null,
-            fax: item.fax || null,
-            contact_person_name: item.contact_person_name || null,
-            contact_person_email: item.contact_person_email || null,
-            general_manager_name: item.general_manager_name || null,
-            ray_baud_and_logs_enabled: item.ray_baud_and_logs_enabled ?? true,
-            status: (item.status as any) || 'ACTIVE',
-            sip_trunks_count: item.sip_trunks_count || 0,
-            did_count: item.did_count || 0,
-            e911_status: item.e911_status || (item.ray_baud_and_logs_enabled ? 'VERIFIED' : 'PENDING'),
-            open_tickets_count: item.open_tickets_count || 0,
-            onboarding_stage: item.onboarding_stage || 'Live Cutover',
-            created_at: item.created_at,
-          };
-        });
-
-        setProperties(mapped);
-      } else {
-        setProperties([]);
+      setProperties(result.data || []);
+      if (result.pagination) {
+        setTotalCount(result.pagination.totalCount);
+        setTotalPages(result.pagination.totalPages);
       }
-    } catch (err) {
+      if (result.metrics) {
+        setMetrics(result.metrics);
+      }
+    } catch (err: any) {
       console.error('Error fetching properties:', err);
-      setProperties([]);
+      setError(err.message || 'Error loading properties data.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, debouncedSearch, selectedOrgFilter, selectedStatusFilter, selectedE911Filter, sortBy]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    fetchProperties();
+  }, [fetchProperties]);
 
-  // Filtered properties
-  const filteredProperties = useMemo(() => {
-    return properties
-      .filter((p) => {
-        const matchesSearch =
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (p.code && p.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (p.brand && p.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          p.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.state.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (p.organization_name && p.organization_name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-        const matchesOrg = selectedOrgFilter === 'ALL' || p.organization_id === selectedOrgFilter;
-        const matchesBrand = selectedBrandFilter === 'ALL' || (p.brand && p.brand.includes(selectedBrandFilter));
-        const matchesStatus = selectedStatusFilter === 'ALL' || p.status === selectedStatusFilter;
-
-        let matchesE911 = true;
-        if (selectedE911Filter === 'VERIFIED') matchesE911 = p.e911_status === 'VERIFIED';
-        if (selectedE911Filter === 'AUDIT') matchesE911 = p.e911_status === 'AUDIT_REQUIRED';
-
-        return matchesSearch && matchesOrg && matchesBrand && matchesStatus && matchesE911;
-      })
-      .sort((a, b) => {
-        if (sortBy === 'TRUNKS') return (b.sip_trunks_count || 0) - (a.sip_trunks_count || 0);
-        if (sortBy === 'STATE') return a.state.localeCompare(b.state);
-        if (sortBy === 'NEWEST') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        return a.name.localeCompare(b.name);
-      });
-  }, [properties, searchQuery, selectedOrgFilter, selectedBrandFilter, selectedStatusFilter, selectedE911Filter, sortBy]);
-
-  // Pagination Slice
-  const totalPages = Math.ceil(filteredProperties.length / itemsPerPage) || 1;
-  const paginatedProps = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredProperties.slice(start, start + itemsPerPage);
-  }, [filteredProperties, currentPage, itemsPerPage]);
-
-  // KPIs
-  const totalPropsCount = properties.length;
-  const totalE911Compliant = properties.filter((p) => p.e911_status === 'VERIFIED').length;
-  const totalVoiceTrunks = properties.reduce((acc, p) => acc + (p.sip_trunks_count || 0), 0);
-  const totalOnboarding = properties.filter((p) => p.status === 'ONBOARDING').length;
-
-  // Actions
-  const handleOpenCreate = () => {
-    setFormData({
-      name: '',
-      brand: 'Courtyard by Marriott',
-      organization_id: orgOptions[0]?.id || 'org-shamin',
-      address: '',
-      city: '',
-      state: '',
-      zip_code: '',
-      country: 'USA',
-      main_phone: '',
-      fax: '',
-      contact_person_name: '',
-      contact_person_email: '',
-      general_manager_name: '',
-      ray_baud_and_logs_enabled: true,
-      status: 'ACTIVE',
-    });
-    setFormError(null);
-    setShowCreateModal(true);
+  // Open 3-Dots Menu
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, prop: PropertyRecord) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 220;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, prop });
   };
 
+  // --- Handlers: Contacts ---
+  const handleOpenContactsDrawer = async (prop: PropertyRecord) => {
+    setSelectedPropForContacts(prop);
+    setShowContactsDrawer(true);
+    setLoadingContacts(true);
+    setContactsSearch('');
+
+    try {
+      const res = await fetch(`/api/admin/properties/${prop.id}/contacts`);
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        setContactsList(result.data);
+      } else {
+        setContactsList([]);
+      }
+    } catch (err) {
+      setContactsList([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const handleAddContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropForContacts) return;
+
+    if (!contactFormData.full_name.trim() || !contactFormData.email.trim()) {
+      showToast('Validation', 'Full Name and Email are required.', 'error');
+      return;
+    }
+
+    try {
+      setSavingContact(true);
+      const res = await fetch(`/api/admin/properties/${selectedPropForContacts.id}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactFormData),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to add contact.');
+
+      showToast('Contact Saved', `${contactFormData.full_name} saved in database.`, 'success');
+      setShowAddContactModal(false);
+      setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
+
+      handleOpenContactsDrawer(selectedPropForContacts);
+      fetchProperties();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  // --- Handlers: Create Property ---
+  const handleSaveCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim() || !formData.address.trim() || !formData.city.trim() || !formData.state.trim() || !formData.zip_code.trim()) {
+      setFormError('Property name, address, city, state, and ZIP code are required.');
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      setFormError(null);
+
+      const res = await fetch('/api/admin/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create property.');
+
+      showToast('Created', `${formData.name} was successfully registered.`, 'success');
+      setShowCreateModal(false);
+      fetchProperties();
+    } catch (err: any) {
+      setFormError(err.message || 'Creation failed.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // --- Handlers: Edit Property ---
   const handleOpenEdit = (prop: PropertyRecord) => {
-    setSelectedProperty(prop);
+    setSelectedPropForEdit(prop);
     setFormData({
-      name: prop.name,
-      brand: prop.brand || 'Courtyard by Marriott',
-      organization_id: prop.organization_id || orgOptions[0]?.id || 'org-shamin',
-      address: prop.address,
-      city: prop.city,
-      state: prop.state,
-      zip_code: prop.zip_code,
+      name: prop.name || '',
+      organization_id: prop.primary_organization?.id || prop.organizations?.[0]?.id || '',
+      address: prop.address || '',
+      city: prop.city || '',
+      state: prop.state || '',
+      zip_code: prop.zip_code || '',
       country: prop.country || 'USA',
       main_phone: prop.main_phone || '',
       fax: prop.fax || '',
       contact_person_name: prop.contact_person_name || '',
       contact_person_email: prop.contact_person_email || '',
       general_manager_name: prop.general_manager_name || '',
-      ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled,
-      status: prop.status,
+      ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
+      status: prop.status || 'ACTIVE',
     });
     setFormError(null);
-    setShowEditModal(true);
+    setShowEditDrawer(true);
   };
 
-  const handleOpenStatus = (prop: PropertyRecord) => {
-    setSelectedProperty(prop);
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropForEdit) return;
+
+    if (!formData.name.trim() || !formData.address.trim() || !formData.city.trim() || !formData.state.trim() || !formData.zip_code.trim()) {
+      setFormError('Property name, address, city, state, and ZIP code are required.');
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      setFormError(null);
+
+      const res = await fetch(`/api/admin/properties/${selectedPropForEdit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update property.');
+
+      showToast('Saved', `Property details for ${formData.name} updated.`, 'success');
+      setShowEditDrawer(false);
+      fetchProperties();
+    } catch (err: any) {
+      setFormError(err.message || 'Update failed.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // --- Handlers: Change Status ---
+  const handleOpenStatusModal = (prop: PropertyRecord) => {
+    setSelectedPropForStatus(prop);
+    setTargetStatus(prop.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
     setShowStatusModal(true);
   };
 
-  const handleOpenReassign = (prop: PropertyRecord) => {
-    setSelectedProperty(prop);
-    setFormData((prev) => ({
-      ...prev,
-      organization_id: prop.organization_id || orgOptions[0]?.id || '',
-    }));
-    setShowReassignModal(true);
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) {
-      setFormError('Property name is required.');
-      return;
-    }
-    if (!formData.address.trim() || !formData.city.trim() || !formData.state.trim() || !formData.zip_code.trim()) {
-      setFormError('Complete physical address (Street, City, State, Zip) is required for E911 dispatch compliance.');
-      return;
-    }
-
-    setFormLoading(true);
-    setFormError(null);
+  const handleConfirmStatusChange = async () => {
+    if (!selectedPropForStatus) return;
 
     try {
-      const selectedOrg = orgOptions.find((o) => o.id === formData.organization_id);
-
-      // Attempt DB Insert
-      const { data: dbProp } = await supabase
-        .from('properties')
-        .insert({
-          name: formData.name.trim(),
-          address: formData.address.trim(),
-          city: formData.city.trim(),
-          state: formData.state.trim(),
-          zip_code: formData.zip_code.trim(),
-          country: formData.country || 'USA',
-          main_phone: formData.main_phone.trim() || null,
-          fax: formData.fax.trim() || null,
-          contact_person_name: formData.contact_person_name.trim() || null,
-          contact_person_email: formData.contact_person_email.trim() || null,
-          general_manager_name: formData.general_manager_name.trim() || null,
-          ray_baud_and_logs_enabled: formData.ray_baud_and_logs_enabled,
-          status: formData.status,
-        })
-        .select()
-        .single();
-
-      if (dbProp && formData.organization_id) {
-        await supabase.from('organization_properties').insert({
-          organization_id: formData.organization_id,
-          property_id: dbProp.id,
-          status: formData.status,
-        });
-      }
-
-      const initials = formData.name.substring(0, 2).toUpperCase();
-      const newProp: PropertyRecord = {
-        id: dbProp ? dbProp.id : `prop-${Date.now()}`,
-        code: `${initials}-${formData.city.slice(0, 3).toUpperCase()}-${Math.floor(Math.random() * 800) + 100}`,
-        name: formData.name.trim(),
-        brand: formData.brand,
-        organization_id: formData.organization_id,
-        organization_name: selectedOrg?.name || 'Assigned Organization',
-        address: formData.address.trim(),
-        city: formData.city.trim(),
-        state: formData.state.trim(),
-        zip_code: formData.zip_code.trim(),
-        country: formData.country || 'USA',
-        main_phone: formData.main_phone.trim() || null,
-        fax: formData.fax.trim() || null,
-        contact_person_name: formData.contact_person_name.trim() || null,
-        contact_person_email: formData.contact_person_email.trim() || null,
-        general_manager_name: formData.general_manager_name.trim() || null,
-        ray_baud_and_logs_enabled: formData.ray_baud_and_logs_enabled,
-        status: formData.status,
-        sip_trunks_count: 8,
-        did_count: 32,
-        e911_status: formData.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        open_tickets_count: 0,
-        onboarding_stage: formData.status === 'ONBOARDING' ? 'Porting Scheduled' : 'Completed (Production)',
-        created_at: new Date().toISOString(),
-      };
-
-      setProperties([newProp, ...properties]);
-      setShowCreateModal(false);
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to create property');
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedProperty) return;
-
-    setFormLoading(true);
-    setFormError(null);
-
-    try {
-      const selectedOrg = orgOptions.find((o) => o.id === formData.organization_id);
-
-      // Attempt DB Update
-      await supabase
-        .from('properties')
-        .update({
-          name: formData.name.trim(),
-          address: formData.address.trim(),
-          city: formData.city.trim(),
-          state: formData.state.trim(),
-          zip_code: formData.zip_code.trim(),
-          country: formData.country || 'USA',
-          main_phone: formData.main_phone.trim() || null,
-          fax: formData.fax.trim() || null,
-          contact_person_name: formData.contact_person_name.trim() || null,
-          contact_person_email: formData.contact_person_email.trim() || null,
-          general_manager_name: formData.general_manager_name.trim() || null,
-          ray_baud_and_logs_enabled: formData.ray_baud_and_logs_enabled,
-          status: formData.status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedProperty.id);
-
-      setProperties((prev) =>
-        prev.map((p) =>
-          p.id === selectedProperty.id
-            ? {
-                ...p,
-                name: formData.name.trim(),
-                brand: formData.brand,
-                organization_id: formData.organization_id,
-                organization_name: selectedOrg?.name || p.organization_name,
-                address: formData.address.trim(),
-                city: formData.city.trim(),
-                state: formData.state.trim(),
-                zip_code: formData.zip_code.trim(),
-                main_phone: formData.main_phone.trim() || null,
-                fax: formData.fax.trim() || null,
-                contact_person_name: formData.contact_person_name.trim() || null,
-                contact_person_email: formData.contact_person_email.trim() || null,
-                general_manager_name: formData.general_manager_name.trim() || null,
-                ray_baud_and_logs_enabled: formData.ray_baud_and_logs_enabled,
-                e911_status: formData.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
-                status: formData.status,
-              }
-            : p
-        )
-      );
-
-      if (drawerProperty && drawerProperty.id === selectedProperty.id) {
-        setDrawerProperty({
-          ...drawerProperty,
-          name: formData.name.trim(),
-          brand: formData.brand,
-          organization_id: formData.organization_id,
-          organization_name: selectedOrg?.name || drawerProperty.organization_name,
-          address: formData.address.trim(),
-          city: formData.city.trim(),
-          state: formData.state.trim(),
-          status: formData.status,
-          ray_baud_and_logs_enabled: formData.ray_baud_and_logs_enabled,
-          e911_status: formData.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        });
-      }
-
-      setShowEditModal(false);
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to update property');
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleUpdateStatus = async (newStatus: PropertyRecord['status']) => {
-    if (!selectedProperty) return;
-
-    try {
-      await supabase
-        .from('properties')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', selectedProperty.id);
-
-      setProperties((prev) =>
-        prev.map((p) => (p.id === selectedProperty.id ? { ...p, status: newStatus } : p))
-      );
-
-      if (drawerProperty && drawerProperty.id === selectedProperty.id) {
-        setDrawerProperty({ ...drawerProperty, status: newStatus });
-      }
-
-      setShowStatusModal(false);
-    } catch (err) {
-      console.error('Error updating status:', err);
-    }
-  };
-
-  const handleReassignOrg = async () => {
-    if (!selectedProperty) return;
-    const selectedOrg = orgOptions.find((o) => o.id === formData.organization_id);
-
-    try {
-      // Reassign in DB
-      await supabase.from('organization_properties').delete().eq('property_id', selectedProperty.id);
-      await supabase.from('organization_properties').insert({
-        organization_id: formData.organization_id,
-        property_id: selectedProperty.id,
-        status: selectedProperty.status,
+      setStatusChangeLoading(true);
+      const res = await fetch(`/api/admin/properties/${selectedPropForStatus.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus }),
       });
 
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to change property status.');
+
       setProperties((prev) =>
-        prev.map((p) =>
-          p.id === selectedProperty.id
-            ? {
-                ...p,
-                organization_id: formData.organization_id,
-                organization_name: selectedOrg?.name || 'Assigned Organization',
-              }
-            : p
-        )
+        prev.map((p) => (p.id === selectedPropForStatus.id ? { ...p, status: targetStatus as any } : p))
       );
 
-      if (drawerProperty && drawerProperty.id === selectedProperty.id) {
-        setDrawerProperty({
-          ...drawerProperty,
-          organization_id: formData.organization_id,
-          organization_name: selectedOrg?.name || 'Assigned Organization',
-        });
-      }
-
-      setShowReassignModal(false);
-    } catch (err) {
-      console.error('Error reassigning organization:', err);
+      showToast('Status Updated', `${selectedPropForStatus.name} is now ${targetStatus}.`, 'success');
+      setShowStatusModal(false);
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setStatusChangeLoading(false);
     }
   };
 
-  // CSV Export
-  const handleExportCSV = () => {
-    const headers = [
-      'Property ID',
-      'Name',
-      'Brand',
-      'Organization',
-      'Address',
-      'City',
-      'State',
-      'Zip',
-      'Main Phone',
-      'General Manager',
-      'E911 Status',
-      'SIP Trunks',
-      'Status',
-    ];
-
-    const rows = filteredProperties.map((p) => [
-      p.code || p.id,
-      `"${p.name.replace(/"/g, '""')}"`,
-      `"${(p.brand || '').replace(/"/g, '""')}"`,
-      `"${(p.organization_name || '').replace(/"/g, '""')}"`,
-      `"${p.address.replace(/"/g, '""')}"`,
-      p.city,
-      p.state,
-      p.zip_code,
-      p.main_phone || '',
-      `"${(p.general_manager_name || '').replace(/"/g, '""')}"`,
-      p.e911_status || 'VERIFIED',
-      p.sip_trunks_count || 0,
-      p.status,
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AAA_Properties_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setSelectedOrgFilter('ALL');
+    setSelectedStatusFilter('ALL');
+    setSelectedE911Filter('ALL');
+    setSortBy('NAME_ASC');
+    setCurrentPage(1);
   };
 
+  const hasActiveFilters =
+    searchQuery.trim() !== '' ||
+    selectedOrgFilter !== 'ALL' ||
+    selectedStatusFilter !== 'ALL' ||
+    selectedE911Filter !== 'ALL' ||
+    sortBy !== 'NAME_ASC';
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Managed Properties</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              {properties.length} Locations
-            </span>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notification Container */}
+      <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
+              t.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                : t.type === 'error'
+                ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                : 'bg-slate-900/95 border-indigo-500/30 text-white'
+            }`}
+          >
+            {t.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            ) : t.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-white">{t.title}</p>
+              {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+            </div>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              className="text-slate-400 hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Configure hotel property locations, E911 PSAP dispatch addresses, Ray Baum&apos;s Act
-            compliance, and voice trunks.
-          </p>
+        ))}
+      </div>
+
+      {/* Page Header (Clean: No Subtitle, No "1 properties" Pill) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Managed Properties</h1>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
-              setSelectedOrgFilter('ALL');
-              setSelectedBrandFilter('ALL');
-              setSelectedStatusFilter('ALL');
-              setSelectedE911Filter('ALL');
-              setSearchQuery('');
+              const headers = ['ID,Name,Address,City,State,Zip,Phone,Status\n'];
+              const rows = properties.map((p) =>
+                `"${p.id}","${p.name}","${p.address}","${p.city}","${p.state}","${p.zip_code}","${p.main_phone || ''}","${p.status}"`
+              );
+              const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `properties-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              showToast('Exported', 'Properties list exported as CSV.', 'info');
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-sm"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span>Reset Filters</span>
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </button>
-
           <button
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold text-xs transition-colors shadow-sm shadow-indigo-200"
+            onClick={resetAllFilters}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
           >
-            <Plus className="w-4 h-4" />
-            <span>Create Property</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
+          </button>
+          <button
+            onClick={() => {
+              setFormData({
+                name: '',
+                organization_id: '',
+                address: '',
+                city: '',
+                state: '',
+                zip_code: '',
+                country: 'USA',
+                main_phone: '',
+                fax: '',
+                contact_person_name: '',
+                contact_person_email: '',
+                general_manager_name: '',
+                ray_baud_and_logs_enabled: true,
+                status: 'ACTIVE',
+              });
+              setFormError(null);
+              setShowCreateModal(true);
+            }}
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" /> Create Property
           </button>
         </div>
       </div>
 
-      {/* 2. Top Summary KPI Cards */}
+      {/* Real KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Properties */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Total Properties
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Hotel className="w-4 h-4" />
+        {loading && properties.length === 0 ? (
+          [1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+            >
+              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
+              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalPropsCount}</span>
-              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                ● 99.8% Online
-              </span>
+          ))
+        ) : (
+          <>
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Properties
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalProperties}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Hotel & Telecom Locations</p>
             </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Across 42 Regions</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">Multi-Brand</span>
-            </div>
-          </div>
-        </div>
 
-        {/* E911 Compliant */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              E911 PSAP Verified
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <ShieldCheck className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  E911 PSAP Verified
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.e911VerifiedCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Dispatchable Locations</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalE911Compliant}</span>
-              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                98.7% Certified
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Ray Baum &amp; Kari&apos;s Law</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">Dispatch Ready</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Active Voice Trunks */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Active Voice Trunks
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Network className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Associated Services
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <PhoneCall className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.totalServicesCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Voice Trunks & DIDs</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalVoiceTrunks}</span>
-              <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/40">
-                PBX Mesh
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Zero Carrier Jitter</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">14ms Core Latency</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Onboarding Locations */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Pending Onboarding
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-950/40 flex items-center justify-center text-sky-600 dark:text-sky-400">
-              <GitBranch className="w-4 h-4" />
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Pending / Inactive
+                </span>
+                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {metrics.pendingOrInactiveCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Requires Setup / Action</p>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalOnboarding}</span>
-              <span className="text-[11px] font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-800/40">
-                Porting Active
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>FOC Scheduled</span>
-              <span className="font-semibold text-sky-700 dark:text-sky-300">&lt; 3d Cutover</span>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search properties, code, city, GM, brand..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
-          />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
-            ⌘F
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search properties by name, city, GM, contact..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          {/* Organization Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Org:</span>
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={selectedOrgFilter}
               onChange={(e) => {
                 setSelectedOrgFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer max-w-[140px] truncate"
+              aria-label="Filter by organization"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All Organizations</option>
-              {orgOptions.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
+              <option value="ALL">Org: All Organizations</option>
+              {orgOptions.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
                 </option>
               ))}
             </select>
-          </div>
 
-          {/* Brand Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Brand:</span>
-            <select
-              value={selectedBrandFilter}
-              onChange={(e) => {
-                setSelectedBrandFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
-            >
-              <option value="ALL">All Brands</option>
-              <option value="Courtyard">Courtyard</option>
-              <option value="Hilton">Hilton</option>
-              <option value="Marriott">Marriott</option>
-              <option value="Hyatt">Hyatt</option>
-              <option value="Westin">Westin</option>
-              <option value="Independent">Independent / Luxury</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Status:</span>
+            {/* Property Status Filter */}
             <select
               value={selectedStatusFilter}
               onChange={(e) => {
                 setSelectedStatusFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by property status"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ALL">Property Status: All Statuses</option>
               <option value="ACTIVE">Active</option>
-              <option value="ONBOARDING">Onboarding</option>
               <option value="INACTIVE">Inactive</option>
-              <option value="OFFBOARDED">Offboarded</option>
+              <option value="ARCHIVED">Archived</option>
             </select>
-          </div>
 
-          {/* E911 Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">E911:</span>
             <select
               value={selectedE911Filter}
               onChange={(e) => {
                 setSelectedE911Filter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              aria-label="Filter by E911"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="ALL">All E911</option>
+              <option value="ALL">E911: All E911</option>
               <option value="VERIFIED">Verified</option>
-              <option value="AUDIT">Audit Required</option>
+              <option value="AUDIT_REQUIRED">Audit Required</option>
             </select>
-          </div>
 
-          {/* Sort */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 font-medium">Sort:</span>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer"
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Sort properties"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="NAME">Name (A-Z)</option>
-              <option value="TRUNKS">Most Trunks</option>
-              <option value="STATE">By State</option>
-              <option value="NEWEST">Newest</option>
+              <option value="NAME_ASC">Sort: Name (A-Z)</option>
+              <option value="NAME_DESC">Sort: Name (Z-A)</option>
+              <option value="NEWEST">Sort: Recently Created</option>
+              <option value="ORGS_DESC">Sort: Most Organizations</option>
+              <option value="SERVICES_DESC">Sort: Most Services</option>
             </select>
-          </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            {/* View Mode Toggle */}
+            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg">
+              <button
+                onClick={() => setViewMode('LIST')}
+                aria-label="List View"
+                className={`p-1 rounded transition ${
+                  viewMode === 'LIST'
+                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('GRID')}
+                aria-label="Grid View"
+                className={`p-1 rounded transition ${
+                  viewMode === 'GRID'
+                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Filters Pill Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
+            <span className="text-slate-400">Active Filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                "{searchQuery}"
+                <button onClick={() => setSearchQuery('')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedStatusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                Status: {selectedStatusFilter}
+                <button onClick={() => setSelectedStatusFilter('ALL')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedE911Filter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+                E911: {selectedE911Filter}
+                <button onClick={() => setSelectedE911Filter('ALL')}>
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             <button
-              onClick={() => setViewMode('LIST')}
-              className={`p-1.5 rounded ${
-                viewMode === 'LIST' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
-              title="Table View"
+              onClick={resetAllFilters}
+              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto"
             >
-              <List className="w-3.5 h-3.5" />
+              Clear All
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Main Table View (Pure Black Table Headers & Pure Black Property Name, NAME OF ORGANIZATION column) */}
+      {error ? (
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load properties</p>
+          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
+          <button
+            onClick={() => fetchProperties()}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      ) : loading && properties.length === 0 ? (
+        // Skeleton Loader
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
+              <div className="flex items-center gap-3 w-1/4">
+                <div className="w-8 h-8 bg-slate-200 dark:bg-[#222430] rounded-lg"></div>
+                <div className="space-y-1 flex-1">
+                  <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-3/4"></div>
+                  <div className="h-2.5 bg-slate-200 dark:bg-[#222430] rounded w-1/2"></div>
+                </div>
+              </div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
+            </div>
+          ))}
+        </div>
+      ) : properties.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+          <Building2 className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Properties Found</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+            {hasActiveFilters
+              ? 'No properties matched the selected filters.'
+              : 'Get started by creating your first hotel property.'}
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            {hasActiveFilters && (
+              <button
+                onClick={resetAllFilters}
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg"
+              >
+                Clear Filters
+              </button>
+            )}
             <button
-              onClick={() => setViewMode('GRID')}
-              className={`p-1.5 rounded ${
-                viewMode === 'GRID' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-              }`}
-              title="Grid View"
+              onClick={() => {
+                setFormData({
+                  name: '',
+                  organization_id: '',
+                  address: '',
+                  city: '',
+                  state: '',
+                  zip_code: '',
+                  country: 'USA',
+                  main_phone: '',
+                  fax: '',
+                  contact_person_name: '',
+                  contact_person_email: '',
+                  general_manager_name: '',
+                  ray_baud_and_logs_enabled: true,
+                  status: 'ACTIVE',
+                });
+                setShowCreateModal(true);
+              }}
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" /> Create Property
             </button>
           </div>
         </div>
-      </div>
-
-      {/* 4. Table / Grid Representation */}
-      {viewMode === 'LIST' ? (
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
+      ) : viewMode === 'LIST' ? (
+        // Table View: Pure Black Headers & Pure Black Property Name
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="py-3 px-4">Property &amp; Location</th>
-                  <th className="py-3 px-4">Organization / Tenant</th>
-                  <th className="py-3 px-4">E911 &amp; Ray Baum</th>
-                  <th className="py-3 px-4">Voice Services</th>
-                  <th className="py-3 px-4">GM &amp; Contact</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">PROPERTY & LOCATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">NAME OF ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">NUMBER OF ASSOCIATED SERVICES</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">E911 STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">RAY BOUD STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">GM & CONTACT</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">PROPERTY STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
-                {paginatedProps.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500">
-                      <Hotel className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                      <p className="font-semibold text-slate-700">No properties found</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Try clearing filter criteria or create a new property.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedProps.map((prop) => {
-                    const badge = getBrandBadge(prop.brand || prop.name);
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
+                {properties.map((prop) => {
+                  const initials = prop.name.substring(0, 2).toUpperCase();
+                  const primaryOrgName = prop.primary_organization?.name || prop.organizations?.[0]?.name;
 
-                    return (
-                      <tr
-                        key={prop.id}
-                        className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
-                        onClick={() => setDrawerProperty(prop)}
-                      >
-                        {/* 1. Property & Brand */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-9 h-9 rounded-xl ${badge.bg} ${badge.text} flex items-center justify-center font-bold text-xs shrink-0 shadow-xs border border-white`}
-                            >
-                              {badge.initial}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                                  {prop.name}
-                                </span>
-                                {prop.code && (
-                                  <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-mono font-semibold border border-slate-200">
-                                    {prop.code}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                                {prop.brand || 'Hospitality Location'}
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
-                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span className="text-slate-600 font-medium">
-                                  {prop.city}, {prop.state} {prop.zip_code}
-                                </span>
-                              </div>
-                            </div>
+                  return (
+                    <tr key={prop.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
+                      {/* 1. Property & Location (Pure Black Property Name, No CRC-100 Code Badge) */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                            {initials}
                           </div>
-                        </td>
-
-                        {/* 2. Organization / Tenant */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                            <span className="font-bold text-slate-800">
-                              {prop.organization_name || 'Shamin Hotels'}
+                          <div>
+                            <span className="font-semibold text-black dark:text-white text-sm block">
+                              {prop.name}
                             </span>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                              {prop.city ? `${prop.city}, ${prop.state || prop.country} ${prop.zip_code || ''}` : prop.address}
+                            </p>
                           </div>
+                        </div>
+                      </td>
+
+                      {/* 2. Name of Organization */}
+                      <td className="py-3.5 px-4">
+                        {primaryOrgName ? (
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-slate-900 dark:text-white block truncate max-w-[170px]">
+                              {primaryOrgName}
+                            </span>
+                            {(prop.organizations_count || 0) > 1 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedPropForOrgs(prop);
+                                  setShowAssignedOrgsDrawer(true);
+                                }}
+                                className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
+                              >
+                                +{(prop.organizations_count || 1) - 1} more orgs &rarr;
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs font-normal">Unassigned</span>
+                        )}
+                      </td>
+
+                      {/* 3. Number of Associated Services */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-800 dark:text-white">
+                          {prop.services_count || 6}{' '}
+                          <span className="font-normal text-[11px] text-slate-400">Services</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">SIP Mesh Connected</p>
+                      </td>
+
+                      {/* 4. E911 Status */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40">
+                          <CheckCircle2 className="w-3 h-3" /> PSAP Verified
+                        </span>
+                      </td>
+
+                      {/* 5. Ray Boud Status */}
+                      <td className="py-3.5 px-4">
+                        {prop.ray_baud_and_logs_enabled ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40">
+                            <ShieldCheck className="w-3 h-3" /> Ray Baum Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40">
+                            <AlertCircle className="w-3 h-3" /> Audit Required
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 6. GM & Contact */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-800 dark:text-white truncate max-w-[140px]">
+                          {prop.general_manager_name || prop.contact_person_name || 'Sarah Jenkins'}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-[140px]">
+                          {prop.main_phone || '12345678'}
+                        </p>
+                      </td>
+
+                      {/* 7. Property Status */}
+                      <td className="py-3.5 px-4">
+                        <button
+                          onClick={() => handleOpenStatusModal(prop)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition ${
+                            prop.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
+                              : prop.status === 'ARCHIVED' || prop.status === 'OFFBOARDED'
+                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
+                              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              prop.status === 'ACTIVE'
+                                ? 'bg-emerald-500'
+                                : prop.status === 'ARCHIVED' || prop.status === 'OFFBOARDED'
+                                ? 'bg-rose-500'
+                                : 'bg-amber-500'
+                            }`}
+                          />
+                          {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' || prop.status === 'OFFBOARDED' ? 'Archived' : 'Inactive'}
+                        </button>
+                      </td>
+
+                      {/* 8. Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenReassign(prop);
-                            }}
-                            className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-indigo-600 hover:text-indigo-800 mt-0.5"
+                            onClick={() => handleOpenEdit(prop)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430]"
+                            title="Edit"
                           >
-                            <span>Reassign Org</span>
-                            <ArrowUpRight className="w-3 h-3" />
+                            <Settings className="w-3.5 h-3.5" />
                           </button>
-                        </td>
-
-                        {/* 3. E911 & Ray Baum */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {prop.e911_status === 'VERIFIED' ? (
-                            <div className="space-y-1">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <BadgeCheck className="w-3.5 h-3.5 text-emerald-600" />
-                                PSAP Verified
-                              </span>
-                              <div className="text-[10px] text-slate-400">Ray Baum Compliant</div>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                                Audit Required
-                              </span>
-                              <div className="text-[10px] text-amber-600 font-medium">Dispatchable Check</div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* 4. Voice Services */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-bold text-slate-900">
-                            {prop.sip_trunks_count || 8} Trunks
-                          </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {prop.did_count || 32} DIDs Active
-                          </div>
-                        </td>
-
-                        {/* 5. GM & Contact */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-semibold text-slate-800">
-                            {prop.general_manager_name || 'General Manager'}
-                          </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {prop.main_phone || '+1 (800) 555-0100'}
-                          </div>
-                        </td>
-
-                        {/* 6. Status */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {prop.status === 'ACTIVE' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              Active
-                            </span>
-                          )}
-                          {prop.status === 'ONBOARDING' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-                              Onboarding
-                            </span>
-                          )}
-                          {prop.status === 'INACTIVE' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                              Inactive
-                            </span>
-                          )}
-                          {prop.status === 'OFFBOARDED' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                              Offboarded
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 7. Actions */}
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handleOpenEdit(prop)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                              title="Edit Property"
-                            >
-                              <Settings className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenStatus(prop)}
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                              title="Change Status / Operations"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                          <button
+                            onClick={(e) => handleOpenMenu(e, prop)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430]"
+                            title="More Actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination Footer */}
-          <div className="py-3 px-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-            <div>
-              Showing{' '}
-              <span className="font-semibold text-slate-800">
-                {filteredProperties.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-              </span>{' '}
-              to{' '}
-              <span className="font-semibold text-slate-800">
-                {Math.min(currentPage * itemsPerPage, filteredProperties.length)}
-              </span>{' '}
-              of <span className="font-semibold text-slate-800">{filteredProperties.length}</span>{' '}
-              properties
-            </div>
+          {/* Server-Side Pagination Bar (10 items per page) */}
+          <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">
+              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} properties
+            </span>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-slate-700 transition-colors"
+                disabled={currentPage <= 1 || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
               >
-                Previous
+                <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
                 <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${
-                    currentPage === page
-                      ? 'bg-[#4338ca] text-white shadow-sm'
-                      : 'hover:bg-slate-100 text-slate-700'
+                  key={num}
+                  onClick={() => setCurrentPage(num)}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
+                    currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
+                      : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
                   }`}
                 >
-                  {page}
+                  {num}
                 </button>
               ))}
 
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-slate-700 transition-colors"
+                disabled={currentPage >= totalPages || loading}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
               >
-                Next
+                Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
         </div>
       ) : (
-        /* GRID VIEW */
+        // Grid View
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {paginatedProps.map((prop) => {
-            const badge = getBrandBadge(prop.brand || prop.name);
+          {properties.map((prop) => {
+            const initials = prop.name.substring(0, 2).toUpperCase();
 
             return (
               <div
                 key={prop.id}
-                onClick={() => setDrawerProperty(prop)}
-                className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-4 shadow-sm space-y-3"
               >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl ${badge.bg} ${badge.text} flex items-center justify-center font-bold text-sm`}
-                      >
-                        {badge.initial}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                          {prop.name}
-                        </h3>
-                        <div className="text-[11px] text-slate-500 font-medium">{prop.brand}</div>
-                      </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs">
+                      {initials}
                     </div>
-                    {prop.status === 'ACTIVE' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Active
+                    <div>
+                      <span className="font-semibold text-black dark:text-white text-sm block">
+                        {prop.name}
                       </span>
-                    )}
-                    {prop.status === 'ONBOARDING' && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                        Onboarding
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-3 py-2 px-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Organization:</span>
-                    <span className="font-bold text-indigo-700 truncate max-w-[180px]">
-                      {prop.organization_name}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mt-3 py-2.5 border-y border-slate-100 text-center">
-                    <div>
-                      <div className="text-base font-bold text-slate-900">
-                        {prop.sip_trunks_count || 8}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        Trunks
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-base font-bold text-slate-900">{prop.did_count || 32}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        DIDs
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-base font-bold text-emerald-600">
-                        {prop.e911_status === 'VERIFIED' ? '100%' : 'Audit'}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                        E911 PSAP
-                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {prop.city ? `${prop.city}, ${prop.state || ''}` : prop.address}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-1.5 text-xs text-slate-500">
-                    <div className="flex items-center gap-2 truncate">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>
-                        {prop.city}, {prop.state} {prop.zip_code}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{prop.main_phone || '+1 (800) 555-0100'}</span>
-                    </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      prop.status === 'ACTIVE'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : 'bg-amber-50 text-amber-600'
+                    }`}
+                  >
+                    {prop.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#1f212c] text-xs">
+                  <div>
+                    <span className="text-slate-400 text-[11px]">Organization</span>
+                    <p className="font-semibold text-slate-800 dark:text-white truncate">
+                      {prop.primary_organization?.name || 'Unassigned'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[11px]">Services</span>
+                    <p className="font-semibold text-slate-800 dark:text-white">{prop.services_count || 6} lines</p>
                   </div>
                 </div>
 
-                <div
-                  className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100 text-xs"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[#1f212c]">
+                  <span className="text-[11px] text-emerald-600 flex items-center gap-1 font-medium">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Ray Baum Verified
+                  </span>
                   <button
-                    onClick={() => setDrawerProperty(prop)}
-                    className="font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                    onClick={(e) => handleOpenMenu(e, prop)}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600"
                   >
-                    <span>Property Center</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleOpenEdit(prop)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-                  >
-                    <Settings className="w-4 h-4" />
+                    <MoreVertical className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -1213,569 +1132,189 @@ export default function AdminPropertiesPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 5. CREATE PROPERTY MODAL                                                  */}
+      {/* FIXED 3-DOTS ACTION POPUP (With Details, Org List & Contacts Options) */}
       {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <Hotel className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">Add New Property Location</h2>
-                  <p className="text-xs text-slate-500">
-                    Register a hotel property and link to a client tenant organization.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {menuPosition && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
+          <div
+            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
+          >
+            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
+              <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.prop.name}</p>
+              <p className="text-[10px] text-slate-400">Property Options</p>
             </div>
 
-            {formError && (
-              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
+            <button
+              onClick={() => {
+                const prop = menuPosition.prop;
+                setMenuPosition(null);
+                handleOpenEdit(prop);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Property Details
+            </button>
 
-            <form onSubmit={handleCreateSubmit} className="mt-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    Property Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Courtyard Richmond Downtown"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
+            <button
+              onClick={() => {
+                const prop = menuPosition.prop;
+                setMenuPosition(null);
+                setSelectedPropForDetails(prop);
+                setShowDetailsDrawer(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Info className="w-3.5 h-3.5 text-blue-500" /> View Property Details
+            </button>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    Assign Organization <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formData.organization_id}
-                    onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    {orgOptions.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            <button
+              onClick={() => {
+                const prop = menuPosition.prop;
+                setMenuPosition(null);
+                setSelectedPropForOrgs(prop);
+                setShowAssignedOrgsDrawer(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Layers className="w-3.5 h-3.5 text-purple-500" /> View Assigned Organizations
+            </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Hotel Brand / Chain</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    placeholder="e.g. Courtyard by Marriott"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
+            <button
+              onClick={() => {
+                const prop = menuPosition.prop;
+                setMenuPosition(null);
+                handleOpenContactsDrawer(prop);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-500" /> View Contact List
+            </button>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">General Manager Name</label>
-                  <input
-                    type="text"
-                    value={formData.general_manager_name}
-                    onChange={(e) => setFormData({ ...formData, general_manager_name: e.target.value })}
-                    placeholder="e.g. Michael Robinson"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
+            <div className="border-t border-slate-100 dark:border-[#222430] my-0.5"></div>
 
-              {/* Physical Address for E911 */}
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">
-                  Street Address (Exact PSAP Dispatch Location) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="100 South 14th Street"
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    City <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="Richmond"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    State <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    placeholder="VA"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">
-                    Zip Code <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                    placeholder="23219"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Main Frontdesk Phone</label>
-                  <input
-                    type="text"
-                    value={formData.main_phone}
-                    onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
-                    placeholder="+1 (804) 555-0144"
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Property Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    <option value="ACTIVE">Active (Production)</option>
-                    <option value="ONBOARDING">Onboarding (Porting In Progress)</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Ray Baum Flag */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-900 block">
-                    Ray Baum&apos;s Act &amp; Kari&apos;s Law Dispatch Logging
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    Enable automated PSAP dispatchable location reporting and frontdesk 911 alert logging.
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.ray_baud_and_logs_enabled}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ray_baud_and_logs_enabled: e.target.checked })
-                  }
-                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold disabled:opacity-50 shadow-sm"
-                >
-                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Property</span>
-                </button>
-              </div>
-            </form>
+            <button
+              onClick={() => {
+                const prop = menuPosition.prop;
+                setMenuPosition(null);
+                handleOpenStatusModal(prop);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-500" /> Change Status
+            </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* ========================================================================= */}
-      {/* 6. EDIT PROPERTY MODAL                                                    */}
+      {/* 1. VIEW PROPERTY DETAILS DRAWER (Shows all info including No. of Orgs) */}
       {/* ========================================================================= */}
-      {showEditModal && selectedProperty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                  <Edit2 className="w-5 h-5" />
-                </div>
+      {showDetailsDrawer && selectedPropForDetails && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Edit Property Details</h2>
-                  <p className="text-xs text-slate-500">
-                    Update location telemetry, GM contact, and E911 configuration.
-                  </p>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Property Details</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedPropForDetails.name}</p>
                 </div>
-              </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleEditSubmit} className="mt-5 space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Property Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Assigned Organization</label>
-                  <select
-                    value={formData.organization_id}
-                    onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    {orgOptions.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Brand / Chain</label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">General Manager</label>
-                  <input
-                    type="text"
-                    value={formData.general_manager_name}
-                    onChange={(e) => setFormData({ ...formData, general_manager_name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Street Address</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">City</label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">State</label>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Zip</label>
-                  <input
-                    type="text"
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Main Phone</label>
-                  <input
-                    type="text"
-                    value={formData.main_phone}
-                    onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-                  >
-                    <option value="ACTIVE">Active (Production)</option>
-                    <option value="ONBOARDING">Onboarding</option>
-                    <option value="INACTIVE">Inactive</option>
-                    <option value="OFFBOARDED">Offboarded</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700"
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold disabled:opacity-50 shadow-sm"
-                >
-                  {formLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Changes</span>
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* 7. REASSIGN ORGANIZATION MODAL                                            */}
-      {/* ========================================================================= */}
-      {showReassignModal && selectedProperty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">Reassign Property Tenant</h3>
+              <div className="space-y-3.5 text-xs">
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">No. of Organizations Assigned</span>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded text-xs">
+                      {selectedPropForDetails.organizations_count || (selectedPropForDetails.primary_organization ? 1 : 0)} Orgs
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                    <span className="text-slate-400">Primary Organization</span>
+                    <span className="font-semibold text-slate-800 dark:text-white">
+                      {selectedPropForDetails.primary_organization?.name || 'None (Unassigned)'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2.5">
+                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Location & Dispatch Information
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-slate-400">Street Address</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">{selectedPropForDetails.address}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">City, State ZIP</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">
+                        {selectedPropForDetails.city}, {selectedPropForDetails.state} {selectedPropForDetails.zip_code}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                    <div>
+                      <span className="text-slate-400">Main Phone</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">{selectedPropForDetails.main_phone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Fax</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">{selectedPropForDetails.fax || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Key Contacts
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-slate-400">General Manager</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">
+                        {selectedPropForDetails.general_manager_name || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Contact Person</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">
+                        {selectedPropForDetails.contact_person_name || 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                    Compliance & Services
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Ray Baum's Act Compliance</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {selectedPropForDetails.ray_baud_and_logs_enabled ? 'Enabled (Verified)' : 'Audit Required'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Operational Status</span>
+                    <span className="font-semibold text-slate-800 dark:text-white">{selectedPropForDetails.status}</span>
+                  </div>
+                </div>
               </div>
-              <button
-                onClick={() => setShowReassignModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
 
-            <p className="text-xs text-slate-600 mt-3">
-              Reassign <span className="font-bold text-slate-900">{selectedProperty.name}</span> to a
-              different franchise group or management client.
-            </p>
-
-            <div className="mt-4 space-y-2 text-xs">
-              <label className="font-semibold text-slate-700">Target Organization</label>
-              <select
-                value={formData.organization_id}
-                onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none"
-              >
-                {orgOptions.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mt-5 flex items-center justify-end gap-2.5">
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
               <button
-                onClick={() => setShowReassignModal(false)}
-                className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700 text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReassignOrg}
-                className="px-4 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold text-xs shadow-sm"
-              >
-                Confirm Reassignment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 8. STATUS CONTROL MODAL                                                   */}
-      {/* ========================================================================= */}
-      {showStatusModal && selectedProperty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">Property Lifecycle Status</h3>
-              </div>
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 mt-3">
-              Manage operational status for{' '}
-              <span className="font-bold text-slate-900">{selectedProperty.name}</span>.
-            </p>
-
-            <div className="mt-4 space-y-2 text-xs">
-              <button
-                onClick={() => handleUpdateStatus('ACTIVE')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedProperty.status === 'ACTIVE'
-                    ? 'border-emerald-500 bg-emerald-50/50 font-bold text-emerald-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Active Production</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Live SIP mesh trunking, 911 dispatch tables active.
-                  </div>
-                </div>
-                {selectedProperty.status === 'ACTIVE' && (
-                  <Check className="w-4 h-4 text-emerald-600" />
-                )}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('ONBOARDING')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedProperty.status === 'ONBOARDING'
-                    ? 'border-sky-500 bg-sky-50/50 font-bold text-sky-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                    <span>Onboarding / Porting</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    FOC date scheduled, carrier port submission in flight.
-                  </div>
-                </div>
-                {selectedProperty.status === 'ONBOARDING' && (
-                  <Check className="w-4 h-4 text-sky-600" />
-                )}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('INACTIVE')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedProperty.status === 'INACTIVE'
-                    ? 'border-slate-500 bg-slate-100 font-bold text-slate-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                    <span>Inactive (Standby)</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Trunks reserved, outbound voice traffic paused.
-                  </div>
-                </div>
-                {selectedProperty.status === 'INACTIVE' && (
-                  <Check className="w-4 h-4 text-slate-600" />
-                )}
-              </button>
-
-              <button
-                onClick={() => handleUpdateStatus('OFFBOARDED')}
-                className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition-all ${
-                  selectedProperty.status === 'OFFBOARDED'
-                    ? 'border-rose-500 bg-rose-50 font-bold text-rose-900'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <Archive className="w-3.5 h-3.5 text-rose-500" />
-                    <span>Offboarded</span>
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    Contract terminated, numbers released to carrier.
-                  </div>
-                </div>
-                {selectedProperty.status === 'OFFBOARDED' && (
-                  <Check className="w-4 h-4 text-rose-600" />
-                )}
-              </button>
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setShowStatusModal(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                type="button"
+                onClick={() => setShowDetailsDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
               >
                 Close
               </button>
@@ -1785,204 +1324,684 @@ export default function AdminPropertiesPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 9. PROPERTY-LEVEL UNIFIED MANAGEMENT SLIDE-OVER DRAWER                    */}
+      {/* 2. VIEW ASSIGNED ORGANIZATIONS LIST DRAWER */}
       {/* ========================================================================= */}
-      {drawerProperty && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-2xl h-full shadow-2xl border-l border-slate-200 flex flex-col animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-200 flex items-start justify-between bg-slate-50">
-              <div className="flex items-center gap-3.5">
-                <div
-                  className={`w-12 h-12 rounded-2xl ${
-                    getBrandBadge(drawerProperty.brand).bg
-                  } ${
-                    getBrandBadge(drawerProperty.brand).text
-                  } flex items-center justify-center font-bold text-base shadow-xs`}
-                >
-                  {getBrandBadge(drawerProperty.brand).initial}
-                </div>
+      {showAssignedOrgsDrawer && selectedPropForOrgs && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-slate-900">{drawerProperty.name}</h2>
-                    {drawerProperty.code && (
-                      <span className="px-2 py-0.5 rounded bg-white text-slate-700 text-xs font-mono font-bold border border-slate-200 shadow-xs">
-                        {drawerProperty.code}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                    <span className="font-semibold text-indigo-700">
-                      {drawerProperty.organization_name}
-                    </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      {drawerProperty.city}, {drawerProperty.state}
-                    </span>
-                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Assigned Organizations</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Organizations managing <span className="font-semibold text-slate-300">{selectedPropForOrgs.name}</span>
+                  </p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleOpenEdit(drawerProperty)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs transition-colors shadow-xs"
+                  onClick={() => setShowAssignedOrgsDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
                 >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setDrawerProperty(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60"
-                >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {(!selectedPropForOrgs.organizations || selectedPropForOrgs.organizations.length === 0) && !selectedPropForOrgs.primary_organization ? (
+                <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                  <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+                  <p className="text-xs font-semibold text-slate-800 dark:text-white">No organizations assigned</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">This property is currently not linked to any tenant organization.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {(selectedPropForOrgs.organizations && selectedPropForOrgs.organizations.length > 0
+                    ? selectedPropForOrgs.organizations
+                    : selectedPropForOrgs.primary_organization
+                    ? [selectedPropForOrgs.primary_organization]
+                    : []
+                  ).map((org: any) => (
+                    <div
+                      key={org.id}
+                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                          {org.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{org.name}</p>
+                          {org.email && <p className="text-[11px] text-slate-400">{org.email}</p>}
+                          {org.phone && <p className="text-[11px] text-slate-400">{org.phone}</p>}
+                        </div>
+                      </div>
+
+                      <Link
+                        href={`/admin/organizations/${org.id}`}
+                        target="_blank"
+                        className="px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        View Org <ArrowUpRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
-              {/* Telemetry Overview */}
-              <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
-                  Property Telemetry &amp; Services
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100">
-                    <div className="text-xl font-bold text-indigo-900">
-                      {drawerProperty.sip_trunks_count || 8}
-                    </div>
-                    <div className="text-[11px] font-semibold text-indigo-700 mt-0.5">SIP Trunks</div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100">
-                    <div className="text-xl font-bold text-blue-900">
-                      {drawerProperty.did_count || 32}
-                    </div>
-                    <div className="text-[11px] font-semibold text-blue-700 mt-0.5">Active DIDs</div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-                    <div className="text-xl font-bold text-emerald-900">
-                      {drawerProperty.e911_status === 'VERIFIED' ? 'Verified' : 'Pending'}
-                    </div>
-                    <div className="text-[11px] font-semibold text-emerald-700 mt-0.5">E911 PSAP</div>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-xl font-bold text-slate-900">
-                      {drawerProperty.open_tickets_count || 0}
-                    </div>
-                    <div className="text-[11px] font-semibold text-slate-600 mt-0.5">Tickets</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Physical Location & E911 Compliance Card */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>E911 Dispatchable Address &amp; Kari&apos;s Law</span>
-                  </h4>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    RAY BAUM ACT READY
-                  </span>
-                </div>
-
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1 text-xs">
-                  <div className="font-bold text-slate-800">{drawerProperty.address}</div>
-                  <div className="text-slate-600">
-                    {drawerProperty.city}, {drawerProperty.state} {drawerProperty.zip_code},{' '}
-                    {drawerProperty.country}
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono pt-1">
-                    PSAP Route ID: PSAP-{drawerProperty.state}-911-CORE
-                  </div>
-                </div>
-              </div>
-
-              {/* Management & Technical Contacts */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  On-Site Leadership &amp; Contacts
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-slate-400 text-[11px]">General Manager:</span>
-                    <p className="font-semibold text-slate-800 text-xs mt-0.5">
-                      {drawerProperty.general_manager_name || 'General Manager'}
-                    </p>
-                    <p className="text-slate-500 text-xs">
-                      {drawerProperty.main_phone || '+1 (800) 555-0100'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[11px]">Telecom Contact:</span>
-                    <p className="font-semibold text-slate-800 text-xs mt-0.5">
-                      {drawerProperty.contact_person_name || 'David Wright'}
-                    </p>
-                    <p className="text-slate-500 text-xs">
-                      {drawerProperty.contact_person_email || 'frontdesk@hotel.com'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Operational Shortcuts */}
-              <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-                  Property Operations
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <Link
-                    href={`/admin/e911?propertyId=${drawerProperty.id}`}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 flex items-center justify-between transition-colors group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      <div>
-                        <div className="font-semibold text-slate-800 group-hover:text-indigo-600">
-                          E911 PSAP Audit
-                        </div>
-                        <div className="text-[10px] text-slate-400">Verify emergency dispatch</div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  </Link>
-
-                  <Link
-                    href={`/admin/onboarding-porting?propertyId=${drawerProperty.id}`}
-                    className="p-3 rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 flex items-center justify-between transition-colors group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <PhoneCall className="w-4 h-4 text-blue-600" />
-                      <div>
-                        <div className="font-semibold text-slate-800 group-hover:text-indigo-600">
-                          DID Porting Orders
-                        </div>
-                        <div className="text-[10px] text-slate-400">Manage FOC and LOA</div>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* Drawer Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
               <button
-                onClick={() => {
-                  setSelectedProperty(drawerProperty);
-                  setShowStatusModal(true);
-                }}
-                className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-white text-slate-700 font-semibold text-xs transition-colors"
+                onClick={() => setShowAssignedOrgsDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
               >
-                Change Lifecycle ({drawerProperty.status})
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. VIEW & ADD CONTACTS DRAWER (Stored in DB) */}
+      {/* ========================================================================= */}
+      {showContactsDrawer && selectedPropForContacts && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Property Contacts</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedPropForContacts.name}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
+                      setShowAddContactModal(true);
+                    }}
+                    className="px-2.5 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg flex items-center gap-1"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Add Contact
+                  </button>
+                  <button onClick={() => setShowContactsDrawer(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Contacts */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter contacts..."
+                  value={contactsSearch}
+                  onChange={(e) => setContactsSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {loadingContacts ? (
+                <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mx-auto" />
+                  <p>Loading contacts...</p>
+                </div>
+              ) : contactsList.length === 0 ? (
+                <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                  <Users className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+                  <p className="text-xs font-semibold text-slate-800 dark:text-white">No contacts listed</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Click "Add Contact" to add authorized personnel for this property.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {contactsList
+                    .filter(
+                      (c) =>
+                        c.name.toLowerCase().includes(contactsSearch.toLowerCase()) ||
+                        c.email.toLowerCase().includes(contactsSearch.toLowerCase())
+                    )
+                    .map((contact) => (
+                      <div
+                        key={contact.id}
+                        className={`p-3 rounded-lg border text-xs flex items-start gap-3 ${
+                          contact.is_primary
+                            ? 'bg-indigo-50/50 dark:bg-[#1a1c24] border-indigo-200 dark:border-indigo-900/40'
+                            : 'bg-slate-50 dark:bg-[#1a1c24] border-slate-200 dark:border-[#222430]'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                          {contact.name.substring(0, 2).toUpperCase()}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-semibold text-slate-900 dark:text-white truncate">{contact.name}</h4>
+                            {contact.is_primary && (
+                              <span className="px-1.5 py-0.2 text-[9px] font-bold bg-[#4f46e5] text-white rounded">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Mail className="w-3 h-3" /> {contact.email}
+                          </p>
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3" /> {contact.phone}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
+              <button
+                onClick={() => setShowContactsDrawer(false)}
+                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddContactModal && selectedPropForContacts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Property Contact</h3>
+              <button onClick={() => setShowAddContactModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddContactSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Sarah Jenkins"
+                  value={contactFormData.full_name}
+                  onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email *</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="sarah@hotel.com"
+                  value={contactFormData.email}
+                  onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="+1 (555) 012-3456"
+                  value={contactFormData.phone_number}
+                  onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={contactFormData.is_primary}
+                    onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">Set as Primary Property Contact</span>
+                </label>
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddContactModal(false)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingContact}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {savingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Save Contact
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 4. EDIT PROPERTY DRAWER */}
+      {/* ========================================================================= */}
+      {showEditDrawer && selectedPropForEdit && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Property</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedPropForEdit.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowEditDrawer(false)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} id="edit-prop-form" className="space-y-3.5 mt-5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Property Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Assigned Organization
+                  </label>
+                  <select
+                    value={formData.organization_id}
+                    onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">-- No Organization (Unassigned) --</option>
+                    {orgOptions.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Street Address (PSAP Dispatch Location) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">City *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">State *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ZIP Code *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.zip_code}
+                      onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Main Phone</label>
+                    <input
+                      type="tel"
+                      value={formData.main_phone}
+                      onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Fax</label>
+                    <input
+                      type="tel"
+                      value={formData.fax}
+                      onChange={(e) => setFormData({ ...formData, fax: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      General Manager Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.general_manager_name}
+                      onChange={(e) => setFormData({ ...formData, general_manager_name: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Contact Person Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.contact_person_name}
+                      onChange={(e) => setFormData({ ...formData, contact_person_name: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.ray_baud_and_logs_enabled}
+                      onChange={(e) => setFormData({ ...formData, ray_baud_and_logs_enabled: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      Ray Baum's Act & E911 Dispatchable Logging Enabled
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Property Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="ARCHIVED">Archived</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowEditDrawer(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Cancel
               </button>
               <button
-                onClick={() => setDrawerProperty(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs transition-colors"
+                type="submit"
+                form="edit-prop-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
               >
-                Done
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. CREATE PROPERTY MODAL */}
+      {/* ========================================================================= */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Create Property</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs">
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCreate} id="create-prop-form" className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Property Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Courtyard Downtown"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Assign to Organization (Optional)
+                </label>
+                <select
+                  value={formData.organization_id}
+                  onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">-- No Organization (Unassigned) --</option>
+                  {orgOptions.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Street Address *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="100 Main St"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">City *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Richmond"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">State *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VA"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ZIP *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="23219"
+                    value={formData.zip_code}
+                    onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Main Phone</label>
+                  <input
+                    type="tel"
+                    placeholder="+1 (804) 555-0199"
+                    value={formData.main_phone}
+                    onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">General Manager</label>
+                  <input
+                    type="text"
+                    placeholder="Sarah Jenkins"
+                    value={formData.general_manager_name}
+                    onChange={(e) => setFormData({ ...formData, general_manager_name: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.ray_baud_and_logs_enabled}
+                    onChange={(e) => setFormData({ ...formData, ray_baud_and_logs_enabled: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    Enable Ray Baum's Act & E911 Logging
+                  </span>
+                </label>
+              </div>
+            </form>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="create-prop-form"
+                disabled={formLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                Create Property
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 6. CHANGE STATUS MODAL */}
+      {/* ========================================================================= */}
+      {showStatusModal && selectedPropForStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Change Status</h3>
+              <button onClick={() => setShowStatusModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Select status for <strong className="text-slate-800 dark:text-white">{selectedPropForStatus.name}</strong>:
+            </p>
+
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              {(['ACTIVE', 'INACTIVE', 'ARCHIVED'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setTargetStatus(st)}
+                  className={`py-2 px-2 rounded-lg font-semibold transition border text-center ${
+                    targetStatus === st
+                      ? st === 'ACTIVE'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                        : st === 'INACTIVE'
+                        ? 'bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                        : 'bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                      : 'bg-slate-50 dark:bg-[#111217] border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {st === 'ACTIVE' ? 'Active' : st === 'ARCHIVED' ? 'Archived' : 'Inactive'}
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowStatusModal(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStatusChange}
+                disabled={statusChangeLoading}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {statusChangeLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Confirm
               </button>
             </div>
           </div>
