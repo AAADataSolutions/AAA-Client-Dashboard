@@ -24,7 +24,7 @@
   --sidebar-text: #f4f4f5;
   --sidebar-muted: #a1a1aa;
 
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-arimo), 'Arimo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
 }
 

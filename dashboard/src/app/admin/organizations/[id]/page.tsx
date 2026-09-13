@@ -17,36 +17,62 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
-  Edit3,
+  Edit2,
   Plus,
   Search,
   Check,
   Copy,
   Clock,
   ArrowUpRight,
-  Server,
   RefreshCw,
-  Globe,
+  GitBranch,
+  Calendar,
+  AlertTriangle,
+  UserPlus,
+  Send,
+  Loader2,
+  X,
 } from 'lucide-react';
+import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
 
 interface OrgDetail {
   id: string;
   name: string;
-  code?: string;
   type?: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zip_code: string | null;
+  address: string;
+  street_address: string;
+  city: string;
+  state: string;
+  zip_code: string;
   country: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'SUSPENDED';
+  phone: string;
+  email: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'SUSPENDED' | 'PENDING_ONBOARDING';
   created_at: string;
   updated_at: string;
-  properties?: any[];
-  members?: any[];
-  tickets?: any[];
+  primary_contact: {
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    is_primary: boolean;
+    status: string;
+  };
+  contacts: any[];
+  properties: any[];
+  onboardings: any[];
+  services: any[];
+  portings: any[];
+  e911: any[];
+  invitations: any[];
+  activeInvite: any | null;
+  stats: {
+    propertiesCount: number;
+    contactsCount: number;
+    servicesCount: number;
+    onboardingsCount: number;
+    portingsCount: number;
+  };
 }
 
 export default function OrganizationDetailPage({
@@ -61,142 +87,280 @@ export default function OrganizationDetailPage({
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'PROPERTIES' | 'CONTACTS' | 'SERVICES' | 'TICKETS'>('PROPERTIES');
-  const [copiedId, setCopiedId] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    'OVERVIEW' | 'CONTACTS' | 'PROPERTIES' | 'ONBOARDING' | 'SERVICES' | 'PORTING' | 'E911'
+  >('OVERVIEW');
 
-  const fetchOrg = async () => {
+  // Modals & Action States
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showEditOrgModal, setShowEditOrgModal] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: '',
+    phone: '',
+    email: '',
+    status: 'ACTIVE',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Add Contact Modal
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [contactFormData, setContactFormData] = useState({
+    full_name: '',
+    email: '',
+    phone_number: '',
+    is_primary: false,
+  });
+  const [savingContact, setSavingContact] = useState(false);
+
+  // Assign Property Modal
+  const [showAssignPropModal, setShowAssignPropModal] = useState(false);
+  const [availableProps, setAvailableProps] = useState<any[]>([]);
+  const [selectedPropToAssign, setSelectedPropToAssign] = useState<string>('');
+  const [assigningLoading, setAssigningLoading] = useState(false);
+
+  // Copy state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const fetchOrgDetails = async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await fetch(`/api/admin/organizations/${orgId}`);
-      const data = await res.json();
-      if (data.success && data.data) {
-        setOrg(data.data);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setOrg(json.data);
+        setEditFormData({
+          name: json.data.name || '',
+          address: json.data.street_address || '',
+          city: json.data.city || '',
+          state: json.data.state || '',
+          zip_code: json.data.zip_code || '',
+          phone: json.data.phone !== '—' ? json.data.phone : '',
+          email: json.data.email !== '—' ? json.data.email : '',
+          status: json.data.status || 'ACTIVE',
+        });
       } else {
-        setError(data.error || 'Failed to load organization');
+        setError(json.error || 'Failed to load organization details');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error');
+      console.error('Error fetching org:', err);
+      setError(err.message || 'Error loading organization workspace');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOrg();
+    fetchOrgDetails();
   }, [orgId]);
 
-  const handleCopyId = () => {
-    if (!org) return;
-    navigator.clipboard.writeText(org.id);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSaveOrgEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFormData),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Update failed');
+      setShowEditOrgModal(false);
+      fetchOrgDetails();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save changes');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingContact(true);
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(contactFormData),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add contact');
+      setShowAddContactModal(false);
+      setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
+      fetchOrgDetails();
+    } catch (err: any) {
+      alert(err.message || 'Error adding contact');
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const handleOpenAssignProp = async () => {
+    setShowAssignPropModal(true);
+    try {
+      const res = await fetch('/api/admin/properties?limit=100');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setAvailableProps(json.data);
+        if (json.data.length > 0) setSelectedPropToAssign(json.data[0].id);
+      }
+    } catch (err) {
+      console.error('Error loading properties catalog:', err);
+    }
+  };
+
+  const handleAssignProp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropToAssign) return;
+    setAssigningLoading(true);
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/properties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: selectedPropToAssign }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to assign property');
+      setShowAssignPropModal(false);
+      fetchOrgDetails();
+    } catch (err: any) {
+      alert(err.message || 'Error assigning property');
+    } finally {
+      setAssigningLoading(false);
+    }
+  };
+
+  const handleUnassignProp = async (propId: string) => {
+    if (!confirm('Are you sure you want to unassign this property from this organization?')) return;
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/properties?propertyId=${propId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to unassign property');
+      fetchOrgDetails();
+    } catch (err: any) {
+      alert(err.message || 'Error unassigning property');
+    }
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    if (!confirm('Are you sure you want to remove this contact?')) return;
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/contacts?member_id=${contactId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to remove contact');
+      fetchOrgDetails();
+    } catch (err: any) {
+      alert(err.message || 'Error removing contact');
+    }
   };
 
   if (loading) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-pulse">
-        <div className="h-6 w-32 bg-slate-200 dark:bg-[#222430] rounded"></div>
-        <div className="h-28 bg-slate-100 dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430]"></div>
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-pulse font-sans">
+        <div className="h-6 w-36 bg-slate-200 dark:bg-[#222430] rounded"></div>
+        <div className="h-32 bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430]"></div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-slate-100 dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430]"></div>
+            <div key={i} className="h-24 bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430]"></div>
           ))}
         </div>
-        <div className="h-96 bg-slate-100 dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430]"></div>
+        <div className="h-96 bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430]"></div>
       </div>
     );
   }
 
   if (error || !org) {
     return (
-      <div className="p-6 md:p-8 max-w-4xl mx-auto text-center py-20">
+      <div className="p-6 md:p-8 max-w-4xl mx-auto text-center py-20 font-sans">
         <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Organization Not Found</h2>
-        <p className="text-slate-500 dark:text-slate-400 mb-6">{error || 'The requested organization could not be retrieved.'}</p>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Organization Workspace Error</h2>
+        <p className="text-slate-500 dark:text-slate-400 mb-6">{error || 'Organization record could not be loaded.'}</p>
         <div className="flex justify-center gap-3">
-          <Link
-            href="/admin/organizations"
-            className="px-4 py-2 bg-slate-100 dark:bg-[#222430] hover:bg-slate-200 dark:hover:bg-[#2a2c3a] text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold transition"
+          <button
+            onClick={() => router.push('/admin/organizations')}
+            className="px-4 py-2 bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold"
           >
             Back to Organizations
-          </Link>
+          </button>
           <button
-            onClick={fetchOrg}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
+            onClick={fetchOrgDetails}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
           >
-            <RefreshCw className="w-4 h-4" /> Retry
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
         </div>
       </div>
     );
   }
 
-  const properties = org.properties || [];
-  const members = org.members || [];
-  const tickets = org.tickets || [];
   const initials = org.name.substring(0, 2).toUpperCase();
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Back button & Breadcrumb */}
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans pb-16">
+      {/* Top Breadcrumbs */}
       <div className="flex items-center justify-between">
         <Link
           href="/admin/organizations"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Organizations
         </Link>
-        <span className="text-xs text-slate-400">Created: {new Date(org.created_at).toLocaleDateString()}</span>
+        <span className="text-[11px] text-slate-400 font-mono">
+          Created: {new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
       </div>
 
-      {/* Organization Header Card */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-sm">
+      {/* Header Card */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-2xl flex-shrink-0 border border-orange-200 dark:border-orange-900/50">
+            <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-2xl shrink-0 border border-orange-200 dark:border-orange-900/50">
               {initials}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{org.name}</h1>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-[#222430] text-slate-600 dark:text-slate-300">
-                  {org.code || 'ORG-' + org.id.slice(0, 5).toUpperCase()}
-                </span>
                 <span
                   className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                     org.status === 'ACTIVE'
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                      : org.status === 'ARCHIVED'
-                      ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                      : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                      : org.status === 'PENDING_ONBOARDING'
+                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
+                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${org.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                   {org.status}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                {org.type || 'Franchise Portfolio'} &bull; {org.city ? `${org.city}, ${org.state || org.country}` : 'Global Portfolio'}
+
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5 text-orange-500" />
+                <span>{org.address}</span>
               </p>
 
-              {/* ID and Contact Meta */}
-              <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
-                <button
-                  onClick={handleCopyId}
-                  className="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200 transition font-mono"
-                  title="Click to copy UUID"
-                >
-                  ID: {org.id.slice(0, 12)}...
-                  {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-                {org.email && (
+              <div className="flex flex-wrap items-center gap-4 mt-2.5 text-xs text-slate-500 dark:text-slate-400">
+                {org.email !== '—' && (
                   <span className="flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5" /> {org.email}
                   </span>
                 )}
-                {org.phone && (
-                  <span className="flex items-center gap-1">
+                {org.phone !== '—' && (
+                  <span className="flex items-center gap-1 font-mono">
                     <Phone className="w-3.5 h-3.5" /> {org.phone}
                   </span>
                 )}
@@ -204,294 +368,917 @@ export default function OrganizationDetailPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
-              onClick={() => router.push('/admin/organizations')}
-              className="px-4 py-2 bg-slate-100 dark:bg-[#1a1c24] hover:bg-slate-200 dark:hover:bg-[#222430] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#2a2c3a] rounded-xl text-sm font-semibold transition flex items-center gap-2"
+              onClick={() => setShowInviteModal(true)}
+              className="px-3.5 py-2 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
             >
-              <Edit3 className="w-4 h-4 text-orange-500" /> Edit in List View
+              <Mail className="w-3.5 h-3.5 text-amber-500" />
+              <span>Invite Manager / Credentials</span>
             </button>
-            <Link
-              href={`/client?orgId=${org.id}`}
-              target="_blank"
-              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-sm font-semibold transition flex items-center gap-2 shadow-sm"
+
+            <button
+              onClick={() => setShowEditOrgModal(true)}
+              className="px-3.5 py-2 bg-slate-100 dark:bg-[#1a1c24] hover:bg-slate-200 dark:hover:bg-[#222430] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#2a2c3a] rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
             >
-              <ExternalLink className="w-4 h-4" /> Open Client View
+              <Edit2 className="w-3.5 h-3.5 text-orange-500" />
+              <span>Edit Details</span>
+            </button>
+
+            <Link
+              href="/dashboard"
+              target="_blank"
+              className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open Client Portal View</span>
             </Link>
           </div>
         </div>
       </div>
 
-      {/* KPI Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] p-5 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Assigned Properties
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-              <Layers className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white">{properties.length}</div>
-          <div className="text-xs text-slate-500 mt-1">Managed locations in portfolio</div>
-        </div>
-
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] p-5 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Active Voice Lines
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
-              <PhoneCall className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white">{properties.length * 6}</div>
-          <div className="text-xs text-emerald-500 font-medium mt-1">SIP Mesh Active</div>
-        </div>
-
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] p-5 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Assigned Members
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white">{members.length || 1}</div>
-          <div className="text-xs text-slate-500 mt-1">Admins & Staff contacts</div>
-        </div>
-
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] p-5 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Support Tickets
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
-              <LifeBuoy className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white">{tickets.length}</div>
-          <div className="text-xs text-emerald-500 mt-1">All SLAs in good standing</div>
-        </div>
-      </div>
-
-      {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-[#222430] gap-2">
+      {/* Tabs Navigation (7 Dedicated Tabs as specified in Task.md) */}
+      <div className="flex border-b border-slate-200 dark:border-[#222430] gap-1 overflow-x-auto [scrollbar-width:thin]">
         <button
-          onClick={() => setActiveTab('PROPERTIES')}
-          className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
-            activeTab === 'PROPERTIES'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+          onClick={() => setActiveTab('OVERVIEW')}
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'OVERVIEW'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <Layers className="w-4 h-4" /> Assigned Properties ({properties.length})
+          <Building2 className="w-4 h-4" />
+          <span>Overview</span>
         </button>
+
         <button
           onClick={() => setActiveTab('CONTACTS')}
-          className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'CONTACTS'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <Users className="w-4 h-4" /> Contacts & Admins ({members.length})
+          <Users className="w-4 h-4" />
+          <span>Contacts ({org.stats?.contactsCount || org.contacts?.length || 0})</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('PROPERTIES')}
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'PROPERTIES'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Assigned Properties ({org.stats?.propertiesCount || org.properties?.length || 0})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ONBOARDING')}
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'ONBOARDING'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Onboarding ({org.stats?.onboardingsCount || org.onboardings?.length || 0})</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('SERVICES')}
-          className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'SERVICES'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <Server className="w-4 h-4" /> Voice Infrastructure
+          <PhoneCall className="w-4 h-4" />
+          <span>Services &amp; Lines ({org.stats?.servicesCount || org.services?.length || 0})</span>
         </button>
+
         <button
-          onClick={() => setActiveTab('TICKETS')}
-          className={`pb-3 px-4 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
-            activeTab === 'TICKETS'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+          onClick={() => setActiveTab('PORTING')}
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'PORTING'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
-          <LifeBuoy className="w-4 h-4" /> Tickets & SLA ({tickets.length})
+          <GitBranch className="w-4 h-4" />
+          <span>Porting ({org.stats?.portingsCount || org.portings?.length || 0})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('E911')}
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'E911'
+              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>E911 Compliance ({org.e911?.length || 0})</span>
         </button>
       </div>
 
-      {/* Tab Contents */}
-      {activeTab === 'PROPERTIES' && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-5 border-b border-slate-200 dark:border-[#222430] flex items-center justify-between">
-            <h3 className="font-bold text-slate-900 dark:text-white">Properties under {org.name}</h3>
-            <span className="text-xs text-slate-400">{properties.length} Total Properties</span>
-          </div>
-          {properties.length === 0 ? (
-            <div className="p-12 text-center">
-              <Layers className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-700 dark:text-slate-200 font-semibold">No properties currently assigned</p>
-              <p className="text-xs text-slate-400 mt-1">Assign properties from the Organizations list or Properties view.</p>
+      {/* Tab 1: OVERVIEW */}
+      {activeTab === 'OVERVIEW' && (
+        <div className="space-y-6">
+          {/* Top Quick Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Assigned Properties
+              </span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {org.properties?.length || 0}
+                </span>
+                <span className="text-xs text-slate-400">Locations</span>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 text-xs uppercase">
+
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Active Voice Lines
+              </span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {org.services?.length || 0}
+                </span>
+                <span className="text-xs text-slate-400">Lines</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Authorized Contacts
+              </span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {org.contacts?.length || 0}
+                </span>
+                <span className="text-xs text-slate-400">Personnel</span>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Onboarding Pipelines
+              </span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {org.onboardings?.length || 0}
+                </span>
+                <span className="text-xs text-slate-400">In Flight</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Organization Info */}
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Organization Profile
+                </h3>
+                <button
+                  onClick={() => setShowEditOrgModal(true)}
+                  className="text-orange-600 dark:text-orange-400 hover:underline text-xs font-semibold cursor-pointer"
+                >
+                  Edit Profile
+                </button>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Full Name:</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{org.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Registered Address:</span>
+                  <span className="text-right text-slate-700 dark:text-slate-300 font-medium max-w-[220px]">
+                    {org.address}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Main Phone:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">{org.phone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Main Email:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">{org.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Account Status:</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{org.status}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Primary Contact & Invite */}
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  Primary Contact &amp; Onboarding Invite
+                </h3>
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="text-amber-600 dark:text-amber-400 hover:underline text-xs font-semibold cursor-pointer"
+                >
+                  Manage Invite
+                </button>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Contact Person:</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {org.primary_contact?.name || 'Not Assigned'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Email Address:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                    {org.primary_contact?.email || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Direct Phone:</span>
+                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                    {org.primary_contact?.phone || '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-[#222430]">
+                  <span className="text-slate-400">Invitation Status:</span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${
+                      org.activeInvite?.status === 'PENDING'
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+                        : org.activeInvite?.status === 'APPROVED' || org.activeInvite?.status === 'ACCEPTED'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    {org.activeInvite?.status || 'NO ACTIVE INVITE'}
+                  </span>
+                </div>
+                {org.activeInvite?.invite_url && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => handleCopy(org.activeInvite.invite_url, 'invite-url')}
+                      className="w-full py-2 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/50 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-orange-200 dark:border-orange-900/40"
+                    >
+                      {copiedId === 'invite-url' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedId === 'invite-url' ? 'Copied URL' : 'Copy Onboarding Invite URL'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: CONTACTS */}
+      {activeTab === 'CONTACTS' && (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430] flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Contact List</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Authorized contacts with portal access for {org.name}.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddContactModal(true)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Add Contact</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Name</th>
+                  <th className="py-3 px-4 font-bold">Email</th>
+                  <th className="py-3 px-4 font-bold">Phone</th>
+                  <th className="py-3 px-4 font-bold">Role</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                  <th className="py-3 px-4 font-bold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
+                {org.contacts?.length === 0 ? (
                   <tr>
-                    <th className="py-3 px-4">Property Name</th>
-                    <th className="py-3 px-4">Location</th>
-                    <th className="py-3 px-4">Main Phone</th>
-                    <th className="py-3 px-4">E911 Status</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                      No contacts listed yet.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-[#222430]">
-                  {properties.map((p: any) => (
-                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition">
-                      <td className="py-3 px-4 font-semibold text-slate-800 dark:text-white">
-                        <Link href={`/admin/properties`} className="hover:text-orange-500 transition">
+                ) : (
+                  org.contacts?.map((c: any) => (
+                    <tr key={c.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        {c.name}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                        {c.email}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-500 dark:text-slate-400">
+                        {c.phone}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {c.role}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {c.invite_url && (
+                            <button
+                              onClick={() => handleCopy(c.invite_url, `copy-url-${c.id}`)}
+                              className="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer"
+                              title="Copy Invitation URL"
+                            >
+                              {copiedId === `copy-url-${c.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Mail className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleCopy(c.email, `copy-c-${c.id}`)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
+                            title="Copy Email"
+                          >
+                            {copiedId === `copy-c-${c.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteContact(c.id)}
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            title="Remove Contact"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: PROPERTIES */}
+      {activeTab === 'PROPERTIES' && (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430] flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Assigned Properties</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Physical property locations assigned to {org.name}.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenAssignProp}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Assign Property</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Property Name</th>
+                  <th className="py-3 px-4 font-bold">Address</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                  <th className="py-3 px-4 font-bold">Services</th>
+                  <th className="py-3 px-4 font-bold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
+                {org.properties?.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                      No properties assigned yet. Click &quot;Assign Property&quot; above.
+                    </td>
+                  </tr>
+                ) : (
+                  org.properties?.map((p: any) => (
+                    <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        <Link href="/admin/properties" className="hover:text-orange-600 transition">
                           {p.name}
                         </Link>
                       </td>
-                      <td className="py-3 px-4 text-slate-500">
-                        {p.city ? `${p.city}, ${p.state || ''}` : p.address || 'N/A'}
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                        {p.address}
                       </td>
-                      <td className="py-3 px-4 text-slate-500">{p.main_phone || 'N/A'}</td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1 text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full font-medium">
-                          <CheckCircle2 className="w-3 h-3" /> Verified
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/50">
+                          {p.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                          {p.status || 'ACTIVE'}
-                        </span>
+                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                        {p.services_count || 6} Lines
                       </td>
-                      <td className="py-3 px-4 text-right">
-                        <Link
-                          href={`/admin/properties`}
-                          className="text-xs font-semibold text-orange-500 hover:text-orange-600 inline-flex items-center gap-1"
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => handleUnassignProp(p.id)}
+                          className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs font-semibold transition cursor-pointer"
                         >
-                          View <ArrowUpRight className="w-3.5 h-3.5" />
+                          Unassign
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: ONBOARDING */}
+      {activeTab === 'ONBOARDING' && (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Onboarding Processes</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Onboarding pipeline stages belonging to {org.name}.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Property</th>
+                  <th className="py-3 px-4 font-bold">Current Stage</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                  <th className="py-3 px-4 font-bold">Target Date</th>
+                  <th className="py-3 px-4 font-bold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
+                {org.onboardings?.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                      No active onboarding requests on record.
+                    </td>
+                  </tr>
+                ) : (
+                  org.onboardings?.map((o: any) => (
+                    <tr key={o.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        {o.property_name}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200/60">
+                          {o.stage?.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400">
+                          {o.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                        {o.target_date ? new Date(o.target_date).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <Link
+                          href="/admin/onboarding-porting"
+                          className="text-orange-600 dark:text-orange-400 hover:underline font-semibold"
+                        >
+                          View Pipeline &rarr;
                         </Link>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'CONTACTS' && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white">Authorized Contacts & Administrators</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Contacts who have portal access and operational authority.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {members.length === 0 ? (
-              <div className="col-span-2 text-center py-8 text-slate-400">
-                <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                No contacts listed yet.
-              </div>
-            ) : (
-              members.map((m: any) => {
-                const prof = m.profile || {};
-                const isPrim = m.role === 'ADMIN' || m.role === 'PRIMARY';
-                return (
-                  <div
-                    key={m.id}
-                    className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-start gap-3"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 font-bold flex items-center justify-center flex-shrink-0">
-                      {(prof.full_name || 'U').substring(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-sm text-slate-800 dark:text-white truncate">
-                          {prof.full_name || 'Contact Member'}
-                        </h4>
-                        {isPrim && (
-                          <span className="px-2 py-0.5 text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-full">
-                            Primary
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">{prof.email || org.email || 'N/A'}</p>
-                      {prof.phone_number && (
-                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                          <Phone className="w-3 h-3" /> {prof.phone_number}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
+      {/* Tab 5: SERVICES & LINES */}
       {activeTab === 'SERVICES' && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-sm space-y-4">
-          <h3 className="font-bold text-slate-900 dark:text-white">SIP Trunking & Mesh Configuration</h3>
-          <p className="text-xs text-slate-400">High availability voice interconnect for {org.name}.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430]">
-              <span className="text-xs text-slate-400">Primary SBC Gate</span>
-              <p className="text-sm font-semibold text-slate-800 dark:text-white mt-1">sbc-east.aaasolutions.net</p>
-              <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 rounded">
-                Online &bull; 12ms
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430]">
-              <span className="text-xs text-slate-400">Failover SBC Gate</span>
-              <p className="text-sm font-semibold text-slate-800 dark:text-white mt-1">sbc-west.aaasolutions.net</p>
-              <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 rounded">
-                Standby &bull; Ready
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430]">
-              <span className="text-xs text-slate-400">E911 Routing Engine</span>
-              <p className="text-sm font-semibold text-slate-800 dark:text-white mt-1">Ray Baum's Act Compliant</p>
-              <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 rounded">
-                Dispatchable Location Verified
-              </span>
-            </div>
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Telecom Inventory</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Provisioned voice services, SIP trunks, and phone numbers for {org.name}.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Property</th>
+                  <th className="py-3 px-4 font-bold">Service Type</th>
+                  <th className="py-3 px-4 font-bold">Phone Number</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
+                {org.services?.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                      No telecom services currently active.
+                    </td>
+                  </tr>
+                ) : (
+                  org.services?.map((s: any) => (
+                    <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        {s.property_name}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-semibold">
+                        {s.service_type}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
+                        {s.phone_number}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                          {s.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {activeTab === 'TICKETS' && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-sm">
-          <h3 className="font-bold text-slate-900 dark:text-white mb-4">Support & Porting Tickets</h3>
-          {tickets.length === 0 ? (
-            <div className="py-10 text-center text-slate-400">
-              <LifeBuoy className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p className="font-semibold text-slate-700 dark:text-slate-300 text-sm">No Active Tickets</p>
-              <p className="text-xs text-slate-400 mt-1">All services and porting requests are operational.</p>
+      {/* Tab 6: PORTING */}
+      {activeTab === 'PORTING' && (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Number Porting Requests</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Phone number transfers and carrier migration orders for {org.name}.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Property</th>
+                  <th className="py-3 px-4 font-bold">Numbers in Batch</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                  <th className="py-3 px-4 font-bold">Target / FOC Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
+                {org.portings?.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                      No porting orders on record.
+                    </td>
+                  </tr>
+                ) : (
+                  org.portings?.map((pr: any) => (
+                    <tr key={pr.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        {pr.property_name}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                        {pr.numbers_count} Line(s)
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
+                          {pr.status?.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                        {pr.target_date ? new Date(pr.target_date).toLocaleDateString() : 'Pending FOC'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 7: E911 */}
+      {activeTab === 'E911' && (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">E911 Emergency Location Compliance</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              PSAP dispatch emergency addresses configured for {org.name} locations.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+                <tr>
+                  <th className="py-3 px-4 font-bold">Property</th>
+                  <th className="py-3 px-4 font-bold">Registered Emergency Address</th>
+                  <th className="py-3 px-4 font-bold">PSAP Status</th>
+                  <th className="py-3 px-4 font-bold">Verified At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
+                {org.e911?.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                      No E911 records configured yet.
+                    </td>
+                  </tr>
+                ) : (
+                  org.e911?.map((rec: any) => (
+                    <tr key={rec.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+                        {rec.property_name}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
+                        {rec.emergency_address}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                          {rec.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-500 dark:text-slate-400">
+                        {rec.verified_at ? new Date(rec.verified_at).toLocaleDateString() : 'Pending Validation'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Manager Modal */}
+      <InviteManagerModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        orgId={org.id}
+        orgName={org.name}
+        onSuccess={fetchOrgDetails}
+      />
+
+      {/* Edit Organization Modal */}
+      {showEditOrgModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
+          <div className="fixed inset-0" onClick={() => setShowEditOrgModal(false)} aria-hidden="true" />
+          <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization Profile</h3>
+              <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          ) : (
-            <div className="divide-y divide-slate-200 dark:divide-[#222430]">
-              {tickets.map((t: any) => (
-                <div key={t.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-mono text-slate-400">#{t.ticket_number || t.id.slice(0, 6)}</span>
-                    <h4 className="text-sm font-semibold text-slate-800 dark:text-white">{t.subject || 'Support Ticket'}</h4>
-                  </div>
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500">
-                    {t.status || 'OPEN'}
-                  </span>
+
+            <form onSubmit={handleSaveOrgEdit} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Organization Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Street Address</label>
+                <input
+                  type="text"
+                  value={editFormData.address}
+                  onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  placeholder="City"
+                  value={editFormData.city}
+                  onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                  className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+                <input
+                  type="text"
+                  placeholder="State"
+                  value={editFormData.state}
+                  onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                  className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+                <input
+                  type="text"
+                  placeholder="ZIP"
+                  value={editFormData.zip_code}
+                  onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
+                  className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Main Phone</label>
+                  <input
+                    type="text"
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                  />
                 </div>
-              ))}
+                <div>
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Status</label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
+                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="SUSPENDED">SUSPENDED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <button
+                  type="button"
+                  onClick={() => setShowEditOrgModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
+                >
+                  {editSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Contact Modal */}
+      {showAddContactModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
+          <div className="fixed inset-0" onClick={() => setShowAddContactModal(false)} aria-hidden="true" />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Organization Contact</h3>
+              <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          )}
+
+            <form onSubmit={handleAddContact} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={contactFormData.full_name}
+                  onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
+                  placeholder="Alex Johnson"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={contactFormData.email}
+                  onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                  placeholder="alex@company.com"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Phone Number</label>
+                <input
+                  type="text"
+                  value={contactFormData.phone_number}
+                  onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
+                  placeholder="+1 (555) 019-2834"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="detail_primary_checkbox"
+                  checked={contactFormData.is_primary}
+                  onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
+                  className="rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                />
+                <label htmlFor="detail_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
+                  Set as Primary Administrator
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                <button
+                  type="button"
+                  onClick={() => setShowAddContactModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingContact}
+                  className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
+                >
+                  {savingContact ? 'Saving...' : 'Add Contact'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Property Modal */}
+      {showAssignPropModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
+          <div className="fixed inset-0" onClick={() => setShowAssignPropModal(false)} aria-hidden="true" />
+          <div className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property</h3>
+              <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignProp} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                  Select Property from Database
+                </label>
+                <select
+                  value={selectedPropToAssign}
+                  onChange={(e) => setSelectedPropToAssign(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                >
+                  {availableProps.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.city || 'US'}, {p.state || 'Location'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignPropModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assigningLoading || !selectedPropToAssign}
+                  className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
+                >
+                  {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
