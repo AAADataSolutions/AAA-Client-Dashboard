@@ -110,6 +110,7 @@ export default function ClientDashboardOverviewPage() {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
             <Radio size={256} className="w-full h-full object-contain" />
+            {/* <img className='h-36' src={"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTZ88OMSYrb9ggBc2cMAWnSr6tc9evVTD33M4-Nlx_3SR40-NoJ8-z5DBE&s=10"} /> */}
           </div>
           <h1 className="text-xl font-bold tracking-tight text-black dark:text-white">
             Client Overview
@@ -156,7 +157,7 @@ export default function ClientDashboardOverviewPage() {
       </motion.div>
 
       {/* 2. Top KPI Cards Row - VARIANT 1 ONLY FOR ALL CARDS */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Organization */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Generate a deterministic 8-digit ticket number from UUID
+function generateTicketNumber(uuid: string): string {
+  const hex = uuid.replace(/-/g, '').substring(0, 8);
+  const num = parseInt(hex, 16) % 100000000;
+  return num.toString().padStart(8, '0');
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,7 +38,7 @@ export async function GET(
       .from('tickets')
       .select(`
         *,
-        creator:profiles!tickets_created_by_fkey(id, full_name, email, role),
+        creator:profiles!tickets_created_by_fkey(id, full_name, email, role, phone_number),
         assignee:profiles!tickets_assigned_to_fkey(id, full_name, email, role),
         organization_property:organization_properties(
           id,
@@ -43,7 +50,16 @@ export async function GET(
           content,
           is_internal,
           created_at,
+          updated_at,
           author:profiles(id, full_name, email, role)
+        ),
+        attachments:ticket_attachments(
+          id,
+          file_name,
+          file_size,
+          mime_type,
+          storage_path,
+          created_at
         )
       `)
       .eq('id', id)
@@ -66,11 +82,43 @@ export async function GET(
       .filter((c: any) => !c.is_internal)
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+    // Generate signed URLs for attachments
+    const attachmentsWithUrls = await Promise.all(
+      (ticket.attachments || []).map(async (att: any) => {
+        let url = '';
+        try {
+          const { data: signedData } = await supabase.storage
+            .from('ticket-attachments')
+            .createSignedUrl(att.storage_path, 3600); // 1 hour expiry
+          url = signedData?.signedUrl || '';
+        } catch {
+          url = '';
+        }
+        return {
+          ...att,
+          url,
+        };
+      })
+    );
+
+    // Extract category from description if it exists
+    let category = null;
+    let cleanDescription = ticket.description || '';
+    const categoryMatch = cleanDescription.match(/^\[Category: ([^\]]+)\]\n\n/);
+    if (categoryMatch) {
+      category = categoryMatch[1];
+      cleanDescription = cleanDescription.replace(categoryMatch[0], '');
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         ...ticket,
+        ticket_number: generateTicketNumber(ticket.id),
+        category,
+        clean_description: cleanDescription,
         comments: visibleComments,
+        attachments: attachmentsWithUrls,
       },
     });
   } catch (err: any) {
@@ -105,7 +153,21 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Comment message is required.' }, { status: 400 });
     }
 
-    // Insert comment
+    // Verify that this ticket exists and user has access (via has_org_property_access RLS)
+    const { data: ticket, error: ticketErr } = await supabase
+      .from('tickets')
+      .select('id, organization_property_id, status')
+      .eq('id', id)
+      .single();
+
+    if (ticketErr || !ticket) {
+      return NextResponse.json(
+        { success: false, error: 'Ticket not found or access denied.' },
+        { status: 404 }
+      );
+    }
+
+    // Insert comment — RLS policy checks has_org_property_access(ticket.organization_property_id) + is_internal=false
     const { data: newComment, error: commentErr } = await supabase
       .from('ticket_comments')
       .insert({
@@ -118,16 +180,21 @@ export async function POST(
       .single();
 
     if (commentErr || !newComment) {
+      console.error('Comment insert error:', commentErr);
       throw commentErr || new Error('Failed to post comment');
     }
 
-    // Update ticket status to OPEN or IN_PROGRESS if previously waiting on client
+    // Update ticket updated_at and status only if it was waiting on client
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+    if (ticket.status === 'WAITING_ON_CLIENT') {
+      updateData.status = 'IN_PROGRESS';
+    }
+
     await supabase
       .from('tickets')
-      .update({
-        status: 'IN_PROGRESS',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id);
 
     return NextResponse.json({

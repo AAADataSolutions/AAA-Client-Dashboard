@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Generate a deterministic 8-digit ticket number from UUID
+function generateTicketNumber(uuid: string): string {
+  // Use the first 8 hex chars of UUID and convert to a numeric string
+  const hex = uuid.replace(/-/g, '').substring(0, 8);
+  const num = parseInt(hex, 16) % 100000000;
+  return num.toString().padStart(8, '0');
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -53,13 +61,13 @@ export async function GET(request: NextRequest) {
       .from('tickets')
       .select(`
         *,
-        creator:profiles!tickets_created_by_fkey(id, full_name, email),
+        creator:profiles!tickets_created_by_fkey(id, full_name, email, phone_number),
         assignee:profiles!tickets_assigned_to_fkey(id, full_name, email),
         organization_property:organization_properties(
           id,
           property:properties(id, name, city, state)
         ),
-        comments:ticket_comments(id, is_internal)
+        comments:ticket_comments(id, content, is_internal, created_at, author:profiles(id, full_name, email, role))
       `)
       .in('organization_property_id', orgPropIds)
       .order('created_at', { ascending: false });
@@ -75,19 +83,36 @@ export async function GET(request: NextRequest) {
       // Exclude internal notes from comments count for client view
       const visibleComments = (t.comments || []).filter((c: any) => !c.is_internal);
 
+      // Find the last admin reply (from SUPER_ADMIN or SUB_SUPER_ADMIN)
+      const adminReplies = visibleComments
+        .filter((c: any) => c.author?.role === 'SUPER_ADMIN' || c.author?.role === 'SUB_SUPER_ADMIN')
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const lastAdminReply = adminReplies.length > 0 ? adminReplies[0] : null;
+
       return {
         id: t.id,
+        ticket_number: generateTicketNumber(t.id),
         subject: t.subject,
         description: t.description,
         status: t.status,
         priority: t.priority,
+        category: t.category || null,
         property_id: prop?.id,
         property_name: prop?.name || 'General Property',
         property_location: prop ? `${prop.city}, ${prop.state}` : '',
         created_by_name: t.creator?.full_name || 'Organization User',
         created_by_email: t.creator?.email,
+        created_by_phone: t.creator?.phone_number || '',
         assigned_to_name: t.assignee?.full_name || 'Engineering Support',
         comments_count: visibleComments.length,
+        last_reply: lastAdminReply
+          ? {
+              content: lastAdminReply.content,
+              created_at: lastAdminReply.created_at,
+              author_name: lastAdminReply.author?.full_name || 'Admin Support',
+            }
+          : null,
         resolved_at: t.resolved_at,
         closed_at: t.closed_at,
         created_at: t.created_at,
@@ -107,7 +132,8 @@ export async function GET(request: NextRequest) {
         (t) =>
           t.subject.toLowerCase().includes(search) ||
           t.description.toLowerCase().includes(search) ||
-          t.property_name.toLowerCase().includes(search)
+          t.property_name.toLowerCase().includes(search) ||
+          t.ticket_number.includes(search)
       );
     }
     if (statusFilter !== 'ALL') {
@@ -159,8 +185,135 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const contentType = request.headers.get('content-type') || '';
+
+    // Handle multipart form data (with attachments)
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      let organization_property_id = formData.get('organization_property_id') as string | null;
+      const property_id = formData.get('property_id') as string | null;
+      const subject = formData.get('subject') as string;
+      const description = formData.get('description') as string;
+      const priority = (formData.get('priority') as string) || 'MEDIUM';
+      const category = formData.get('category') as string | null;
+      const phone_number = formData.get('phone_number') as string | null;
+
+      if (!subject || !subject.trim()) {
+        return NextResponse.json({ success: false, error: 'Ticket subject is required.' }, { status: 400 });
+      }
+      if (!description || !description.trim()) {
+        return NextResponse.json({ success: false, error: 'Ticket description is required.' }, { status: 400 });
+      }
+
+      // Resolve organization_property_id
+      if (!organization_property_id && property_id) {
+        const { data: op } = await supabase
+          .from('organization_properties')
+          .select('id')
+          .eq('organization_id', member.organization_id)
+          .eq('property_id', property_id)
+          .maybeSingle();
+        if (op) organization_property_id = op.id;
+      }
+
+      if (!organization_property_id) {
+        const { data: defaultOp } = await supabase
+          .from('organization_properties')
+          .select('id')
+          .eq('organization_id', member.organization_id)
+          .limit(1)
+          .maybeSingle();
+        if (defaultOp) organization_property_id = defaultOp.id;
+      }
+
+      if (!organization_property_id) {
+        return NextResponse.json(
+          { success: false, error: 'No property attached to your organization.' },
+          { status: 400 }
+        );
+      }
+
+      // Update phone number on profile if provided
+      if (phone_number && phone_number.trim()) {
+        await supabase
+          .from('profiles')
+          .update({ phone_number: phone_number.trim() })
+          .eq('id', user.id);
+      }
+
+      // Build the description with category prefix
+      const fullDescription = category
+        ? `[Category: ${category}]\n\n${description.trim()}`
+        : description.trim();
+
+      // Create ticket
+      const { data: newTicket, error: insertErr } = await supabase
+        .from('tickets')
+        .insert({
+          organization_property_id,
+          created_by: user.id,
+          subject: subject.trim(),
+          description: fullDescription,
+          priority,
+          status: 'OPEN',
+        })
+        .select()
+        .single();
+
+      if (insertErr || !newTicket) {
+        throw insertErr || new Error('Failed to create ticket');
+      }
+
+      // Handle file attachments (max 3)
+      const files: File[] = [];
+      for (let i = 0; i < 3; i++) {
+        const file = formData.get(`attachment_${i}`) as File | null;
+        if (file && file.size > 0) {
+          files.push(file);
+        }
+      }
+
+      if (files.length > 0) {
+        for (const file of files) {
+          const fileExt = file.name.split('.').pop() || 'png';
+          const storagePath = `tickets/${newTicket.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          const { error: uploadErr } = await supabase.storage
+            .from('ticket-attachments')
+            .upload(storagePath, buffer, {
+              contentType: file.type,
+              upsert: false,
+            });
+
+          if (!uploadErr) {
+            // Insert attachment record
+            await supabase.from('ticket_attachments').insert({
+              ticket_id: newTicket.id,
+              uploaded_by: user.id,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+              storage_path: storagePath,
+            });
+          } else {
+            console.error('File upload error:', uploadErr.message);
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: newTicket,
+        message: 'Support ticket raised successfully.',
+      });
+    }
+
+    // Handle JSON body (without attachments)
     const body = await request.json();
-    let { organization_property_id, property_id, subject, description, priority } = body;
+    let { organization_property_id, property_id, subject, description, priority, category, phone_number } = body;
 
     if (!subject || !subject.trim()) {
       return NextResponse.json({ success: false, error: 'Ticket subject is required.' }, { status: 400 });
@@ -200,13 +353,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Update phone number on profile if provided
+    if (phone_number && phone_number.trim()) {
+      await supabase
+        .from('profiles')
+        .update({ phone_number: phone_number.trim() })
+        .eq('id', user.id);
+    }
+
+    // Build the description with category prefix
+    const fullDescription = category
+      ? `[Category: ${category}]\n\n${description.trim()}`
+      : description.trim();
+
     const { data: newTicket, error: insertErr } = await supabase
       .from('tickets')
       .insert({
         organization_property_id,
         created_by: user.id,
         subject: subject.trim(),
-        description: description.trim(),
+        description: fullDescription,
         priority: priority || 'MEDIUM',
         status: 'OPEN',
       })
