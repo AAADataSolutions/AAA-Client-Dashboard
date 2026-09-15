@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Building2,
+  Hotel,
   ChevronLeft,
   MapPin,
   Mail,
@@ -358,13 +359,12 @@ export default function OrganizationDetailPage({
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{org.name}</h1>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                    org.status === 'ACTIVE'
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${org.status === 'ACTIVE'
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
                       : org.status === 'PENDING_ONBOARDING'
-                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                  }`}
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
+                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                    }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${org.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                   {org.status}
@@ -430,11 +430,10 @@ export default function OrganizationDetailPage({
       <motion.div variants={itemVariants} className="flex border-b border-slate-200 dark:border-[#222430] gap-1 overflow-x-auto [scrollbar-width:thin]">
         <button
           onClick={() => setActiveTab('OVERVIEW')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'OVERVIEW'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'OVERVIEW'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Building2 className="w-4 h-4" />
           <span>Overview</span>
@@ -442,11 +441,10 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('CONTACTS')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'CONTACTS'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'CONTACTS'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Users className="w-4 h-4" />
           <span>Contacts ({org.stats?.contactsCount || org.contacts?.length || 0})</span>
@@ -454,11 +452,10 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('PROPERTIES')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'PROPERTIES'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'PROPERTIES'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Layers className="w-4 h-4" />
           <span>Assigned Properties ({org.stats?.propertiesCount || org.properties?.length || 0})</span>
@@ -466,11 +463,10 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('ONBOARDING')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'ONBOARDING'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'ONBOARDING'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <Clock className="w-4 h-4" />
           <span>Onboarding ({org.stats?.onboardingsCount || org.onboardings?.length || 0})</span>
@@ -478,11 +474,10 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('SERVICES')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'SERVICES'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'SERVICES'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <PhoneCall className="w-4 h-4" />
           <span>Services &amp; Lines ({org.stats?.servicesCount || org.services?.length || 0})</span>
@@ -490,11 +485,10 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('PORTING')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'PORTING'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'PORTING'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <GitBranch className="w-4 h-4" />
           <span>Porting ({org.stats?.portingsCount || org.portings?.length || 0})</span>
@@ -502,11 +496,10 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('E911')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'E911'
+          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'E911'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+            }`}
         >
           <ShieldCheck className="w-4 h-4" />
           <span>E911 Compliance ({org.e911?.length || 0})</span>
@@ -519,67 +512,95 @@ export default function OrganizationDetailPage({
           {/* Top Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-blue-700 to-blue-900 border border-blue-600/30 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200/90 block">
-                Assigned Properties
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Assigned Properties
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Hotel size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {org.properties?.length || 0}
                 </span>
-                <span className="text-xs text-blue-200/80">Locations</span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Locations</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Hospitality assets linked</p>
             </motion.div>
 
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-emerald-800 to-emerald-950 border border-emerald-700/30 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200/90 block">
-                Active Voice Lines
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Active Voice Lines
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <PhoneCall size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {org.services?.length || 0}
                 </span>
-                <span className="text-xs text-emerald-200/80">Lines</span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Lines</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Operational trunks &amp; DIDs</p>
             </motion.div>
 
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-black border border-neutral-800 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 block">
-                Authorized Contacts
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Authorized Contacts
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Users size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {org.contacts?.length || 0}
                 </span>
-                <span className="text-xs text-neutral-400">Personnel</span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Personnel</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Authorized managers</p>
             </motion.div>
 
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 border border-amber-300 p-5 rounded-2xl shadow-sm text-neutral-950 relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-900/80 block">
-                Onboarding Pipelines
-              </span>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-neutral-950">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Onboarding Pipelines
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Clock size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {org.onboardings?.length || 0}
                 </span>
-                <span className="text-xs text-neutral-900/70">In Flight</span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">In Flight</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Active migrations</p>
             </motion.div>
           </div>
 
@@ -661,13 +682,12 @@ export default function OrganizationDetailPage({
                 <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-[#222430]">
                   <span className="text-slate-400">Invitation Status:</span>
                   <span
-                    className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${
-                      org.activeInvite?.status === 'PENDING'
+                    className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${org.activeInvite?.status === 'PENDING'
                         ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
                         : org.activeInvite?.status === 'APPROVED' || org.activeInvite?.status === 'ACCEPTED'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                    }`}
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                      }`}
                   >
                     {org.activeInvite?.status || 'NO ACTIVE INVITE'}
                   </span>

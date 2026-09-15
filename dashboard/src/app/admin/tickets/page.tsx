@@ -245,11 +245,11 @@ export default function AdminTicketsPage() {
       prev.map((t) =>
         t.id === drawerTicket.id
           ? {
-              ...t,
-              comments_count: updatedComments.length,
-              comments: updatedComments,
-              updated_at: new Date().toISOString(),
-            }
+            ...t,
+            comments_count: updatedComments.length,
+            comments: updatedComments,
+            updated_at: new Date().toISOString(),
+          }
           : t
       )
     );
@@ -316,92 +316,100 @@ export default function AdminTicketsPage() {
 
       {/* 2. Top Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Active Open Tickets - V3 Bright Yellow */}
+        {/* Active Open Tickets - Variant 1 Deep Blue */}
         <motion.div
           variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white shadow-amber-500/20 cursor-pointer"
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
-          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Active Open Tickets</span>
-            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <LifeBuoy className="w-5 h-5 text-white" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Active Open Tickets
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <LifeBuoy size={18} />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-3xl font-extrabold tracking-tight text-white">{totalOpen}</div>
-            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
-              <span>Avg Response: &lt; 18 mins</span>
-              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">+2 last 24h</span>
-            </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {totalOpen}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Active</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Avg response &lt; 18 mins</p>
         </motion.div>
 
-        {/* Urgent Escalations - V2 Deep Red */}
+        {/* Urgent Escalations - Variant 1 Deep Blue */}
         <motion.div
           variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-red-600 via-rose-600 to-pink-700 text-white shadow-red-500/20 cursor-pointer"
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
-          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Urgent Escalations</span>
-            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-white" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Urgent Escalations
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <AlertCircle size={18} />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-3xl font-extrabold tracking-tight text-white">{totalUrgent}</div>
-            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
-              <span>Carrier SLA: &lt; 1h</span>
-              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">P1 Critical</span>
-            </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {totalUrgent}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Critical</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Carrier SLA &lt; 1h priority</p>
         </motion.div>
 
-        {/* Waiting on Client - V4 Black */}
+        {/* Waiting on Client - Variant 1 Deep Blue */}
         <motion.div
           variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shadow-zinc-900/20 cursor-pointer"
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
-          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Waiting on Client</span>
-            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <Clock className="w-5 h-5 text-white" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Waiting on Client
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <Clock size={18} />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-3xl font-extrabold tracking-tight text-white">{totalWaiting}</div>
-            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
-              <span>Client Action</span>
-              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">Awaiting Info</span>
-            </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {totalWaiting}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Awaiting client information</p>
         </motion.div>
 
-        {/* Resolved This Week - V5 Deep Green */}
+        {/* Resolved Tickets - Variant 1 Deep Blue */}
         <motion.div
           variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white shadow-emerald-500/20 cursor-pointer"
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
-          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Resolved This Week</span>
-            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-white" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Resolved This Week
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <CheckCircle2 size={18} />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="text-3xl font-extrabold tracking-tight text-white">{totalResolved}</div>
-            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
-              <span>Avg Resolution: 2.4h</span>
-              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">100% SLA OK</span>
-            </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {totalResolved}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Closed</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Avg resolution 2.4h (100% SLA)</p>
         </motion.div>
       </div>
 
@@ -803,11 +811,10 @@ export default function AdminTicketsPage() {
                     {drawerTicket.comments.map((c) => (
                       <div
                         key={c.id}
-                        className={`p-3.5 rounded-xl border ${
-                          c.is_internal
+                        className={`p-3.5 rounded-xl border ${c.is_internal
                             ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'
                             : 'bg-slate-50 dark:bg-[#111217] border-slate-200 dark:border-[#222430]'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between pb-1.5 border-b border-black/5 dark:border-white/5">
                           <div className="flex items-center gap-2">

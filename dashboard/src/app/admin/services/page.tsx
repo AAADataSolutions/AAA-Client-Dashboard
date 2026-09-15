@@ -412,13 +412,12 @@ export default function AdminServicesPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
-              t.type === 'success'
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${t.type === 'success'
                 ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                 : t.type === 'error'
-                ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                : 'bg-slate-900/95 border-blue-500/30 text-white'
-            }`}
+                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                  : 'bg-slate-900/95 border-blue-500/30 text-white'
+              }`}
           >
             {t.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -517,86 +516,98 @@ export default function AdminServicesPage() {
           <>
             {/* Card 1: Total Services -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 text-white shadow-lg border border-blue-600/30"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-100/90">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Total Services
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
-                  <PhoneCall className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <PhoneCall size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-white tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.totalServicesCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Lines</span>
               </div>
-              <p className="text-[11px] text-blue-100/70 mt-1">Provisioned Voice Lines</p>
+              <p className="text-[11px] text-slate-100 mt-2">Provisioned voice lines &amp; DIDs</p>
             </motion.div>
 
-            {/* Card 2: Active Services -> Variant 5 (Deep Green) */}
+            {/* Card 2: Active Services -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 text-white shadow-lg border border-emerald-600/30"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-100/90">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Active Services
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
-                  <CheckCircle2 className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <CheckCircle2 size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-white tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.activeServicesCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Connected</span>
               </div>
-              <p className="text-[11px] text-emerald-100/70 mt-1">Operational & Connected</p>
+              <p className="text-[11px] text-slate-100 mt-2">Operational &amp; connected</p>
             </motion.div>
 
-            {/* Card 3: Assigned Services -> Variant 4 (Pure Black) */}
+            {/* Card 3: Assigned Services -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white shadow-lg border border-slate-700/50"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Assigned Services
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
-                  <Building2 className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Building2 size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-white tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.assignedServicesCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Bound</span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Bound to Property Locations</p>
+              <p className="text-[11px] text-slate-100 mt-2">Bound to property locations</p>
             </motion.div>
 
-            {/* Card 4: Pending / Suspended -> Variant 3 (Bright Yellow) */}
+            {/* Card 4: Pending / Suspended -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-slate-950 shadow-lg border border-amber-300/40"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-950">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Pending / Suspended
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-black/10 backdrop-blur-md text-slate-950 flex items-center justify-center shadow-inner">
-                  <AlertCircle className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <AlertCircle size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-slate-950 tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.inactiveOrSuspendedCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Attention</span>
               </div>
-              <p className="text-[11px] text-slate-900/80 font-medium mt-1">Requires Attention</p>
+              <p className="text-[11px] text-slate-100 mt-2">Requires admin review</p>
             </motion.div>
           </>
         )}
@@ -678,22 +689,20 @@ export default function AdminServicesPage() {
               <button
                 onClick={() => setViewMode('LIST')}
                 aria-label="List View"
-                className={`p-1 rounded transition cursor-pointer ${
-                  viewMode === 'LIST'
+                className={`p-1 rounded transition cursor-pointer ${viewMode === 'LIST'
                     ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-400 hover:text-slate-600'
-                }`}
+                  }`}
               >
                 <List className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setViewMode('GRID')}
                 aria-label="Grid View"
-                className={`p-1 rounded transition cursor-pointer ${
-                  viewMode === 'GRID'
+                className={`p-1 rounded transition cursor-pointer ${viewMode === 'GRID'
                     ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-400 hover:text-slate-600'
-                }`}
+                  }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
               </button>
@@ -885,11 +894,10 @@ export default function AdminServicesPage() {
                       {/* 5. Status */}
                       <td className="py-3.5 px-4">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                            service.status === 'ACTIVE'
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${service.status === 'ACTIVE'
                               ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40'
                               : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40'
-                          }`}
+                            }`}
                         >
                           {service.status}
                         </span>
@@ -941,11 +949,10 @@ export default function AdminServicesPage() {
                 <button
                   key={num}
                   onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                    currentPage === num
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${currentPage === num
                       ? 'bg-blue-600 text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                  }`}
+                    }`}
                 >
                   {num}
                 </button>
@@ -983,11 +990,10 @@ export default function AdminServicesPage() {
                 </div>
 
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                    service.status === 'ACTIVE'
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${service.status === 'ACTIVE'
                       ? 'bg-emerald-50 text-emerald-600'
                       : 'bg-amber-50 text-amber-600'
-                  }`}
+                    }`}
                 >
                   {service.status}
                 </span>

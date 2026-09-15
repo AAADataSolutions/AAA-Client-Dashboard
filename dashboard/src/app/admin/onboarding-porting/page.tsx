@@ -359,13 +359,12 @@ export default function AdminOnboardingPortingPage() {
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${
-                t.type === 'success'
+              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${t.type === 'success'
                   ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                   : t.type === 'error'
-                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                  : 'bg-slate-900/95 border-blue-500/30 text-white'
-              }`}
+                    ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                    : 'bg-slate-900/95 border-blue-500/30 text-white'
+                }`}
             >
               {t.type === 'success' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -469,80 +468,100 @@ export default function AdminOnboardingPortingPage() {
           ))
         ) : (
           <>
-            {/* Total Onboardings - V1 Deep Blue */}
+            {/* Total Onboardings - Variant 1 Deep Blue */}
             <motion.div
               variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 text-white shadow-blue-500/20 cursor-pointer"
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Total Onboardings</span>
-                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-                  <Hotel className="w-5 h-5 text-white" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Total Onboardings
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Hotel size={18} />
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.totalOnboardings}</div>
-                <p className="text-xs text-white/80 mt-1">Tracked Deployments</p>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
+                  {metrics.totalOnboardings}
+                </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Deployments</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Tracked client workflows</p>
             </motion.div>
 
-            {/* Live Cutover - V5 Deep Green */}
+            {/* Live Cutover - Variant 1 Deep Blue */}
             <motion.div
               variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white shadow-emerald-500/20 cursor-pointer"
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Live Cutover</span>
-                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-white" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Live Cutover
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <CheckCircle2 size={18} />
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.completedCount}</div>
-                <p className="text-xs text-white/80 mt-1">Completed Cutover</p>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
+                  {metrics.completedCount}
+                </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Completed</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Successful cutovers</p>
             </motion.div>
 
-            {/* Porting In-Flight - V3 Bright Yellow */}
+            {/* Porting In-Flight - Variant 1 Deep Blue */}
             <motion.div
               variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white shadow-amber-500/20 cursor-pointer"
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Porting In-Flight</span>
-                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-white" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Porting In-Flight
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Clock size={18} />
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.inProgressCount}</div>
-                <p className="text-xs text-white/80 mt-1">Carrier LOA / FOC Stage</p>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
+                  {metrics.inProgressCount}
+                </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">In Progress</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Carrier LOA / FOC stage</p>
             </motion.div>
 
-            {/* Draft & Contract - V4 Black */}
+            {/* Draft & Contract - Variant 1 Deep Blue */}
             <motion.div
               variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shadow-zinc-900/20 cursor-pointer"
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Draft &amp; Contract</span>
-                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-white" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Draft &amp; Contract
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <FileText size={18} />
                 </div>
               </div>
-              <div className="mt-4">
-                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.pendingReviewCount}</div>
-                <p className="text-xs text-white/80 mt-1">Pending Signatures</p>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
+                  {metrics.pendingReviewCount}
+                </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
               </div>
+              <p className="text-[11px] text-slate-100 mt-2">Pending documentation / signatures</p>
             </motion.div>
           </>
         )}
@@ -824,11 +843,10 @@ export default function AdminOnboardingPortingPage() {
                 <button
                   key={num}
                   onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                    currentPage === num
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${currentPage === num
                       ? 'bg-blue-600 text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                  }`}
+                    }`}
                 >
                   {num}
                 </button>

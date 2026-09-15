@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Building2,
+  Hotel,
   Search,
   Plus,
   Download,
@@ -486,13 +487,12 @@ export default function AdminPropertiesPage() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
-              t.type === 'success'
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${t.type === 'success'
                 ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                 : t.type === 'error'
-                ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                : 'bg-slate-900/95 border-blue-500/30 text-white'
-            }`}
+                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                  : 'bg-slate-900/95 border-blue-500/30 text-white'
+              }`}
           >
             {t.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -600,70 +600,98 @@ export default function AdminPropertiesPage() {
           <>
             {/* Card 1: Total Properties (Variant 1: Deep Blue) */}
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-blue-700 to-blue-900 border border-blue-600/30 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200/90 block">
-                Total Properties
-              </span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Total Properties
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <Hotel size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.totalProperties}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Locations</span>
               </div>
-              <p className="text-xs text-blue-200/80 mt-1">Hotel &amp; Telecom Locations</p>
+              <p className="text-[11px] text-slate-100 mt-2">Hotel &amp; telecom assets</p>
             </motion.div>
 
-            {/* Card 2: E911 PSAP Verified (Variant 5: Deep Green) */}
+            {/* Card 2: E911 PSAP Verified (Variant 1: Deep Blue) */}
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-emerald-800 to-emerald-950 border border-emerald-700/30 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200/90 block">
-                E911 PSAP Verified
-              </span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  E911 PSAP Verified
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <ShieldCheck size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.e911VerifiedCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Verified</span>
               </div>
-              <p className="text-xs text-emerald-200/80 mt-1">Dispatchable Locations</p>
+              <p className="text-[11px] text-slate-100 mt-2">Dispatchable locations compliant</p>
             </motion.div>
 
-            {/* Card 3: Associated Services (Variant 4: Black) */}
+            {/* Card 3: Associated Services (Variant 1: Deep Blue) */}
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-black border border-neutral-800 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 block">
-                Associated Services
-              </span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Associated Services
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <PhoneCall size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.totalServicesCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Lines</span>
               </div>
-              <p className="text-xs text-neutral-400 mt-1">Voice Trunks &amp; DIDs</p>
+              <p className="text-[11px] text-slate-100 mt-2">Voice trunks &amp; DIDs</p>
             </motion.div>
 
-            {/* Card 4: Pending / Inactive (Variant 3: Bright Yellow) */}
+            {/* Card 4: Pending / Inactive (Variant 1: Deep Blue) */}
             <motion.div
+              variants={itemVariants}
               whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-              className="bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 border border-amber-300 p-5 rounded-2xl shadow-sm text-neutral-950 relative overflow-hidden group cursor-pointer"
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-900/80 block">
-                Pending / Inactive
-              </span>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-neutral-950">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+                  Pending / Inactive
+                </span>
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <AlertCircle size={18} />
+                </div>
+              </div>
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.pendingOrInactiveCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Action</span>
               </div>
-              <p className="text-xs text-neutral-900/70 mt-1">Requires Setup / Action</p>
+              <p className="text-[11px] text-slate-100 mt-2">Requires configuration setup</p>
             </motion.div>
           </>
         )}
@@ -762,22 +790,20 @@ export default function AdminPropertiesPage() {
               <button
                 onClick={() => setViewMode('LIST')}
                 aria-label="List View"
-                className={`p-1 rounded transition cursor-pointer ${
-                  viewMode === 'LIST'
+                className={`p-1 rounded transition cursor-pointer ${viewMode === 'LIST'
                     ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-400 hover:text-slate-600'
-                }`}
+                  }`}
               >
                 <List className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setViewMode('GRID')}
                 aria-label="Grid View"
-                className={`p-1 rounded transition cursor-pointer ${
-                  viewMode === 'GRID'
+                className={`p-1 rounded transition cursor-pointer ${viewMode === 'GRID'
                     ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-400 hover:text-slate-600'
-                }`}
+                  }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
               </button>
@@ -1009,22 +1035,20 @@ export default function AdminPropertiesPage() {
                       <td className="py-3.5 px-4">
                         <button
                           onClick={() => handleOpenStatusModal(prop)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition ${
-                            prop.status === 'ACTIVE'
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition ${prop.status === 'ACTIVE'
                               ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
                               : prop.status === 'ARCHIVED' || prop.status === 'OFFBOARDED'
-                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
-                              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
-                          }`}
+                                ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
+                                : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
+                            }`}
                         >
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              prop.status === 'ACTIVE'
+                            className={`w-1.5 h-1.5 rounded-full ${prop.status === 'ACTIVE'
                                 ? 'bg-emerald-500'
                                 : prop.status === 'ARCHIVED' || prop.status === 'OFFBOARDED'
-                                ? 'bg-rose-500'
-                                : 'bg-amber-500'
-                            }`}
+                                  ? 'bg-rose-500'
+                                  : 'bg-amber-500'
+                              }`}
                           />
                           {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' || prop.status === 'OFFBOARDED' ? 'Archived' : 'Inactive'}
                         </button>
@@ -1076,11 +1100,10 @@ export default function AdminPropertiesPage() {
                 <button
                   key={num}
                   onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
-                    currentPage === num
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${currentPage === num
                       ? 'bg-[#4f46e5] text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                  }`}
+                    }`}
                 >
                   {num}
                 </button>
@@ -1123,11 +1146,10 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      prop.status === 'ACTIVE'
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${prop.status === 'ACTIVE'
                         ? 'bg-emerald-50 text-emerald-600'
                         : 'bg-amber-50 text-amber-600'
-                    }`}
+                      }`}
                   >
                     {prop.status}
                   </span>
@@ -1405,8 +1427,8 @@ export default function AdminPropertiesPage() {
                     {(selectedPropForOrgs.organizations && selectedPropForOrgs.organizations.length > 0
                       ? selectedPropForOrgs.organizations
                       : selectedPropForOrgs.primary_organization
-                      ? [selectedPropForOrgs.primary_organization]
-                      : []
+                        ? [selectedPropForOrgs.primary_organization]
+                        : []
                     ).map((org: any) => (
                       <div
                         key={org.id}
@@ -1517,8 +1539,8 @@ export default function AdminPropertiesPage() {
                         contactsSearch.trim() === ''
                           ? true
                           : c.name.toLowerCase().includes(contactsSearch.toLowerCase()) ||
-                            c.email.toLowerCase().includes(contactsSearch.toLowerCase()) ||
-                            c.role.toLowerCase().includes(contactsSearch.toLowerCase())
+                          c.email.toLowerCase().includes(contactsSearch.toLowerCase()) ||
+                          c.role.toLowerCase().includes(contactsSearch.toLowerCase())
                       )
                       .map((contact) => (
                         <div
@@ -2088,15 +2110,14 @@ export default function AdminPropertiesPage() {
                   <button
                     key={st}
                     onClick={() => setTargetStatus(st)}
-                    className={`py-2 px-2 rounded-lg font-semibold transition border text-center cursor-pointer ${
-                      targetStatus === st
+                    className={`py-2 px-2 rounded-lg font-semibold transition border text-center cursor-pointer ${targetStatus === st
                         ? st === 'ACTIVE'
                           ? 'bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                           : st === 'INACTIVE'
-                          ? 'bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                          : 'bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
+                            ? 'bg-amber-50 border-amber-500 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                            : 'bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
                         : 'bg-slate-50 dark:bg-[#111217] border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300'
-                    }`}
+                      }`}
                   >
                     {st === 'ACTIVE' ? 'Active' : st === 'ARCHIVED' ? 'Archived' : 'Inactive'}
                   </button>

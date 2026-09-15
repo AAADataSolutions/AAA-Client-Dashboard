@@ -177,18 +177,18 @@ export default function AdminOverviewPage() {
           <p className="text-[11px] text-slate-100 mt-2">Active client tenants</p>
         </motion.div>
 
-        {/* Card 2: Properties (Variant 4: Black) */}
+        {/* Card 2: Properties (Variant 1: Deep Blue) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-black to-gray-800/60 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Properties
             </span>
-            <div className="w-7 h-7 rounded-lg text-purple-100 dark:text-purple-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <Hotel size={18} />
             </div>
           </div>
@@ -201,23 +201,23 @@ export default function AdminOverviewPage() {
           <p className="text-[11px] text-slate-100 mt-2">Hospitality locations</p>
         </motion.div>
 
-        {/* Card 3: Voice Lines (Variant 2: Deep Red) */}
+        {/* Card 3: Voice Lines (Variant 1: Deep Blue) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-red-900 to-red-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Voice Lines
             </span>
-            <div className="w-7 h-7 rounded-lg text-emerald-100 dark:text-emerald-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <PhoneCall size={18} />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-emerald-100 dark:text-emerald-400">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {stats.servicesCount}
             </span>
             <span className="text-xs text-slate-100 ml-1.5 font-medium">DIDs</span>
@@ -225,28 +225,28 @@ export default function AdminOverviewPage() {
           <p className="text-[11px] text-slate-100 mt-2">Provisioned trunks</p>
         </motion.div>
 
-        {/* Card 4: Active Onboardings (Variant 3: Bright Yellow) */}
+        {/* Card 4: Active Onboardings (Variant 1: Deep Blue) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-yellow-500 to-yellow-400 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Onboardings
             </span>
-            <div className="w-7 h-7 rounded-lg text-amber-900 dark:text-amber-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <Send size={18} />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-amber-900 dark:text-amber-400">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {stats.onboardingsCount}
             </span>
-            <span className="text-xs text-slate-900 ml-1.5 font-medium">In Flight</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">In Flight</span>
           </div>
-          <p className="text-[11px] text-slate-900 mt-2">Active setup stages</p>
+          <p className="text-[11px] text-slate-100 mt-2">Active setup stages</p>
         </motion.div>
 
         {/* Card 5: Porting Active (Variant 1: Deep Blue) */}
@@ -273,18 +273,18 @@ export default function AdminOverviewPage() {
           <p className="text-[11px] text-slate-100 mt-2">Carrier trunk cuts</p>
         </motion.div>
 
-        {/* Card 6: Open Tickets (Variant 5: Deep Green) */}
+        {/* Card 6: Open Tickets (Variant 1: Deep Blue) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-green-900 to-green-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Open Tickets
             </span>
-            <div className="w-7 h-7 rounded-lg text-slate-100 dark:text-emerald-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <LifeBuoy size={18} />
             </div>
           </div>

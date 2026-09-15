@@ -461,13 +461,12 @@ export default function AdminE911Page() {
               initial={{ opacity: 0, y: -20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${
-                t.type === 'success'
+              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${t.type === 'success'
                   ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                   : t.type === 'error'
-                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                  : 'bg-slate-900/95 border-blue-500/30 text-white'
-              }`}
+                    ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                    : 'bg-slate-900/95 border-blue-500/30 text-white'
+                }`}
             >
               {t.type === 'success' ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -568,86 +567,98 @@ export default function AdminE911Page() {
           <>
             {/* Card 1: Total Records -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 text-white shadow-lg border border-blue-600/30"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-100/90">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Total E911 Records
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
-                  <ShieldCheck className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <ShieldCheck size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-white tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.totalRecordsCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Endpoints</span>
               </div>
-              <p className="text-[11px] text-blue-100/70 mt-1">Registered Dispatch Endpoints</p>
+              <p className="text-[11px] text-slate-100 mt-2">Registered dispatch endpoints</p>
             </motion.div>
 
-            {/* Card 2: PSAP Verified -> Variant 5 (Deep Green) */}
+            {/* Card 2: PSAP Verified -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 text-white shadow-lg border border-emerald-600/30"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-100/90">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   PSAP Verified
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
-                  <CheckCircle2 className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <CheckCircle2 size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-white tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.verifiedCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Verified</span>
               </div>
-              <p className="text-[11px] text-emerald-100/70 mt-1">Direct Emergency Routing Active</p>
+              <p className="text-[11px] text-slate-100 mt-2">Direct emergency routing active</p>
             </motion.div>
 
-            {/* Card 3: Correction Required -> Variant 2 (Deep Red) */}
+            {/* Card 3: Correction Required -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-red-600 via-rose-700 to-red-950 text-white shadow-lg border border-red-500/30"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-100/90">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Correction Required
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
-                  <AlertTriangle className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <AlertTriangle size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-white tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.correctionRequiredCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Flagged</span>
               </div>
-              <p className="text-[11px] text-rose-100/70 mt-1">Address / Suite Audit Flagged</p>
+              <p className="text-[11px] text-slate-100 mt-2">Address / suite audit flagged</p>
             </motion.div>
 
-            {/* Card 4: Pending Validation -> Variant 3 (Bright Yellow) */}
+            {/* Card 4: Pending Validation -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-slate-950 shadow-lg border border-amber-300/40"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-950">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
                   Pending Validation
                 </span>
-                <div className="w-8 h-8 rounded-xl bg-black/10 backdrop-blur-md text-slate-950 flex items-center justify-center shadow-inner">
-                  <AlertCircle className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+                  <AlertCircle size={18} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold text-slate-950 tracking-tight">
+              <div className="mt-3">
+                <span className="text-2xl font-bold text-slate-100 dark:text-white">
                   {metrics.pendingOrFailedCount}
                 </span>
+                <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
               </div>
-              <p className="text-[11px] text-slate-900/80 font-medium mt-1">Carrier Validation Pending</p>
+              <p className="text-[11px] text-slate-100 mt-2">Carrier validation pending</p>
             </motion.div>
           </>
         )}
@@ -943,11 +954,10 @@ export default function AdminE911Page() {
                 <button
                   key={num}
                   onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                    currentPage === num
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${currentPage === num
                       ? 'bg-blue-600 text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                  }`}
+                    }`}
                 >
                   {num}
                 </button>
