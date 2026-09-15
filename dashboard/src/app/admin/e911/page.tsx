@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   ShieldCheck,
   Search,
@@ -31,6 +31,26 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import Link from 'next/link';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1.0] as any },
+  },
+};
 
 export type E911Status = 'VERIFIED' | 'PENDING' | 'CORRECTION_REQUIRED' | 'FAILED';
 
@@ -426,7 +446,12 @@ export default function AdminE911Page() {
     sortBy !== 'NEWEST';
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="p-6 md:p-8 max-w-7xl mx-auto space-y-6"
+    >
       {/* Toast Notification Container */}
       <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
         <AnimatePresence>
@@ -441,7 +466,7 @@ export default function AdminE911Page() {
                   ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                   : t.type === 'error'
                   ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                  : 'bg-slate-900/95 border-indigo-500/30 text-white'
+                  : 'bg-slate-900/95 border-blue-500/30 text-white'
               }`}
             >
               {t.type === 'success' ? (
@@ -449,7 +474,7 @@ export default function AdminE911Page() {
               ) : t.type === 'error' ? (
                 <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
               ) : (
-                <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+                <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
               )}
               <div className="flex-1 text-xs">
                 <p className="font-semibold text-white">{t.title}</p>
@@ -467,15 +492,18 @@ export default function AdminE911Page() {
       </div>
 
       {/* Page Header (Clean: No Subtitle, No Mini Pill next to Title) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <ShieldCheck size={256} className="w-full h-full object-contain" />
+          </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">E911 & Emergency Routing</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               const headers = ['ID,Property,Organization,EmergencyAddress,PSAP,Status,RayBaum\n'];
               const rows = records.map((r) =>
@@ -494,16 +522,16 @@ export default function AdminE911Page() {
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={resetAllFilters}
             className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               const firstOpt = orgPropOptions[0];
               setFormData({
@@ -516,20 +544,20 @@ export default function AdminE911Page() {
               setFormError(null);
               setShowCreateModal(true);
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" /> Register E911 Record
           </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Real KPI Cards (No Fake Data) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Real KPI Cards (5 Design System Variants with Hover Pop) */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading && records.length === 0 ? (
           [1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5 shadow-sm"
             >
               <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
               <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
@@ -538,91 +566,95 @@ export default function AdminE911Page() {
           ))
         ) : (
           <>
+            {/* Card 1: Total Records -> Variant 1 (Deep Blue) */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 text-white shadow-lg border border-blue-600/30"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-100/90">
                   Total E911 Records
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
+                  <ShieldCheck className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-white tracking-tight">
                   {metrics.totalRecordsCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Registered Dispatch Endpoints</p>
+              <p className="text-[11px] text-blue-100/70 mt-1">Registered Dispatch Endpoints</p>
             </motion.div>
 
+            {/* Card 2: PSAP Verified -> Variant 5 (Deep Green) */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 text-white shadow-lg border border-emerald-600/30"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-100/90">
                   PSAP Verified
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-white tracking-tight">
                   {metrics.verifiedCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Direct Emergency Routing Active</p>
+              <p className="text-[11px] text-emerald-100/70 mt-1">Direct Emergency Routing Active</p>
             </motion.div>
 
+            {/* Card 3: Correction Required -> Variant 2 (Deep Red) */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-red-600 via-rose-700 to-red-950 text-white shadow-lg border border-red-500/30"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-100/90">
                   Correction Required
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                  <AlertTriangle className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
+                  <AlertTriangle className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-white tracking-tight">
                   {metrics.correctionRequiredCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Address / Suite Audit Flagged</p>
+              <p className="text-[11px] text-rose-100/70 mt-1">Address / Suite Audit Flagged</p>
             </motion.div>
 
+            {/* Card 4: Pending Validation -> Variant 3 (Bright Yellow) */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-slate-950 shadow-lg border border-amber-300/40"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-950">
                   Pending Validation
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <AlertCircle className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-black/10 backdrop-blur-md text-slate-950 flex items-center justify-center shadow-inner">
+                  <AlertCircle className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-slate-950 tracking-tight">
                   {metrics.pendingOrFailedCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Carrier Validation Pending</p>
+              <p className="text-[11px] text-slate-900/80 font-medium mt-1">Carrier Validation Pending</p>
             </motion.div>
           </>
         )}
-      </div>
+      </motion.div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -632,7 +664,7 @@ export default function AdminE911Page() {
               placeholder="Search by property, organization, emergency address, PSAP ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
             />
             {searchQuery && (
               <button
@@ -653,7 +685,7 @@ export default function AdminE911Page() {
                 setCurrentPage(1);
               }}
               aria-label="Filter by status"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="ALL">Status: All Statuses</option>
               <option value="VERIFIED">PSAP Verified</option>
@@ -669,7 +701,7 @@ export default function AdminE911Page() {
                 setCurrentPage(1);
               }}
               aria-label="Filter by compliance"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="ALL">Compliance: All</option>
               <option value="COMPLIANT">Ray Baum Compliant</option>
@@ -683,7 +715,7 @@ export default function AdminE911Page() {
                 setCurrentPage(1);
               }}
               aria-label="Sort records"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="NEWEST">Sort: Recently Added</option>
               <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
@@ -698,7 +730,7 @@ export default function AdminE911Page() {
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
             <span className="text-slate-400">Active Filters:</span>
             {searchQuery && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 "{searchQuery}"
                 <button onClick={() => setSearchQuery('')} className="cursor-pointer">
                   <X className="w-3 h-3" />
@@ -706,7 +738,7 @@ export default function AdminE911Page() {
               </span>
             )}
             {selectedStatusFilter !== 'ALL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 {selectedStatusFilter}
                 <button onClick={() => setSelectedStatusFilter('ALL')} className="cursor-pointer">
                   <X className="w-3 h-3" />
@@ -715,29 +747,29 @@ export default function AdminE911Page() {
             )}
             <button
               onClick={resetAllFilters}
-              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto cursor-pointer"
+              className="text-slate-500 hover:text-blue-600 text-xs font-medium underline ml-auto cursor-pointer"
             >
               Clear All
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Main Table View (Pure Black Headers, Separate Property & Org columns, No Location displayed in table) */}
       {error ? (
-        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
           <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load E911 records</p>
           <p className="text-xs text-slate-400 mt-0.5">{error}</p>
           <button
             onClick={() => fetchE911Records()}
-            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
+            className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
-        </div>
+        </motion.div>
       ) : loading && records.length === 0 ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
               <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
@@ -746,9 +778,9 @@ export default function AdminE911Page() {
               <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
             </div>
           ))}
-        </div>
+        </motion.div>
       ) : records.length === 0 ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
           <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
           <h4 className="text-sm font-bold text-slate-800 dark:text-white">No E911 Records Found</h4>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
@@ -765,7 +797,9 @@ export default function AdminE911Page() {
                 Clear Filters
               </button>
             )}
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => {
                 const firstOpt = orgPropOptions[0];
                 setFormData({
@@ -777,14 +811,14 @@ export default function AdminE911Page() {
                 });
                 setShowCreateModal(true);
               }}
-              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" /> Register E911 Record
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
       ) : (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
@@ -811,7 +845,7 @@ export default function AdminE911Page() {
                       {/* 1. Property Name (ONLY Name, No Location) */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-blue-100 dark:border-blue-900/40">
                             <ShieldCheck className="w-3.5 h-3.5" />
                           </div>
                           <div>
@@ -835,7 +869,7 @@ export default function AdminE911Page() {
                           <span className="font-medium text-slate-800 dark:text-slate-200 block truncate">
                             {record.emergency_address}
                           </span>
-                          <span className="text-[10px] text-slate-500 font-mono block">
+                          <span className="text-[10px] text-slate-500 block">
                             PSAP ID: {record.psap_id}
                           </span>
                         </div>
@@ -868,7 +902,7 @@ export default function AdminE911Page() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(record)}
-                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                             title="Edit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -911,7 +945,7 @@ export default function AdminE911Page() {
                   onClick={() => setCurrentPage(num)}
                   className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     currentPage === num
-                      ? 'bg-[#4f46e5] text-white'
+                      ? 'bg-blue-600 text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
                   }`}
                 >
@@ -928,7 +962,7 @@ export default function AdminE911Page() {
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* ========================================================================= */}
@@ -958,7 +992,7 @@ export default function AdminE911Page() {
               }}
               className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Info className="w-3.5 h-3.5 text-blue-500" /> View Details
+              <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> View Details
             </button>
 
             {/* 2. Edit E911 Record */}
@@ -970,7 +1004,7 @@ export default function AdminE911Page() {
               }}
               className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Record
+              <Edit2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Edit Record
             </button>
 
             {/* 3. Correction Notes */}
@@ -991,177 +1025,385 @@ export default function AdminE911Page() {
       {/* ========================================================================= */}
       {/* 1. VIEW DETAILS DRAWER (No Light Gray Text, High Contrast) */}
       {/* ========================================================================= */}
-      {showDetailsDrawer && selectedRecordForDetails && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-          >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-base font-bold text-black dark:text-white">E911 Record Specifications</h3>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                    {selectedRecordForDetails.property_name}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowDetailsDrawer(false)}
-                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-3.5 text-xs">
-                {/* Emergency Address & PSAP */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Emergency Dispatch Configuration
-                  </h4>
-                  <div className="pt-0.5">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Registered Dispatch Address</span>
-                    <p className="font-bold text-black dark:text-white mt-1 text-sm">
-                      {selectedRecordForDetails.emergency_address}
+      <AnimatePresence>
+        {showDetailsDrawer && selectedRecordForDetails && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-black dark:text-white">E911 Record Specifications</h3>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                      {selectedRecordForDetails.property_name}
                     </p>
                   </div>
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">PSAP Routing ID</span>
-                    <span className="font-mono font-bold text-black dark:text-white">
-                      {selectedRecordForDetails.psap_id}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Validation Status</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                      {getStatusBadge(selectedRecordForDetails.status).label}
-                    </span>
-                  </div>
+                  <button
+                    onClick={() => setShowDetailsDrawer(false)}
+                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Compliance Verification */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Federal Regulatory Compliance
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Ray Baum's Act (Dispatchable Location)</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Compliant
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Kari's Law (Direct 911 Dialing)</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Enabled
-                    </span>
-                  </div>
-                </div>
-
-                {/* Property & Organization Details */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Tenant & Location
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Property</span>
-                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Organization</span>
-                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.organization_name}</span>
-                  </div>
-                </div>
-
-                {/* Correction Notes History */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Correction Notes & Audit Flags
-                  </h4>
-                  {selectedRecordForDetails.correction_notes ? (
-                    <div className="bg-white dark:bg-[#111217] p-3 rounded-lg border border-slate-200 dark:border-[#222430] whitespace-pre-line text-slate-900 dark:text-slate-100 font-sans">
-                      {selectedRecordForDetails.correction_notes}
+                <div className="space-y-3.5 text-xs">
+                  {/* Emergency Address & PSAP */}
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Emergency Dispatch Configuration
+                    </h4>
+                    <div className="pt-0.5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Registered Dispatch Address</span>
+                      <p className="font-bold text-black dark:text-white mt-1 text-sm">
+                        {selectedRecordForDetails.emergency_address}
+                      </p>
                     </div>
-                  ) : (
-                    <p className="text-slate-500 font-medium italic">No correction notes or audit flags reported.</p>
-                  )}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">PSAP Routing ID</span>
+                      <span className="font-bold text-black dark:text-white">
+                        {selectedRecordForDetails.psap_id}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Validation Status</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                        {getStatusBadge(selectedRecordForDetails.status).label}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Compliance Verification */}
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Federal Regulatory Compliance
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Ray Baum's Act (Dispatchable Location)</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Compliant
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Kari's Law (Direct 911 Dialing)</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Enabled
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Property & Organization Details */}
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Tenant & Location
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Property</span>
+                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Organization</span>
+                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.organization_name}</span>
+                    </div>
+                  </div>
+
+                  {/* Correction Notes History */}
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Correction Notes & Audit Flags
+                    </h4>
+                    {selectedRecordForDetails.correction_notes ? (
+                      <div className="bg-white dark:bg-[#111217] p-3 rounded-lg border border-slate-200 dark:border-[#222430] whitespace-pre-line text-slate-900 dark:text-slate-100 font-sans">
+                        {selectedRecordForDetails.correction_notes}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 font-medium italic">No correction notes or audit flags reported.</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowDetailsDrawer(false)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#2c2e3c] transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 2. EDIT E911 DRAWER */}
       {/* ========================================================================= */}
-      {showEditDrawer && selectedRecordForEdit && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+      <AnimatePresence>
+        {showEditDrawer && selectedRecordForEdit && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-black dark:text-white">Edit E911 Record</h3>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                      {selectedRecordForEdit.property_name}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowEditDrawer(false)}
+                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {formError && (
+                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveEdit} id="edit-e911-form" className="space-y-3.5 mt-5 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Emergency Dispatch Address *
+                    </label>
+                    <textarea
+                      rows={2}
+                      required
+                      value={formData.emergency_address}
+                      onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      PSAP Routing ID
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.psap_id}
+                      onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Validation Status
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    >
+                      <option value="VERIFIED">PSAP Verified</option>
+                      <option value="CORRECTION_REQUIRED">Correction Required</option>
+                      <option value="PENDING">Validation Pending</option>
+                      <option value="FAILED">Routing Failed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Correction Notes / Audit Details
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={formData.correction_notes}
+                      onChange={(e) => setFormData({ ...formData, correction_notes: e.target.value })}
+                      placeholder="e.g. Suite 400 location verification required by county PSAP."
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
+                </form>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowEditDrawer(false)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  type="submit"
+                  form="edit-e911-form"
+                  disabled={formLoading}
+                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                >
+                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save Changes
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 3. CORRECTION NOTES MODAL */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showNotesModal && selectedRecordForNotes && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
                 <div>
-                  <h3 className="text-base font-bold text-black dark:text-white">Edit E911 Record</h3>
+                  <h3 className="text-sm font-bold text-black dark:text-white">Add E911 Correction Note</h3>
                   <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                    {selectedRecordForEdit.property_name}
+                    {selectedRecordForNotes.property_name}
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowEditDrawer(false)}
-                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
-                >
+                <button onClick={() => setShowNotesModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveCorrectionNote} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Correction / Audit Note *
+                  </label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={correctionNoteInput}
+                    onChange={(e) => setCorrectionNoteInput(e.target.value)}
+                    placeholder="e.g. PSAP mismatch on floor/suite number; property contacted for clarification."
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
+                    Saving will set the record to "Correction Required" and append to the audit log.
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowNotesModal(false)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={noteLoading || !correctionNoteInput.trim()}
+                    className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {noteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    Save Note
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 4. CREATE E911 RECORD MODAL */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+                <h3 className="text-sm font-bold text-black dark:text-white">Register E911 Dispatch Endpoint</h3>
+                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {formError && (
-                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveEdit} id="edit-e911-form" className="space-y-3.5 mt-5 text-xs">
+              <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Select Property & Organization *
+                  </label>
+                  <select
+                    required
+                    value={formData.org_property_id}
+                    onChange={(e) => {
+                      const selId = e.target.value;
+                      const opt = orgPropOptions.find((o) => o.org_property_id === selId);
+                      setFormData({
+                        ...formData,
+                        org_property_id: selId,
+                        emergency_address: opt?.address || formData.emergency_address,
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                  >
+                    <option value="">-- Choose Property --</option>
+                    {orgPropOptions.map((opt, idx) => (
+                      <option key={idx} value={opt.org_property_id}>
+                        {opt.property_name} &bull; {opt.organization_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-900 dark:text-white mb-1">
                     Emergency Dispatch Address *
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     required
+                    placeholder="e.g. 100 Ocean Drive, Suite 200, Miami, FL 33139"
                     value={formData.emergency_address}
                     onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                   />
                 </div>
 
                 <div>
                   <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    PSAP Routing ID
+                    PSAP Identifier (Optional)
                   </label>
                   <input
                     type="text"
+                    placeholder="e.g. FL-MIA-PSAP-01"
                     value={formData.psap_id}
                     onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                   />
                 </div>
 
@@ -1172,228 +1414,38 @@ export default function AdminE911Page() {
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
                   >
+                    <option value="PENDING">Validation Pending</option>
                     <option value="VERIFIED">PSAP Verified</option>
                     <option value="CORRECTION_REQUIRED">Correction Required</option>
-                    <option value="PENDING">Validation Pending</option>
-                    <option value="FAILED">Routing Failed</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Correction Notes / Audit Details
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={formData.correction_notes}
-                    onChange={(e) => setFormData({ ...formData, correction_notes: e.target.value })}
-                    placeholder="e.g. Suite 400 location verification required by county PSAP."
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                  />
+                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={formLoading}
+                    className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Register Address
+                  </motion.button>
                 </div>
               </form>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowEditDrawer(false)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="edit-e911-form"
-                disabled={formLoading}
-                className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-              >
-                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                Save Changes
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 3. CORRECTION NOTES MODAL */}
-      {/* ========================================================================= */}
-      {showNotesModal && selectedRecordForNotes && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-              <div>
-                <h3 className="text-sm font-bold text-black dark:text-white">Add E911 Correction Note</h3>
-                <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                  {selectedRecordForNotes.property_name}
-                </p>
-              </div>
-              <button onClick={() => setShowNotesModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCorrectionNote} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  Correction / Audit Note *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={correctionNoteInput}
-                  onChange={(e) => setCorrectionNoteInput(e.target.value)}
-                  placeholder="e.g. PSAP mismatch on floor/suite number; property contacted for clarification."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                />
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-                  Saving will set the record to "Correction Required" and append to the audit log.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowNotesModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={noteLoading || !correctionNoteInput.trim()}
-                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {noteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                  Save Note
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 4. CREATE E911 RECORD MODAL */}
-      {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-black dark:text-white">Register E911 Dispatch Endpoint</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  Select Property & Organization *
-                </label>
-                <select
-                  required
-                  value={formData.org_property_id}
-                  onChange={(e) => {
-                    const selId = e.target.value;
-                    const opt = orgPropOptions.find((o) => o.org_property_id === selId);
-                    setFormData({
-                      ...formData,
-                      org_property_id: selId,
-                      emergency_address: opt?.address || formData.emergency_address,
-                    });
-                  }}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="">-- Choose Property --</option>
-                  {orgPropOptions.map((opt, idx) => (
-                    <option key={idx} value={opt.org_property_id}>
-                      {opt.property_name} &bull; {opt.organization_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  Emergency Dispatch Address *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 100 Ocean Drive, Suite 200, Miami, FL 33139"
-                  value={formData.emergency_address}
-                  onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  PSAP Identifier (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. FL-MIA-PSAP-01"
-                  value={formData.psap_id}
-                  onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  Validation Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="PENDING">Validation Pending</option>
-                  <option value="VERIFIED">PSAP Verified</option>
-                  <option value="CORRECTION_REQUIRED">Correction Required</option>
-                </select>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  Register Address
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
-    </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

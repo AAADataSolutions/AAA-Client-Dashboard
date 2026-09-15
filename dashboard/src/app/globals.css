@@ -78,7 +78,7 @@ html, body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Enforce Arimo font across whole admin side */
+/* Enforce Arimo font across whole admin & client side */
 .admin-scope,
 .admin-scope *,
 .admin-scope input,
@@ -98,7 +98,27 @@ html, body {
 .admin-scope h3,
 .admin-scope h4,
 .admin-scope h5,
-.admin-scope h6 {
+.admin-scope h6,
+.client-scope,
+.client-scope *,
+.client-scope input,
+.client-scope button,
+.client-scope select,
+.client-scope textarea,
+.client-scope table,
+.client-scope th,
+.client-scope td,
+.client-scope code,
+.client-scope kbd,
+.client-scope pre,
+.client-scope span,
+.client-scope p,
+.client-scope h1,
+.client-scope h2,
+.client-scope h3,
+.client-scope h4,
+.client-scope h5,
+.client-scope h6 {
   font-family: var(--font-arimo), 'Arimo', sans-serif !important;
 }
 

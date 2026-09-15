@@ -14,19 +14,61 @@ export async function GET(request: NextRequest) {
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const supabase = await createClient();
-    const dbClient = createAdminClient() || supabase;
+    const adminClient = createAdminClient();
 
-    // Search by raw token or token hash
-    const { data: invite, error } = await dbClient
-      .from('invitations')
-      .select(`
-        *,
-        organization:organizations(id, name, city, state, address)
-      `)
-      .or(`token_hash.eq.${token},token_hash.eq.${tokenHash}`)
-      .maybeSingle();
+    let invite: any = null;
 
-    if (error || !invite) {
+    // 1. Primary: If service role is available, query directly bypassing RLS
+    if (adminClient) {
+      const { data, error } = await adminClient
+        .from('invitations')
+        .select(`
+          *,
+          organization:organizations(id, name, city, state, address)
+        `)
+        .or(`token_hash.eq.${token},token_hash.eq.${tokenHash}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        invite = data;
+      }
+    }
+
+    // 2. Secondary: If no admin client or not found, try RPC function (security definer)
+    if (!invite) {
+      try {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('verify_invitation_token', {
+          p_token: token,
+        });
+
+        if (!rpcError && rpcResult?.success && rpcResult?.data) {
+          return NextResponse.json({
+            success: true,
+            data: rpcResult.data,
+          });
+        }
+      } catch (rpcErr) {
+        // RPC may not be installed yet, proceed to direct fallback
+      }
+    }
+
+    // 3. Fallback: Direct select on table (works if public RLS policy is applied)
+    if (!invite) {
+      const { data, error } = await supabase
+        .from('invitations')
+        .select(`
+          *,
+          organization:organizations(id, name, city, state, address)
+        `)
+        .or(`token_hash.eq.${token},token_hash.eq.${tokenHash}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        invite = data;
+      }
+    }
+
+    if (!invite) {
       return NextResponse.json(
         { success: false, error: 'Invitation not found or invalid token.' },
         { status: 404 }

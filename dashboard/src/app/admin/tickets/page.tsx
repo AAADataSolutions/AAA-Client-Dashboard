@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   LifeBuoy,
   Search,
@@ -37,6 +38,23 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 },
+  },
+};
 
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_ON_CLIENT' | 'RESOLVED' | 'CLOSED';
@@ -273,133 +291,122 @@ export default function AdminTicketsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6 pb-12">
       {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Support &amp; Operations Tickets</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-              {totalOpen} Open Issues
-            </span>
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <LifeBuoy size={256} className="w-full h-full object-contain" />
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Central ticket management across all tenant organizations, carrier port escalations, and technical inquiries.
-          </p>
+          <h1 className="text-xl font-bold text-black dark:text-white tracking-tight">Support &amp; Operations Tickets</h1>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] text-white font-semibold text-xs transition-colors shadow-sm shadow-indigo-200"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Create New Ticket</span>
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* 2. Top Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Open Tickets */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
+        {/* Active Open Tickets - V3 Bright Yellow */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white shadow-amber-500/20 cursor-pointer"
+        >
+          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Active Open Tickets
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <LifeBuoy className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Active Open Tickets</span>
+            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+              <LifeBuoy className="w-5 h-5 text-white" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalOpen}</span>
-              <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/40">
-                +2 in last 24h
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Avg Response</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-200">&lt; 18 mins</span>
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-white">{totalOpen}</div>
+            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
+              <span>Avg Response: &lt; 18 mins</span>
+              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">+2 last 24h</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Urgent Escalations */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
+        {/* Urgent Escalations - V2 Deep Red */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-red-600 via-rose-600 to-pink-700 text-white shadow-red-500/20 cursor-pointer"
+        >
+          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Urgent Escalations
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-600 dark:text-rose-400">
-              <AlertCircle className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Urgent Escalations</span>
+            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-white" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalUrgent}</span>
-              <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800/40">
-                P1 Critical
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Carrier SLA</span>
-              <span className="font-semibold text-rose-600 dark:text-rose-400">&lt; 1h SLA</span>
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-white">{totalUrgent}</div>
+            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
+              <span>Carrier SLA: &lt; 1h</span>
+              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">P1 Critical</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Waiting on Client */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
+        {/* Waiting on Client - V4 Black */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shadow-zinc-900/20 cursor-pointer"
+        >
+          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Waiting on Client
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <Clock className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Waiting on Client</span>
+            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+              <Clock className="w-5 h-5 text-white" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalWaiting}</span>
-              <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
-                Awaiting Info
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-white">{totalWaiting}</div>
+            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
               <span>Client Action</span>
-              <span className="font-semibold text-amber-700 dark:text-amber-300">Verification</span>
+              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">Awaiting Info</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Resolved Tickets */}
-        <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-4 shadow-sm flex flex-col justify-between">
+        {/* Resolved This Week - V5 Deep Green */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white shadow-emerald-500/20 cursor-pointer"
+        >
+          <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Resolved This Week
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-wider text-white/80">Resolved This Week</span>
+            <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-white" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalResolved}</span>
-              <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                100% SLA OK
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-              <span>Avg Resolution</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">2.4h</span>
+          <div className="mt-4">
+            <div className="text-3xl font-extrabold tracking-tight text-white">{totalResolved}</div>
+            <div className="flex items-center justify-between text-xs text-white/80 mt-1">
+              <span>Avg Resolution: 2.4h</span>
+              <span className="font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full">100% SLA OK</span>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Search */}
         <div className="relative flex-1 min-w-[220px]">
           <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -408,9 +415,9 @@ export default function AdminTicketsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search ticket #, subject, client organization, hotel..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
+            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] text-slate-400 dark:text-slate-500 bg-white dark:bg-[#1a1b22] border border-slate-200 dark:border-[#272935] rounded">
             ⌘F
           </div>
         </div>
@@ -450,10 +457,10 @@ export default function AdminTicketsPage() {
             </select>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* 4. Table Representation */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -485,10 +492,10 @@ export default function AdminTicketsPage() {
                     {/* 1. Ticket & Subject */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 font-mono font-bold text-[10px] border border-slate-200 dark:border-[#2c2f3c]">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 font-bold text-[10px] border border-slate-200 dark:border-[#2c2f3c]">
                           {tkt.ticket_number}
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-white group-hover:text-[#f97316] transition-colors line-clamp-1">
+                        <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-1">
                           {tkt.subject}
                         </span>
                       </div>
@@ -505,13 +512,13 @@ export default function AdminTicketsPage() {
                     {/* 2. Organization & Property */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">{tkt.property_name}</div>
-                      <div className="text-[11px] text-indigo-600 dark:text-[#f97316] font-semibold mt-0.5">{tkt.organization_name}</div>
+                      <div className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">{tkt.organization_name}</div>
                     </td>
 
                     {/* 3. Assignee */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-                        <UserCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <UserCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         <span>{tkt.assigned_to_name || 'Unassigned'}</span>
                       </div>
                     </td>
@@ -569,7 +576,7 @@ export default function AdminTicketsPage() {
                     </td>
 
                     {/* 6. Updated */}
-                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                    <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400 text-[11px]">
                       {new Date(tkt.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </td>
 
@@ -577,7 +584,7 @@ export default function AdminTicketsPage() {
                     <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setDrawerTicket(tkt)}
-                        className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-[#20222a] hover:bg-slate-200 dark:hover:bg-[#282a36] text-slate-700 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-[#2e313e]"
+                        className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-[#20222a] hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-[#282a36] text-slate-700 dark:text-slate-200 font-semibold text-xs border border-slate-200 dark:border-[#2e313e] cursor-pointer transition-colors"
                       >
                         Reply &amp; Manage
                       </button>
@@ -588,254 +595,284 @@ export default function AdminTicketsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
       {/* ========================================================================= */}
       {/* 5. CREATE TICKET MODAL                                                    */}
       {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430] shadow-xl max-w-lg w-full p-6 my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#222430]">
-              <div className="flex items-center gap-2">
-                <LifeBuoy className="w-5 h-5 text-[#f97316]" />
-                <h3 className="font-bold text-slate-900 dark:text-white">Create Support / Operational Ticket</h3>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 dark:text-slate-300">Subject</label>
-                <input
-                  type="text"
-                  required
-                  value={createData.subject}
-                  onChange={(e) => setCreateData({ ...createData, subject: e.target.value })}
-                  placeholder="e.g. Inbound DID routing issue"
-                  className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-[#f97316] rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 dark:text-slate-300">Organization</label>
-                  <select
-                    value={createData.organization_name}
-                    onChange={(e) => setCreateData({ ...createData, organization_name: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-[#f97316] rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none"
-                  >
-                    <option value="Shamin Hotels" className="dark:bg-[#15161c]">Shamin Hotels</option>
-                    <option value="ABC Hospitality" className="dark:bg-[#15161c]">ABC Hospitality</option>
-                    <option value="Summit Hospitality Partners" className="dark:bg-[#15161c]">Summit Hospitality Partners</option>
-                  </select>
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430] shadow-2xl max-w-lg w-full p-6 my-8"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-[#222430]">
+                <div className="flex items-center gap-2">
+                  <LifeBuoy className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="font-bold text-slate-900 dark:text-white">Create Support / Operational Ticket</h3>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-700 dark:text-slate-300">Priority</label>
-                  <select
-                    value={createData.priority}
-                    onChange={(e) => setCreateData({ ...createData, priority: e.target.value as any })}
-                    className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-[#f97316] rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none"
-                  >
-                    <option value="URGENT" className="dark:bg-[#15161c]">Urgent (P1)</option>
-                    <option value="HIGH" className="dark:bg-[#15161c]">High (P2)</option>
-                    <option value="MEDIUM" className="dark:bg-[#15161c]">Medium</option>
-                    <option value="LOW" className="dark:bg-[#15161c]">Low</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700 dark:text-slate-300">Description</label>
-                <textarea
-                  rows={3}
-                  value={createData.description}
-                  onChange={(e) => setCreateData({ ...createData, description: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-[#f97316] rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[#222430]">
                 <button
-                  type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#282a36] hover:bg-slate-50 dark:hover:bg-[#20222a] font-semibold text-slate-700 dark:text-slate-300"
+                  className="text-slate-400 hover:text-slate-200 cursor-pointer p-1 rounded-lg"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold shadow-sm"
-                >
-                  Create Ticket
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+
+              <form onSubmit={handleCreateSubmit} className="mt-4 space-y-3.5 text-xs">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">Subject</label>
+                  <input
+                    type="text"
+                    required
+                    value={createData.subject}
+                    onChange={(e) => setCreateData({ ...createData, subject: e.target.value })}
+                    placeholder="e.g. Inbound DID routing issue"
+                    className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">Organization</label>
+                    <select
+                      value={createData.organization_name}
+                      onChange={(e) => setCreateData({ ...createData, organization_name: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none cursor-pointer"
+                    >
+                      <option value="Shamin Hotels" className="dark:bg-[#15161c]">Shamin Hotels</option>
+                      <option value="ABC Hospitality" className="dark:bg-[#15161c]">ABC Hospitality</option>
+                      <option value="Summit Hospitality Partners" className="dark:bg-[#15161c]">Summit Hospitality Partners</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">Priority</label>
+                    <select
+                      value={createData.priority}
+                      onChange={(e) => setCreateData({ ...createData, priority: e.target.value as any })}
+                      className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none cursor-pointer"
+                    >
+                      <option value="URGENT" className="dark:bg-[#15161c]">Urgent (P1)</option>
+                      <option value="HIGH" className="dark:bg-[#15161c]">High (P2)</option>
+                      <option value="MEDIUM" className="dark:bg-[#15161c]">Medium</option>
+                      <option value="LOW" className="dark:bg-[#15161c]">Low</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700 dark:text-slate-300">Description</label>
+                  <textarea
+                    rows={3}
+                    value={createData.description}
+                    onChange={(e) => setCreateData({ ...createData, description: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg p-2 text-xs text-slate-900 dark:text-slate-100 outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-[#282a36] hover:bg-slate-50 dark:hover:bg-[#20222a] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm cursor-pointer"
+                  >
+                    Create Ticket
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 6. TICKET DETAIL & REPLY SLIDE-OVER DRAWER                                */}
       {/* ========================================================================= */}
-      {drawerTicket && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs">
-          <div className="bg-white dark:bg-[#15161c] w-full max-w-2xl h-full shadow-2xl border-l border-slate-200 dark:border-[#222430] flex flex-col animate-in slide-in-from-right duration-200">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-200 dark:border-[#222430] bg-slate-50 dark:bg-[#111217] flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-mono font-bold border border-indigo-200 dark:border-indigo-800/40">
-                    {drawerTicket.ticket_number}
-                  </span>
-                  <span className="font-semibold text-slate-500 dark:text-slate-400 text-xs">{drawerTicket.organization_name}</span>
+      <AnimatePresence>
+        {drawerTicket && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
+          >
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="bg-white dark:bg-[#15161c] w-full max-w-2xl h-full shadow-2xl border-l border-slate-200 dark:border-[#222430] flex flex-col"
+            >
+              {/* Header */}
+              <div className="p-6 border-b border-slate-200 dark:border-[#222430] bg-slate-50 dark:bg-[#111217] flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800/40">
+                      {drawerTicket.ticket_number}
+                    </span>
+                    <span className="font-semibold text-slate-500 dark:text-slate-400 text-xs">{drawerTicket.organization_name}</span>
+                  </div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white mt-1.5">{drawerTicket.subject}</h2>
                 </div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white mt-1.5">{drawerTicket.subject}</h2>
+
+                <button
+                  onClick={() => setDrawerTicket(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#20222a] cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <button
-                onClick={() => setDrawerTicket(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#20222a]"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
-              {/* Controls Bar */}
-              <div className="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430]">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
-                  <select
-                    value={drawerTicket.status}
-                    onChange={(e) => handleUpdateStatus(drawerTicket.id, e.target.value as any)}
-                    className="bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#2a2d39] rounded px-2 py-1 font-semibold text-slate-800 dark:text-slate-200 outline-none mt-1 w-full"
-                  >
-                    <option value="OPEN" className="dark:bg-[#15161c]">Open</option>
-                    <option value="IN_PROGRESS" className="dark:bg-[#15161c]">In Progress</option>
-                    <option value="WAITING_ON_CLIENT" className="dark:bg-[#15161c]">Waiting on Client</option>
-                    <option value="RESOLVED" className="dark:bg-[#15161c]">Resolved</option>
-                    <option value="CLOSED" className="dark:bg-[#15161c]">Closed</option>
-                  </select>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Priority</span>
-                  <select
-                    value={drawerTicket.priority}
-                    onChange={(e) => handleUpdatePriority(drawerTicket.id, e.target.value as any)}
-                    className="bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#2a2d39] rounded px-2 py-1 font-semibold text-slate-800 dark:text-slate-200 outline-none mt-1 w-full"
-                  >
-                    <option value="URGENT" className="dark:bg-[#15161c]">Urgent (P1)</option>
-                    <option value="HIGH" className="dark:bg-[#15161c]">High (P2)</option>
-                    <option value="MEDIUM" className="dark:bg-[#15161c]">Medium</option>
-                    <option value="LOW" className="dark:bg-[#15161c]">Low</option>
-                  </select>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Assignee</span>
-                  <select
-                    value={drawerTicket.assigned_to_name || 'Binoy (Super Admin)'}
-                    onChange={(e) => handleUpdateAssignee(drawerTicket.id, e.target.value)}
-                    className="bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#2a2d39] rounded px-2 py-1 font-semibold text-slate-800 dark:text-slate-200 outline-none mt-1 w-full"
-                  >
-                    <option value="Binoy (Super Admin)" className="dark:bg-[#15161c]">Binoy (Super Admin)</option>
-                    <option value="Alex Rivera (Support Lead)" className="dark:bg-[#15161c]">Alex Rivera</option>
-                    <option value="Unassigned" className="dark:bg-[#15161c]">Unassigned</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Initial Issue Description */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] space-y-1">
-                <span className="text-[10px] uppercase font-bold text-slate-400">Issue Description</span>
-                <p className="text-slate-800 dark:text-slate-200 text-xs leading-relaxed">{drawerTicket.description}</p>
-              </div>
-
-              {/* Comment Thread */}
-              <div className="space-y-3">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Communication History &amp; Internal Notes
-                </h4>
-                <div className="space-y-2.5">
-                  {drawerTicket.comments.map((c) => (
-                    <div
-                      key={c.id}
-                      className={`p-3.5 rounded-xl border ${
-                        c.is_internal
-                          ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'
-                          : 'bg-slate-50 dark:bg-[#111217] border-slate-200 dark:border-[#222430]'
-                      }`}
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+                {/* Controls Bar */}
+                <div className="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Status</span>
+                    <select
+                      value={drawerTicket.status}
+                      onChange={(e) => handleUpdateStatus(drawerTicket.id, e.target.value as any)}
+                      className="bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#2a2d39] rounded-lg px-2 py-1 font-semibold text-slate-800 dark:text-slate-200 outline-none mt-1 w-full cursor-pointer focus:border-blue-500"
                     >
-                      <div className="flex items-center justify-between pb-1.5 border-b border-black/5 dark:border-white/5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white">{c.author_name}</span>
-                          {c.is_internal && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-800">
-                              <Lock className="w-2.5 h-2.5" /> Internal Note Only
-                            </span>
-                          )}
+                      <option value="OPEN" className="dark:bg-[#15161c]">Open</option>
+                      <option value="IN_PROGRESS" className="dark:bg-[#15161c]">In Progress</option>
+                      <option value="WAITING_ON_CLIENT" className="dark:bg-[#15161c]">Waiting on Client</option>
+                      <option value="RESOLVED" className="dark:bg-[#15161c]">Resolved</option>
+                      <option value="CLOSED" className="dark:bg-[#15161c]">Closed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Priority</span>
+                    <select
+                      value={drawerTicket.priority}
+                      onChange={(e) => handleUpdatePriority(drawerTicket.id, e.target.value as any)}
+                      className="bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#2a2d39] rounded-lg px-2 py-1 font-semibold text-slate-800 dark:text-slate-200 outline-none mt-1 w-full cursor-pointer focus:border-blue-500"
+                    >
+                      <option value="URGENT" className="dark:bg-[#15161c]">Urgent (P1)</option>
+                      <option value="HIGH" className="dark:bg-[#15161c]">High (P2)</option>
+                      <option value="MEDIUM" className="dark:bg-[#15161c]">Medium</option>
+                      <option value="LOW" className="dark:bg-[#15161c]">Low</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Assignee</span>
+                    <select
+                      value={drawerTicket.assigned_to_name || 'Binoy (Super Admin)'}
+                      onChange={(e) => handleUpdateAssignee(drawerTicket.id, e.target.value)}
+                      className="bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#2a2d39] rounded-lg px-2 py-1 font-semibold text-slate-800 dark:text-slate-200 outline-none mt-1 w-full cursor-pointer focus:border-blue-500"
+                    >
+                      <option value="Binoy (Super Admin)" className="dark:bg-[#15161c]">Binoy (Super Admin)</option>
+                      <option value="Alex Rivera (Support Lead)" className="dark:bg-[#15161c]">Alex Rivera</option>
+                      <option value="Unassigned" className="dark:bg-[#15161c]">Unassigned</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Initial Issue Description */}
+                <div className="p-4 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Issue Description</span>
+                  <p className="text-slate-800 dark:text-slate-200 text-xs leading-relaxed">{drawerTicket.description}</p>
+                </div>
+
+                {/* Comment Thread */}
+                <div className="space-y-3">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Communication History &amp; Internal Notes
+                  </h4>
+                  <div className="space-y-2.5">
+                    {drawerTicket.comments.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`p-3.5 rounded-xl border ${
+                          c.is_internal
+                            ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'
+                            : 'bg-slate-50 dark:bg-[#111217] border-slate-200 dark:border-[#222430]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between pb-1.5 border-b border-black/5 dark:border-white/5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white">{c.author_name}</span>
+                            {c.is_internal && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-800">
+                                <Lock className="w-2.5 h-2.5" /> Internal Note Only
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <p className="text-slate-800 dark:text-slate-200 text-xs mt-2 leading-relaxed">{c.content}</p>
                       </div>
-                      <p className="text-slate-800 dark:text-slate-200 text-xs mt-2 leading-relaxed">{c.content}</p>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+
+                {/* Reply Box */}
+                <form onSubmit={handleAddComment} className="space-y-2.5 pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">Add Reply / Note</span>
+                    <label className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-400 font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isInternalComment}
+                        onChange={(e) => setIsInternalComment(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <span>Make this an Internal Note (hidden from client)</span>
+                    </label>
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder={
+                      isInternalComment
+                        ? 'Write an internal engineering note...'
+                        : 'Type response to the client organization...'
+                    }
+                    className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl p-3 text-xs text-slate-900 dark:text-slate-100 outline-none"
+                  />
+
+                  <div className="flex justify-end">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      type="submit"
+                      disabled={submittingComment || !commentText.trim()}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm disabled:opacity-50 cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isInternalComment ? 'Save Internal Note' : 'Send Reply to Client'}</span>
+                    </motion.button>
+                  </div>
+                </form>
               </div>
-
-              {/* Reply Box */}
-              <form onSubmit={handleAddComment} className="space-y-2.5 pt-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Add Reply / Note</span>
-                  <label className="flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-400 font-semibold cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isInternalComment}
-                      onChange={(e) => setIsInternalComment(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded text-[#f97316] focus:ring-orange-500"
-                    />
-                    <span>Make this an Internal Note (hidden from client)</span>
-                  </label>
-                </div>
-
-                <textarea
-                  rows={3}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder={
-                    isInternalComment
-                      ? 'Write an internal engineering note...'
-                      : 'Type response to the client organization...'
-                  }
-                  className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:bg-white dark:focus:bg-[#1a1b22] focus:border-[#f97316] rounded-xl p-3 text-xs text-slate-900 dark:text-slate-100 outline-none"
-                />
-
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={submittingComment || !commentText.trim()}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f97316] hover:bg-[#ea580c] text-white font-semibold text-xs shadow-sm disabled:opacity-50"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{isInternalComment ? 'Save Internal Note' : 'Send Reply to Client'}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

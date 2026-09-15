@@ -128,12 +128,12 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
         {/* Drawer Top Header */}
         <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
           <div className="flex items-center gap-3 truncate">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/40">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
               <LifeBuoy className="w-5 h-5" />
             </div>
             <div className="truncate">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[11px] text-slate-400 font-semibold">
+                <span className="text-[11px] text-slate-400 font-semibold">
                   #{ticketId.substring(0, 8)}
                 </span>
                 {ticket && (
@@ -142,7 +142,7 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
                       ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40'
                         : ticket.status === 'WAITING_ON_CLIENT'
-                        ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200 dark:border-purple-900/40'
+                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40'
                         : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40'
                     }`}
                   >
@@ -161,14 +161,14 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
               <button
                 onClick={() => handleUpdateStatus('RESOLVED')}
                 disabled={updatingStatus}
-                className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold text-xs border border-emerald-200 dark:border-emerald-800/60 transition"
+                className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold text-xs border border-emerald-200 dark:border-emerald-800/60 transition cursor-pointer"
               >
                 <Check className="w-3.5 h-3.5" /> Mark Resolved
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition-colors cursor-pointer"
               aria-label="Close drawer"
             >
               <X className="w-5 h-5" />
@@ -179,7 +179,7 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
         {/* Drawer Body */}
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-3">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
             <p className="text-xs text-slate-400 font-medium">Loading ticket messages...</p>
           </div>
         ) : error || !ticket ? (
@@ -255,7 +255,7 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
                           {isSelf ? 'You' : comment.author?.full_name || 'Support Staff'}
                         </span>
                         {isStaff && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold border border-indigo-200 dark:border-indigo-900/40">
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-900/40">
                             AAA Support
                           </span>
                         )}
@@ -266,7 +266,7 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
                       <div
                         className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-xs ${
                           isSelf
-                            ? 'bg-indigo-600 text-white rounded-tr-none'
+                            ? 'bg-blue-600 text-white rounded-tr-none'
                             : 'bg-slate-100 dark:bg-[#1f212c] text-slate-900 dark:text-slate-100 rounded-tl-none border border-slate-200/60 dark:border-[#2a2c3a]'
                         }`}
                       >
@@ -293,7 +293,7 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Type your response to the engineering team..."
                     disabled={sending}
-                    className="flex-1 px-3 py-2 bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] focus:border-indigo-500 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 outline-none resize-none"
+                    className="flex-1 px-3 py-2 bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl text-xs text-slate-900 dark:text-white placeholder:text-slate-400 outline-hidden resize-none"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -304,7 +304,7 @@ export const TicketConversationDrawer: React.FC<TicketConversationDrawerProps> =
                   <button
                     type="submit"
                     disabled={sending || !replyText.trim()}
-                    className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 shrink-0"
+                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 shrink-0 cursor-pointer"
                   >
                     {sending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

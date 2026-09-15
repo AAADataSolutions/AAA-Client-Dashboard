@@ -65,7 +65,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
             <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
                 <Radio className="w-4 h-4 text-white" />
               </div>
               {isOpen && (
@@ -73,7 +73,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                   <span className="font-semibold text-[13px] text-[#f4f4f5] tracking-tight block leading-tight truncate">
                     AAA Data Solutions
                   </span>
-                  <span className="text-[9px] uppercase font-bold tracking-widest text-indigo-400 block leading-none mt-0.5">
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-blue-400 block leading-none mt-0.5">
                     Client Portal
                   </span>
                 </div>
@@ -107,7 +107,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
               <span
                 className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                   isClientAdmin
-                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                     : 'bg-slate-700/50 text-slate-300 border border-slate-600/30'
                 }`}
               >
@@ -143,14 +143,14 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                   <div className="flex items-center gap-3 truncate">
                     <Icon
                       className={`w-4 h-4 shrink-0 transition-colors ${
-                        isActive ? 'text-indigo-400' : 'text-[#71717a] group-hover:text-[#a1a1aa]'
+                        isActive ? 'text-blue-400' : 'text-[#71717a] group-hover:text-[#a1a1aa]'
                       }`}
                     />
                     {isOpen && <span className="truncate">{item.label}</span>}
                   </div>
 
                   {isOpen && isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                   )}
                 </Link>
               );
@@ -162,19 +162,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
         {isOpen ? (
           <div className="p-3 space-y-2.5 border-t border-[#27272a] bg-[#161618] shrink-0">
             {/* Telecom Network Health */}
-            <div className="p-3 rounded-lg bg-[#222226] border border-[#2c2c32] space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase font-bold text-[#a1a1aa] flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-indigo-400" /> Network Status
-                </span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/25">
-                  Live &amp; Healthy
-                </span>
-              </div>
-              <p className="text-[10.5px] text-[#71717a] leading-tight">
-                All voice gateways and emergency PSAP routes operating normally.
-              </p>
-            </div>
+            
 
             {/* Quick Footer Links */}
             <div className="flex items-center justify-between px-1 text-[11px] text-[#71717a] pt-1">

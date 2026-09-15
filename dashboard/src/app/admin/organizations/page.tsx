@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Building2,
   Search,
@@ -34,6 +35,31 @@ import {
 import Link from 'next/link';
 import { CreateOrgModal } from '@/components/admin/CreateOrgModal';
 import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 22, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring',
+      damping: 24,
+      stiffness: 280,
+    },
+  },
+};
 
 // --- Interfaces ---
 interface OrgRecord {
@@ -115,9 +141,9 @@ export default function AdminOrganizationsPage() {
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // 3-Dots Fixed Action Menu Positioning
+  // 3-Dots Fixed Action Menu Positioning (Opens upside)
   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
+    bottom: number;
     left: number;
     org: OrgRecord;
   } | null>(null);
@@ -226,14 +252,14 @@ export default function AdminOrganizationsPage() {
     fetchOrganizations();
   }, [fetchOrganizations]);
 
-  // Open 3-Dots Action Menu
+  // Open 3-Dots Action Menu (Opens upside above trigger button)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, org: OrgRecord) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 240;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, org });
+    const bottom = Math.max(16, window.innerHeight - rect.top + 6);
+    setMenuPosition({ bottom, left, org });
   };
 
   // Copy Quick Action
@@ -460,7 +486,12 @@ export default function AdminOrganizationsPage() {
   const hasActiveFilters = searchQuery !== '' || selectedStatus !== 'ALL' || selectedPropFilter !== 'ALL';
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-12 font-sans"
+    >
       {/* Toast alert */}
       {toastMsg && (
         <div
@@ -476,135 +507,165 @@ export default function AdminOrganizationsPage() {
       )}
 
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center border border-orange-100 dark:border-orange-900/40">
-              <Building2 className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl text-black dark:text-white flex items-center justify-center">
+              <Building2 size={256} />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Client Organizations
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Manage client tenant accounts, credentials, invitation tokens, assigned properties, and telecom operations.
-              </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Create Organization</span>
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* 2. KPI Cards (5 Cards as specified in Task.md) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <motion.div
+        variants={itemVariants}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5"
+      >
         {/* Card 1: Total Organizations */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Total Organizations
             </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Building2 className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <Building2 size={18} />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {metrics.totalOrganizations}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Clients</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Clients</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">All provisioned tenant accounts</p>
-        </div>
+          <p className="text-[11px] text-slate-100 mt-2">All provisioned tenant accounts</p>
+        </motion.div>
 
         {/* Card 2: Active Organizations */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-red-900 to-red-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Active Organizations
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-emerald-100 dark:text-emerald-400 flex items-center justify-center">
               <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xl font-bold text-emerald-100 dark:text-emerald-400">
               {metrics.activeOrganizations}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Live Portfolios</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Live Portfolios</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Operational active accounts</p>
-        </div>
+          <p className="text-[11px] text-slate-100 mt-2">Operational active accounts</p>
+        </motion.div>
 
         {/* Card 3: Pending / Invited */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-yellow-500 to-yellow-400 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-slate-400">
               Pending / Invited
             </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-amber-900 dark:text-amber-400 flex items-center justify-center">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`text-2xl font-bold ${metrics.pendingOrInvited > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
+            <span className={`text-2xl font-bold ${metrics.pendingOrInvited > 0 ? 'text-amber-900 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
               {metrics.pendingOrInvited}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Awaiting Setup</span>
+            <span className="text-xs text-slate-900 ml-1.5 font-medium">Awaiting Setup</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Pending invite or onboarding</p>
-        </div>
+          <p className="text-[11px] text-slate-900 mt-2">Pending invite or onboarding</p>
+        </motion.div>
 
         {/* Card 4: Total Properties */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-black to-gray-800/60 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Total Properties
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg text-purple-100 dark:text-purple-400 flex items-center justify-center">
               <Layers className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {metrics.totalProperties}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Locations</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Locations</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Assigned across all clients</p>
-        </div>
+          <p className="text-[11px] text-slate-100 mt-2">Assigned across all clients</p>
+        </motion.div>
 
         {/* Card 5: Organizations with No Properties */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-green-900 to-green-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               No Properties
             </span>
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
               metrics.noPropertiesOrganizations > 0
-                ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
+                ? 'text-rose-600 dark:text-rose-400'
+                : 'text-slate-100'
             }`}>
               <AlertCircle className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`text-2xl font-bold ${metrics.noPropertiesOrganizations > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+            <span className={`text-2xl font-bold ${metrics.noPropertiesOrganizations > 0 ? 'text-rose-100 dark:text-rose-400' : 'text-slate-100 dark:text-white'}`}>
               {metrics.noPropertiesOrganizations}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Unassigned</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Unassigned</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Orgs with 0 assigned properties</p>
-        </div>
-      </div>
+          <p className="text-[11px] text-slate-100 mt-2">Orgs with 0 assigned properties</p>
+        </motion.div>
+      </motion.div>
 
       {/* 3. Search & Filters Bar */}
       <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col lg:flex-row items-center justify-between gap-3">
@@ -617,7 +678,7 @@ export default function AdminOrganizationsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by organization, address, contact, email, or phone..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-orange-500 transition"
+              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
             />
             {searchQuery && (
               <button
@@ -637,7 +698,7 @@ export default function AdminOrganizationsPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter by organization status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-orange-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -654,7 +715,7 @@ export default function AdminOrganizationsPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter by assigned properties"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-orange-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
             <option value="ALL">All Property Statuses</option>
             <option value="HAS_PROPERTIES">Has Assigned Properties</option>
@@ -669,7 +730,7 @@ export default function AdminOrganizationsPage() {
               setCurrentPage(1);
             }}
             aria-label="Sort organizations"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-orange-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
             <option value="NEWEST">Sort: Newest First</option>
             <option value="PROPERTIES_DESC">Most Properties First</option>
@@ -687,7 +748,7 @@ export default function AdminOrganizationsPage() {
               setSortBy('NEWEST');
               setCurrentPage(1);
             }}
-            className="text-xs text-orange-600 dark:text-orange-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
           >
             Reset Filters
           </button>
@@ -719,7 +780,7 @@ export default function AdminOrganizationsPage() {
         </div>
       ) : organizations.length === 0 ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 text-orange-500 flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
             <Building2 className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -731,48 +792,50 @@ export default function AdminOrganizationsPage() {
               : 'Create your first client organization to begin onboarding and managing telecom services.'}
           </p>
           {!hasActiveFilters && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setShowCreateModal(true)}
-              className="mt-4 px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              className="mt-4 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Create Organization
-            </button>
+            </motion.button>
           )}
         </div>
       ) : (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto [scrollbar-width:thin]">
-            <table className="w-full text-left border-collapse min-w-[1050px]">
+            <table className="w-full text-left border-collapse min-w-[1320px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[190px]">
                     Organization Name
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[240px]">
                     Address
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[140px]">
                     Primary Contact
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[180px]">
                     Email
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[110px]">
                     Phone
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center whitespace-nowrap min-w-[90px]">
                     Properties
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[100px]">
                     Status
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[120px]">
                     Invite
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[105px]">
                     Created At
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap min-w-[105px]">
                     Actions
                   </th>
                 </tr>
@@ -787,31 +850,23 @@ export default function AdminOrganizationsPage() {
                       className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors group"
                     >
                       {/* Column 1: Organization Name */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs shrink-0 border border-orange-100 dark:border-orange-900/40">
-                            {initials}
-                          </div>
-                          <div>
-                            <Link
-                              href={`/admin/organizations/${org.id}`}
-                              target="_blank"
-                              className="font-bold text-slate-900 dark:text-white hover:text-orange-600 dark:hover:text-orange-400 transition-colors inline-flex items-center gap-1"
-                            >
-                              <span>{org.name}</span>
-                              <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-orange-500 transition-opacity" />
-                            </Link>
-                            <span className="block text-[10px] text-slate-400">
-                              {org.type || 'Client Organization'}
-                            </span>
-                          </div>
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[190px]">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin/organizations/${org.id}`}
+                            target="_blank"
+                            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                          >
+                            <span>{org.name}</span>
+                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-blue-600 transition-opacity shrink-0" />
+                          </Link>
                         </div>
                       </td>
 
                       {/* Column 2: Address */}
-                      <td className="py-3.5 px-3.5">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[240px]">
                         <span
-                          className="text-slate-700 dark:text-slate-300 block max-w-[200px] truncate"
+                          className="text-slate-700 dark:text-slate-300 block max-w-[240px] truncate"
                           title={org.address}
                         >
                           {org.address}
@@ -819,22 +874,22 @@ export default function AdminOrganizationsPage() {
                       </td>
 
                       {/* Column 3: Primary Contact */}
-                      <td className="py-3.5 px-3.5">
-                        <span className="font-semibold text-slate-900 dark:text-white block truncate max-w-[140px]">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[140px]">
+                        <span className="font-semibold text-slate-900 dark:text-white block truncate max-w-[160px]">
                           {org.primary_contact_name}
                         </span>
                       </td>
 
                       {/* Column 4: Email */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="flex items-center gap-1 font-mono text-[11px]">
-                          <span className="text-slate-700 dark:text-slate-300 truncate max-w-[150px]" title={org.email}>
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[180px]">
+                        <div className="flex items-center gap-1 text-[11px]">
+                          <span className="text-slate-700 dark:text-slate-300 truncate max-w-[170px]" title={org.email}>
                             {org.email}
                           </span>
                           {org.email !== '—' && (
                             <button
                               onClick={(e) => handleCopyText(org.email, 'Email', `email-${org.id}`, e)}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer shrink-0"
                               title="Copy email"
                             >
                               {copiedId === `email-${org.id}` ? (
@@ -848,14 +903,14 @@ export default function AdminOrganizationsPage() {
                       </td>
 
                       {/* Column 5: Phone */}
-                      <td className="py-3.5 px-3.5">
-                        <span className="font-mono text-slate-700 dark:text-slate-300 text-[11px] whitespace-nowrap">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[110px]">
+                        <span className="text-slate-700 dark:text-slate-300 text-[11px] whitespace-nowrap">
                           {org.phone}
                         </span>
                       </td>
 
                       {/* Column 6: Properties */}
-                      <td className="py-3.5 px-3.5 text-center">
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap min-w-[90px]">
                         <button
                           onClick={() => handleOpenProperties(org)}
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition cursor-pointer ${
@@ -871,7 +926,7 @@ export default function AdminOrganizationsPage() {
                       </td>
 
                       {/* Column 7: Status */}
-                      <td className="py-3.5 px-3.5">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[100px]">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold ${
                             org.status === 'ACTIVE'
@@ -895,7 +950,7 @@ export default function AdminOrganizationsPage() {
                       </td>
 
                       {/* Column 8: Invite */}
-                      <td className="py-3.5 px-3.5">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[120px]">
                         <div className="flex items-center gap-1.5">
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold ${
@@ -911,7 +966,7 @@ export default function AdminOrganizationsPage() {
                           </span>
                           <button
                             onClick={() => handleOpenInvite(org)}
-                            className="p-1 rounded text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
+                            className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
                             title="Manage invite link"
                           >
                             <Send className="w-3 h-3" />
@@ -920,7 +975,7 @@ export default function AdminOrganizationsPage() {
                       </td>
 
                       {/* Column 9: Created At */}
-                      <td className="py-3.5 px-3.5 text-slate-500 dark:text-slate-400 text-[11px] font-mono whitespace-nowrap">
+                      <td className="py-3.5 px-3.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap min-w-[105px]">
                         {new Date(org.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -929,12 +984,12 @@ export default function AdminOrganizationsPage() {
                       </td>
 
                       {/* Column 10: Actions */}
-                      <td className="py-3.5 px-3.5 text-right">
+                      <td className="py-3.5 px-3.5 text-right whitespace-nowrap min-w-[105px]">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <Link
                             href={`/admin/organizations/${org.id}`}
                             target="_blank"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-orange-50 dark:hover:bg-orange-950/50 text-slate-700 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 text-xs font-semibold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
                             title="Open organization workspace in new tab"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -1003,10 +1058,10 @@ export default function AdminOrganizationsPage() {
           <div
             style={{
               position: 'fixed',
-              top: `${menuPosition.top}px`,
+              bottom: `${menuPosition.bottom}px`,
               left: `${menuPosition.left}px`,
             }}
-            className="z-50 w-60 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
+            className="z-50 w-60 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100 max-h-[calc(100vh-32px)] overflow-y-auto"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#252733]">
               <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
@@ -1024,7 +1079,7 @@ export default function AdminOrganizationsPage() {
               onClick={() => setMenuPosition(null)}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer text-slate-800 dark:text-slate-200 font-semibold"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-orange-500" />
+              <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
               <span>Open Workspace (New Tab)</span>
             </Link>
 
@@ -1100,526 +1155,615 @@ export default function AdminOrganizationsPage() {
       )}
 
       {/* 9. Properties Drawer */}
-      {showPropertiesDrawer && selectedOrgForProps && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="fixed inset-0" onClick={() => setShowPropertiesDrawer(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10 animate-in slide-in-from-right duration-300">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/40">
-                  <Layers className="w-5 h-5" />
+      <AnimatePresence>
+        {showPropertiesDrawer && selectedOrgForProps && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowPropertiesDrawer(false)}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
+                <div className="flex items-center gap-3">
+                  <div className="text-black dark:text-white flex items-center justify-center">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Assigned Properties
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selectedOrgForProps.name} ({orgPropertiesList.length} Assigned)
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Assigned Properties
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {selectedOrgForProps.name} ({orgPropertiesList.length} Assigned)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowPropertiesDrawer(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Property Portfolio
-                </span>
                 <button
-                  onClick={handleOpenAssignPropModal}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+                  onClick={() => setShowPropertiesDrawer(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Assign New Property</span>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {loadingOrgProps ? (
-                <div className="py-8 flex flex-col items-center justify-center space-y-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-                  <span className="text-xs text-slate-400">Loading assigned properties...</span>
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Property Portfolio
+                  </span>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleOpenAssignPropModal}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Assign New Property</span>
+                  </motion.button>
                 </div>
-              ) : orgPropertiesList.length === 0 ? (
-                <div className="p-8 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-center space-y-2">
-                  <Layers className="w-8 h-8 text-slate-400 mx-auto" />
-                  <p className="font-bold text-slate-800 dark:text-white">No properties assigned</p>
-                  <p className="text-slate-400 text-[11px]">
-                    Click &quot;Assign New Property&quot; to associate an existing property with this organization.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {orgPropertiesList.map((prop) => (
-                    <div
-                      key={prop.id}
-                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
-                    >
-                      <div>
-                        <span className="font-bold text-slate-900 dark:text-white text-xs block">
-                          {prop.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block mt-0.5">
-                          {prop.address || `${prop.city}, ${prop.state}`}
-                        </span>
-                        <span className="text-[10.5px] font-mono text-slate-500 mt-0.5 block">
-                          Main Phone: {prop.main_phone || '—'}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleUnassignProperty(prop.id)}
-                        className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs font-semibold transition cursor-pointer"
-                      >
-                        Unassign
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end">
-              <button
-                onClick={() => setShowPropertiesDrawer(false)}
-                className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-[#1f212a] transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 10. Assign Property Modal */}
-      {showAssignPropModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="fixed inset-0" onClick={() => setShowAssignPropModal(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Assign Existing Property
-              </h3>
-              <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAssignPropertySubmit} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Select Property from Database
-                </label>
-                {loadingAvailableProps ? (
-                  <div className="p-3 bg-slate-50 rounded-lg text-center text-slate-400">
-                    Loading properties...
+                {loadingOrgProps ? (
+                  <div className="py-8 flex flex-col items-center justify-center space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="text-xs text-slate-400">Loading assigned properties...</span>
+                  </div>
+                ) : orgPropertiesList.length === 0 ? (
+                  <div className="p-8 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-center space-y-2">
+                    <Layers className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="font-bold text-slate-800 dark:text-white">No properties assigned</p>
+                    <p className="text-slate-400 text-[11px]">
+                      Click &quot;Assign New Property&quot; to associate an existing property with this organization.
+                    </p>
                   </div>
                 ) : (
-                  <select
-                    value={selectedPropToAssign}
-                    onChange={(e) => setSelectedPropToAssign(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
-                  >
-                    {allAvailableProps.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.city || 'US'}, {p.state || 'Location'})
-                      </option>
+                  <div className="space-y-2.5">
+                    {orgPropertiesList.map((prop) => (
+                      <div
+                        key={prop.id}
+                        className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white text-xs block">
+                            {prop.name}
+                          </span>
+                          <span className="text-[11px] text-slate-400 block mt-0.5">
+                            {prop.address || `${prop.city}, ${prop.state}`}
+                          </span>
+                          <span className="text-[10.5px] text-slate-500 mt-0.5 block">
+                            Main Phone: {prop.main_phone || '—'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleUnassignProperty(prop.id)}
+                          className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs font-semibold transition cursor-pointer"
+                        >
+                          Unassign
+                        </button>
+                      </div>
                     ))}
-                  </select>
+                  </div>
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end">
                 <button
-                  type="button"
-                  onClick={() => setShowAssignPropModal(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
+                  onClick={() => setShowPropertiesDrawer(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-[#1f212a] transition cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={assigningLoading || !selectedPropToAssign}
-                  className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
-                >
-                  {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+                  Close
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* 10. Assign Property Modal */}
+      <AnimatePresence>
+        {showAssignPropModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowAssignPropModal(false)}
+              className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs"
+            />
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Assign Existing Property
+                  </h3>
+                  <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAssignPropertySubmit} className="space-y-4 text-xs">
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                      Select Property from Database
+                    </label>
+                    {loadingAvailableProps ? (
+                      <div className="p-3 bg-slate-50 dark:bg-[#181920] rounded-lg text-center text-slate-400">
+                        Loading properties...
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedPropToAssign}
+                        onChange={(e) => setSelectedPropToAssign(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                      >
+                        {allAvailableProps.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.city || 'US'}, {p.state || 'Location'})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                    <button
+                      type="button"
+                      onClick={() => setShowAssignPropModal(false)}
+                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      disabled={assigningLoading || !selectedPropToAssign}
+                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* 11. Contacts Drawer */}
-      {showContactsDrawer && selectedOrgForContacts && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="fixed inset-0" onClick={() => setShowContactsDrawer(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10 animate-in slide-in-from-right duration-300">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
-                  <Users className="w-5 h-5" />
+      <AnimatePresence>
+        {showContactsDrawer && selectedOrgForContacts && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowContactsDrawer(false)}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
+                <div className="flex items-center gap-3">
+                  <div className="text-black dark:text-white flex items-center justify-center">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Organization Contacts
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selectedOrgForContacts.name} ({orgContactsList.length} Contacts)
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Organization Contacts
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {selectedOrgForContacts.name} ({orgContactsList.length} Contacts)
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowContactsDrawer(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Contacts &amp; Authorized Personnel
-                </span>
                 <button
-                  onClick={() => setShowAddContactModal(true)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+                  onClick={() => setShowContactsDrawer(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                 >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Add Contact</span>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {loadingOrgContacts ? (
-                <div className="py-8 flex flex-col items-center justify-center space-y-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                  <span className="text-xs text-slate-400">Loading contacts...</span>
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Contacts &amp; Authorized Personnel
+                  </span>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setShowAddContactModal(true)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Add Contact</span>
+                  </motion.button>
                 </div>
-              ) : orgContactsList.length === 0 ? (
-                <div className="p-8 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-center space-y-2">
-                  <Users className="w-8 h-8 text-slate-400 mx-auto" />
-                  <p className="font-bold text-slate-800 dark:text-white">No contacts listed</p>
-                  <p className="text-slate-400 text-[11px]">
-                    Click &quot;Add Contact&quot; to create authorized personnel for this organization.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {orgContactsList.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">
-                            {contact.name}
-                          </span>
-                          {contact.is_primary && (
-                            <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400 border border-orange-200/60">
-                              Primary Admin
+
+                {loadingOrgContacts ? (
+                  <div className="py-8 flex flex-col items-center justify-center space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <span className="text-xs text-slate-400">Loading contacts...</span>
+                  </div>
+                ) : orgContactsList.length === 0 ? (
+                  <div className="p-8 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-center space-y-2">
+                    <Users className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="font-bold text-slate-800 dark:text-white">No contacts listed</p>
+                    <p className="text-slate-400 text-[11px]">
+                      Click &quot;Add Contact&quot; to create authorized personnel for this organization.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {orgContactsList.map((contact) => (
+                      <div
+                        key={contact.id}
+                        className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white text-xs">
+                              {contact.name}
                             </span>
-                          )}
-                          <span className="text-[10px] font-semibold text-slate-400">
-                            ({contact.role})
+                            {contact.is_primary && (
+                              <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60">
+                                Primary Admin
+                              </span>
+                            )}
+                            <span className="text-[10px] font-semibold text-slate-400">
+                              ({contact.role})
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-600 dark:text-slate-300 block mt-0.5">
+                            {contact.email}
+                          </span>
+                          <span className="text-[10.5px] text-slate-400 block mt-0.5">
+                            {contact.phone}
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300 block mt-0.5">
-                          {contact.email}
-                        </span>
-                        <span className="text-[10.5px] text-slate-400 font-mono block mt-0.5">
-                          {contact.phone}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {(contact as any).invite_url && (
+                        <div className="flex items-center gap-1">
+                          {(contact as any).invite_url && (
+                            <button
+                              onClick={(e) => handleCopyText((contact as any).invite_url, 'Invite URL', `url-${contact.id}`, e)}
+                              className="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer"
+                              title="Copy Invitation URL"
+                            >
+                              {copiedId === `url-${contact.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Mail className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
                           <button
-                            onClick={(e) => handleCopyText((contact as any).invite_url, 'Invite URL', `url-${contact.id}`, e)}
-                            className="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer"
-                            title="Copy Invitation URL"
+                            onClick={(e) => handleCopyText(contact.email, 'Email', `c-email-${contact.id}`, e)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-[#252836] transition cursor-pointer"
+                            title="Copy Email"
                           >
-                            {copiedId === `url-${contact.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Mail className="w-3.5 h-3.5" />}
+                            {copiedId === `c-email-${contact.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
-                        )}
-                        <button
-                          onClick={(e) => handleCopyText(contact.email, 'Email', `c-email-${contact.id}`, e)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-[#252836] transition cursor-pointer"
-                          title="Copy Email"
-                        >
-                          {copiedId === `c-email-${contact.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteContactFromDrawer(contact.id)}
-                          className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                          title="Remove Contact"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                          <button
+                            onClick={() => handleDeleteContactFromDrawer(contact.id)}
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                            title="Remove Contact"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end">
-              <button
-                onClick={() => setShowContactsDrawer(false)}
-                className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-[#1f212a] transition cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end">
+                <button
+                  onClick={() => setShowContactsDrawer(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-[#1f212a] transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* 12. Add Contact Modal */}
-      {showAddContactModal && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="fixed inset-0" onClick={() => setShowAddContactModal(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Add Organization Contact
-              </h3>
-              <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
+      <AnimatePresence>
+        {showAddContactModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowAddContactModal(false)}
+              className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs"
+            />
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Add Organization Contact
+                  </h3>
+                  <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddContactSubmit} className="space-y-3 text-xs">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={contactFormData.full_name}
+                      onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
+                      placeholder="e.g., Alex Johnson"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                      Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={contactFormData.email}
+                      onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                      placeholder="alex@company.com"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                      Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={contactFormData.phone_number}
+                      onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="is_primary_checkbox"
+                      checked={contactFormData.is_primary}
+                      onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="is_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
+                      Set as Primary Administrator
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddContactModal(false)}
+                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      disabled={savingContact}
+                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {savingContact ? 'Saving...' : 'Add Contact'}
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
             </div>
-
-            <form onSubmit={handleAddContactSubmit} className="space-y-3 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={contactFormData.full_name}
-                  onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
-                  placeholder="e.g., Alex Johnson"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Email Address <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={contactFormData.email}
-                  onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
-                  placeholder="alex@company.com"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Phone Number
-                </label>
-                <input
-                  type="text"
-                  value={contactFormData.phone_number}
-                  onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
-                  placeholder="+1 (555) 019-2834"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="is_primary_checkbox"
-                  checked={contactFormData.is_primary}
-                  onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
-                  className="rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                />
-                <label htmlFor="is_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
-                  Set as Primary Administrator
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
-                <button
-                  type="button"
-                  onClick={() => setShowAddContactModal(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingContact}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
-                >
-                  {savingContact ? 'Saving...' : 'Add Contact'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </AnimatePresence>
 
       {/* 13. Edit Organization Drawer */}
-      {showEditDrawer && selectedOrgForEdit && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="fixed inset-0" onClick={() => setShowEditDrawer(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10 animate-in slide-in-from-right duration-300">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center border border-orange-100 dark:border-orange-900/40">
-                  <Edit2 className="w-5 h-5" />
+      <AnimatePresence>
+        {showEditDrawer && selectedOrgForEdit && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowEditDrawer(false)}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
+                <div className="flex items-center gap-3">
+                  <div className="text-black dark:text-white flex items-center justify-center">
+                    <Edit2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Edit Organization Details
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selectedOrgForEdit.name}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Edit Organization Details
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {selectedOrgForEdit.name}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowEditDrawer(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Organization Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Street Address
-                </label>
-                <input
-                  type="text"
-                  value={editFormData.address}
-                  onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">City</label>
-                  <input
-                    type="text"
-                    value={editFormData.city}
-                    onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
-                    className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">State</label>
-                  <input
-                    type="text"
-                    value={editFormData.state}
-                    onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
-                    className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">ZIP</label>
-                  <input
-                    type="text"
-                    value={editFormData.zip_code}
-                    onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
-                    className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Main Phone
-                </label>
-                <input
-                  type="text"
-                  value={editFormData.phone}
-                  onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Primary Email
-                </label>
-                <input
-                  type="email"
-                  value={editFormData.email}
-                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Operational Status
-                </label>
-                <select
-                  value={editFormData.status}
-                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
-                  <option value="INACTIVE">INACTIVE</option>
-                  <option value="SUSPENDED">SUSPENDED</option>
-                </select>
-              </div>
-
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2 pt-4">
                 <button
-                  type="button"
                   onClick={() => setShowEditDrawer(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editSaving}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
-                >
-                  {editSaving ? 'Saving Changes...' : 'Save Organization'}
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+
+              {/* Form */}
+              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Organization Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Street Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editFormData.address}
+                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">City</label>
+                    <input
+                      type="text"
+                      value={editFormData.city}
+                      onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">State</label>
+                    <input
+                      type="text"
+                      value={editFormData.state}
+                      onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">ZIP</label>
+                    <input
+                      type="text"
+                      value={editFormData.zip_code}
+                      onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
+                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Main Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Primary Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editFormData.email}
+                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Operational Status
+                  </label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
+                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="SUSPENDED">SUSPENDED</option>
+                  </select>
+                </div>
+
+                <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditDrawer(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    type="submit"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    disabled={editSaving}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {editSaving ? 'Saving Changes...' : 'Save Organization'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

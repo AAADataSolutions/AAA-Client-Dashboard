@@ -30,6 +30,24 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { PropertyDetailDrawer } from '@/components/client/PropertyDetailDrawer';
 import { CreateTicketModal } from '@/components/client/CreateTicketModal';
+import { motion, type Variants } from 'framer-motion';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 }
+  }
+};
 
 interface PropertyRecord {
   id: string;
@@ -97,7 +115,8 @@ export default function ClientPropertiesPage() {
 
   // 3-Dots Fixed Action Menu state
   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     prop: PropertyRecord;
   } | null>(null);
@@ -146,8 +165,12 @@ export default function ClientPropertiesPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 230;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, prop });
+    const isNearBottom = rect.bottom + 230 > window.innerHeight;
+    if (isNearBottom) {
+      setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, prop });
+    } else {
+      setMenuPosition({ top: rect.bottom + 4, left, prop });
+    }
   };
 
   const handleOpenTicketModalForProp = (propId: string) => {
@@ -204,227 +227,126 @@ export default function ClientPropertiesPage() {
   }, [metrics]);
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-12 font-sans"
+    >
       {/* 1. Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
-              <Hotel className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Properties &amp; Locations
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Directory and operational telecommunication status for {orgName} properties.
-              </p>
-            </div>
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <Hotel size={256} className="w-full h-full object-contain" />
           </div>
+          <h1 className="text-xl font-bold tracking-tight text-black dark:text-white">
+            Properties &amp; Locations
+          </h1>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => handleOpenTicketModalForProp('')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Raise Property Ticket</span>
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* 2. Top KPI Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI Card 1: Donut / Pie Chart of Total Properties */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Properties Breakdown
-            </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-              {metrics.totalProperties} Total
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 pt-1">
-            {/* SVG Donut Chart */}
-            <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                {/* Background Ring */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="38"
-                  fill="transparent"
-                  stroke="currentColor"
-                  strokeWidth="10"
-                  className="text-slate-100 dark:text-slate-800"
-                />
-                {metrics.totalProperties > 0 ? (
-                  <>
-                    {/* Active Segment (Emerald) */}
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="38"
-                      fill="transparent"
-                      stroke="#10b981"
-                      strokeWidth="10"
-                      strokeDasharray={`${donutData.activeLength} ${donutData.circumference}`}
-                      strokeDashoffset="0"
-                      className="transition-all duration-700"
-                    />
-                    {/* Onboarding Segment (Purple) */}
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="38"
-                      fill="transparent"
-                      stroke="#8b5cf6"
-                      strokeWidth="10"
-                      strokeDasharray={`${donutData.onboardingLength} ${donutData.circumference}`}
-                      strokeDashoffset={-donutData.activeLength}
-                      className="transition-all duration-700"
-                    />
-                    {/* Inactive Segment (Slate) */}
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="38"
-                      fill="transparent"
-                      stroke="#64748b"
-                      strokeWidth="10"
-                      strokeDasharray={`${donutData.inactiveLength} ${donutData.circumference}`}
-                      strokeDashoffset={-(donutData.activeLength + donutData.onboardingLength)}
-                      className="transition-all duration-700"
-                    />
-                  </>
-                ) : null}
-              </svg>
-              {/* Donut Center Count */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-lg font-bold text-slate-900 dark:text-white leading-none">
-                  {metrics.totalProperties}
-                </span>
-                <span className="text-[9px] text-slate-400 font-medium tracking-tight">
-                  Properties
-                </span>
-              </div>
-            </div>
-
-            {/* Donut Legend */}
-            <div className="flex-1 space-y-1.5 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  <span>Active</span>
-                </span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {metrics.activeProperties}{' '}
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ({donutData.activePct}%)
-                  </span>
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
-                  <span>Onboarding</span>
-                </span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {metrics.onboardingProperties}{' '}
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ({donutData.onboardingPct}%)
-                  </span>
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                  <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
-                  <span>Inactive</span>
-                </span>
-                <span className="font-bold text-slate-900 dark:text-white">
-                  {metrics.inactiveProperties}{' '}
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ({donutData.inactivePct}%)
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* KPI Card 2: Total Services */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+      {/* 2. Top KPI Cards Row - ALL VARIANT 1 ONLY */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Properties */}
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Total Telecom Services
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              Total Properties
             </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Radio className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <Hotel className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl font-bold text-white">
+              {metrics.totalProperties}
+            </span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Locations</span>
+          </div>
+          <p className="text-[11px] text-slate-200 mt-2">Active portfolio facilities</p>
+        </motion.div>
+
+        {/* Card 2: Active Properties */}
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              Active Properties
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-white">
+              {metrics.activeProperties}
+            </span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Live In Service</span>
+          </div>
+          <p className="text-[11px] text-slate-200 mt-2">Fully operational facilities</p>
+        </motion.div>
+
+        {/* Card 3: In Onboarding */}
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              In Onboarding
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <GitBranch className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-white">
+              {metrics.onboardingProperties}
+            </span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Pipeline</span>
+          </div>
+          <p className="text-[11px] text-slate-200 mt-2">Provisioning in progress</p>
+        </motion.div>
+
+        {/* Card 4: Services & Lines */}
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              Total Services &amp; Lines
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <PhoneCall className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-white">
               {metrics.totalServices}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Provisioned Lines</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Lines</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
-            <PhoneCall className="w-3 h-3 text-emerald-500" />
-            <span>DIDs, SIP trunks, analog voice across properties</span>
-          </p>
-        </div>
-
-        {/* KPI Card 3: Services Requiring Attention */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Services Needing Attention
-            </span>
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              metrics.servicesAttention > 0
-                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
-            }`}>
-              <AlertTriangle className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className={`text-2xl font-bold ${
-              metrics.servicesAttention > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'
-            }`}>
-              {metrics.servicesAttention}
-            </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">In-Flight / Pending</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Lines undergoing carrier porting or cutover review
-          </p>
-        </div>
-
-        {/* KPI Card 4: Open Tickets */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Open Support Tickets
-            </span>
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <LifeBuoy className="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
-              {metrics.openTickets}
-            </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Active Inquiries</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Unresolved tickets across all tenant locations
-          </p>
-        </div>
-      </div>
+          <p className="text-[11px] text-slate-200 mt-2">DIDs, SIP trunks &amp; circuits</p>
+        </motion.div>
+      </motion.div>
 
       {/* 3. Search & Filter Bar */}
       <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
@@ -440,7 +362,7 @@ export default function ClientPropertiesPage() {
                 setCurrentPage(1);
               }}
               placeholder="Search by property name, address, or main phone..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 transition"
+              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition"
             />
             {searchQuery && (
               <button
@@ -460,7 +382,7 @@ export default function ClientPropertiesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter properties by operational status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -477,7 +399,7 @@ export default function ClientPropertiesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter properties by onboarding pipeline status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Onboarding</option>
             <option value="ONBOARDING">In Onboarding</option>
@@ -497,7 +419,7 @@ export default function ClientPropertiesPage() {
                 setStateFilter('ALL');
                 setCurrentPage(1);
               }}
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline px-2 cursor-pointer font-medium"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium"
             >
               Reset Filters
             </button>
@@ -508,7 +430,7 @@ export default function ClientPropertiesPage() {
               onClick={() => setViewMode('LIST')}
               className={`p-1.5 rounded-md text-xs transition cursor-pointer ${
                 viewMode === 'LIST'
-                  ? 'bg-white dark:bg-[#252733] text-indigo-600 dark:text-white shadow-2xs'
+                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-2xs'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title="Table View"
@@ -520,7 +442,7 @@ export default function ClientPropertiesPage() {
               onClick={() => setViewMode('GRID')}
               className={`p-1.5 rounded-md text-xs transition cursor-pointer ${
                 viewMode === 'GRID'
-                  ? 'bg-white dark:bg-[#252733] text-indigo-600 dark:text-white shadow-2xs'
+                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-2xs'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title="Grid View"
@@ -576,28 +498,28 @@ export default function ClientPropertiesPage() {
             <table className="w-full text-left border-collapse min-w-[850px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Property Name
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Address
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Contact Person
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Phone
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Services
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Status
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Onboarding
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     Actions
                   </th>
                 </tr>
@@ -610,13 +532,13 @@ export default function ClientPropertiesPage() {
                     className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
                   >
                     {/* Column 1: Property Name */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
                           <Hotel className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {prop.name}
                           </span>
                         </div>
@@ -624,14 +546,14 @@ export default function ClientPropertiesPage() {
                     </td>
 
                     {/* Column 2: Address */}
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       <span className="block max-w-[200px] truncate" title={`${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}`}>
                         {prop.address ? `${prop.address}, ${prop.city}, ${prop.state}` : `${prop.city}, ${prop.state}`}
                       </span>
                     </td>
 
                     {/* Column 3: Contact Person */}
-                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span className="truncate max-w-[140px]">
@@ -641,9 +563,9 @@ export default function ClientPropertiesPage() {
                     </td>
 
                     {/* Column 4: Phone */}
-                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {prop.main_phone ? (
-                        <div className="flex items-center gap-1.5 font-mono">
+                        <div className="flex items-center gap-1.5">
                           <span>{prop.main_phone}</span>
                           <button
                             onClick={(e) => handleCopyPhone(prop.main_phone!, prop.id, e)}
@@ -663,15 +585,15 @@ export default function ClientPropertiesPage() {
                     </td>
 
                     {/* Column 5: Services */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        <PhoneCall className="w-3 h-3 text-indigo-500" />
+                        <PhoneCall className="w-3 h-3 text-blue-500" />
                         <span>{prop.services_count} {prop.services_count === 1 ? 'Line' : 'Lines'}</span>
                       </span>
                     </td>
 
                     {/* Column 6: Status */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                           prop.status === 'ACTIVE'
@@ -695,9 +617,9 @@ export default function ClientPropertiesPage() {
                     </td>
 
                     {/* Column 7: Onboarding */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       {prop.onboarding_status ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
                           <GitBranch className="w-3 h-3" />
                           <span>{prop.onboarding_status}</span>
                         </span>
@@ -707,11 +629,11 @@ export default function ClientPropertiesPage() {
                     </td>
 
                     {/* Column 8: Actions */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleOpenPropertyDetails(prop)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-semibold transition cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
@@ -738,7 +660,7 @@ export default function ClientPropertiesPage() {
             <div
               key={prop.id}
               onClick={() => handleOpenPropertyDetails(prop)}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs hover:border-indigo-400 dark:hover:border-indigo-600 transition-all cursor-pointer flex flex-col justify-between"
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-3">
@@ -761,7 +683,7 @@ export default function ClientPropertiesPage() {
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold shrink-0 ${
                       prop.status === 'ACTIVE'
                         ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                        : 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400'
+                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
                     }`}
                   >
                     {prop.status}
@@ -771,7 +693,7 @@ export default function ClientPropertiesPage() {
                 <div className="space-y-2 text-xs py-2 border-t border-b border-slate-100 dark:border-[#20222c] my-2 text-slate-600 dark:text-slate-300">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 text-[11px]">Main Phone:</span>
-                    <span className="font-mono font-medium text-slate-900 dark:text-white">
+                    <span className="font-medium text-slate-900 dark:text-white">
                       {prop.main_phone || '—'}
                     </span>
                   </div>
@@ -783,7 +705,7 @@ export default function ClientPropertiesPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 text-[11px]">Active Services:</span>
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">
                       {prop.services_count} Lines
                     </span>
                   </div>
@@ -796,7 +718,7 @@ export default function ClientPropertiesPage() {
                     e.stopPropagation();
                     handleOpenPropertyDetails(prop);
                   }}
-                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   <span>View Details</span>
@@ -844,7 +766,7 @@ export default function ClientPropertiesPage() {
                       onClick={() => setCurrentPage(p)}
                       className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
                         currentPage === p
-                          ? 'bg-indigo-600 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212a]'
                       }`}
                     >
@@ -876,7 +798,8 @@ export default function ClientPropertiesPage() {
           <div
             style={{
               position: 'fixed',
-              top: `${menuPosition.top}px`,
+              ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
+              ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
               left: `${menuPosition.left}px`,
             }}
             className="z-50 w-56 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
@@ -902,7 +825,7 @@ export default function ClientPropertiesPage() {
               onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'SERVICES')}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
-              <PhoneCall className="w-3.5 h-3.5 text-indigo-500" />
+              <PhoneCall className="w-3.5 h-3.5 text-blue-500" />
               <span>View Assigned Services ({menuPosition.prop.services_count})</span>
             </button>
 
@@ -926,9 +849,9 @@ export default function ClientPropertiesPage() {
 
             <button
               onClick={() => handleOpenTicketModalForProp(menuPosition.prop.id)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-2 transition cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2 transition cursor-pointer"
             >
-              <LifeBuoy className="w-3.5 h-3.5 text-indigo-500" />
+              <LifeBuoy className="w-3.5 h-3.5 text-blue-500" />
               <span>Raise Support Ticket</span>
             </button>
           </div>
@@ -964,6 +887,6 @@ export default function ClientPropertiesPage() {
           }}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

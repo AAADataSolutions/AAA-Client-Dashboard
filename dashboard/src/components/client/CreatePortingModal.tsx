@@ -125,7 +125,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/40">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
               <ArrowLeftRight className="w-4 h-4" />
             </div>
             <div>
@@ -166,7 +166,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
                 setSelectedServiceIds([]);
               }}
               disabled={loadingData || submitting}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs cursor-pointer"
             >
               {properties.map((p) => (
                 <option key={p.org_property_id} value={p.org_property_id}>
@@ -186,7 +186,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
               value={targetDate}
               onChange={(e) => setTargetDate(e.target.value)}
               disabled={submitting}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs"
             />
             <p className="text-[10.5px] text-slate-400">
               Standard carrier cutovers require 5 to 10 business days for FOC confirmation.
@@ -203,7 +203,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSelectAllServices}
-                  className="text-purple-600 dark:text-purple-400 hover:underline text-[11px] font-semibold cursor-pointer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold cursor-pointer"
                 >
                   {selectedServiceIds.length === eligibleServices.length ? 'Deselect All' : 'Select All'}
                 </button>
@@ -228,7 +228,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
                       onClick={() => toggleService(s.id)}
                       className={`p-2 rounded-md flex items-center justify-between cursor-pointer transition ${
                         isChecked
-                          ? 'bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/40 text-purple-900 dark:text-purple-200'
+                          ? 'bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-blue-900 dark:text-blue-200'
                           : 'hover:bg-white dark:hover:bg-[#181920] text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -236,13 +236,13 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
                         <div
                           className={`w-4 h-4 rounded border flex items-center justify-center ${
                             isChecked
-                              ? 'bg-purple-600 border-purple-600 text-white'
+                              ? 'bg-blue-600 border-blue-600 text-white'
                               : 'border-slate-300 dark:border-slate-600'
                           }`}
                         >
                           {isChecked && <Check className="w-3 h-3" />}
                         </div>
-                        <span className="font-mono font-bold text-xs">{s.phone_number}</span>
+                        <span className="font-bold text-xs">{s.phone_number}</span>
                       </div>
                       <span className="text-[10px] text-slate-400 font-medium">
                         {s.service_type || 'Voice Line'}
@@ -265,7 +265,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Enter losing carrier name (e.g., AT&T, Verizon), Account #, BTN (Billing Telephone Number), Authorization PIN, or manual numbers to port..."
               disabled={submitting}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500 resize-none text-xs"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 resize-none text-xs"
             />
           </div>
 
@@ -282,7 +282,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <>

@@ -109,7 +109,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
                   PSAP Status: {record.status}
                 </span>
               </div>
-              <span className="text-[10.5px] font-mono">
+              <span className="text-[10.5px]">
                 {record.verified_at
                   ? `Verified: ${new Date(record.verified_at).toLocaleDateString()}`
                   : 'Pending Validation'}
@@ -132,7 +132,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
               </span>
               <button
                 onClick={() => handleCopy(record.emergency_address, 'Emergency address')}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                className="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <Copy className="w-3 h-3" />
                 <span>Copy Address</span>
@@ -140,7 +140,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
             </div>
             <div className="p-4 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-2">
               <div className="flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                <MapPin className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                 <p className="font-semibold text-slate-900 dark:text-white text-xs leading-relaxed">
                   {record.emergency_address}
                 </p>
@@ -149,7 +149,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
                 <div className="pt-2 border-t border-slate-100 dark:border-[#222430] flex justify-end">
                   <button
                     onClick={() => onOpenEdit(record)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 text-xs font-semibold transition cursor-pointer border border-amber-200 dark:border-amber-800/40"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer shadow-2xs"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                     <span>Update Civic Address</span>
@@ -208,7 +208,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
             <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Hotel className="w-4 h-4 text-indigo-500" />
+                  <Hotel className="w-4 h-4 text-blue-500" />
                   <span className="font-bold text-slate-900 dark:text-white text-xs">
                     {record.property_name}
                   </span>
@@ -216,7 +216,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
                 {onOpenProperty && record.property_id && (
                   <button
                     onClick={() => onOpenProperty(record.property_id)}
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <span>View 360°</span>
                     <ArrowUpRight className="w-3 h-3" />
@@ -237,7 +237,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
           {onCreateTicket && (
             <button
               onClick={() => onCreateTicket(record.property_id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
             >
               <LifeBuoy className="w-3.5 h-3.5" />
               <span>Raise E911 Ticket</span>

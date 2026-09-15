@@ -6,9 +6,9 @@ import crypto from 'crypto';
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const dbClient = createAdminClient() || supabase;
+    const adminClient = createAdminClient();
     const body = await request.json();
-    const { rawToken, password, fullName } = body;
+    const { rawToken, password, fullName, email: customEmail } = body;
 
     if (!rawToken) {
       return NextResponse.json({ error: 'Invitation token is missing.' }, { status: 400 });
@@ -16,14 +16,47 @@ export async function POST(request: Request) {
 
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    // Find invitation by token or token_hash
-    const { data: invite, error: findErr } = await dbClient
-      .from('invitations')
-      .select('*, organization:organizations(*)')
-      .or(`token_hash.eq.${rawToken},token_hash.eq.${tokenHash}`)
-      .maybeSingle();
+    // 1. Locate invitation (adminClient -> RPC -> direct)
+    let invite: any = null;
 
-    if (findErr || !invite) {
+    if (adminClient) {
+      const { data, error } = await adminClient
+        .from('invitations')
+        .select('*, organization:organizations(*)')
+        .or(`token_hash.eq.${rawToken},token_hash.eq.${tokenHash}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        invite = data;
+      }
+    }
+
+    if (!invite) {
+      try {
+        const { data: rpcResult } = await supabase.rpc('verify_invitation_token', {
+          p_token: rawToken,
+        });
+        if (rpcResult?.success && rpcResult?.data) {
+          invite = rpcResult.data;
+        }
+      } catch (e) {
+        // RPC might not be installed
+      }
+    }
+
+    if (!invite) {
+      const { data, error } = await supabase
+        .from('invitations')
+        .select('*, organization:organizations(*)')
+        .or(`token_hash.eq.${rawToken},token_hash.eq.${tokenHash}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        invite = data;
+      }
+    }
+
+    if (!invite) {
       return NextResponse.json({ error: 'Invalid or expired invitation link.' }, { status: 404 });
     }
 
@@ -35,6 +68,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'This invitation link has expired.' }, { status: 400 });
     }
 
+    // Determine target email
+    const targetEmail = (customEmail || invite.email).trim().toLowerCase();
+
     // Check if user is currently logged in
     const {
       data: { user: currentUser },
@@ -44,26 +80,24 @@ export async function POST(request: Request) {
 
     // If not logged in and password provided, create/signup user
     if (!targetUserId && password) {
-      const adminClient = createAdminClient();
       if (adminClient) {
-        // Try creating or getting user with service role
+        // Try creating user with service role (auto-confirm email)
         const { data: newUser, error: createAuthErr } = await adminClient.auth.admin.createUser({
-          email: invite.email,
+          email: targetEmail,
           password: password,
           email_confirm: true,
           user_metadata: {
-            full_name: fullName || invite.email.split('@')[0],
+            full_name: fullName || targetEmail.split('@')[0],
             initial_org_id: invite.organization_id,
             initial_org_role: invite.target_org_role || 'ADMIN',
           },
         });
 
         if (createAuthErr) {
-          // If user already exists in auth, attempt updating password
           if (createAuthErr.message?.includes('already registered')) {
             const { data: existingUsers } = await adminClient.auth.admin.listUsers();
             const foundUser = existingUsers?.users?.find(
-              (u) => u.email?.toLowerCase() === invite.email.toLowerCase()
+              (u) => u.email?.toLowerCase() === targetEmail.toLowerCase()
             );
             if (foundUser) {
               await adminClient.auth.admin.updateUserById(foundUser.id, {
@@ -80,6 +114,25 @@ export async function POST(request: Request) {
         } else if (newUser?.user) {
           targetUserId = newUser.user.id;
         }
+      } else {
+        // Fallback without service role: use public supabase.auth.signUp
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+          email: targetEmail,
+          password: password,
+          options: {
+            data: {
+              full_name: fullName || targetEmail.split('@')[0],
+              initial_org_id: invite.organization_id,
+              initial_org_role: invite.target_org_role || 'ADMIN',
+            },
+          },
+        });
+
+        if (signUpErr) {
+          return NextResponse.json({ error: signUpErr.message }, { status: 400 });
+        }
+
+        targetUserId = signUpData.user?.id;
       }
     }
 
@@ -90,59 +143,40 @@ export async function POST(request: Request) {
       );
     }
 
-    // Ensure Profile exists and is updated
-    const { data: existingProfile } = await dbClient
-      .from('profiles')
-      .select('id')
-      .eq('id', targetUserId)
-      .maybeSingle();
+    // Try completing via RPC if available (bypasses RLS with security definer)
+    let rpcCompleted = false;
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('complete_invitation_acceptance', {
+        p_token: rawToken,
+        p_user_id: targetUserId,
+        p_full_name: fullName || targetEmail.split('@')[0],
+      });
+      if (!rpcErr && rpcRes?.success) {
+        rpcCompleted = true;
+      }
+    } catch (e) {
+      // RPC might not be installed
+    }
 
-    if (!existingProfile) {
-      await dbClient.from('profiles').insert({
+    // Fallback or adminClient completion: Ensure profile, member, and invitation updated
+    const db = adminClient || supabase;
+
+    if (!rpcCompleted) {
+      // Ensure Profile exists and is active
+      await db.from('profiles').upsert({
         id: targetUserId,
-        full_name: fullName || invite.email.split('@')[0],
-        email: invite.email.toLowerCase(),
+        email: targetEmail,
+        full_name: fullName || targetEmail.split('@')[0],
         role: invite.invite_type === 'INTERNAL_TEAM' ? invite.target_app_role || 'SUB_SUPER_ADMIN' : 'CLIENT_USER',
         status: 'ACTIVE',
+        updated_at: new Date().toISOString(),
       });
-    } else {
-      await dbClient
-        .from('profiles')
-        .update({
-          full_name: fullName || undefined,
-          status: 'ACTIVE',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', targetUserId);
-    }
 
-    // INTERNAL TEAM INVITATION FLOW
-    if (invite.invite_type === 'INTERNAL_TEAM') {
-      const { error: updateErr } = await dbClient
-        .from('invitations')
-        .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
-        .eq('id', invite.id);
+      // CLIENT MEMBER / ADMIN INVITATION FLOW
+      if (invite.invite_type === 'CLIENT_MEMBER' && invite.organization_id) {
+        const orgRole = invite.target_org_role || 'ADMIN';
 
-      if (updateErr) {
-        return NextResponse.json({ error: updateErr.message }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        success: true,
-        type: 'INTERNAL_TEAM',
-        requiresApproval: true,
-        message: 'Invitation accepted! Your access is now pending Super Admin approval.',
-      });
-    }
-
-    // CLIENT MEMBER / ADMIN INVITATION FLOW
-    if (invite.invite_type === 'CLIENT_MEMBER') {
-      const orgRole = invite.target_org_role || 'ADMIN';
-
-      // If invited as ADMIN, ensure any previous primary role is properly configured
-      const { error: memberErr } = await dbClient
-        .from('organization_members')
-        .upsert(
+        await db.from('organization_members').upsert(
           {
             organization_id: invite.organization_id,
             profile_id: targetUserId,
@@ -153,34 +187,27 @@ export async function POST(request: Request) {
           { onConflict: 'organization_id,profile_id' }
         );
 
-      if (memberErr) {
-        console.error('Member upsert error:', memberErr);
-      }
-
-      // Update organization status to ACTIVE if it was PENDING_ONBOARDING
-      if (invite.organization_id) {
-        await dbClient
+        await db
           .from('organizations')
           .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
           .eq('id', invite.organization_id);
       }
 
-      // Mark invite as APPROVED / COMPLETED
-      await dbClient
+      // Mark invite as ACCEPTED
+      await db
         .from('invitations')
-        .update({ status: 'APPROVED', updated_at: new Date().toISOString() })
+        .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
         .eq('id', invite.id);
-
-      return NextResponse.json({
-        success: true,
-        type: 'CLIENT_MEMBER',
-        requiresApproval: false,
-        organization: invite.organization,
-        message: 'Account activated successfully! You now have access to your organization dashboard.',
-      });
     }
 
-    return NextResponse.json({ error: 'Unhandled invitation flow.' }, { status: 400 });
+    return NextResponse.json({
+      success: true,
+      type: invite.invite_type,
+      requiresApproval: invite.invite_type === 'INTERNAL_TEAM',
+      organizationId: invite.organization_id,
+      email: targetEmail,
+      message: 'Account activated successfully! You now have access to your organization dashboard.',
+    });
   } catch (err: unknown) {
     console.error('Accept invitation error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';

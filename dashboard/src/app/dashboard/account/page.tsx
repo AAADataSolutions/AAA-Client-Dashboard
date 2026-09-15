@@ -20,9 +20,33 @@ import {
   Lock,
   Link2,
 } from 'lucide-react';
+import { motion, type Variants } from 'framer-motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useToast } from '@/components/client/ClientToast';
 import { InviteMemberModal } from '@/components/client/InviteMemberModal';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
 
 export default function ClientAccountPage() {
   const { profile, orgMembership, effectiveRole, refreshProfile } = useAuth();
@@ -44,9 +68,10 @@ export default function ClientAccountPage() {
   const [loadingTeam, setLoadingTeam] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
-  // 3-Dots Fixed Action Menu state
+  // 3-Dots Fixed Action Menu state with upside detection
   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     member: any;
   } | null>(null);
@@ -119,8 +144,20 @@ export default function ClientAccountPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 220;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, member });
+    const isNearBottom = rect.bottom + 180 > window.innerHeight;
+    if (isNearBottom) {
+      setMenuPosition({
+        bottom: window.innerHeight - rect.top + 6,
+        left,
+        member,
+      });
+    } else {
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left,
+        member,
+      });
+    }
   };
 
   const handleToggleMemberRole = async (memberId: string, currentRole: string) => {
@@ -184,43 +221,43 @@ export default function ClientAccountPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-12 font-sans"
+    >
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Account &amp; Team Management
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Manage personal credentials, authorized users, and organization preferences for {orgName}.
-              </p>
-            </div>
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <Users size={256} className="w-full h-full object-contain" />
           </div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Account &amp; Team Management
+          </h1>
         </div>
 
         {activeTab === 'TEAM' && isClientAdmin && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => setShowInviteModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Invite Team Member</span>
-          </button>
+          </motion.button>
         )}
-      </div>
+      </motion.div>
 
       {/* 2. Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200/80 dark:border-[#222430] pb-2 text-xs font-semibold">
+      <motion.div variants={itemVariants} className="flex items-center gap-2 border-b border-slate-200/80 dark:border-[#222430] pb-2 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('PROFILE')}
-          className={`px-3.5 py-1.5 rounded-lg transition ${
+          className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
             activeTab === 'PROFILE'
-              ? 'bg-indigo-600 text-white shadow-2xs'
+              ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#181920]'
           }`}
         >
@@ -228,9 +265,9 @@ export default function ClientAccountPage() {
         </button>
         <button
           onClick={() => setActiveTab('TEAM')}
-          className={`px-3.5 py-1.5 rounded-lg transition ${
+          className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
             activeTab === 'TEAM'
-              ? 'bg-indigo-600 text-white shadow-2xs'
+              ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#181920]'
           }`}
         >
@@ -238,19 +275,19 @@ export default function ClientAccountPage() {
         </button>
         <button
           onClick={() => setActiveTab('NOTIFICATIONS')}
-          className={`px-3.5 py-1.5 rounded-lg transition ${
+          className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
             activeTab === 'NOTIFICATIONS'
-              ? 'bg-indigo-600 text-white shadow-2xs'
+              ? 'bg-blue-600 text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#181920]'
           }`}
         >
           Notifications
         </button>
-      </div>
+      </motion.div>
 
       {/* TAB 1: PROFILE SETTINGS */}
       {activeTab === 'PROFILE' && (
-        <div className="max-w-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 shadow-xs space-y-6">
+        <motion.div variants={itemVariants} className="max-w-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 shadow-xs space-y-6">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Personal Profile</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -269,7 +306,7 @@ export default function ClientAccountPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Your full name"
                 disabled={savingProfile}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 text-xs"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs"
               />
             </div>
 
@@ -299,7 +336,7 @@ export default function ClientAccountPage() {
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="+1 (555) 000-0000"
                 disabled={savingProfile}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 text-xs font-mono"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs"
               />
             </div>
 
@@ -318,17 +355,19 @@ export default function ClientAccountPage() {
                       : 'Operational property & support tickets access.'}
                   </span>
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/40">
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40">
                   {isClientAdmin ? 'ADMIN' : 'USER'}
                 </span>
               </div>
             </div>
 
             <div className="pt-3 border-t border-slate-100 dark:border-[#222430] flex justify-end">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 type="submit"
                 disabled={savingProfile}
-                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-2xs disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {savingProfile ? (
                   <>
@@ -338,15 +377,15 @@ export default function ClientAccountPage() {
                 ) : (
                   <span>Save Profile</span>
                 )}
-              </button>
+              </motion.button>
             </div>
           </form>
-        </div>
+        </motion.div>
       )}
 
       {/* TAB 2: ORGANIZATION TEAM USERS */}
       {activeTab === 'TEAM' && (
-        <div className="space-y-6">
+        <motion.div variants={itemVariants} className="space-y-6">
           {/* Members Table */}
           <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
@@ -358,7 +397,7 @@ export default function ClientAccountPage() {
               </div>
               <button
                 onClick={fetchTeamMembers}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 title="Refresh Team"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -369,12 +408,12 @@ export default function ClientAccountPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
-                    <th className="py-3.5 px-4 font-bold">MEMBER NAME</th>
-                    <th className="py-3.5 px-4 font-bold">EMAIL ADDRESS</th>
-                    <th className="py-3.5 px-4 font-bold">ORGANIZATION ROLE</th>
-                    <th className="py-3.5 px-4 font-bold">STATUS</th>
-                    <th className="py-3.5 px-4 font-bold">JOINED DATE</th>
-                    {isClientAdmin && <th className="py-3.5 px-4 font-bold text-right">ACTIONS</th>}
+                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">MEMBER NAME</th>
+                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">EMAIL ADDRESS</th>
+                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">ORGANIZATION ROLE</th>
+                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">STATUS</th>
+                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">JOINED DATE</th>
+                    {isClientAdmin && <th className="py-3.5 px-4 font-bold text-right whitespace-nowrap">ACTIONS</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
@@ -385,16 +424,16 @@ export default function ClientAccountPage() {
                     return (
                       <tr key={mem.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition-colors">
                         {/* Name & Avatar */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200 dark:border-indigo-900/40">
+                            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 font-bold text-xs flex items-center justify-center border border-blue-200 dark:border-blue-900/40">
                               {(prof.full_name || prof.email || 'U').charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <span className="font-semibold text-slate-900 dark:text-white text-xs block">
                                 {prof.full_name || 'Member'} {isSelf && '(You)'}
                               </span>
-                              <span className="text-[10.5px] text-slate-400 block font-mono">
+                              <span className="text-[10.5px] text-slate-400 block">
                                 {prof.phone_number || '—'}
                               </span>
                             </div>
@@ -402,16 +441,16 @@ export default function ClientAccountPage() {
                         </td>
 
                         {/* Email */}
-                        <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                           {prof.email}
                         </td>
 
                         {/* Role */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               mem.role === 'ADMIN'
-                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/40'
+                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40'
                                 : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                             }`}
                           >
@@ -420,7 +459,7 @@ export default function ClientAccountPage() {
                         </td>
 
                         {/* Status */}
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
                               mem.status === 'ACTIVE'
@@ -434,17 +473,17 @@ export default function ClientAccountPage() {
                         </td>
 
                         {/* Joined Date */}
-                        <td className="py-3.5 px-4 text-slate-400 text-xs font-mono">
+                        <td className="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">
                           {new Date(mem.created_at).toLocaleDateString()}
                         </td>
 
                         {/* Actions (Client Admin Only) */}
                         {isClientAdmin && (
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             {!isSelf && (
                               <button
                                 onClick={(e) => handleOpenMenu(e, mem)}
-                                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition"
+                                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </button>
@@ -484,7 +523,7 @@ export default function ClientAccountPage() {
                         <div className="flex items-center gap-2.5">
                           <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                           <div>
-                            <span className="font-semibold text-slate-900 dark:text-white block font-mono">
+                            <span className="font-semibold text-slate-900 dark:text-white block">
                               {inv.email}
                             </span>
                             <span className="text-[10.5px] text-slate-400">
@@ -497,7 +536,7 @@ export default function ClientAccountPage() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleRevokeInvitation(inv.id)}
-                            className="px-2.5 py-1 rounded border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-[11px] font-semibold transition"
+                            className="px-2.5 py-1 rounded border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-[11px] font-semibold transition cursor-pointer"
                           >
                             Revoke
                           </button>
@@ -508,12 +547,12 @@ export default function ClientAccountPage() {
               )}
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* TAB 3: NOTIFICATIONS */}
       {activeTab === 'NOTIFICATIONS' && (
-        <div className="max-w-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 shadow-xs space-y-6">
+        <motion.div variants={itemVariants} className="max-w-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 shadow-xs space-y-6">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Notification Preferences</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -537,7 +576,7 @@ export default function ClientAccountPage() {
                 onChange={(e) =>
                   setNotifications({ ...notifications, ticketReplies: e.target.checked })
                 }
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
               />
             </div>
 
@@ -556,7 +595,7 @@ export default function ClientAccountPage() {
                 onChange={(e) =>
                   setNotifications({ ...notifications, e911Alerts: e.target.checked })
                 }
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
               />
             </div>
 
@@ -575,7 +614,7 @@ export default function ClientAccountPage() {
                 onChange={(e) =>
                   setNotifications({ ...notifications, onboardingMilestones: e.target.checked })
                 }
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
               />
             </div>
 
@@ -594,11 +633,11 @@ export default function ClientAccountPage() {
                 onChange={(e) =>
                   setNotifications({ ...notifications, portingCutovers: e.target.checked })
                 }
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
               />
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Fixed 3-Dots Action Popup for Team Member */}
@@ -606,7 +645,12 @@ export default function ClientAccountPage() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
           <div
-            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            style={{
+              position: 'fixed',
+              ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
+              ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
+              left: `${menuPosition.left}px`,
+            }}
             className="fixed z-50 w-56 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
@@ -622,9 +666,9 @@ export default function ClientAccountPage() {
                 setMenuPosition(null);
                 handleToggleMemberRole(m.id, m.role);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Shield className="w-3.5 h-3.5 text-indigo-500" />
+              <Shield className="w-3.5 h-3.5 text-blue-500" />
               <span>Change to {menuPosition.member.role === 'ADMIN' ? 'Member' : 'Admin'}</span>
             </button>
 
@@ -636,7 +680,7 @@ export default function ClientAccountPage() {
                 setMenuPosition(null);
                 handleRemoveMember(m.id, m.profile?.full_name || 'Member');
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2 cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-500" /> Remove from Organization
             </button>
@@ -650,6 +694,6 @@ export default function ClientAccountPage() {
         onClose={() => setShowInviteModal(false)}
         onSuccess={fetchTeamMembers}
       />
-    </div>
+    </motion.div>
   );
 }

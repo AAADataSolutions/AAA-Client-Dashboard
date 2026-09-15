@@ -116,7 +116,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
         {/* Drawer Header */}
         <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
           <div className="flex items-center gap-3 truncate">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/40">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
               <GitBranch className="w-5 h-5" />
             </div>
             <div className="truncate">
@@ -131,7 +131,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition-colors cursor-pointer"
             aria-label="Close drawer"
           >
             <X className="w-5 h-5" />
@@ -145,11 +145,11 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
               <span className="font-bold text-slate-900 dark:text-white">
                 Stage {currentStepIndex} of 8:
               </span>
-              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+              <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                 {onboarding.stage_label}
               </span>
             </div>
-            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+            <span className="font-bold text-blue-600 dark:text-blue-400">
               {Math.round(onboarding.progress_percentage)}% Completed
             </span>
           </div>
@@ -162,7 +162,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
                   ? 'bg-emerald-500'
                   : isWaitingOnClient
                   ? 'bg-amber-500'
-                  : 'bg-indigo-600'
+                  : 'bg-blue-600'
               }`}
               style={{ width: `${onboarding.progress_percentage}%` }}
             />
@@ -283,7 +283,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
                           : isCurrent
                           ? isWaitingOnClient
                             ? 'bg-amber-500 text-white ring-4 ring-amber-500/20 animate-pulse'
-                            : 'bg-indigo-600 text-white ring-4 ring-indigo-600/20'
+                            : 'bg-blue-600 text-white ring-4 ring-blue-600/20'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-300 dark:border-slate-700'
                       }`}
                     >
@@ -298,7 +298,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
                     <div
                       className={`p-3.5 rounded-xl border transition-all ${
                         isCurrent
-                          ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60 shadow-xs'
+                          ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/60 shadow-xs'
                           : isPassed
                           ? 'bg-white dark:bg-[#181920] border-slate-200/80 dark:border-[#222430]'
                           : 'bg-slate-50/50 dark:bg-[#14151a] border-slate-200/40 dark:border-slate-800/40 opacity-70'
@@ -308,7 +308,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
                         <span
                           className={`font-bold text-xs ${
                             isCurrent
-                              ? 'text-indigo-900 dark:text-indigo-300'
+                              ? 'text-blue-900 dark:text-blue-300'
                               : isPassed
                               ? 'text-slate-900 dark:text-white'
                               : 'text-slate-500 dark:text-slate-400'
@@ -327,7 +327,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
                             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                               isWaitingOnClient
                                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                                : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
                             }`}
                           >
                             {isWaitingOnClient ? 'Action Needed' : 'In Progress'}
@@ -402,8 +402,8 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
                     className="p-3 rounded-lg bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5 text-indigo-500" />
-                      <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                      <Phone className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="font-semibold text-slate-900 dark:text-white">
                         {s.phone_number}
                       </span>
                       <span className="text-[10.5px] text-slate-400">
@@ -424,7 +424,7 @@ export const OnboardingDetailDrawer: React.FC<OnboardingDetailDrawerProps> = ({
         <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-between shrink-0">
           <button
             onClick={() => onCreateTicket?.(onboarding.property_id)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
           >
             <LifeBuoy className="w-3.5 h-3.5" />
             <span>Raise Onboarding Ticket</span>

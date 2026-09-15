@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
+  ArrowLeftRight,
   Search,
   Plus,
   Download,
@@ -25,6 +26,23 @@ import {
   Check,
   Hotel,
 } from 'lucide-react';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 },
+  },
+};
 
 export type OnboardingStatus =
   | 'DRAFT'
@@ -331,7 +349,7 @@ export default function AdminOnboardingPortingPage() {
     sortBy !== 'NEWEST';
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Toast Notification Container */}
       <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
         <AnimatePresence>
@@ -346,7 +364,7 @@ export default function AdminOnboardingPortingPage() {
                   ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                   : t.type === 'error'
                   ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                  : 'bg-slate-900/95 border-indigo-500/30 text-white'
+                  : 'bg-slate-900/95 border-blue-500/30 text-white'
               }`}
             >
               {t.type === 'success' ? (
@@ -354,7 +372,7 @@ export default function AdminOnboardingPortingPage() {
               ) : t.type === 'error' ? (
                 <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
               ) : (
-                <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+                <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
               )}
               <div className="flex-1 text-xs">
                 <p className="font-semibold text-white">{t.title}</p>
@@ -371,16 +389,19 @@ export default function AdminOnboardingPortingPage() {
         </AnimatePresence>
       </div>
 
-      {/* Page Header (Clean: No Subtitle, No Mini Component) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Onboarding & Porting</h1>
+      {/* Page Header (Clean: No Subtitle, Raw Icon) */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <ArrowLeftRight size={256} className="w-full h-full object-contain" />
+          </div>
+          <h1 className="text-xl font-bold text-black dark:text-white tracking-tight">Onboarding &amp; Porting</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               const headers = ['ID,Property,Organization,Status,Progress,TargetDate\n'];
               const rows = onboardings.map((o) =>
@@ -394,21 +415,21 @@ export default function AdminOnboardingPortingPage() {
               a.click();
               showToast('Exported', 'Onboarding records exported as CSV.', 'info');
             }}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={resetAllFilters}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
           </motion.button>
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               setNewPropertyForm({
                 property_name: '',
@@ -426,14 +447,14 @@ export default function AdminOnboardingPortingPage() {
               setFormError(null);
               setShowCreateModal(true);
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" /> New Onboarding
           </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Real KPI Cards (No Fake Data) */}
+      {/* Real KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading && onboardings.length === 0 ? (
           [1, 2, 3, 4].map((i) => (
@@ -448,91 +469,87 @@ export default function AdminOnboardingPortingPage() {
           ))
         ) : (
           <>
+            {/* Total Onboardings - V1 Deep Blue */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900 text-white shadow-blue-500/20 cursor-pointer"
             >
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Total Onboardings
-                </span>
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Hotel className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Total Onboardings</span>
+                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+                  <Hotel className="w-5 h-5 text-white" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {metrics.totalOnboardings}
-                </span>
+              <div className="mt-4">
+                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.totalOnboardings}</div>
+                <p className="text-xs text-white/80 mt-1">Tracked Deployments</p>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Tracked Deployments</p>
             </motion.div>
 
+            {/* Live Cutover - V5 Deep Green */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white shadow-emerald-500/20 cursor-pointer"
             >
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Live Cutover
-                </span>
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Live Cutover</span>
+                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-white" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {metrics.completedCount}
-                </span>
+              <div className="mt-4">
+                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.completedCount}</div>
+                <p className="text-xs text-white/80 mt-1">Completed Cutover</p>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Completed Cutover</p>
             </motion.div>
 
+            {/* Porting In-Flight - V3 Bright Yellow */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-white shadow-amber-500/20 cursor-pointer"
             >
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Porting In-Flight
-                </span>
-                <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                  <Clock className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Porting In-Flight</span>
+                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-white" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {metrics.inProgressCount}
-                </span>
+              <div className="mt-4">
+                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.inProgressCount}</div>
+                <p className="text-xs text-white/80 mt-1">Carrier LOA / FOC Stage</p>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Carrier LOA / FOC Stage</p>
             </motion.div>
 
+            {/* Draft & Contract - V4 Black */}
             <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm"
+              variants={itemVariants}
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden rounded-2xl p-5 shadow-lg bg-gradient-to-br from-zinc-800 via-zinc-900 to-black text-white shadow-zinc-900/20 cursor-pointer"
             >
+              <div className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full bg-white/10 blur-xl pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Draft & Contract
-                </span>
-                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <FileText className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white/80">Draft &amp; Contract</span>
+                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {metrics.pendingReviewCount}
-                </span>
+              <div className="mt-4">
+                <div className="text-3xl font-extrabold tracking-tight text-white">{metrics.pendingReviewCount}</div>
+                <p className="text-xs text-white/80 mt-1">Pending Signatures</p>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Pending Signatures</p>
             </motion.div>
           </>
         )}
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -542,7 +559,7 @@ export default function AdminOnboardingPortingPage() {
               placeholder="Search by property or organization name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             />
             {searchQuery && (
               <button
@@ -563,7 +580,7 @@ export default function AdminOnboardingPortingPage() {
                 setCurrentPage(1);
               }}
               aria-label="Filter by stage"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="ALL">Stage: All Stages</option>
               <option value="DRAFT">Draft Initialized</option>
@@ -583,7 +600,7 @@ export default function AdminOnboardingPortingPage() {
                 setCurrentPage(1);
               }}
               aria-label="Sort records"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="NEWEST">Sort: Recently Created</option>
               <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
@@ -598,32 +615,32 @@ export default function AdminOnboardingPortingPage() {
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
             <span className="text-slate-400">Active Filters:</span>
             {searchQuery && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 "{searchQuery}"
                 <button onClick={() => setSearchQuery('')} className="cursor-pointer">
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             {selectedStageFilter !== 'ALL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 {selectedStageFilter}
                 <button onClick={() => setSelectedStageFilter('ALL')} className="cursor-pointer">
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </span>
             )}
             <button
               onClick={resetAllFilters}
-              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto cursor-pointer"
+              className="text-slate-500 hover:text-blue-600 text-xs font-medium underline ml-auto cursor-pointer"
             >
               Clear All
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
 
-      {/* Main Table View (Pure Black Headers, Separate Property & Org columns, No Location in table) */}
+      {/* Main Table View */}
       {error ? (
         <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
@@ -631,7 +648,7 @@ export default function AdminOnboardingPortingPage() {
           <p className="text-xs text-slate-400 mt-0.5">{error}</p>
           <button
             onClick={() => fetchOnboardings()}
-            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
+            className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
@@ -660,12 +677,14 @@ export default function AdminOnboardingPortingPage() {
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
-                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
               >
                 Clear Filters
               </button>
             )}
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => {
                 setNewPropertyForm({
                   property_name: '',
@@ -682,14 +701,14 @@ export default function AdminOnboardingPortingPage() {
                 });
                 setShowCreateModal(true);
               }}
-              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> New Onboarding
-            </button>
+            </motion.button>
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
@@ -705,17 +724,14 @@ export default function AdminOnboardingPortingPage() {
                 {onboardings.map((record) => {
                   const badge = getStageBadge(record.status);
                   return (
-                    <motion.tr
+                    <tr
                       key={record.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      whileHover={{ backgroundColor: 'rgba(248, 250, 252, 0.6)' }}
-                      className="transition"
+                      className="hover:bg-slate-50/70 dark:hover:bg-[#1a1b22] transition-colors"
                     >
-                      {/* 1. Property Name (ONLY Name, No Location) */}
+                      {/* 1. Property Name */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-blue-100 dark:border-blue-900/40">
                             <Building2 className="w-3.5 h-3.5" />
                           </div>
                           <div>
@@ -726,7 +742,7 @@ export default function AdminOnboardingPortingPage() {
                         </div>
                       </td>
 
-                      {/* 2. Organization Name (ONLY Name, No Location) */}
+                      {/* 2. Organization Name */}
                       <td className="py-3.5 px-4">
                         <span className="font-semibold text-black dark:text-white">
                           {record.organization_name}
@@ -743,7 +759,7 @@ export default function AdminOnboardingPortingPage() {
                           </span>
                           <div className="w-full bg-slate-100 dark:bg-[#222430] h-1.5 rounded-full overflow-hidden">
                             <div
-                              className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
                               style={{ width: `${record.progress_pct}%` }}
                             />
                           </div>
@@ -767,7 +783,7 @@ export default function AdminOnboardingPortingPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(record)}
-                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                             title="Edit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -781,14 +797,14 @@ export default function AdminOnboardingPortingPage() {
                           </button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
 
-          {/* Server-Side Pagination Bar (10 items per page) */}
+          {/* Server-Side Pagination Bar */}
           <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <span className="text-slate-500 dark:text-slate-400">
               Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
@@ -810,7 +826,7 @@ export default function AdminOnboardingPortingPage() {
                   onClick={() => setCurrentPage(num)}
                   className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     currentPage === num
-                      ? 'bg-[#4f46e5] text-white'
+                      ? 'bg-blue-600 text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
                   }`}
                 >
@@ -827,7 +843,7 @@ export default function AdminOnboardingPortingPage() {
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* ========================================================================= */}
@@ -869,399 +885,426 @@ export default function AdminOnboardingPortingPage() {
               }}
               className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Stage
+              <Edit2 className="w-3.5 h-3.5 text-blue-600" /> Edit Stage
             </button>
           </motion.div>
         </>
       )}
 
       {/* ========================================================================= */}
-      {/* 1. VIEW DETAILS DRAWER (High Contrast, No Light Gray) */}
+      {/* 1. VIEW DETAILS DRAWER */}
       {/* ========================================================================= */}
-      {showDetailsDrawer && selectedRecordForDetails && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+      <AnimatePresence>
+        {showDetailsDrawer && selectedRecordForDetails && (
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
           >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-base font-bold text-black dark:text-white">Onboarding & Porting Details</h3>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                    {selectedRecordForDetails.property_name}
-                  </p>
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-black dark:text-white">Onboarding &amp; Porting Details</h3>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                      {selectedRecordForDetails.property_name}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowDetailsDrawer(false)}
+                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
+
+                <div className="space-y-3.5 text-xs">
+                  {/* Status & Timeline */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Stage &amp; Timeline
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Current Milestone</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400">
+                        {getStageBadge(selectedRecordForDetails.status).label}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Progress Completion</span>
+                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.progress_pct}%</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Target Cutover Date</span>
+                      <span className="font-bold text-black dark:text-white">
+                        {selectedRecordForDetails.target_date
+                          ? new Date(selectedRecordForDetails.target_date).toLocaleDateString()
+                          : 'Not Set'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Property Details */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Property Specifications
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Property Name</span>
+                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
+                    </div>
+                    {selectedRecordForDetails.property_details && (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">General Manager</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {selectedRecordForDetails.property_details.general_manager_name || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Primary Contact</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {selectedRecordForDetails.property_details.contact_person_name || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Contact Email</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {selectedRecordForDetails.property_details.contact_person_email || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Main Phone</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {selectedRecordForDetails.property_details.main_phone || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="pt-1">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Address</span>
+                          <p className="font-medium text-slate-900 dark:text-white mt-0.5">
+                            {selectedRecordForDetails.property_details.address || 'N/A'},{' '}
+                            {selectedRecordForDetails.property_details.city}{' '}
+                            {selectedRecordForDetails.property_details.state}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Organization Details */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Managing Organization
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">Organization Name</span>
+                      <span className="font-bold text-black dark:text-white">
+                        {selectedRecordForDetails.organization_name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
                 <button
+                  type="button"
                   onClick={() => setShowDetailsDrawer(false)}
-                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  Close
                 </button>
               </div>
-
-              <div className="space-y-3.5 text-xs">
-                {/* Status & Timeline */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Stage & Timeline
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Current Milestone</span>
-                    <span className="font-bold text-indigo-700 dark:text-indigo-400">
-                      {getStageBadge(selectedRecordForDetails.status).label}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Progress Completion</span>
-                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.progress_pct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Target Cutover Date</span>
-                    <span className="font-bold text-black dark:text-white">
-                      {selectedRecordForDetails.target_date
-                        ? new Date(selectedRecordForDetails.target_date).toLocaleDateString()
-                        : 'Not Set'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Property Details */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Property Specifications
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Property Name</span>
-                    <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
-                  </div>
-                  {selectedRecordForDetails.property_details && (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">General Manager</span>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {selectedRecordForDetails.property_details.general_manager_name || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">Primary Contact</span>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {selectedRecordForDetails.property_details.contact_person_name || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">Contact Email</span>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {selectedRecordForDetails.property_details.contact_person_email || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">Main Phone</span>
-                        <span className="font-bold text-slate-900 dark:text-white font-mono">
-                          {selectedRecordForDetails.property_details.main_phone || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="pt-1">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">Address</span>
-                        <p className="font-medium text-slate-900 dark:text-white mt-0.5">
-                          {selectedRecordForDetails.property_details.address || 'N/A'},{' '}
-                          {selectedRecordForDetails.property_details.city}{' '}
-                          {selectedRecordForDetails.property_details.state}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Organization Details */}
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Managing Organization
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Organization Name</span>
-                    <span className="font-bold text-black dark:text-white">
-                      {selectedRecordForDetails.organization_name}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowDetailsDrawer(false)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 2. EDIT ONBOARDING DRAWER */}
       {/* ========================================================================= */}
-      {showEditDrawer && selectedRecordForEdit && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
+      <AnimatePresence>
+        {showEditDrawer && selectedRecordForEdit && (
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
           >
-            <div>
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-black dark:text-white">Edit Onboarding Milestone</h3>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                      {selectedRecordForEdit.property_name}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowEditDrawer(false)}
+                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {formError && (
+                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveEdit} id="edit-onboarding-form" className="space-y-3.5 mt-5 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Onboarding Stage / Milestone *
+                    </label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="DRAFT">Draft Initialized</option>
+                      <option value="CONTRACT_SENT">Contract Sent</option>
+                      <option value="SIGNED">Contract Signed</option>
+                      <option value="PORTING_WAITING">Waiting for LOA</option>
+                      <option value="PORTING_SUBMITTED">Porting Submitted</option>
+                      <option value="SOF_WAITING">SOF Review</option>
+                      <option value="FOC_RECEIVED">FOC Confirmed</option>
+                      <option value="COMPLETED">Live Cutover (Completed)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Target Cutover Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editFormData.target_date}
+                      onChange={(e) => setEditFormData({ ...editFormData, target_date: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </div>
+                </form>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowEditDrawer(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  type="submit"
+                  form="edit-onboarding-form"
+                  disabled={formLoading}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save Changes
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 3. START NEW PROPERTY ONBOARDING MODAL */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto my-8"
+            >
               <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
                 <div>
-                  <h3 className="text-base font-bold text-black dark:text-white">Edit Onboarding Milestone</h3>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                    {selectedRecordForEdit.property_name}
+                  <h3 className="text-sm font-bold text-black dark:text-white">Start New Property Onboarding</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                    Register a new hotel property to track contract and porting cutover
                   </p>
                 </div>
-                <button
-                  onClick={() => setShowEditDrawer(false)}
-                  className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
-                >
+                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer p-1 rounded-lg">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {formError && (
-                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveEdit} id="edit-onboarding-form" className="space-y-3.5 mt-5 text-xs">
+              <form onSubmit={handleSaveCreate} className="space-y-3.5 text-xs">
+                {/* 1. New Property Name */}
                 <div>
                   <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Onboarding Stage / Milestone *
-                  </label>
-                  <select
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-                  >
-                    <option value="DRAFT">Draft Initialized</option>
-                    <option value="CONTRACT_SENT">Contract Sent</option>
-                    <option value="SIGNED">Contract Signed</option>
-                    <option value="PORTING_WAITING">Waiting for LOA</option>
-                    <option value="PORTING_SUBMITTED">Porting Submitted</option>
-                    <option value="SOF_WAITING">SOF Review</option>
-                    <option value="FOC_RECEIVED">FOC Confirmed</option>
-                    <option value="COMPLETED">Live Cutover (Completed)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Target Cutover Date
+                    Property Name *
                   </label>
                   <input
-                    type="date"
-                    value={editFormData.target_date}
-                    onChange={(e) => setEditFormData({ ...editFormData, target_date: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    type="text"
+                    required
+                    placeholder="e.g. Grand Hyatt Miami Downtown"
+                    value={newPropertyForm.property_name}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, property_name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
+                </div>
+
+                {/* 2. Physical Address */}
+                <div>
+                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                    Property Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. 100 Biscayne Boulevard"
+                    value={newPropertyForm.address}
+                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, address: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* 3. City, State, Zip */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">City</label>
+                    <input
+                      type="text"
+                      placeholder="Miami"
+                      value={newPropertyForm.city}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, city: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">State</label>
+                    <input
+                      type="text"
+                      placeholder="FL"
+                      value={newPropertyForm.state}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, state: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">Zip Code</label>
+                    <input
+                      type="text"
+                      placeholder="33131"
+                      value={newPropertyForm.zip_code}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, zip_code: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Contacts */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">General Manager</label>
+                    <input
+                      type="text"
+                      placeholder="GM Full Name"
+                      value={newPropertyForm.general_manager_name}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, general_manager_name: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">Main Phone</label>
+                    <input
+                      type="text"
+                      placeholder="+1 (305) 555-0100"
+                      value={newPropertyForm.main_phone}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, main_phone: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Stage & Date */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Initial Stage
+                    </label>
+                    <select
+                      value={newPropertyForm.status}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, status: e.target.value as any })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="DRAFT">Draft Initialized</option>
+                      <option value="CONTRACT_SENT">Contract Sent</option>
+                      <option value="SIGNED">Contract Signed</option>
+                      <option value="PORTING_WAITING">Waiting for LOA</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
+                      Target Cutover Date
+                    </label>
+                    <input
+                      type="date"
+                      value={newPropertyForm.target_date}
+                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, target_date: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={formLoading}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Create Tracker
+                  </motion.button>
                 </div>
               </form>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowEditDrawer(false)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="edit-onboarding-form"
-                disabled={formLoading}
-                className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-              >
-                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                Save Changes
-              </button>
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 3. START NEW PROPERTY ONBOARDING MODAL (No Organization Dropdown Required) */}
-      {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-              <div>
-                <h3 className="text-sm font-bold text-black dark:text-white">Start New Property Onboarding</h3>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                  Register a new hotel property to track contract and porting cutover
-                </p>
-              </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveCreate} className="space-y-3.5 text-xs">
-              {/* 1. New Property Name */}
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  Property Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Grand Hyatt Miami Downtown"
-                  value={newPropertyForm.property_name}
-                  onChange={(e) => setNewPropertyForm({ ...newPropertyForm, property_name: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              {/* 2. Physical Address */}
-              <div>
-                <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                  Property Address
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 100 Biscayne Boulevard"
-                  value={newPropertyForm.address}
-                  onChange={(e) => setNewPropertyForm({ ...newPropertyForm, address: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              {/* 3. City, State, Zip */}
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">City</label>
-                  <input
-                    type="text"
-                    placeholder="Miami"
-                    value={newPropertyForm.city}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, city: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">State</label>
-                  <input
-                    type="text"
-                    placeholder="FL"
-                    value={newPropertyForm.state}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, state: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">Zip Code</label>
-                  <input
-                    type="text"
-                    placeholder="33131"
-                    value={newPropertyForm.zip_code}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, zip_code: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* 4. Contacts */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">General Manager</label>
-                  <input
-                    type="text"
-                    placeholder="GM Full Name"
-                    value={newPropertyForm.general_manager_name}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, general_manager_name: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">Main Phone</label>
-                  <input
-                    type="text"
-                    placeholder="+1 (305) 555-0100"
-                    value={newPropertyForm.main_phone}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, main_phone: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* 5. Stage & Date */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Initial Stage
-                  </label>
-                  <select
-                    value={newPropertyForm.status}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, status: e.target.value as any })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-                  >
-                    <option value="DRAFT">Draft Initialized</option>
-                    <option value="CONTRACT_SENT">Contract Sent</option>
-                    <option value="SIGNED">Contract Signed</option>
-                    <option value="PORTING_WAITING">Waiting for LOA</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Target Cutover Date
-                  </label>
-                  <input
-                    type="date"
-                    value={newPropertyForm.target_date}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, target_date: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  Create Tracker
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

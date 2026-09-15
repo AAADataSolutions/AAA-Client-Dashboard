@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Building2,
   ChevronLeft,
@@ -34,6 +35,23 @@ import {
   X,
 } from 'lucide-react';
 import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', damping: 25, stiffness: 300 },
+  },
+};
 
 interface OrgDetail {
   id: string;
@@ -298,7 +316,7 @@ export default function OrganizationDetailPage({
           </button>
           <button
             onClick={fetchOrgDetails}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
@@ -310,25 +328,30 @@ export default function OrganizationDetailPage({
   const initials = org.name.substring(0, 2).toUpperCase();
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans pb-16">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans pb-16"
+    >
       {/* Top Breadcrumbs */}
-      <div className="flex items-center justify-between">
+      <motion.div variants={itemVariants} className="flex items-center justify-between">
         <Link
           href="/admin/organizations"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Organizations
         </Link>
-        <span className="text-[11px] text-slate-400 font-mono">
+        <span className="text-[11px] text-slate-400">
           Created: {new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </span>
-      </div>
+      </motion.div>
 
       {/* Header Card */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-xs">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-2xl shrink-0 border border-orange-200 dark:border-orange-900/50">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-2xl shrink-0 border border-blue-200/50 dark:border-blue-900/50">
               {initials}
             </div>
             <div>
@@ -349,7 +372,7 @@ export default function OrganizationDetailPage({
               </div>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5 text-orange-500" />
+                <MapPin className="w-3.5 h-3.5 text-blue-600" />
                 <span>{org.address}</span>
               </p>
 
@@ -360,7 +383,7 @@ export default function OrganizationDetailPage({
                   </span>
                 )}
                 {org.phone !== '—' && (
-                  <span className="flex items-center gap-1 font-mono">
+                  <span className="flex items-center gap-1">
                     <Phone className="w-3.5 h-3.5" /> {org.phone}
                   </span>
                 )}
@@ -369,41 +392,47 @@ export default function OrganizationDetailPage({
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setShowInviteModal(true)}
-              className="px-3.5 py-2 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
             >
-              <Mail className="w-3.5 h-3.5 text-amber-500" />
+              <Mail className="w-3.5 h-3.5 text-blue-600" />
               <span>Invite Manager / Credentials</span>
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setShowEditOrgModal(true)}
               className="px-3.5 py-2 bg-slate-100 dark:bg-[#1a1c24] hover:bg-slate-200 dark:hover:bg-[#222430] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#2a2c3a] rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
             >
-              <Edit2 className="w-3.5 h-3.5 text-orange-500" />
+              <Edit2 className="w-3.5 h-3.5 text-blue-600" />
               <span>Edit Details</span>
-            </button>
+            </motion.button>
 
-            <Link
-              href="/dashboard"
-              target="_blank"
-              className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Open Client Portal View</span>
-            </Link>
+            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+              <Link
+                href="/dashboard"
+                target="_blank"
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs cursor-pointer inline-flex"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Client Portal View</span>
+              </Link>
+            </motion.div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Tabs Navigation (7 Dedicated Tabs as specified in Task.md) */}
-      <div className="flex border-b border-slate-200 dark:border-[#222430] gap-1 overflow-x-auto [scrollbar-width:thin]">
+      <motion.div variants={itemVariants} className="flex border-b border-slate-200 dark:border-[#222430] gap-1 overflow-x-auto [scrollbar-width:thin]">
         <button
           onClick={() => setActiveTab('OVERVIEW')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'OVERVIEW'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
@@ -415,7 +444,7 @@ export default function OrganizationDetailPage({
           onClick={() => setActiveTab('CONTACTS')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'CONTACTS'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
@@ -427,7 +456,7 @@ export default function OrganizationDetailPage({
           onClick={() => setActiveTab('PROPERTIES')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'PROPERTIES'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
@@ -439,7 +468,7 @@ export default function OrganizationDetailPage({
           onClick={() => setActiveTab('ONBOARDING')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'ONBOARDING'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
@@ -451,7 +480,7 @@ export default function OrganizationDetailPage({
           onClick={() => setActiveTab('SERVICES')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'SERVICES'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
@@ -463,7 +492,7 @@ export default function OrganizationDetailPage({
           onClick={() => setActiveTab('PORTING')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'PORTING'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
@@ -475,67 +504,83 @@ export default function OrganizationDetailPage({
           onClick={() => setActiveTab('E911')}
           className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
             activeTab === 'E911'
-              ? 'border-orange-500 text-orange-600 dark:text-orange-400 font-bold'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <ShieldCheck className="w-4 h-4" />
           <span>E911 Compliance ({org.e911?.length || 0})</span>
         </button>
-      </div>
+      </motion.div>
 
       {/* Tab 1: OVERVIEW */}
       {activeTab === 'OVERVIEW' && (
         <div className="space-y-6">
           {/* Top Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className="bg-gradient-to-br from-blue-700 to-blue-900 border border-blue-600/30 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200/90 block">
                 Assigned Properties
               </span>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                <span className="text-3xl font-extrabold text-white">
                   {org.properties?.length || 0}
                 </span>
-                <span className="text-xs text-slate-400">Locations</span>
+                <span className="text-xs text-blue-200/80">Locations</span>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className="bg-gradient-to-br from-emerald-800 to-emerald-950 border border-emerald-700/30 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200/90 block">
                 Active Voice Lines
               </span>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                <span className="text-3xl font-extrabold text-white">
                   {org.services?.length || 0}
                 </span>
-                <span className="text-xs text-slate-400">Lines</span>
+                <span className="text-xs text-emerald-200/80">Lines</span>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className="bg-gradient-to-br from-neutral-900 via-neutral-950 to-black border border-neutral-800 p-5 rounded-2xl shadow-sm text-white relative overflow-hidden group cursor-pointer"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 block">
                 Authorized Contacts
               </span>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                <span className="text-3xl font-extrabold text-white">
                   {org.contacts?.length || 0}
                 </span>
-                <span className="text-xs text-slate-400">Personnel</span>
+                <span className="text-xs text-neutral-400">Personnel</span>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+              className="bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 border border-amber-300 p-5 rounded-2xl shadow-sm text-neutral-950 relative overflow-hidden group cursor-pointer"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-900/80 block">
                 Onboarding Pipelines
               </span>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                <span className="text-3xl font-extrabold text-neutral-950">
                   {org.onboardings?.length || 0}
                 </span>
-                <span className="text-xs text-slate-400">In Flight</span>
+                <span className="text-xs text-neutral-900/70">In Flight</span>
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Cards Grid */}
@@ -548,7 +593,7 @@ export default function OrganizationDetailPage({
                 </h3>
                 <button
                   onClick={() => setShowEditOrgModal(true)}
-                  className="text-orange-600 dark:text-orange-400 hover:underline text-xs font-semibold cursor-pointer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-semibold cursor-pointer"
                 >
                   Edit Profile
                 </button>
@@ -567,11 +612,11 @@ export default function OrganizationDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Main Phone:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">{org.phone}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{org.phone}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Main Email:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">{org.email}</span>
+                  <span className="text-slate-700 dark:text-slate-300">{org.email}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Account Status:</span>
@@ -588,7 +633,7 @@ export default function OrganizationDetailPage({
                 </h3>
                 <button
                   onClick={() => setShowInviteModal(true)}
-                  className="text-amber-600 dark:text-amber-400 hover:underline text-xs font-semibold cursor-pointer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-semibold cursor-pointer"
                 >
                   Manage Invite
                 </button>
@@ -603,13 +648,13 @@ export default function OrganizationDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Email Address:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                  <span className="text-slate-700 dark:text-slate-300">
                     {org.primary_contact?.email || '—'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Direct Phone:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                  <span className="text-slate-700 dark:text-slate-300">
                     {org.primary_contact?.phone || '—'}
                   </span>
                 </div>
@@ -631,7 +676,7 @@ export default function OrganizationDetailPage({
                   <div className="pt-2">
                     <button
                       onClick={() => handleCopy(org.activeInvite.invite_url, 'invite-url')}
-                      className="w-full py-2 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/50 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-orange-200 dark:border-orange-900/40"
+                      className="w-full py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-blue-200 dark:border-blue-900/40"
                     >
                       {copiedId === 'invite-url' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                       <span>{copiedId === 'invite-url' ? 'Copied URL' : 'Copy Onboarding Invite URL'}</span>
@@ -654,13 +699,15 @@ export default function OrganizationDetailPage({
                 Authorized contacts with portal access for {org.name}.
               </p>
             </div>
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setShowAddContactModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Add Contact</span>
-            </button>
+            </motion.button>
           </div>
 
           <div className="overflow-x-auto">
@@ -688,10 +735,10 @@ export default function OrganizationDetailPage({
                       <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                         {c.name}
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
                         {c.email}
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-500 dark:text-slate-400">
+                      <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
                         {c.phone}
                       </td>
                       <td className="py-3.5 px-4">
@@ -750,13 +797,15 @@ export default function OrganizationDetailPage({
                 Physical property locations assigned to {org.name}.
               </p>
             </div>
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={handleOpenAssignProp}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Assign Property</span>
-            </button>
+            </motion.button>
           </div>
 
           <div className="overflow-x-auto">
@@ -781,7 +830,7 @@ export default function OrganizationDetailPage({
                   org.properties?.map((p: any) => (
                     <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
                       <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        <Link href="/admin/properties" className="hover:text-orange-600 transition">
+                        <Link href="/admin/properties" className="hover:text-blue-600 transition">
                           {p.name}
                         </Link>
                       </td>
@@ -793,7 +842,7 @@ export default function OrganizationDetailPage({
                           {p.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
                         {p.services_count || 6} Lines
                       </td>
                       <td className="py-3.5 px-4 text-right">
@@ -857,13 +906,13 @@ export default function OrganizationDetailPage({
                           {o.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
                         {o.target_date ? new Date(o.target_date).toLocaleDateString() : '—'}
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <Link
                           href="/admin/onboarding-porting"
-                          className="text-orange-600 dark:text-orange-400 hover:underline font-semibold"
+                          className="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
                         >
                           View Pipeline &rarr;
                         </Link>
@@ -913,7 +962,7 @@ export default function OrganizationDetailPage({
                       <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-semibold">
                         {s.service_type}
                       </td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                         {s.phone_number}
                       </td>
                       <td className="py-3.5 px-4">
@@ -963,15 +1012,15 @@ export default function OrganizationDetailPage({
                       <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                         {pr.property_name}
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
                         {pr.numbers_count} Line(s)
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/30">
                           {pr.status?.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
                         {pr.target_date ? new Date(pr.target_date).toLocaleDateString() : 'Pending FOC'}
                       </td>
                     </tr>
@@ -1024,7 +1073,7 @@ export default function OrganizationDetailPage({
                           {rec.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-500 dark:text-slate-400">
+                      <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
                         {rec.verified_at ? new Date(rec.verified_at).toLocaleDateString() : 'Pending Validation'}
                       </td>
                     </tr>
@@ -1046,241 +1095,271 @@ export default function OrganizationDetailPage({
       />
 
       {/* Edit Organization Modal */}
-      {showEditOrgModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
-          <div className="fixed inset-0" onClick={() => setShowEditOrgModal(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization Profile</h3>
-              <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveOrgEdit} className="space-y-3 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Organization Name</label>
-                <input
-                  type="text"
-                  required
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
+      <AnimatePresence>
+        {showEditOrgModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
+            <div className="fixed inset-0" onClick={() => setShowEditOrgModal(false)} aria-hidden="true" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization Profile</h3>
+                <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Street Address</label>
-                <input
-                  type="text"
-                  value={editFormData.address}
-                  onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  type="text"
-                  placeholder="City"
-                  value={editFormData.city}
-                  onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
-                  className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-                <input
-                  type="text"
-                  placeholder="State"
-                  value={editFormData.state}
-                  onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
-                  className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-                <input
-                  type="text"
-                  placeholder="ZIP"
-                  value={editFormData.zip_code}
-                  onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
-                  className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Main Phone</label>
+              <form onSubmit={handleSaveOrgEdit} className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Organization Name</label>
                   <input
                     type="text"
-                    value={editFormData.phone}
-                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                   />
                 </div>
-                <div>
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Status</label>
-                  <select
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
-                  >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
-                    <option value="INACTIVE">INACTIVE</option>
-                    <option value="SUSPENDED">SUSPENDED</option>
-                  </select>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
-                <button
-                  type="button"
-                  onClick={() => setShowEditOrgModal(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editSaving}
-                  className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
-                >
-                  {editSaving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Street Address</label>
+                  <textarea
+                    rows={2}
+                    value={editFormData.address}
+                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={editFormData.city}
+                    onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                    className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                  <input
+                    type="text"
+                    placeholder="State"
+                    value={editFormData.state}
+                    onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                    className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                  <input
+                    type="text"
+                    placeholder="ZIP"
+                    value={editFormData.zip_code}
+                    onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
+                    className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Main Phone</label>
+                    <input
+                      type="text"
+                      value={editFormData.phone}
+                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Status</label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                      <option value="SUSPENDED">SUSPENDED</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditOrgModal(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={editSaving}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {editSaving ? 'Saving...' : 'Save Changes'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Add Contact Modal */}
-      {showAddContactModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
-          <div className="fixed inset-0" onClick={() => setShowAddContactModal(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Organization Contact</h3>
-              <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddContact} className="space-y-3 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={contactFormData.full_name}
-                  onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
-                  placeholder="Alex Johnson"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={contactFormData.email}
-                  onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
-                  placeholder="alex@company.com"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">Phone Number</label>
-                <input
-                  type="text"
-                  value={contactFormData.phone_number}
-                  onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
-                  placeholder="+1 (555) 019-2834"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="detail_primary_checkbox"
-                  checked={contactFormData.is_primary}
-                  onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
-                  className="rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                />
-                <label htmlFor="detail_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
-                  Set as Primary Administrator
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
-                <button
-                  type="button"
-                  onClick={() => setShowAddContactModal(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingContact}
-                  className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
-                >
-                  {savingContact ? 'Saving...' : 'Add Contact'}
+      <AnimatePresence>
+        {showAddContactModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
+            <div className="fixed inset-0" onClick={() => setShowAddContactModal(false)} aria-hidden="true" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Organization Contact</h3>
+                <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleAddContact} className="space-y-3 text-xs">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={contactFormData.full_name}
+                    onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
+                    placeholder="Alex Johnson"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={contactFormData.email}
+                    onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                    placeholder="alex@company.com"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Phone Number</label>
+                  <input
+                    type="text"
+                    value={contactFormData.phone_number}
+                    onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
+                    placeholder="+1 (555) 019-2834"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="detail_primary_checkbox"
+                    checked={contactFormData.is_primary}
+                    onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor="detail_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
+                    Set as Primary Administrator
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddContactModal(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={savingContact}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingContact ? 'Saving...' : 'Add Contact'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Assign Property Modal */}
-      {showAssignPropModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
-          <div className="fixed inset-0" onClick={() => setShowAssignPropModal(false)} aria-hidden="true" />
-          <div className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property</h3>
-              <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAssignProp} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Select Property from Database
-                </label>
-                <select
-                  value={selectedPropToAssign}
-                  onChange={(e) => setSelectedPropToAssign(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
-                >
-                  {availableProps.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.city || 'US'}, {p.state || 'Location'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignPropModal(false)}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={assigningLoading || !selectedPropToAssign}
-                  className="px-4 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50"
-                >
-                  {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+      <AnimatePresence>
+        {showAssignPropModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
+            <div className="fixed inset-0" onClick={() => setShowAssignPropModal(false)} aria-hidden="true" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property</h3>
+                <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleAssignProp} className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Select Property from Database
+                  </label>
+                  <select
+                    value={selectedPropToAssign}
+                    onChange={(e) => setSelectedPropToAssign(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                  >
+                    {availableProps.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.city || 'US'}, {p.state || 'Location'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignPropModal(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={assigningLoading || !selectedPropToAssign}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   FileClock,
   Search,
@@ -21,6 +22,23 @@ import {
   Key,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 },
+  },
+};
 
 interface AuditLogRecord {
   id: string;
@@ -112,34 +130,31 @@ export default function AdminAuditLogsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6 pb-12">
       {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Security &amp; Audit Logs</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              Immutable Trail
-            </span>
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <FileClock size={256} className="w-full h-full object-contain" />
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Tamper-evident operational audit events, Super Admin authorizations, role changes, and system state modifications.
-          </p>
+          <h1 className="text-xl font-bold text-black dark:text-white tracking-tight">Security &amp; Audit Logs</h1>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] hover:bg-slate-50 dark:hover:bg-[#1e1f27] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] hover:bg-slate-50 dark:hover:bg-[#1e1f27] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors shadow-sm cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span>Export Audit Trail (CSV)</span>
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* 2. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -147,7 +162,7 @@ export default function AdminAuditLogsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search actor email, action, entity, IP address..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-[#f97316] focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
+            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
         </div>
 
@@ -157,7 +172,7 @@ export default function AdminAuditLogsPage() {
             <select
               value={selectedActionFilter}
               onChange={(e) => setSelectedActionFilter(e.target.value)}
-              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer"
+              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:border-blue-500"
             >
               <option value="ALL" className="dark:bg-[#15161c]">All Actions</option>
               <option value="E911" className="dark:bg-[#15161c]">E911 Events</option>
@@ -168,10 +183,10 @@ export default function AdminAuditLogsPage() {
             </select>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* 3. Audit Log Table */}
-      <div className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -187,14 +202,14 @@ export default function AdminAuditLogsPage() {
               {filteredLogs.map((log) => (
                 <tr
                   key={log.id}
-                  className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                  className="hover:bg-slate-50/70 dark:hover:bg-[#1a1b22] transition-colors group cursor-pointer"
                   onClick={() => setSelectedLog(log)}
                 >
                   {/* Timestamp & Actor */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
-                    <div className="font-semibold text-slate-900">{log.actor_email}</div>
+                    <div className="font-semibold text-slate-900 dark:text-white">{log.actor_email}</div>
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                      <span className="font-mono text-indigo-600 font-semibold">{log.actor_role}</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">{log.actor_role}</span>
                       <span>•</span>
                       <span>{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
@@ -202,19 +217,19 @@ export default function AdminAuditLogsPage() {
 
                   {/* Action */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
-                    <span className="px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-slate-100 text-slate-800 border border-slate-200">
+                    <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-slate-100 dark:bg-[#20222a] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#2e313e]">
                       {log.action}
                     </span>
                   </td>
 
                   {/* Entity */}
                   <td className="py-3.5 px-4">
-                    <div className="font-semibold text-slate-800">{log.entity_name}</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">{log.entity_name}</div>
                     <span className="text-[11px] text-slate-400">{log.entity_type}</span>
                   </td>
 
                   {/* IP Address */}
-                  <td className="py-3.5 px-4 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                  <td className="py-3.5 px-4 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
                     {log.ip_address}
                   </td>
 
@@ -222,7 +237,7 @@ export default function AdminAuditLogsPage() {
                   <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setSelectedLog(log)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700"
+                      className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-[#282a36] text-slate-400 hover:text-blue-600 cursor-pointer transition-colors"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
@@ -232,56 +247,71 @@ export default function AdminAuditLogsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
       {/* 4. Log Inspection Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <FileClock className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900">Audit Event Details</h3>
-              </div>
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold">Actor Email</span>
-                  <p className="font-semibold text-slate-900 mt-0.5">{selectedLog.actor_email}</p>
+      <AnimatePresence>
+        {selectedLog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430] shadow-2xl max-w-lg w-full p-6"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                <div className="flex items-center gap-2">
+                  <FileClock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="font-bold text-slate-900 dark:text-white">Audit Event Details</h3>
                 </div>
+                <button
+                  onClick={() => setSelectedLog(null)}
+                  className="text-slate-400 hover:text-slate-200 cursor-pointer p-1 rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold">Actor Email</span>
+                    <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{selectedLog.actor_email}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold">Role</span>
+                    <p className="font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{selectedLog.actor_role}</p>
+                  </div>
+                </div>
+
                 <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold">Role</span>
-                  <p className="font-semibold text-indigo-600 mt-0.5">{selectedLog.actor_role}</p>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">State Modifications (JSON)</span>
+                  <pre className="p-3 rounded-xl bg-slate-900 text-emerald-400 text-[11px] overflow-x-auto">
+                    {JSON.stringify(selectedLog.changes || {}, null, 2)}
+                  </pre>
                 </div>
               </div>
 
-              <div>
-                <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">State Modifications (JSON)</span>
-                <pre className="p-3 rounded-xl bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto">
-                  {JSON.stringify(selectedLog.changes || {}, null, 2)}
-                </pre>
+              <div className="mt-5 flex justify-end">
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setSelectedLog(null)}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer shadow-sm"
+                >
+                  Close
+                </motion.button>
               </div>
-            </div>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

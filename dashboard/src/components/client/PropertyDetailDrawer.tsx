@@ -84,9 +84,9 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
-              className={`py-3 px-3.5 border-b-2 font-medium transition-colors shrink-0 ${
+              className={`py-3 px-3.5 border-b-2 font-medium transition-colors shrink-0 cursor-pointer ${
                 activeTab === tab.key
-                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
@@ -140,13 +140,13 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
                     <div>
                       <span className="text-[10px] text-slate-400 block">Main Phone</span>
-                      <span className="font-mono text-slate-800 dark:text-slate-200 font-medium">
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
                         {property.main_phone || '—'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block">Fax</span>
-                      <span className="font-mono text-slate-800 dark:text-slate-200 font-medium">
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
                         {property.fax || '—'}
                       </span>
                     </div>
@@ -191,7 +191,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                 </h4>
                 <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0" />
                     <div>
                       <span className="font-semibold text-slate-900 dark:text-white block">
                         Ray Baum's &amp; Dispatch Logging
@@ -241,11 +241,11 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                       className="p-3 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                           <Phone className="w-3.5 h-3.5" />
                         </div>
                         <div>
-                          <span className="font-mono font-bold text-slate-900 dark:text-white text-xs block">
+                          <span className="font-bold text-slate-900 dark:text-white text-xs block">
                             {svc.phone_number}
                           </span>
                           <span className="text-[10.5px] text-slate-500 dark:text-slate-400">
@@ -302,7 +302,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                 )}
                 <div className="text-[10.5px] text-slate-400 pt-2 border-t border-slate-200/80 dark:border-[#252733] flex items-center justify-between">
                   <span>Last Verified:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
+                  <span className="text-slate-700 dark:text-slate-300">
                     {e911?.verified_at ? new Date(e911.verified_at).toLocaleDateString() : 'Pending'}
                   </span>
                 </div>
@@ -318,7 +318,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                   <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                     Onboarding Pipeline
                   </span>
-                  <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-900/40">
+                  <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40">
                     {onboarding?.status?.replace(/_/g, ' ') || 'ACTIVE'}
                   </span>
                 </div>
@@ -342,7 +342,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                 {onCreateTicket && (
                   <button
                     onClick={() => onCreateTicket(property.id)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium text-xs hover:bg-indigo-700 transition shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 text-white font-medium text-xs hover:bg-blue-700 transition shadow-2xs cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> New Ticket
                   </button>
@@ -396,11 +396,11 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
         {/* Drawer Footer */}
         <div className="p-4 border-t border-slate-200/80 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-400">
-            Property ID: <span className="font-mono text-slate-600 dark:text-slate-300">{property.id.substring(0, 8)}...</span>
+            Property ID: <span className="text-slate-600 dark:text-slate-300">{property.id.substring(0, 8)}...</span>
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1c1e27] text-xs font-semibold transition"
+            className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1c1e27] text-xs font-semibold transition cursor-pointer"
           >
             Close
           </button>

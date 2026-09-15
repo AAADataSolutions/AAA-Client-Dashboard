@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu,
   Search,
@@ -36,7 +37,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
       <div className="flex items-center gap-3 flex-1 max-w-xl">
         <button
           onClick={onOpenSidebar}
-          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
           title={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           aria-label="Toggle navigation"
         >
@@ -50,9 +51,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search properties, voice lines, DIDs, or tickets..."
-            className="w-full bg-[#f8f9fa] dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] focus:border-indigo-500 dark:focus:border-orange-500 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-9 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
+            className="w-full bg-[#f8f9fa] dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] focus:border-blue-500 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-9 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
-          <kbd className="hidden sm:inline-flex absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-[#20222a] px-1.5 py-0.2 rounded border border-slate-200 dark:border-[#2c2e3a] font-mono font-medium">
+          <kbd className="hidden sm:inline-flex absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-[#20222a] px-1.5 py-0.2 rounded border border-slate-200 dark:border-[#2c2e3a] font-medium">
             ⌘K
           </kbd>
         </div>
@@ -63,7 +64,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
         {/* Theme Switcher Toggle (Sun / Moon) */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg text-slate-500 dark:text-amber-400 hover:text-slate-900 dark:hover:text-amber-300 hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+          className="p-2 rounded-lg text-slate-500 dark:text-amber-400 hover:text-slate-900 dark:hover:text-amber-300 hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
           aria-label="Toggle color theme"
         >
@@ -76,7 +77,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
 
         {/* Sync / Refresh */}
         <button
-          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
           title="Refresh Operational State"
           onClick={() => window.location.reload()}
         >
@@ -87,40 +88,48 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+            className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
             title="Operational Alerts"
           >
             <Bell className="w-3.5 h-3.5" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[#ea580c]" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600" />
           </button>
 
-          {showNotifications && (
-            <>
-              <div
-                onClick={() => setShowNotifications(false)}
-                className="fixed inset-0 z-40"
-                aria-hidden="true"
-              />
-              <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#232530] rounded-xl shadow-xl p-4 z-50 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-                  <span className="font-semibold text-xs text-slate-900 dark:text-slate-100">Operational Triggers</span>
-                  <button onClick={() => setShowNotifications(false)} className="text-slate-400">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                  <p className="p-2 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200 dark:border-[#252733]">
-                    <strong className="text-slate-900 dark:text-slate-200 block font-semibold">E911 Routing Mismatch</strong>
-                    5 properties require civic address correction.
-                  </p>
-                  <p className="p-2 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200 dark:border-[#252733]">
-                    <strong className="text-slate-900 dark:text-slate-200 block font-semibold">FOC Confirmation</strong>
-                    Batch #44 cutover scheduled for Sep 14.
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
+          <AnimatePresence>
+            {showNotifications && (
+              <>
+                <div
+                  onClick={() => setShowNotifications(false)}
+                  className="fixed inset-0 z-40"
+                  aria-hidden="true"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#232530] rounded-xl shadow-xl p-4 z-50 space-y-3"
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                    <span className="font-semibold text-xs text-slate-900 dark:text-slate-100">Operational Triggers</span>
+                    <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+                    <p className="p-2 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200 dark:border-[#252733]">
+                      <strong className="text-slate-900 dark:text-slate-200 block font-semibold">E911 Routing Mismatch</strong>
+                      5 properties require civic address correction.
+                    </p>
+                    <p className="p-2 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200 dark:border-[#252733]">
+                      <strong className="text-slate-900 dark:text-slate-200 block font-semibold">FOC Confirmation</strong>
+                      Batch #44 cutover scheduled for Sep 14.
+                    </p>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* User Profile Pill */}

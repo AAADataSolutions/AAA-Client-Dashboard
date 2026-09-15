@@ -27,6 +27,27 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1.0] as any },
+  },
+};
 
 // --- Interfaces ---
 interface AttachedProperty {
@@ -380,7 +401,12 @@ export default function AdminServicesPage() {
     sortBy !== 'NEWEST';
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="p-6 md:p-8 max-w-7xl mx-auto space-y-6"
+    >
       {/* Toast Notification Container */}
       <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
         {toasts.map((t) => (
@@ -391,7 +417,7 @@ export default function AdminServicesPage() {
                 ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                 : t.type === 'error'
                 ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                : 'bg-slate-900/95 border-indigo-500/30 text-white'
+                : 'bg-slate-900/95 border-blue-500/30 text-white'
             }`}
           >
             {t.type === 'success' ? (
@@ -399,7 +425,7 @@ export default function AdminServicesPage() {
             ) : t.type === 'error' ? (
               <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
             ) : (
-              <Sparkles className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+              <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
             )}
             <div className="flex-1 text-xs">
               <p className="font-semibold text-white">{t.title}</p>
@@ -407,7 +433,7 @@ export default function AdminServicesPage() {
             </div>
             <button
               onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
-              className="text-slate-400 hover:text-white"
+              className="text-slate-400 hover:text-white cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -416,13 +442,18 @@ export default function AdminServicesPage() {
       </div>
 
       {/* Page Header (Clean: No Subtitle, No Mini Component) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <PhoneCall size={256} className="w-full h-full object-contain" />
+          </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Telephony Services</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               const headers = ['ID,PhoneNumber,ServiceType,Organization,AttachedProperty,Status\n'];
               const rows = services.map((s) =>
@@ -436,17 +467,21 @@ export default function AdminServicesPage() {
               a.click();
               showToast('Exported', 'Services list exported as CSV.', 'info');
             }}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={resetAllFilters}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               setFormData({
                 phone_number: '',
@@ -458,20 +493,20 @@ export default function AdminServicesPage() {
               setFormError(null);
               setShowCreateModal(true);
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white transition flex items-center gap-1.5 shadow-sm"
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" /> Provision Service
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Real KPI Cards (No Fake Data) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Real KPI Cards (5 Design System Variants with Hover Pop) */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading && services.length === 0 ? (
           [1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
+              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5 shadow-sm"
             >
               <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
               <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
@@ -480,79 +515,95 @@ export default function AdminServicesPage() {
           ))
         ) : (
           <>
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+            {/* Card 1: Total Services -> Variant 1 (Deep Blue) */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-950 text-white shadow-lg border border-blue-600/30"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-100/90">
                   Total Services
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <PhoneCall className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
+                  <PhoneCall className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-white tracking-tight">
                   {metrics.totalServicesCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Provisioned Voice Lines</p>
-            </div>
+              <p className="text-[11px] text-blue-100/70 mt-1">Provisioned Voice Lines</p>
+            </motion.div>
 
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+            {/* Card 2: Active Services -> Variant 5 (Deep Green) */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 text-white shadow-lg border border-emerald-600/30"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-100/90">
                   Active Services
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-white tracking-tight">
                   {metrics.activeServicesCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Operational & Connected</p>
-            </div>
+              <p className="text-[11px] text-emerald-100/70 mt-1">Operational & Connected</p>
+            </motion.div>
 
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+            {/* Card 3: Assigned Services -> Variant 4 (Pure Black) */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white shadow-lg border border-slate-700/50"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
                   Assigned Services
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                  <Building2 className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white flex items-center justify-center shadow-inner">
+                  <Building2 className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-white tracking-tight">
                   {metrics.assignedServicesCount}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">Bound to Property Locations</p>
-            </div>
+            </motion.div>
 
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-sm">
+            {/* Card 4: Pending / Suspended -> Variant 3 (Bright Yellow) */}
+            <motion.div
+              whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+              className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-600 text-slate-950 shadow-lg border border-amber-300/40"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-950">
                   Pending / Suspended
                 </span>
-                <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <AlertCircle className="w-3.5 h-3.5" />
+                <div className="w-8 h-8 rounded-xl bg-black/10 backdrop-blur-md text-slate-950 flex items-center justify-center shadow-inner">
+                  <AlertCircle className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="flex items-baseline gap-2 mt-3">
+                <span className="text-3xl font-bold text-slate-950 tracking-tight">
                   {metrics.inactiveOrSuspendedCount}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Requires Attention</p>
-            </div>
+              <p className="text-[11px] text-slate-900/80 font-medium mt-1">Requires Attention</p>
+            </motion.div>
           </>
         )}
-      </div>
+      </motion.div>
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -562,12 +613,12 @@ export default function AdminServicesPage() {
               placeholder="Search services by phone number, DID, description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -583,7 +634,7 @@ export default function AdminServicesPage() {
                 setCurrentPage(1);
               }}
               aria-label="Filter by service type"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="ALL">Type: All Types</option>
               <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
@@ -599,7 +650,7 @@ export default function AdminServicesPage() {
                 setCurrentPage(1);
               }}
               aria-label="Filter by status"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="ALL">Status: All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -614,7 +665,7 @@ export default function AdminServicesPage() {
                 setCurrentPage(1);
               }}
               aria-label="Sort services"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
             >
               <option value="NEWEST">Sort: Recently Created</option>
               <option value="NUMBER_ASC">Sort: Phone Number (A-Z)</option>
@@ -627,9 +678,9 @@ export default function AdminServicesPage() {
               <button
                 onClick={() => setViewMode('LIST')}
                 aria-label="List View"
-                className={`p-1 rounded transition ${
+                className={`p-1 rounded transition cursor-pointer ${
                   viewMode === 'LIST'
-                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -638,9 +689,9 @@ export default function AdminServicesPage() {
               <button
                 onClick={() => setViewMode('GRID')}
                 aria-label="Grid View"
-                className={`p-1 rounded transition ${
+                className={`p-1 rounded transition cursor-pointer ${
                   viewMode === 'GRID'
-                    ? 'bg-white dark:bg-[#1f212c] text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
                     : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -655,55 +706,55 @@ export default function AdminServicesPage() {
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
             <span className="text-slate-400">Active Filters:</span>
             {searchQuery && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 "{searchQuery}"
-                <button onClick={() => setSearchQuery('')}>
+                <button onClick={() => setSearchQuery('')} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
             {selectedTypeFilter !== 'ALL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 {selectedTypeFilter}
-                <button onClick={() => setSelectedTypeFilter('ALL')}>
+                <button onClick={() => setSelectedTypeFilter('ALL')} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
             {selectedStatusFilter !== 'ALL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 {selectedStatusFilter}
-                <button onClick={() => setSelectedStatusFilter('ALL')}>
+                <button onClick={() => setSelectedStatusFilter('ALL')} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
             <button
               onClick={resetAllFilters}
-              className="text-slate-500 hover:text-indigo-600 text-xs font-medium underline ml-auto"
+              className="text-slate-500 hover:text-blue-600 text-xs font-medium underline ml-auto cursor-pointer"
             >
               Clear All
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Main Table / Grid View */}
       {error ? (
-        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
           <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load services</p>
           <p className="text-xs text-slate-400 mt-0.5">{error}</p>
           <button
             onClick={() => fetchServices()}
-            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5"
+            className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
-        </div>
+        </motion.div>
       ) : loading && services.length === 0 ? (
         // Skeleton Loader
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
               <div className="flex items-center gap-3 w-1/4">
@@ -719,9 +770,9 @@ export default function AdminServicesPage() {
               <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
             </div>
           ))}
-        </div>
+        </motion.div>
       ) : services.length === 0 ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
           <PhoneCall className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
           <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Services Found</h4>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
@@ -733,12 +784,14 @@ export default function AdminServicesPage() {
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
-                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg"
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
               >
                 Clear Filters
               </button>
             )}
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => {
                 setFormData({
                   phone_number: '',
@@ -749,15 +802,15 @@ export default function AdminServicesPage() {
                 });
                 setShowCreateModal(true);
               }}
-              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" /> Provision Service
-            </button>
+            </motion.button>
           </div>
-        </div>
+        </motion.div>
       ) : viewMode === 'LIST' ? (
         // Table View: Pure Black Headers & Pure Black Phone Number & ONLY Org Name
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
@@ -774,14 +827,14 @@ export default function AdminServicesPage() {
                 {services.map((service) => {
                   return (
                     <tr key={service.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
-                      {/* 1. Service & Phone Number (Pure Black Phone Number) */}
+                      {/* 1. Service & Phone Number (Arimo Font, No font-mono) */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-indigo-100 dark:border-indigo-900/40">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-blue-100 dark:border-blue-900/40">
                             <Phone className="w-3.5 h-3.5" />
                           </div>
                           <div>
-                            <span className="font-semibold text-black dark:text-white text-sm block font-mono">
+                            <span className="font-semibold text-black dark:text-white text-sm block">
                               {service.phone_number}
                             </span>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[200px]">
@@ -818,7 +871,7 @@ export default function AdminServicesPage() {
                                   setSelectedServiceForProps(service);
                                   setShowPropertiesDrawer(true);
                                 }}
-                                className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
+                                className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline inline-block cursor-pointer"
                               >
                                 +{service.attached_properties.length - 1} more locations &rarr;
                               </button>
@@ -847,14 +900,14 @@ export default function AdminServicesPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(service)}
-                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition"
+                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                             title="Edit Service"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={(e) => handleOpenMenu(e, service)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition"
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                             title="More Actions"
                           >
                             <MoreVertical className="w-3.5 h-3.5" />
@@ -879,7 +932,7 @@ export default function AdminServicesPage() {
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1 || loading}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="w-3 h-3" /> Previous
               </button>
@@ -888,9 +941,9 @@ export default function AdminServicesPage() {
                 <button
                   key={num}
                   onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition ${
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     currentPage === num
-                      ? 'bg-[#4f46e5] text-white'
+                      ? 'bg-blue-600 text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
                   }`}
                 >
@@ -901,16 +954,16 @@ export default function AdminServicesPage() {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages || loading}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : (
         // Grid View
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {services.map((service) => (
             <div
               key={service.id}
@@ -918,11 +971,11 @@ export default function AdminServicesPage() {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-xs">
+                  <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
                     <Phone className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="font-semibold text-black dark:text-white text-sm block font-mono">
+                    <span className="font-semibold text-black dark:text-white text-sm block">
                       {service.phone_number}
                     </span>
                     <p className="text-[11px] text-slate-400">{service.service_type}</p>
@@ -961,14 +1014,14 @@ export default function AdminServicesPage() {
                 </span>
                 <button
                   onClick={(e) => handleOpenMenu(e, service)}
-                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                  className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       {/* ========================================================================= */}
@@ -993,9 +1046,9 @@ export default function AdminServicesPage() {
                 setMenuPosition(null);
                 handleOpenEdit(service);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Edit2 className="w-3.5 h-3.5 text-indigo-500" /> Edit Service
+              <Edit2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Edit Service
             </button>
 
             {/* Option 2: View Details */}
@@ -1006,9 +1059,9 @@ export default function AdminServicesPage() {
                 setSelectedServiceForDetails(service);
                 setShowDetailsDrawer(true);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Info className="w-3.5 h-3.5 text-blue-500" /> View Details
+              <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> View Details
             </button>
 
             {/* Option 3: See Properties in which this service is attached */}
@@ -1019,9 +1072,9 @@ export default function AdminServicesPage() {
                 setSelectedServiceForProps(service);
                 setShowPropertiesDrawer(true);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
             >
-              <Building2 className="w-3.5 h-3.5 text-purple-500" /> See Properties
+              <Building2 className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" /> See Properties
             </button>
 
             {/* Option 4: Assign this service to property (dropdown modal) */}
@@ -1031,9 +1084,9 @@ export default function AdminServicesPage() {
                 setMenuPosition(null);
                 handleOpenAssignModal(service);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 border-t border-slate-100 dark:border-[#222430]"
+              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 border-t border-slate-100 dark:border-[#222430] cursor-pointer"
             >
-              <LinkIcon className="w-3.5 h-3.5 text-emerald-500" /> Assign to Property
+              <LinkIcon className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" /> Assign to Property
             </button>
           </div>
         </>
@@ -1042,263 +1095,423 @@ export default function AdminServicesPage() {
       {/* ========================================================================= */}
       {/* 1. VIEW SERVICE DETAILS DRAWER */}
       {/* ========================================================================= */}
-      {showDetailsDrawer && selectedServiceForDetails && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Service Details</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Specifications & configuration</p>
+      <AnimatePresence>
+        {showDetailsDrawer && selectedServiceForDetails && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Service Details</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Specifications & configuration</p>
+                  </div>
+                  <button
+                    onClick={() => setShowDetailsDrawer(false)}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
+
+                <div className="space-y-3.5 text-xs">
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Telephony Identification
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Phone Number / DID</span>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {selectedServiceForDetails.phone_number}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                      <span className="text-slate-400">Service Type</span>
+                      <span className="font-semibold text-slate-800 dark:text-white">
+                        {selectedServiceForDetails.service_type}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Organization & Property Association
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Organization</span>
+                      <span className="font-semibold text-black dark:text-white">
+                        {selectedServiceForDetails.attached_organization_name}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Attached Property</span>
+                      <span className="font-semibold text-slate-800 dark:text-white">
+                        {selectedServiceForDetails.attached_property_name}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
+                      Status & Description
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Status</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        {selectedServiceForDetails.status}
+                      </span>
+                    </div>
+                    <div className="pt-1">
+                      <span className="text-slate-400">Description</span>
+                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">
+                        {selectedServiceForDetails.description || 'No description provided'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
                 <button
+                  type="button"
                   onClick={() => setShowDetailsDrawer(false)}
-                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                  className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#2c2e3c] transition cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  Close
                 </button>
               </div>
-
-              <div className="space-y-3.5 text-xs">
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Telephony Identification
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Phone Number / DID</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                      {selectedServiceForDetails.phone_number}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
-                    <span className="text-slate-400">Service Type</span>
-                    <span className="font-semibold text-slate-800 dark:text-white">
-                      {selectedServiceForDetails.service_type}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Organization & Property Association
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Organization</span>
-                    <span className="font-semibold text-black dark:text-white">
-                      {selectedServiceForDetails.attached_organization_name}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Attached Property</span>
-                    <span className="font-semibold text-slate-800 dark:text-white">
-                      {selectedServiceForDetails.attached_property_name}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                  <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                    Status & Description
-                  </h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Status</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                      {selectedServiceForDetails.status}
-                    </span>
-                  </div>
-                  <div className="pt-1">
-                    <span className="text-slate-400">Description</span>
-                    <p className="font-medium text-slate-800 dark:text-white mt-0.5">
-                      {selectedServiceForDetails.description || 'No description provided'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowDetailsDrawer(false)}
-                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
-              >
-                Close
-              </button>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 2. SEE PROPERTIES DRAWER */}
       {/* ========================================================================= */}
-      {showPropertiesDrawer && selectedServiceForProps && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Attached Properties</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Properties using <span className="font-semibold text-slate-900 dark:text-white font-mono">{selectedServiceForProps.phone_number}</span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowPropertiesDrawer(false)}
-                  className="p-1 rounded text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {selectedServiceForProps.attached_properties.length === 0 && selectedServiceForProps.attached_property_name === 'Unassigned' ? (
-                <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
-                  <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
-                  <p className="text-xs font-semibold text-slate-800 dark:text-white">No properties attached</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">This service is currently not assigned to any property.</p>
+      <AnimatePresence>
+        {showPropertiesDrawer && selectedServiceForProps && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Attached Properties</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Properties using <span className="font-semibold text-slate-900 dark:text-white">{selectedServiceForProps.phone_number}</span>
+                    </p>
+                  </div>
                   <button
-                    onClick={() => {
-                      setShowPropertiesDrawer(false);
-                      handleOpenAssignModal(selectedServiceForProps);
-                    }}
-                    className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5"
+                    onClick={() => setShowPropertiesDrawer(false)}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
-                    <LinkIcon className="w-3.5 h-3.5" /> Assign Property Now
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {(selectedServiceForProps.attached_properties.length > 0
-                    ? selectedServiceForProps.attached_properties
-                    : [{ name: selectedServiceForProps.attached_property_name, organization_name: selectedServiceForProps.attached_organization_name }]
-                  ).map((prop: any, idx: number) => (
-                    <div
-                      key={idx}
-                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
+
+                {selectedServiceForProps.attached_properties.length === 0 && selectedServiceForProps.attached_property_name === 'Unassigned' ? (
+                  <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                    <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
+                    <p className="text-xs font-semibold text-slate-800 dark:text-white">No properties attached</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">This service is currently not assigned to any property.</p>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        setShowPropertiesDrawer(false);
+                        handleOpenAssignModal(selectedServiceForProps);
+                      }}
+                      className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
-                          <Building2 className="w-3.5 h-3.5" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900 dark:text-white">{prop.name}</p>
-                          <p className="text-[11px] text-slate-400">
-                            Organization: <span className="font-medium text-slate-700 dark:text-slate-300">{prop.organization_name || 'Unassigned'}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <Link
-                        href={`/admin/properties`}
-                        className="px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                      <LinkIcon className="w-3.5 h-3.5" /> Assign Property Now
+                    </motion.button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {(selectedServiceForProps.attached_properties.length > 0
+                      ? selectedServiceForProps.attached_properties
+                      : [{ name: selectedServiceForProps.attached_property_name, organization_name: selectedServiceForProps.attached_organization_name }]
+                    ).map((prop: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
                       >
-                        View <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
+                            <Building2 className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 dark:text-white">{prop.name}</p>
+                            <p className="text-[11px] text-slate-400">
+                              Organization: <span className="font-medium text-slate-700 dark:text-slate-300">{prop.organization_name || 'Unassigned'}</span>
+                            </p>
+                          </div>
+                        </div>
 
-            <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
-              <button
-                onClick={() => setShowPropertiesDrawer(false)}
-                className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300"
-              >
-                Close
-              </button>
-            </div>
+                        <Link
+                          href={`/admin/properties`}
+                          className="px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                        >
+                          View <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
+                <button
+                  onClick={() => setShowPropertiesDrawer(false)}
+                  className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#2c2e3c] transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 3. ASSIGN SERVICE TO PROPERTY MODAL */}
       {/* ========================================================================= */}
-      {showAssignModal && selectedServiceForAssign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Service to Property</h3>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedServiceForAssign.phone_number}</p>
-              </div>
-              <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveAssignment} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Select Property & Organization
-                </label>
-                <select
-                  value={selectedOrgPropId}
-                  onChange={(e) => setSelectedOrgPropId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 text-xs"
-                >
-                  <option value="UNASSIGNED">-- Unassigned (No Property) --</option>
-                  {orgPropOptions.map((opt, idx) => (
-                    <option key={idx} value={opt.org_property_id || opt.property_id}>
-                      {opt.property_name} {opt.property_city ? `(${opt.property_city})` : ''} &bull; {opt.organization_name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Associating this service allows the property's PBX routing and DID allocation to activate.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignModal(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={assignLoading}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {assignLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Save Assignment
+      <AnimatePresence>
+        {showAssignModal && selectedServiceForAssign && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Service to Property</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{selectedServiceForAssign.phone_number}</p>
+                </div>
+                <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSaveAssignment} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Select Property & Organization
+                  </label>
+                  <select
+                    value={selectedOrgPropId}
+                    onChange={(e) => setSelectedOrgPropId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs cursor-pointer"
+                  >
+                    <option value="UNASSIGNED">-- Unassigned (No Property) --</option>
+                    {orgPropOptions.map((opt, idx) => (
+                      <option key={idx} value={opt.org_property_id || opt.property_id}>
+                        {opt.property_name} {opt.property_city ? `(${opt.property_city})` : ''} &bull; {opt.organization_name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Associating this service allows the property's PBX routing and DID allocation to activate.
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignModal(false)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={assignLoading}
+                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {assignLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    Save Assignment
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* ========================================================================= */}
       {/* 4. EDIT SERVICE DRAWER */}
       {/* ========================================================================= */}
-      {showEditDrawer && selectedServiceForEdit && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-150">
-            <div>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Service</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{selectedServiceForEdit.phone_number}</p>
+      <AnimatePresence>
+        {showEditDrawer && selectedServiceForEdit && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Service</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{selectedServiceForEdit.phone_number}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowEditDrawer(false)}
+                    className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
+
+                {formError && (
+                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveEdit} id="edit-service-form" className="space-y-3.5 mt-5 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Phone Number / DID *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.phone_number}
+                      onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Service Type
+                    </label>
+                    <select
+                      value={formData.service_type_name}
+                      onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    >
+                      <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
+                      <option value="SIP Trunk">SIP Trunk</option>
+                      <option value="Emergency PRI">Emergency PRI</option>
+                      <option value="Toll-Free DID">Toll-Free DID</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Attached Property Location
+                    </label>
+                    <select
+                      value={formData.org_property_id}
+                      onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    >
+                      <option value="">-- No Property (Unassigned) --</option>
+                      {orgPropOptions.map((opt, idx) => (
+                        <option key={idx} value={opt.org_property_id || opt.property_id}>
+                          {opt.property_name} ({opt.organization_name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Description</label>
+                    <textarea
+                      rows={2}
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="e.g. Front Desk Direct Line"
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                      <option value="SUSPENDED">Suspended</option>
+                    </select>
+                  </div>
+                </form>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
                 <button
+                  type="button"
                   onClick={() => setShowEditDrawer(false)}
-                  className="p-1 rounded text-slate-400 hover:text-slate-600"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
                 >
+                  Cancel
+                </button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  type="submit"
+                  form="edit-service-form"
+                  disabled={formLoading}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                >
+                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Save Changes
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* 5. PROVISION SERVICE MODAL */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Provision New Service</h3>
+                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {formError && (
-                <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveEdit} id="edit-service-form" className="space-y-3.5 mt-5 text-xs">
+              <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Phone Number / DID *
@@ -1306,9 +1519,10 @@ export default function AdminServicesPage() {
                   <input
                     type="text"
                     required
+                    placeholder="+1 (555) 000-0000"
                     value={formData.phone_number}
                     onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                   />
                 </div>
 
@@ -1319,7 +1533,7 @@ export default function AdminServicesPage() {
                   <select
                     value={formData.service_type_name}
                     onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
                   >
                     <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
                     <option value="SIP Trunk">SIP Trunk</option>
@@ -1330,14 +1544,14 @@ export default function AdminServicesPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Attached Property Location
+                    Attach to Property
                   </label>
                   <select
                     value={formData.org_property_id}
                     onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
                   >
-                    <option value="">-- No Property (Unassigned) --</option>
+                    <option value="">-- Leave Unassigned --</option>
                     {orgPropOptions.map((opt, idx) => (
                       <option key={idx} value={opt.org_property_id || opt.property_id}>
                         {opt.property_name} ({opt.organization_name})
@@ -1347,155 +1561,42 @@ export default function AdminServicesPage() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Description</label>
-                  <input
-                    type="text"
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Description / Label
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Reservation Line"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="e.g. Front Desk Direct Line"
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
                   >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                    <option value="SUSPENDED">Suspended</option>
-                  </select>
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    disabled={formLoading}
+                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Provision Line
+                  </motion.button>
                 </div>
               </form>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowEditDrawer(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                form="edit-service-form"
-                disabled={formLoading}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                Save Changes
-              </button>
-            </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 5. PROVISION SERVICE MODAL */}
-      {/* ========================================================================= */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Provision New Service</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Phone Number / DID *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="+1 (555) 000-0000"
-                  value={formData.phone_number}
-                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-mono focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Service Type
-                </label>
-                <select
-                  value={formData.service_type_name}
-                  onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
-                  <option value="SIP Trunk">SIP Trunk</option>
-                  <option value="Emergency PRI">Emergency PRI</option>
-                  <option value="Toll-Free DID">Toll-Free DID</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Attach to Property
-                </label>
-                <select
-                  value={formData.org_property_id}
-                  onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">-- Leave Unassigned --</option>
-                  {orgPropOptions.map((opt, idx) => (
-                    <option key={idx} value={opt.org_property_id || opt.property_id}>
-                      {opt.property_name} ({opt.organization_name})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Description / Label
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Reservation Line"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4f46e5] hover:bg-[#4338ca] text-white flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  Provision Line
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

@@ -185,7 +185,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
         {/* Modal Header */}
         <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-100 dark:border-indigo-900/40">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
               <GitBranch className="w-5 h-5" />
             </div>
             <div>
@@ -217,13 +217,13 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
               }}
               className={`p-3 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
                 mode === 'EXISTING_PROPERTY'
-                  ? 'bg-white dark:bg-[#1f2029] border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
+                  ? 'bg-white dark:bg-[#1f2029] border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
                   : 'bg-white/60 dark:bg-[#181920]/60 border-slate-200 dark:border-[#252733] hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               <div className={`p-2 rounded-lg shrink-0 ${
                 mode === 'EXISTING_PROPERTY'
-                  ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400'
+                  ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
               }`}>
                 <Building className="w-4 h-4" />
@@ -246,13 +246,13 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
               }}
               className={`p-3 rounded-xl border text-left transition flex items-start gap-3 cursor-pointer ${
                 mode === 'NEW_PROPERTY'
-                  ? 'bg-white dark:bg-[#1f2029] border-indigo-500 ring-2 ring-indigo-500/20 shadow-xs'
+                  ? 'bg-white dark:bg-[#1f2029] border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
                   : 'bg-white/60 dark:bg-[#181920]/60 border-slate-200 dark:border-[#252733] hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               <div className={`p-2 rounded-lg shrink-0 ${
                 mode === 'NEW_PROPERTY'
-                  ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400'
+                  ? 'bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
               }`}>
                 <PlusCircle className="w-4 h-4" />
@@ -301,14 +301,14 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                       value={filterQuery}
                       onChange={(e) => setFilterQuery(e.target.value)}
                       placeholder="Type to filter properties by name, city, or address..."
-                      className="w-full text-xs pl-9 pr-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      className="w-full text-xs pl-9 pr-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                   {filterQuery && (
                     <button
                       type="button"
                       onClick={() => setFilterQuery('')}
-                      className="px-2.5 py-2 text-xs rounded-lg border border-slate-200 dark:border-[#252733] hover:bg-slate-50 dark:hover:bg-[#1f2029] text-slate-500"
+                      className="px-2.5 py-2 text-xs rounded-lg border border-slate-200 dark:border-[#252733] hover:bg-slate-50 dark:hover:bg-[#1f2029] text-slate-500 cursor-pointer"
                     >
                       Clear
                     </button>
@@ -324,7 +324,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                       setError(null);
                     }}
                     aria-label="Select property from AAA Database"
-                    className="w-full text-xs px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                    className="w-full text-xs px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="">
                       {isLoadingProps
@@ -344,10 +344,10 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
 
               {/* Selected Property Preview Card */}
               {selectedProperty ? (
-                <div className="p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/80 dark:border-indigo-800/60 space-y-2.5 animate-in fade-in duration-200">
+                <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-800/60 space-y-2.5 animate-in fade-in duration-200">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
                         <Hotel className="w-4 h-4" />
                       </div>
                       <div>
@@ -366,10 +366,10 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/40 text-[11px]">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-blue-100 dark:border-blue-900/40 text-[11px]">
                     <div>
                       <span className="text-slate-400 block text-[10px]">Main Phone:</span>
-                      <span className="font-mono font-medium text-slate-800 dark:text-slate-200">
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
                         {selectedProperty.main_phone || '—'}
                       </span>
                     </div>
@@ -397,7 +397,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     type="date"
                     value={formData.target_date}
                     onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -409,7 +409,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="e.g. 24 DIDs, port from AT&T, analog lines"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -430,7 +430,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. Grand Hyatt Downtown Chicago"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -444,7 +444,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     placeholder="e.g. 151 E Wacker Dr"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -458,7 +458,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     placeholder="e.g. Chicago"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -473,7 +473,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                       placeholder="e.g. IL"
-                      className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                   <div>
@@ -486,7 +486,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                       value={formData.zip_code}
                       onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })}
                       placeholder="e.g. 60601"
-                      className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -500,7 +500,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.main_phone}
                     onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
                     placeholder="e.g. +1 (312) 565-1234"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 font-mono"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -513,7 +513,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.general_manager_name}
                     onChange={(e) => setFormData({ ...formData, general_manager_name: e.target.value })}
                     placeholder="e.g. Mark Roberts"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -526,7 +526,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.contact_person_name}
                     onChange={(e) => setFormData({ ...formData, contact_person_name: e.target.value })}
                     placeholder="e.g. Sarah Jenkins (IT Director)"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -539,7 +539,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     value={formData.contact_person_email}
                     onChange={(e) => setFormData({ ...formData, contact_person_email: e.target.value })}
                     placeholder="e.g. sjenkins@hyatt.com"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
@@ -551,20 +551,20 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
                     type="date"
                     value={formData.target_date}
                     onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                     Project Scope Notes
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="e.g. New property cutover, 12 voice lines"
-                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 resize-none"
                   />
                 </div>
               </div>
@@ -572,13 +572,13 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
           )}
 
           {/* Workflow Note Alert */}
-          <div className="p-3.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40 text-indigo-900 dark:text-indigo-300 flex items-start gap-2.5">
-            <Info className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+          <div className="p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 text-blue-900 dark:text-blue-300 flex items-start gap-2.5">
+            <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
             <div className="space-y-1">
               <span className="font-bold text-[11.5px] block">
                 Next Steps in the Onboarding Roadmap:
               </span>
-              <p className="text-[11px] text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed">
+              <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80 leading-relaxed">
                 Submitting will create the property onboarding at <strong>Stage 1: Draft</strong>. The AAA Data Solutions engineering team will review the property details and prepare your master telecom contract and porting LOA authorization.
               </p>
             </div>
@@ -599,7 +599,7 @@ export const StartOnboardingModal: React.FC<StartOnboardingModalProps> = ({
             type="button"
             onClick={handleSubmit}
             disabled={submitting || (mode === 'EXISTING_PROPERTY' && !selectedPropertyId)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {submitting ? (
               <>

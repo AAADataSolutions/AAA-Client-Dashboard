@@ -125,190 +125,178 @@ export default function AdminOverviewPage() {
   }, []);
 
   return (
-    <div className="space-y-6 pb-12 overflow-hidden">
-      {/* 1. Greeting Header with Spring Fade In */}
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-12 overflow-hidden"
+    >
+      {/* 1. Header (Clean: large icon size=256, no background, no subtitle) */}
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+        variants={itemVariants}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div>
-          <span className="text-[10.5px] uppercase font-bold tracking-widest text-[#f97316] block">
-            TELECOM OPERATIONS MESH
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-0.5">
-            Hello {userName}
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Take a real-time operational overview across all hospitality portfolios and carrier pipelines.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Core Mesh Operational
-          </span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl text-black dark:text-white flex items-center justify-center">
+            <Layers size={256} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Operations Overview
+            </h1>
+          </div>
         </div>
       </motion.div>
 
-      {/* 2. Top KPI Cards Row (6 Cards with Heavy Staggered Viewport Animations) */}
+      {/* 2. Top KPI Cards Row (6 Gradient Variant Cards with Framer Motion Hover Pop) */}
       <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.15 }}
+        variants={itemVariants}
         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5"
       >
-        {/* Card 1: Organizations */}
+        {/* Card 1: Organizations (Variant 1: Deep Blue) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm hover:border-orange-500/40 dark:hover:border-orange-500/40 flex flex-col justify-between space-y-2 cursor-pointer transition-colors group"
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Organizations
             </span>
-            <div className="w-7 h-7 rounded-lg bg-orange-500/10 text-[#f97316] flex items-center justify-center">
-              <Building2 className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <Building2 size={18} />
             </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-[#f97316] transition-colors">
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {stats.orgsCount}
-            </h2>
-            <span className="inline-block text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
-              Active Portfolios
             </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Portfolios</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Active client tenants</p>
         </motion.div>
 
-        {/* Card 2: Properties */}
+        {/* Card 2: Properties (Variant 4: Black) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm hover:border-emerald-500/40 dark:hover:border-emerald-500/40 flex flex-col justify-between space-y-2 cursor-pointer transition-colors group"
+          className="bg-gradient-to-r from-black to-gray-800/60 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Properties
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-              <Hotel className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-purple-100 dark:text-purple-400 flex items-center justify-center">
+              <Hotel size={18} />
             </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {stats.propsCount}
-            </h2>
-            <span className="inline-block text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
-              Managed Assets
             </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Assets</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Hospitality locations</p>
         </motion.div>
 
-        {/* Card 3: Services & Lines */}
+        {/* Card 3: Voice Lines (Variant 2: Deep Red) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm hover:border-sky-500/40 dark:hover:border-sky-500/40 flex flex-col justify-between space-y-2 cursor-pointer transition-colors group"
+          className="bg-gradient-to-r from-red-900 to-red-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Voice Lines
             </span>
-            <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center">
-              <PhoneCall className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-emerald-100 dark:text-emerald-400 flex items-center justify-center">
+              <PhoneCall size={18} />
             </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-sky-500 transition-colors">
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-emerald-100 dark:text-emerald-400">
               {stats.servicesCount}
-            </h2>
-            <span className="inline-block text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800/40">
-              Active DIDs
             </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">DIDs</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Provisioned trunks</p>
         </motion.div>
 
-        {/* Card 4: Active Onboardings */}
+        {/* Card 4: Active Onboardings (Variant 3: Bright Yellow) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm hover:border-orange-500/40 dark:hover:border-orange-500/40 flex flex-col justify-between space-y-2 cursor-pointer transition-colors group"
+          className="bg-gradient-to-r from-yellow-500 to-yellow-400 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900 dark:text-slate-400">
               Onboardings
             </span>
-            <div className="w-7 h-7 rounded-lg bg-orange-500/10 text-[#f97316] flex items-center justify-center">
-              <Send className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-amber-900 dark:text-amber-400 flex items-center justify-center">
+              <Send size={18} />
             </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-[#f97316] transition-colors">
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-amber-900 dark:text-amber-400">
               {stats.onboardingsCount}
-            </h2>
-            <span className="inline-block text-[10.5px] font-semibold text-[#ea580c] dark:text-[#f97316] bg-orange-50 dark:bg-orange-950/40 px-1.5 py-0.2 rounded border border-orange-200 dark:border-orange-800/40">
-              Active In Progress
             </span>
+            <span className="text-xs text-slate-900 ml-1.5 font-medium">In Flight</span>
           </div>
+          <p className="text-[11px] text-slate-900 mt-2">Active setup stages</p>
         </motion.div>
 
-        {/* Card 5: Active Porting */}
+        {/* Card 5: Porting Active (Variant 1: Deep Blue) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm hover:border-purple-500/40 dark:hover:border-purple-500/40 flex flex-col justify-between space-y-2 cursor-pointer transition-colors group"
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Porting Active
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
-              <GitBranch className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <GitBranch size={18} />
             </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-purple-400 transition-colors">
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {stats.portingCount}
-            </h2>
-            <span className="inline-block text-[10.5px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-800/40">
-              Carrier Orders
             </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Orders</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">Carrier trunk cuts</p>
         </motion.div>
 
-        {/* Card 6: Open Tickets */}
+        {/* Card 6: Open Tickets (Variant 5: Deep Green) */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm hover:border-rose-500/40 dark:hover:border-rose-500/40 flex flex-col justify-between space-y-2 cursor-pointer transition-colors group"
+          className="bg-gradient-to-r from-green-900 to-green-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10.5px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
               Open Tickets
             </span>
-            <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
-              <LifeBuoy className="w-3.5 h-3.5" />
+            <div className="w-7 h-7 rounded-lg text-slate-100 dark:text-emerald-400 flex items-center justify-center">
+              <LifeBuoy size={18} />
             </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-rose-500 transition-colors">
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {stats.ticketsCount}
-            </h2>
-            <span className="inline-block text-[10.5px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.2 rounded border border-rose-200 dark:border-rose-800/40">
-              {stats.urgentTicketsCount > 0 ? `${stats.urgentTicketsCount} Urgent` : 'All Normal Priority'}
             </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Issues</span>
           </div>
+          <p className="text-[11px] text-slate-100 mt-2">
+            {stats.urgentTicketsCount > 0 ? `${stats.urgentTicketsCount} Urgent tickets` : 'Queue normal'}
+          </p>
         </motion.div>
       </motion.div>
 
@@ -904,7 +892,7 @@ export default function AdminOverviewPage() {
                   points="0,35 30,30 60,22 90,18 120,25 150,15 180,10 200,8"
                 />
               </svg>
-              <div className="flex justify-between text-[9px] text-slate-400 px-0.5 font-mono">
+              <div className="flex justify-between text-[9px] text-slate-400 px-0.5">
                 <span>Mon</span>
                 <span>Tue</span>
                 <span>Wed</span>
@@ -1176,7 +1164,7 @@ export default function AdminOverviewPage() {
                 <div className="space-y-0.5">
                   <p className="font-semibold text-slate-900 dark:text-white">Onboarding milestone reached</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">Courtyard Richmond moved to Live Cutover stage.</p>
-                  <span className="text-[10px] text-slate-400 font-mono">12 min ago</span>
+                  <span className="text-[10px] text-slate-400">12 min ago</span>
                 </div>
               </motion.div>
 
@@ -1191,7 +1179,7 @@ export default function AdminOverviewPage() {
                 <div className="space-y-0.5">
                   <p className="font-semibold text-slate-900 dark:text-white">New property provisioned</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">Residence Inn Austin configured with 24 DIDs.</p>
-                  <span className="text-[10px] text-slate-400 font-mono">35 min ago</span>
+                  <span className="text-[10px] text-slate-400">35 min ago</span>
                 </div>
               </motion.div>
 
@@ -1206,20 +1194,20 @@ export default function AdminOverviewPage() {
                 <div className="space-y-0.5">
                   <p className="font-semibold text-slate-900 dark:text-white">E911 status verified</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">Westin Seattle certified for PSAP emergency dispatch.</p>
-                  <span className="text-[10px] text-slate-400 font-mono">1 hour ago</span>
+                  <span className="text-[10px] text-slate-400">1 hour ago</span>
                 </div>
               </motion.div>
             </div>
           </div>
 
           <div className="pt-2 border-t border-slate-100 dark:border-[#222430]">
-            <Link href="/admin/audit-logs" className="text-[11.5px] font-semibold text-[#f97316] hover:underline inline-flex items-center gap-1">
+            <Link href="/admin/audit-logs" className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer">
               <span>View system audit log</span>
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </motion.div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

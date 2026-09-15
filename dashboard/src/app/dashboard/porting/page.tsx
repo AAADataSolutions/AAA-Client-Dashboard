@@ -23,12 +23,36 @@ import {
   AlertTriangle,
   GitBranch,
 } from 'lucide-react';
+import { motion, type Variants } from 'framer-motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useToast } from '@/components/client/ClientToast';
 import { CreatePortingModal } from '@/components/client/CreatePortingModal';
 import { PortingDetailDrawer } from '@/components/client/PortingDetailDrawer';
 import { CreateTicketModal } from '@/components/client/CreateTicketModal';
 import { PropertyDetailDrawer } from '@/components/client/PropertyDetailDrawer';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
 
 interface PortingRecordItem {
   id: string;
@@ -86,9 +110,10 @@ export default function ClientPortingPage() {
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // 3-Dots Fixed Action Menu
+  // 3-Dots Fixed Action Menu with upside detection
   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     record: PortingRecordItem;
   } | null>(null);
@@ -136,8 +161,20 @@ export default function ClientPortingPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 230;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, record });
+    const isNearBottom = rect.bottom + 230 > window.innerHeight;
+    if (isNearBottom) {
+      setMenuPosition({
+        bottom: window.innerHeight - rect.top + 6,
+        left,
+        record,
+      });
+    } else {
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left,
+        record,
+      });
+    }
   };
 
   const handleCopyNumbers = (record: PortingRecordItem, e?: React.MouseEvent) => {
@@ -180,139 +217,150 @@ export default function ClientPortingPage() {
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-12 font-sans"
+    >
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/40">
-              <ArrowLeftRight className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Number Porting Tracker
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Carrier phone number migrations, LOA submissions, and scheduled FOC cutover dates for {orgName}.
-              </p>
-            </div>
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <ArrowLeftRight size={256} className="w-full h-full object-contain" />
           </div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Number Porting Tracker
+          </h1>
         </div>
 
         <div className="flex items-center gap-2.5">
           {isClientAdmin && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setShowPortingModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Start Porting Request</span>
-            </button>
+            </motion.button>
           )}
         </div>
-      </div>
+      </motion.div>
 
-      {/* 2. KPI Cards (5 Cards as specified in Task.md) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {/* 2. KPI Cards (5 Cards) - ALL VARIANT 1 ONLY */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Card 1: Total Porting Requests */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Total Porting Requests
             </span>
-            <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-              <ArrowLeftRight className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <ArrowLeftRight className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl font-bold text-white">
               {metrics.total}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Orders</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Orders</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">All carrier migration orders</p>
-        </div>
+          <p className="text-[11px] text-slate-200 mt-2">All carrier migration orders</p>
+        </motion.div>
 
         {/* Card 2: In Progress */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               In Progress
             </span>
-            <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Clock className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <Clock className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`text-2xl font-bold ${metrics.inProgress > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
+            <span className="text-2xl font-bold text-white">
               {metrics.inProgress}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Under Review</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Under Review</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Carrier validation in flight</p>
-        </div>
+          <p className="text-[11px] text-slate-200 mt-2">Carrier validation in flight</p>
+        </motion.div>
 
         {/* Card 3: FOC Received */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               FOC Received
             </span>
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <Calendar className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`text-2xl font-bold ${metrics.focReceived > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
+            <span className="text-2xl font-bold text-white">
               {metrics.focReceived}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Cutover Date</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Cutover Date</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Firm cutover date confirmed</p>
-        </div>
+          <p className="text-[11px] text-slate-200 mt-2">Firm cutover date confirmed</p>
+        </motion.div>
 
         {/* Card 4: Completed */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Completed
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xl font-bold text-white">
               {metrics.completed}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Ported Live</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Ported Live</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Successfully cut over &amp; active</p>
-        </div>
+          <p className="text-[11px] text-slate-200 mt-2">Successfully cut over &amp; active</p>
+        </motion.div>
 
         {/* Card 5: Action Required */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Action Required
             </span>
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              metrics.actionRequired > 0
-                ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
-            }`}>
-              <AlertCircle className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <AlertCircle className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`text-2xl font-bold ${metrics.actionRequired > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+            <span className="text-2xl font-bold text-white">
               {metrics.actionRequired}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Issues / Rejected</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Issues / Rejected</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Rejected, cancelled, or pending LOA</p>
-        </div>
-      </div>
+          <p className="text-[11px] text-slate-200 mt-2">Rejected, cancelled, or pending LOA</p>
+        </motion.div>
+      </motion.div>
 
       {/* 3. Search & Filters Bar */}
       <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col lg:flex-row items-center justify-between gap-3">
@@ -328,7 +376,7 @@ export default function ClientPortingPage() {
                 setCurrentPage(1);
               }}
               placeholder="Search by phone number, property name, or notes..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500 transition"
+              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition"
             />
             {searchQuery && (
               <button
@@ -348,7 +396,7 @@ export default function ClientPortingPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter porting by property location"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-purple-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Properties</option>
             {propertyFilterOptions.map((prop) => (
@@ -366,7 +414,7 @@ export default function ClientPortingPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter porting by order status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-purple-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="IN_PROGRESS_ALL">In Progress / Processing</option>
@@ -389,14 +437,14 @@ export default function ClientPortingPage() {
               setPropertyFilter('ALL');
               setCurrentPage(1);
             }}
-            className="text-xs text-purple-600 dark:text-purple-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
           >
             Reset Filters
           </button>
         )}
       </div>
 
-      {/* 4. Porting Table — Separate Columns as specified in Task.md */}
+      {/* 4. Porting Table */}
       {loading ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 space-y-4 shadow-xs animate-pulse">
           <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/4" />
@@ -421,7 +469,7 @@ export default function ClientPortingPage() {
         </div>
       ) : portings.length === 0 ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/50 text-purple-500 flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mx-auto mb-3">
             <ArrowLeftRight className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -435,7 +483,7 @@ export default function ClientPortingPage() {
           {isClientAdmin && !hasActiveFilters && (
             <button
               onClick={() => setShowPortingModal(true)}
-              className="mt-4 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              className="mt-4 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Start Porting Request
             </button>
@@ -447,25 +495,25 @@ export default function ClientPortingPage() {
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Property
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Numbers
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Current Status
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Target / FOC Date
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Created
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Last Updated
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     Action
                   </th>
                 </tr>
@@ -478,16 +526,16 @@ export default function ClientPortingPage() {
                     className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
                   >
                     {/* Column 1: Property */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/40">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
                           <Hotel className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {item.property_name}
                           </span>
-                          <span className="block text-[10.5px] text-slate-400 truncate max-w-[160px]">
+                          <span className="block text-[10.5px] text-slate-400">
                             {item.property_location}
                           </span>
                         </div>
@@ -495,10 +543,10 @@ export default function ClientPortingPage() {
                     </td>
 
                     {/* Column 2: Numbers */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200/60">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60">
                             <Phone className="w-3 h-3" />
                             <span>{item.services_count || item.services?.length || 0} Line(s)</span>
                           </span>
@@ -517,7 +565,7 @@ export default function ClientPortingPage() {
                           )}
                         </div>
                         {item.services?.length > 0 && (
-                          <span className="font-mono text-[10.5px] text-slate-400 block truncate max-w-[160px]">
+                          <span className="text-[10.5px] text-slate-400 block">
                             {item.services.map((s) => s.phone_number).join(', ')}
                           </span>
                         )}
@@ -525,13 +573,13 @@ export default function ClientPortingPage() {
                     </td>
 
                     {/* Column 3: Current Status */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                           item.status === 'COMPLETED'
                             ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
                             : item.status === 'FOC_RECEIVED'
-                            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60'
+                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60'
                             : item.status === 'REJECTED' || item.status === 'CANCELLED'
                             ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
                             : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
@@ -542,7 +590,7 @@ export default function ClientPortingPage() {
                             item.status === 'COMPLETED'
                               ? 'bg-emerald-500'
                               : item.status === 'FOC_RECEIVED'
-                              ? 'bg-indigo-500'
+                              ? 'bg-blue-500'
                               : item.status === 'REJECTED' || item.status === 'CANCELLED'
                               ? 'bg-rose-500'
                               : 'bg-amber-500'
@@ -553,8 +601,8 @@ export default function ClientPortingPage() {
                     </td>
 
                     {/* Column 4: Target / FOC Date */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 font-mono text-xs">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 text-xs">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span className="font-semibold text-slate-800 dark:text-slate-200">
                           {item.target_date ? (
@@ -564,14 +612,14 @@ export default function ClientPortingPage() {
                               year: 'numeric',
                             })
                           ) : (
-                            <span className="text-slate-400 font-sans font-normal">Pending FOC</span>
+                            <span className="text-slate-400 font-normal">Pending FOC</span>
                           )}
                         </span>
                       </div>
                     </td>
 
                     {/* Column 5: Created */}
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] font-mono">
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
                       {new Date(item.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -579,7 +627,7 @@ export default function ClientPortingPage() {
                     </td>
 
                     {/* Column 6: Last Updated */}
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] font-mono">
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
                       {new Date(item.updated_at || item.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -587,11 +635,11 @@ export default function ClientPortingPage() {
                     </td>
 
                     {/* Column 7: Action */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setSelectedPortingForDrawer(item)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-purple-50 dark:hover:bg-purple-950/50 text-slate-700 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400 text-xs font-semibold transition cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
@@ -658,7 +706,8 @@ export default function ClientPortingPage() {
           <div
             style={{
               position: 'fixed',
-              top: `${menuPosition.top}px`,
+              ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
+              ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
               left: `${menuPosition.left}px`,
             }}
             className="z-50 w-56 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
@@ -679,7 +728,7 @@ export default function ClientPortingPage() {
               }}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
-              <Eye className="w-3.5 h-3.5 text-purple-500" />
+              <Eye className="w-3.5 h-3.5 text-blue-500" />
               <span>View Porting Timeline</span>
             </button>
 
@@ -691,7 +740,7 @@ export default function ClientPortingPage() {
               }}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
-              <Copy className="w-3.5 h-3.5 text-indigo-500" />
+              <Copy className="w-3.5 h-3.5 text-blue-500" />
               <span>Copy Attached Numbers</span>
             </button>
 
@@ -700,7 +749,7 @@ export default function ClientPortingPage() {
                 onClick={() => handleOpenProperty(menuPosition.record.property_id!)}
                 className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
               >
-                <Hotel className="w-3.5 h-3.5 text-indigo-500" />
+                <Hotel className="w-3.5 h-3.5 text-blue-500" />
                 <span>View Property 360°</span>
               </button>
             )}
@@ -709,9 +758,9 @@ export default function ClientPortingPage() {
 
             <button
               onClick={() => handleRaisePortingTicket(menuPosition.record)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-2 transition cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2 transition cursor-pointer"
             >
-              <LifeBuoy className="w-3.5 h-3.5 text-indigo-500" />
+              <LifeBuoy className="w-3.5 h-3.5 text-blue-500" />
               <span>Raise Porting Support Ticket</span>
             </button>
           </div>
@@ -766,6 +815,6 @@ export default function ClientPortingPage() {
           onSuccess={fetchPortings}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

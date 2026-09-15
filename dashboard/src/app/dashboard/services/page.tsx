@@ -30,6 +30,24 @@ import { useToast } from '@/components/client/ClientToast';
 import { CreateTicketModal } from '@/components/client/CreateTicketModal';
 import { PropertyDetailDrawer } from '@/components/client/PropertyDetailDrawer';
 import Link from 'next/link';
+import { motion, type Variants } from 'framer-motion';
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 }
+  }
+};
 
 interface ServiceItem {
   id: string;
@@ -87,7 +105,8 @@ export default function ClientServicesPage() {
 
   // 3-Dots Fixed Action Menu
   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     record: ServiceItem;
   } | null>(null);
@@ -148,8 +167,12 @@ export default function ClientServicesPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 230;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, record });
+    const isNearBottom = rect.bottom + 230 > window.innerHeight;
+    if (isNearBottom) {
+      setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, record });
+    } else {
+      setMenuPosition({ top: rect.bottom + 4, left, record });
+    }
   };
 
   const handleOpenTicketModalForService = (service: ServiceItem) => {
@@ -178,131 +201,137 @@ export default function ClientServicesPage() {
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
   return (
-    <div className="space-y-6 pb-12 font-sans">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6 pb-12 font-sans"
+    >
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
-              <PhoneCall className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Services &amp; Lines Inventory
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Telecom inventory, provisioned voice numbers, SIP trunks, and carrier routing across {orgName} locations.
-              </p>
-            </div>
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
+            <PhoneCall size={256} className="w-full h-full object-contain" />
           </div>
+          <h1 className="text-xl font-bold tracking-tight text-black dark:text-white">
+            Services &amp; Lines Inventory
+          </h1>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               setTicketPropId(null);
               setShowTicketModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Raise Line Ticket</span>
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* 2. KPI Cards (4 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 2. KPI Cards (4 Cards) - ALL VARIANT 1 ONLY */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Services */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Total Services
             </span>
-            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Radio className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <Radio className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl font-bold text-white">
               {metrics.totalServices}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Telecom Lines</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Telecom Lines</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Total active &amp; provisioning services
+          <p className="text-[11px] text-slate-200 mt-2">
+            Active &amp; provisioning services
           </p>
-        </div>
+        </motion.div>
 
         {/* Card 2: Active Services */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Active Services
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <ShieldCheck className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xl font-bold text-white">
               {metrics.activeServices}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Live In Service</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Live In Service</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            Fully operational voice &amp; trunk circuits
+          <p className="text-[11px] text-slate-200 mt-2">
+            Operational voice &amp; trunk circuits
           </p>
-        </div>
+        </motion.div>
 
         {/* Card 3: Pending / Porting */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Pending / Porting
             </span>
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              metrics.pendingPortingServices > 0
-                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400'
-            }`}>
-              <GitBranch className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <GitBranch className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`text-2xl font-bold ${
-              metrics.pendingPortingServices > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'
-            }`}>
+            <span className="text-2xl font-bold text-white">
               {metrics.pendingPortingServices}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Transfer In Flight</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Transfer In Flight</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">
+          <p className="text-[11px] text-slate-200 mt-2">
             Numbers undergoing carrier cutover
           </p>
-        </div>
+        </motion.div>
 
         {/* Card 4: Disconnected */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between">
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
               Disconnected
             </span>
-            <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
-              <Layers className="w-3.5 h-3.5" />
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <Layers className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-700 dark:text-slate-300">
+            <span className="text-2xl font-bold text-white">
               {metrics.disconnectedServices}
             </span>
-            <span className="text-xs text-slate-400 ml-1.5 font-medium">Decommissioned</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Decommissioned</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">
+          <p className="text-[11px] text-slate-200 mt-2">
             Inactive or retired telecom lines
           </p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* 3. Search & Filters Bar */}
       <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col lg:flex-row items-center justify-between gap-3">
@@ -318,7 +347,7 @@ export default function ClientServicesPage() {
                 setCurrentPage(1);
               }}
               placeholder="Search by phone number, property, or description..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 transition"
+              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition"
             />
             {searchQuery && (
               <button
@@ -338,7 +367,7 @@ export default function ClientServicesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter services by property location"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Properties</option>
             {propertyFilterOptions.map((prop) => (
@@ -356,7 +385,7 @@ export default function ClientServicesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter services by telecom type"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Service Types</option>
             {typeFilterOptions.map((t) => (
@@ -374,7 +403,7 @@ export default function ClientServicesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter services by operational status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -393,7 +422,7 @@ export default function ClientServicesPage() {
               setPropertyFilter('ALL');
               setCurrentPage(1);
             }}
-            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
           >
             Reset Filters
           </button>
@@ -443,25 +472,25 @@ export default function ClientServicesPage() {
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Property
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Service Type
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Phone Number
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Status
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Description
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     Last Updated
                   </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     Action
                   </th>
                 </tr>
@@ -474,13 +503,13 @@ export default function ClientServicesPage() {
                     className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
                   >
                     {/* Column 1: Property */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
                           <Hotel className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                             {item.property_name}
                           </span>
                           <span className="block text-[10.5px] text-slate-400 truncate max-w-[160px]">
@@ -491,17 +520,17 @@ export default function ClientServicesPage() {
                     </td>
 
                     {/* Column 2: Service Type */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        <Radio className="w-3 h-3 text-indigo-500" />
+                        <Radio className="w-3 h-3 text-blue-500" />
                         <span>{item.service_type}</span>
                       </span>
                     </td>
 
                     {/* Column 3: Phone Number */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       {item.phone_number ? (
-                        <div className="flex items-center gap-1.5 font-mono">
+                        <div className="flex items-center gap-1.5">
                           <span className="font-semibold text-slate-900 dark:text-white">
                             {item.phone_number}
                           </span>
@@ -523,7 +552,7 @@ export default function ClientServicesPage() {
                     </td>
 
                     {/* Column 4: Status */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                           item.status === 'ACTIVE'
@@ -547,14 +576,14 @@ export default function ClientServicesPage() {
                     </td>
 
                     {/* Column 5: Description */}
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
+                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                       <span className="block max-w-[200px] truncate" title={item.description}>
                         {item.description || 'Standard Voice Line'}
                       </span>
                     </td>
 
                     {/* Column 6: Last Updated */}
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px]">
+                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
                       {new Date(item.updated_at || item.created_at).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -562,11 +591,11 @@ export default function ClientServicesPage() {
                     </td>
 
                     {/* Column 7: Action */}
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setSelectedServiceForDrawer(item)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-semibold transition cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
@@ -633,7 +662,8 @@ export default function ClientServicesPage() {
           <div
             style={{
               position: 'fixed',
-              top: `${menuPosition.top}px`,
+              ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
+              ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
               left: `${menuPosition.left}px`,
             }}
             className="z-50 w-56 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
@@ -642,7 +672,7 @@ export default function ClientServicesPage() {
               <span className="text-[10.5px] uppercase font-bold text-slate-400 block tracking-wider">
                 Service Line
               </span>
-              <span className="font-mono font-semibold text-slate-900 dark:text-white truncate block">
+              <span className="font-semibold text-slate-900 dark:text-white truncate block">
                 {menuPosition.record.phone_number}
               </span>
             </div>
@@ -662,7 +692,7 @@ export default function ClientServicesPage() {
               onClick={() => handleOpenPropertyForService(menuPosition.record)}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
-              <Hotel className="w-3.5 h-3.5 text-indigo-500" />
+              <Hotel className="w-3.5 h-3.5 text-blue-500" />
               <span>View Property ({menuPosition.record.property_name})</span>
             </button>
 
@@ -688,9 +718,9 @@ export default function ClientServicesPage() {
 
             <button
               onClick={() => handleOpenTicketModalForService(menuPosition.record)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-2 transition cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2 transition cursor-pointer"
             >
-              <LifeBuoy className="w-3.5 h-3.5 text-indigo-500" />
+              <LifeBuoy className="w-3.5 h-3.5 text-blue-500" />
               <span>Raise Support Ticket</span>
             </button>
           </div>
@@ -713,7 +743,7 @@ export default function ClientServicesPage() {
                   <PhoneCall className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     {selectedServiceForDrawer.phone_number}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -769,7 +799,7 @@ export default function ClientServicesPage() {
                     </span>
                     <button
                       onClick={() => handleOpenPropertyForService(selectedServiceForDrawer)}
-                      className="text-indigo-600 dark:text-indigo-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <span>View 360°</span>
                       <ArrowUpRight className="w-3 h-3" />
@@ -789,7 +819,7 @@ export default function ClientServicesPage() {
                 <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">Phone Number:</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">
+                    <span className="font-bold text-slate-900 dark:text-white">
                       {selectedServiceForDrawer.phone_number}
                     </span>
                   </div>
@@ -830,7 +860,7 @@ export default function ClientServicesPage() {
                   </p>
                   <Link
                     href="/dashboard/porting"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline pt-1"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline pt-1 cursor-pointer"
                   >
                     <span>Track Porting Progress</span>
                     <ArrowUpRight className="w-3 h-3" />
@@ -843,7 +873,7 @@ export default function ClientServicesPage() {
             <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-between shrink-0">
               <button
                 onClick={() => handleOpenTicketModalForService(selectedServiceForDrawer)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
               >
                 <LifeBuoy className="w-3.5 h-3.5" />
                 <span>Raise Line Ticket</span>
@@ -887,6 +917,6 @@ export default function ClientServicesPage() {
           onSuccess={() => fetchServices()}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

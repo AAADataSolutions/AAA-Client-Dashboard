@@ -12,7 +12,7 @@ export default function ClientDashboardLayout({ children }: { children: React.Re
   return (
     <AuthProvider>
       <ToastProvider>
-        <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#0d0e12] text-[#181c22] dark:text-[#f4f4f6] flex flex-col font-sans transition-colors duration-200">
+        <div className="client-scope min-h-screen bg-[#f8f9fa] dark:bg-[#0d0e12] text-[#181c22] dark:text-[#f4f4f6] flex flex-col font-sans transition-colors duration-200">
           {/* Client Navigation Sidebar */}
           <ClientSidebar
             isOpen={isSidebarOpen}

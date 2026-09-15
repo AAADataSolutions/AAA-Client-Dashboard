@@ -65,13 +65,13 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search properties, voice lines, DIDs, or tickets..."
-            className="w-full bg-[#f8f9fa] dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] focus:border-indigo-500 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-9 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
+            className="w-full bg-[#f8f9fa] dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] focus:border-blue-600 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-9 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -84,7 +84,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
         {/* Theme Switcher Toggle (Sun / Moon) */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg text-slate-500 dark:text-amber-400 hover:text-slate-900 dark:hover:text-amber-300 hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+          className="p-2 rounded-lg text-slate-500 dark:text-amber-400 hover:text-slate-900 dark:hover:text-amber-300 hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
           aria-label="Toggle color theme"
         >
@@ -97,7 +97,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
 
         {/* Sync / Refresh */}
         <button
-          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
           title="Refresh Operations"
           onClick={() => window.location.reload()}
         >
@@ -108,7 +108,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+            className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
             title="Operational Alerts"
             aria-label="Open notifications"
           >
@@ -128,7 +128,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                   <span className="font-semibold text-xs text-slate-900 dark:text-slate-100">
                     Operational Alerts
                   </span>
-                  <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600">
+                  <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -145,7 +145,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                     </div>
                   </div>
                   <div className="p-2.5 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200/80 dark:border-[#252733] flex items-start gap-2">
-                    <LifeBuoy className="w-3.5 h-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                    <LifeBuoy className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
                     <div>
                       <strong className="text-slate-900 dark:text-slate-200 block font-semibold">
                         Support Desk Live
@@ -160,7 +160,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                   <Link
                     href="/dashboard/tickets"
                     onClick={() => setShowNotifications(false)}
-                    className="text-[11.5px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline inline-block"
+                    className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-block cursor-pointer"
                   >
                     View support portal &rarr;
                   </Link>
@@ -174,10 +174,10 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-[#232530] text-left hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-[#232530] text-left hover:opacity-90 transition-opacity cursor-pointer"
             aria-label="User menu"
           >
-            <div className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200/60 dark:border-indigo-900/40">
+            <div className="w-7 h-7 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 font-bold text-xs flex items-center justify-center border border-blue-200/60 dark:border-blue-900/40">
               {initial}
             </div>
             <div className="hidden sm:block text-left">
@@ -203,9 +203,9 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                 <Link
                   href="/dashboard/account"
                   onClick={() => setShowUserMenu(false)}
-                  className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
                 >
-                  <User className="w-3.5 h-3.5 text-indigo-500" /> Account &amp; Team
+                  <User className="w-3.5 h-3.5 text-blue-500" /> Account &amp; Team
                 </Link>
 
                 <div className="border-t border-slate-100 dark:border-[#222430] my-0.5"></div>

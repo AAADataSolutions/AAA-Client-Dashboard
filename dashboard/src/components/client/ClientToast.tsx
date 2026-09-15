@@ -57,18 +57,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   ? 'bg-white/95 dark:bg-[#15161c]/95 border-emerald-500/40 text-slate-800 dark:text-slate-100 shadow-emerald-500/10'
                   : isError
                   ? 'bg-white/95 dark:bg-[#15161c]/95 border-rose-500/40 text-slate-800 dark:text-slate-100 shadow-rose-500/10'
-                  : 'bg-white/95 dark:bg-[#15161c]/95 border-indigo-500/40 text-slate-800 dark:text-slate-100 shadow-indigo-500/10'
+                  : 'bg-white/95 dark:bg-[#15161c]/95 border-blue-500/40 text-slate-800 dark:text-slate-100 shadow-blue-500/10'
               }`}
             >
               <div className="shrink-0 mt-0.5">
                 {isSuccess && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 {isError && <AlertCircle className="w-4 h-4 text-rose-500" />}
-                {!isSuccess && !isError && <Info className="w-4 h-4 text-indigo-500" />}
+                {!isSuccess && !isError && <Info className="w-4 h-4 text-blue-500" />}
               </div>
               <div className="flex-1 text-xs font-medium leading-relaxed">{toast.message}</div>
               <button
                 onClick={() => removeToast(toast.id)}
-                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded transition-colors"
+                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
                 aria-label="Close notification"
               >
                 <X className="w-3.5 h-3.5" />
