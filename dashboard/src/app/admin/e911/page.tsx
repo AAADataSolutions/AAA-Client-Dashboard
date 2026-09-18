@@ -28,18 +28,26 @@ import {
   MapPin,
   Send,
   Hotel,
-  BadgeCheck,
+  Eye,
+  MessageSquare,
 } from 'lucide-react';
-import Link from 'next/link';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  fetchE911Records,
+  setSearchQuery,
+  setStatusFilter,
+  setComplianceFilter,
+  setSortBy,
+  setPagination,
+  optimisticUpdateE911Status,
+  E911Item,
+} from '@/store/slices/e911Slice';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
+    transition: { staggerChildren: 0.08 },
   },
 };
 
@@ -48,66 +56,11 @@ const itemVariants: Variants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1.0] as any },
+    transition: { type: 'spring', stiffness: 300, damping: 24 },
   },
 };
 
 export type E911Status = 'VERIFIED' | 'PENDING' | 'CORRECTION_REQUIRED' | 'FAILED';
-
-interface PropertyDetails {
-  id?: string;
-  name: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  main_phone?: string;
-  contact_person_name?: string;
-  contact_person_email?: string;
-  general_manager_name?: string;
-}
-
-interface OrganizationDetails {
-  id?: string;
-  name: string;
-  primary_email?: string;
-  primary_phone?: string;
-}
-
-interface E911Record {
-  id: string;
-  emergency_address: string;
-  psap_id: string;
-  status: E911Status;
-  correction_notes: string | null;
-  verified_at: string | null;
-  ray_baum_compliant: boolean;
-  karis_law_direct_dial: boolean;
-  created_at: string;
-  updated_at?: string;
-  property_id?: string;
-  property_name: string;
-  organization_id?: string;
-  organization_name: string;
-  property_details?: PropertyDetails | null;
-  organization_details?: OrganizationDetails | null;
-}
-
-interface OrgPropertyOption {
-  org_property_id: string;
-  property_id: string;
-  property_name: string;
-  organization_id: string;
-  organization_name: string;
-  address?: string;
-}
-
-interface Toast {
-  id: string;
-  title: string;
-  message?: string;
-  type: 'success' | 'error' | 'info';
-}
 
 function getStatusBadge(status: E911Status): { label: string; bg: string; text: string; border: string } {
   switch (status) {
@@ -149,41 +102,52 @@ function getStatusBadge(status: E911Status): { label: string; bg: string; text: 
   }
 }
 
+interface PropertyOption {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  org_property_id?: string;
+  organization_name?: string;
+}
+
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
+}
+
 export default function AdminE911Page() {
-  const [records, setRecords] = useState<E911Record[]>([]);
-  const [orgPropOptions, setOrgPropOptions] = useState<OrgPropertyOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    items: records,
+    loading,
+    error,
+    pagination,
+    metrics,
+    filters,
+  } = useAppSelector((state) => state.e911);
 
-  // Server-Side Pagination (10 per page)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const itemsPerPage = 10;
+  const [propertyList, setPropertyList] = useState<PropertyOption[]>([]);
+  const [searchInput, setSearchInput] = useState(filters.searchQuery);
 
-  // Real Database Metrics (No fake data)
-  const [metrics, setMetrics] = useState({
-    totalRecordsCount: 0,
-    verifiedCount: 0,
-    correctionRequiredCount: 0,
-    pendingOrFailedCount: 0,
-  });
+  // Modals & Drawers
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<E911Item | null>(null);
 
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
-  const [selectedComplianceFilter, setSelectedComplianceFilter] = useState('ALL');
-  const [sortBy, setSortBy] = useState('NEWEST');
+  // Unified Details & Notes Modal
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedRecordForDetails, setSelectedRecordForDetails] = useState<E911Item | null>(null);
+  const [modalActiveTab, setModalActiveTab] = useState<'DETAILS' | 'NOTES'>('DETAILS');
+  const [newCorrectionNote, setNewCorrectionNote] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
 
-  // Debounce search (300ms)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
+  // 3-Dots Action Menu Position
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: E911Item } | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -195,308 +159,292 @@ export default function AdminE911Page() {
     }, 4000);
   }, []);
 
-  // Fixed 3-Dots Action Menu Overlay
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: E911Record } | null>(null);
-
-  // Drawers & Modals State
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditDrawer, setShowEditDrawer] = useState(false);
-  const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<E911Record | null>(null);
-
-  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
-  const [selectedRecordForDetails, setSelectedRecordForDetails] = useState<E911Record | null>(null);
-
-  const [showNotesModal, setShowNotesModal] = useState(false);
-  const [selectedRecordForNotes, setSelectedRecordForNotes] = useState<E911Record | null>(null);
-  const [correctionNoteInput, setCorrectionNoteInput] = useState('');
-  const [noteLoading, setNoteLoading] = useState(false);
-
-  // Form State for Create / Edit
-  const [formData, setFormData] = useState({
-    org_property_id: '',
+  // Form State for Add / Edit
+  const [createForm, setCreateForm] = useState({
+    property_id: '',
     emergency_address: '',
-    psap_id: '',
     status: 'PENDING' as E911Status,
-    correction_notes: '',
   });
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  // Load Org-Property Options
-  const loadOrgPropertyOptions = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/properties?limit=100');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        const options: OrgPropertyOption[] = [];
-        data.data.forEach((p: any) => {
-          const links = Array.isArray(p.org_links) ? p.org_links : (p.org_links ? [p.org_links] : []);
-          links.forEach((l: any) => {
-            if (l && l.organization) {
-              options.push({
-                org_property_id: l.id,
-                property_id: p.id,
-                property_name: p.name,
-                organization_id: l.organization.id,
-                organization_name: l.organization.name,
-                address: p.address ? `${p.address}, ${p.city || ''} ${p.state || ''}` : '',
-              });
-            }
+  const [editForm, setEditForm] = useState({
+    emergency_address: '',
+    status: 'PENDING' as E911Status,
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Load all properties for the Add modal dropdown
+  useEffect(() => {
+    async function loadProperties() {
+      try {
+        const res = await fetch('/api/admin/properties?limit=100');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          const props: PropertyOption[] = data.data.map((p: any) => {
+            const orgLinks = Array.isArray(p.org_links) ? p.org_links : (p.org_links ? [p.org_links] : []);
+            const firstOrg = orgLinks[0]?.organization?.name || p.primary_organization?.name || 'Unassigned';
+            const firstOrgPropId = orgLinks[0]?.id || '';
+
+            return {
+              id: p.id,
+              name: p.name,
+              address: p.address,
+              city: p.city,
+              state: p.state,
+              zip_code: p.zip_code,
+              org_property_id: firstOrgPropId,
+              organization_name: firstOrg,
+            };
           });
-        });
-        setOrgPropOptions(options);
+          setPropertyList(props);
+        }
+      } catch (err) {
+        console.warn('Could not load properties dropdown:', err);
       }
-    } catch (err) {
-      console.warn('Could not load org property options:', err);
     }
+    loadProperties();
   }, []);
 
-  useEffect(() => {
-    loadOrgPropertyOptions();
-  }, [loadOrgPropertyOptions]);
-
-  // Fetch E911 Records (Server-Side Paginated)
-  const fetchE911Records = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-        search: debouncedSearch,
-        status: selectedStatusFilter,
-        compliance: selectedComplianceFilter,
-        sortBy: sortBy,
-      });
-
-      const res = await fetch(`/api/admin/e911?${params.toString()}`);
-      const result = await res.json();
-
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Failed to fetch E911 records.');
-      }
-
-      setRecords(result.data || []);
-      if (result.pagination) {
-        setTotalCount(result.pagination.totalCount);
-        setTotalPages(result.pagination.totalPages);
-      }
-      if (result.metrics) {
-        setMetrics(result.metrics);
-      }
-    } catch (err: any) {
-      console.error('Error fetching E911:', err);
-      setError(err.message || 'Error loading E911 records.');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, debouncedSearch, selectedStatusFilter, selectedComplianceFilter, sortBy]);
+  // Fetch E911 Records via Redux
+  const loadData = useCallback(() => {
+    dispatch(
+      fetchE911Records({
+        page: pagination.currentPage,
+        limit: pagination.limit,
+        searchQuery: filters.searchQuery,
+        status: filters.selectedStatus,
+        compliance: filters.selectedCompliance,
+        sortBy: filters.sortBy,
+      })
+    );
+  }, [dispatch, pagination.currentPage, pagination.limit, filters]);
 
   useEffect(() => {
-    fetchE911Records();
-  }, [fetchE911Records]);
+    loadData();
+  }, [loadData]);
 
-  // Open 3-Dots Menu
-  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: E911Record) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const menuWidth = 220;
-    const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, record });
+  // Search input handler (char-by-char)
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    dispatch(setSearchQuery(val));
   };
 
-  // --- Handlers: Create ---
-  const handleSaveCreate = async (e: React.FormEvent) => {
+  // Open 3-Dots Menu
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, rec: E911Item) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 200;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, record: rec });
+  };
+
+  // Open Details Modal
+  const openDetailsModal = (rec: E911Item, tab: 'DETAILS' | 'NOTES' = 'DETAILS') => {
+    setSelectedRecordForDetails(rec);
+    setModalActiveTab(tab);
+    setNewCorrectionNote('');
+    setShowDetailsModal(true);
+  };
+
+  // Handle Create E911 Record
+  const handlePropertySelectInAdd = (propId: string) => {
+    const selectedProp = propertyList.find((p) => p.id === propId);
+    if (selectedProp) {
+      const fullAddr = `${selectedProp.address}, ${selectedProp.city}, ${selectedProp.state} ${selectedProp.zip_code}`.trim();
+      setCreateForm({
+        ...createForm,
+        property_id: propId,
+        emergency_address: fullAddr,
+      });
+    } else {
+      setCreateForm({
+        ...createForm,
+        property_id: propId,
+      });
+    }
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.org_property_id || !formData.emergency_address.trim()) {
-      setFormError('Please select a Property and enter the Emergency Dispatch Address.');
+    if (!createForm.property_id) {
+      setCreateError('Please choose a property.');
+      return;
+    }
+    if (!createForm.emergency_address.trim()) {
+      setCreateError('Emergency dispatch address is required.');
       return;
     }
 
     try {
-      setFormLoading(true);
-      setFormError(null);
+      setCreateLoading(true);
+      setCreateError(null);
+
+      const chosenProp = propertyList.find((p) => p.id === createForm.property_id);
 
       const res = await fetch('/api/admin/e911', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_property_id: formData.org_property_id,
-          emergency_address: formData.emergency_address.trim(),
-          psap_id: formData.psap_id.trim() || null,
-          status: formData.status,
-          correction_notes: formData.correction_notes || null,
+          organization_property_id: chosenProp?.org_property_id || null,
+          emergency_address: createForm.emergency_address.trim(),
+          status: createForm.status,
         }),
       });
 
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create E911 record.');
 
-      showToast('Created', 'E911 dispatch record registered successfully.', 'success');
+      showToast('E911 Created', `Record registered for ${chosenProp?.name || 'property'}.`, 'success');
       setShowCreateModal(false);
-      fetchE911Records();
+      setCreateForm({ property_id: '', emergency_address: '', status: 'PENDING' });
+      loadData();
     } catch (err: any) {
-      setFormError(err.message || 'Registration failed.');
+      setCreateError(err.message || 'Creation failed.');
       showToast('Error', err.message, 'error');
     } finally {
-      setFormLoading(false);
+      setCreateLoading(false);
     }
   };
 
-  // --- Handlers: Edit ---
-  const handleOpenEdit = (record: E911Record) => {
-    setSelectedRecordForEdit(record);
-    setFormData({
-      org_property_id: '',
-      emergency_address: record.emergency_address,
-      psap_id: record.psap_id || '',
-      status: record.status,
-      correction_notes: record.correction_notes || '',
+  // Handle Edit E911 Record
+  const handleOpenEdit = (rec: E911Item) => {
+    setSelectedRecordForEdit(rec);
+    setEditForm({
+      emergency_address: rec.emergency_address || '',
+      status: (rec.status as E911Status) || 'PENDING',
     });
-    setFormError(null);
-    setShowEditDrawer(true);
+    setEditError(null);
+    setShowEditModal(true);
   };
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRecordForEdit) return;
 
+    if (!editForm.emergency_address.trim()) {
+      setEditError('Emergency dispatch address is required.');
+      return;
+    }
+
     try {
-      setFormLoading(true);
-      setFormError(null);
+      setEditLoading(true);
+      setEditError(null);
 
       const res = await fetch('/api/admin/e911', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: selectedRecordForEdit.id,
-          emergency_address: formData.emergency_address,
-          psap_id: formData.psap_id,
-          status: formData.status,
-          correction_notes: formData.correction_notes,
+          emergency_address: editForm.emergency_address.trim(),
+          status: editForm.status,
         }),
       });
 
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update E911 record.');
 
-      showToast('Updated', 'E911 record updated.', 'success');
-      setShowEditDrawer(false);
-      fetchE911Records();
+      showToast('E911 Updated', 'Record details updated successfully.', 'success');
+      setShowEditModal(false);
+      loadData();
     } catch (err: any) {
-      setFormError(err.message || 'Update failed.');
+      setEditError(err.message || 'Update failed.');
       showToast('Error', err.message, 'error');
     } finally {
-      setFormLoading(false);
+      setEditLoading(false);
     }
   };
 
-  // --- Handlers: Correction Notes ---
-  const handleOpenCorrectionNotes = (record: E911Record) => {
-    setSelectedRecordForNotes(record);
-    setCorrectionNoteInput('');
-    setShowNotesModal(true);
-  };
-
-  const handleSaveCorrectionNote = async (e: React.FormEvent) => {
+  // Handle Append Correction Note
+  const handleAddCorrectionNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRecordForNotes || !correctionNoteInput.trim()) return;
+    if (!selectedRecordForDetails || !newCorrectionNote.trim()) return;
 
     try {
-      setNoteLoading(true);
-
+      setAddingNote(true);
       const res = await fetch('/api/admin/e911', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: selectedRecordForNotes.id,
-          append_correction_note: correctionNoteInput.trim(),
-          status: 'CORRECTION_REQUIRED',
+          id: selectedRecordForDetails.id,
+          append_correction_note: newCorrectionNote.trim(),
         }),
       });
 
       const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to save correction note.');
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to add note.');
 
-      showToast('Note Added', 'Correction note appended and status updated.', 'success');
-      setShowNotesModal(false);
-      fetchE911Records();
+      showToast('Note Added', 'Correction note appended successfully.', 'success');
+      setNewCorrectionNote('');
+      setShowDetailsModal(false);
+      loadData();
     } catch (err: any) {
       showToast('Error', err.message, 'error');
     } finally {
-      setNoteLoading(false);
+      setAddingNote(false);
     }
   };
 
   const resetAllFilters = () => {
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setSelectedStatusFilter('ALL');
-    setSelectedComplianceFilter('ALL');
-    setSortBy('NEWEST');
-    setCurrentPage(1);
+    setSearchInput('');
+    dispatch(setSearchQuery(''));
+    dispatch(setStatusFilter('ALL'));
+    dispatch(setComplianceFilter('ALL'));
+    dispatch(setSortBy('NEWEST'));
+    dispatch(setPagination({ currentPage: 1 }));
   };
 
   const hasActiveFilters =
-    searchQuery.trim() !== '' ||
-    selectedStatusFilter !== 'ALL' ||
-    selectedComplianceFilter !== 'ALL' ||
-    sortBy !== 'NEWEST';
+    filters.searchQuery.trim() !== '' ||
+    filters.selectedStatus !== 'ALL' ||
+    filters.selectedCompliance !== 'ALL' ||
+    filters.sortBy !== 'NEWEST';
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="p-6 md:p-8 max-w-7xl mx-auto space-y-6"
-    >
-      {/* Toast Notification Container */}
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notifications */}
       <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
-        <AnimatePresence>
-          {toasts.map((t) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${t.type === 'success'
-                  ? 'bg-slate-900/95 border-emerald-500/30 text-white'
-                  : t.type === 'error'
-                    ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                    : 'bg-slate-900/95 border-blue-500/30 text-white'
-                }`}
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
+              t.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                : t.type === 'error'
+                ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                : 'bg-slate-900/95 border-blue-500/30 text-white'
+            }`}
+          >
+            {t.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            ) : t.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-white">{t.title}</p>
+              {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+            </div>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              className="text-slate-400 hover:text-white cursor-pointer"
             >
-              {t.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-              ) : t.type === 'error' ? (
-                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-              ) : (
-                <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 text-xs">
-                <p className="font-semibold text-white">{t.title}</p>
-                {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
-              </div>
-              <button
-                onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
-                className="text-slate-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
       </div>
 
-      {/* Page Header (Clean: No Subtitle, No Mini Pill next to Title) */}
+      {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
-            <ShieldCheck size={256} className="w-full h-full object-contain" />
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+            <ShieldCheck size={256} className="text-black dark:text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">E911 & Emergency Routing</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">E911 &amp; Ray Baum Compliance</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -504,9 +452,9 @@ export default function AdminE911Page() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              const headers = ['ID,Property,Organization,EmergencyAddress,PSAP,Status,RayBaum\n'];
-              const rows = records.map((r) =>
-                `"${r.id}","${r.property_name}","${r.organization_name}","${r.emergency_address}","${r.psap_id}","${r.status}","${r.ray_baum_compliant}"`
+              const headers = ['Property,Property Address,Organization,Emergency Dispatch Address,Status,Ray Baum\n'];
+              const rows = records.map((r: E911Item) =>
+                `"${r.property_name}","${r.emergency_address}","${r.organization_name}","${r.emergency_address}","${r.status}","${r.ray_baum_compliant ? 'Verified' : 'Non-Verified'}"`
               );
               const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
@@ -516,7 +464,7 @@ export default function AdminE911Page() {
               a.click();
               showToast('Exported', 'E911 records exported as CSV.', 'info');
             }}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </motion.button>
@@ -524,7 +472,7 @@ export default function AdminE911Page() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={resetAllFilters}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
           </motion.button>
@@ -532,154 +480,132 @@ export default function AdminE911Page() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              const firstOpt = orgPropOptions[0];
-              setFormData({
-                org_property_id: firstOpt?.org_property_id || '',
-                emergency_address: firstOpt?.address || '',
-                psap_id: '',
-                status: 'PENDING',
-                correction_notes: '',
-              });
-              setFormError(null);
+              setCreateForm({ property_id: '', emergency_address: '', status: 'PENDING' });
+              setCreateError(null);
               setShowCreateModal(true);
             }}
             className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" /> Register E911 Record
+            <Plus className="w-3.5 h-3.5" /> Add E911 Location
           </motion.button>
         </div>
       </motion.div>
 
-      {/* Real KPI Cards (5 Design System Variants with Hover Pop) */}
+      {/* Real KPI Cards - ONLY Variant 1 (Deep Blue) */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading && records.length === 0 ? (
-          [1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5 shadow-sm"
-            >
-              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
-              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
-              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
+        {/* Card 1: Total Locations */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Total Locations
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <ShieldCheck size={18} />
             </div>
-          ))
-        ) : (
-          <>
-            {/* Card 1: Total Records -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Total E911 Records
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <ShieldCheck size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.totalRecordsCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Endpoints</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Registered dispatch endpoints</p>
-            </motion.div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.totalRecordsCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Mapped</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Dispatchable hotel locations</p>
+        </motion.div>
 
-            {/* Card 2: PSAP Verified -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  PSAP Verified
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <CheckCircle2 size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.verifiedCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Verified</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Direct emergency routing active</p>
-            </motion.div>
+        {/* Card 2: PSAP Verified */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              PSAP Verified
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.verifiedCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Compliant</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">100% emergency dispatch ready</p>
+        </motion.div>
 
-            {/* Card 3: Correction Required -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Correction Required
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <AlertTriangle size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.correctionRequiredCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Flagged</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Address / suite audit flagged</p>
-            </motion.div>
+        {/* Card 3: Correction Required */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Correction Required
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <AlertTriangle size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.correctionRequiredCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Action</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Address formatting review</p>
+        </motion.div>
 
-            {/* Card 4: Pending Validation -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Pending Validation
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <AlertCircle size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.pendingOrFailedCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Carrier validation pending</p>
-            </motion.div>
-          </>
-        )}
+        {/* Card 4: Pending or Failed */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Pending / In-Flight
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <AlertCircle size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.pendingOrFailedCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">In-Queue</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Carrier validation in progress</p>
+        </motion.div>
       </motion.div>
 
       {/* Search & Filter Toolbar */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-          {/* Search Box */}
+          {/* Search Box (char-by-char) */}
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search by property, organization, emergency address, PSAP ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+              placeholder="Search by property, emergency address, org, PSAP..."
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
             />
-            {searchQuery && (
+            {searchInput && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => handleSearchChange('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
@@ -690,68 +616,68 @@ export default function AdminE911Page() {
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <select
-              value={selectedStatusFilter}
+              value={filters.selectedStatus}
               onChange={(e) => {
-                setSelectedStatusFilter(e.target.value);
-                setCurrentPage(1);
+                dispatch(setStatusFilter(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Filter by status"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+              aria-label="Filter by validation status"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">Status: All Statuses</option>
               <option value="VERIFIED">PSAP Verified</option>
-              <option value="CORRECTION_REQUIRED">Correction Required</option>
               <option value="PENDING">Validation Pending</option>
+              <option value="CORRECTION_REQUIRED">Correction Required</option>
               <option value="FAILED">Routing Failed</option>
             </select>
 
             <select
-              value={selectedComplianceFilter}
+              value={filters.selectedCompliance}
               onChange={(e) => {
-                setSelectedComplianceFilter(e.target.value);
-                setCurrentPage(1);
+                dispatch(setComplianceFilter(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Filter by compliance"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+              aria-label="Filter by Ray Baum compliance"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="ALL">Compliance: All</option>
-              <option value="COMPLIANT">Ray Baum Compliant</option>
-              <option value="NON_COMPLIANT">Audit Required</option>
+              <option value="ALL">Ray Baum: All</option>
+              <option value="COMPLIANT">Verified</option>
+              <option value="NON_COMPLIANT">Non-Verified</option>
             </select>
 
             <select
-              value={sortBy}
+              value={filters.sortBy}
               onChange={(e) => {
-                setSortBy(e.target.value);
-                setCurrentPage(1);
+                dispatch(setSortBy(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Sort records"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+              aria-label="Sort E911 records"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="NEWEST">Sort: Recently Added</option>
-              <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
+              <option value="PROP_ASC">Sort: Property (A-Z)</option>
               <option value="ORG_ASC">Sort: Organization (A-Z)</option>
               <option value="STATUS">Sort: Status</option>
             </select>
           </div>
         </div>
 
-        {/* Active Filters Bar */}
+        {/* Active Filters Pill Bar */}
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
             <span className="text-slate-400">Active Filters:</span>
-            {searchQuery && (
+            {filters.searchQuery && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                "{searchQuery}"
-                <button onClick={() => setSearchQuery('')} className="cursor-pointer">
+                "{filters.searchQuery}"
+                <button onClick={() => handleSearchChange('')} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
-            {selectedStatusFilter !== 'ALL' && (
+            {filters.selectedStatus !== 'ALL' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                {selectedStatusFilter}
-                <button onClick={() => setSelectedStatusFilter('ALL')} className="cursor-pointer">
+                Status: {filters.selectedStatus}
+                <button onClick={() => dispatch(setStatusFilter('ALL'))} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -764,40 +690,41 @@ export default function AdminE911Page() {
             </button>
           </div>
         )}
-      </motion.div>
+      </div>
 
-      {/* Main Table View (Pure Black Headers, Separate Property & Org columns, No Location displayed in table) */}
+      {/* Main Table View */}
       {error ? (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
           <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load E911 records</p>
           <p className="text-xs text-slate-400 mt-0.5">{error}</p>
           <button
-            onClick={() => fetchE911Records()}
-            className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            onClick={loadData}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
-        </motion.div>
+        </div>
       ) : loading && records.length === 0 ? (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/3"></div>
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+              <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
             </div>
           ))}
-        </motion.div>
+        </div>
       ) : records.length === 0 ? (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
           <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
           <h4 className="text-sm font-bold text-slate-800 dark:text-white">No E911 Records Found</h4>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
             {hasActiveFilters
-              ? 'No records matched the selected filters.'
-              : 'Register your first property emergency dispatch address for Kari’s Law and Ray Baum compliance.'}
+              ? 'No records match the selected filters.'
+              : 'Add your first dispatchable location for PSAP verification.'}
           </p>
           <div className="mt-4 flex justify-center gap-2">
             {hasActiveFilters && (
@@ -808,623 +735,424 @@ export default function AdminE911Page() {
                 Clear Filters
               </button>
             )}
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
+            <button
               onClick={() => {
-                const firstOpt = orgPropOptions[0];
-                setFormData({
-                  org_property_id: firstOpt?.org_property_id || '',
-                  emergency_address: firstOpt?.address || '',
-                  psap_id: '',
-                  status: 'PENDING',
-                  correction_notes: '',
-                });
+                setCreateForm({ property_id: '', emergency_address: '', status: 'PENDING' });
                 setShowCreateModal(true);
               }}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" /> Register E911 Record
-            </motion.button>
+              <Plus className="w-3.5 h-3.5" /> Add E911 Location
+            </button>
           </div>
-        </motion.div>
+        </div>
       ) : (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">PROPERTY</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ORGANIZATION</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">EMERGENCY DISPATCH ADDRESS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">RAY BAUM ACT</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY NAME</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY ADDRESS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION NAME</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">EMERGENCY DISPATCH ADDRESS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM ACT</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
-                {records.map((record) => {
-                  const badge = getStatusBadge(record.status);
-                  return (
-                    <motion.tr
-                      key={record.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      whileHover={{ backgroundColor: 'rgba(248, 250, 252, 0.6)' }}
-                      className="transition"
-                    >
-                      {/* 1. Property Name (ONLY Name, No Location) */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-blue-100 dark:border-blue-900/40">
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-black dark:text-white text-sm block">
-                              {record.property_name}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
+                {records.map((rec: E911Item) => {
+                  const badge = getStatusBadge(rec.status as E911Status);
 
-                      {/* 2. Organization Name (ONLY Name, No Location) */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-semibold text-black dark:text-white">
-                          {record.organization_name}
+                  return (
+                    <tr
+                      key={rec.id}
+                      onClick={() => openDetailsModal(rec, 'DETAILS')}
+                      className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition cursor-pointer"
+                    >
+                      {/* 1. Property Name (NO badge icon) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-bold text-black dark:text-white text-sm block">
+                          {rec.property_name}
                         </span>
                       </td>
 
-                      {/* 3. Emergency Dispatch Address */}
-                      <td className="py-3.5 px-4">
-                        <div className="space-y-0.5 max-w-[240px]">
-                          <span className="font-medium text-slate-800 dark:text-slate-200 block truncate">
-                            {record.emergency_address}
-                          </span>
-                          <span className="text-[10px] text-slate-500 block">
-                            PSAP ID: {record.psap_id}
-                          </span>
-                        </div>
+                      {/* 2. Property Address */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-slate-700 dark:text-slate-300">
+                          {rec.property_details?.address || rec.emergency_address}
+                        </span>
                       </td>
 
-                      {/* 4. Status Badge */}
-                      <td className="py-3.5 px-4">
+                      {/* 3. Organization Name */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-slate-800 dark:text-white">
+                          {rec.organization_name || 'Unassigned'}
+                        </span>
+                      </td>
+
+                      {/* 4. Emergency Dispatch Address */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-slate-800 dark:text-slate-200 font-medium">
+                          {rec.emergency_address}
+                        </span>
+                      </td>
+
+                      {/* 5. Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
                         >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
                           {badge.label}
                         </span>
                       </td>
 
-                      {/* 5. Ray Baum Compliance */}
-                      <td className="py-3.5 px-4">
-                        {record.ray_baum_compliant ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Compliant
+                      {/* 6. Ray Baum Act (Single Line) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {rec.ray_baum_compliant ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
+                            <ShieldCheck className="w-3 h-3" /> Verified
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                            <AlertTriangle className="w-3.5 h-3.5" /> Audit Needed
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 whitespace-nowrap">
+                            <AlertCircle className="w-3 h-3" /> Non-Verified
                           </span>
                         )}
                       </td>
 
-                      {/* 6. Actions (3-Dots Trigger) */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      {/* 7. Actions (Edit Pencil and Three Dots) */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleOpenEdit(record)}
-                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-                            title="Edit"
+                            onClick={() => handleOpenEdit(rec)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                            title="Edit Record"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={(e) => handleOpenMenu(e, record)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-                            title="More Actions"
+                            onClick={(e) => handleOpenMenu(e, rec)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                            title="More Options"
                           >
                             <MoreVertical className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
 
-          {/* Server-Side Pagination Bar (10 items per page) */}
+          {/* Server-Side Pagination Bar */}
           <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <span className="text-slate-500 dark:text-slate-400">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} records
+              Showing {(pagination.currentPage - 1) * pagination.limit + 1} to{' '}
+              {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount} records
             </span>
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1 || loading}
+                onClick={() => dispatch(setPagination({ currentPage: Math.max(1, pagination.currentPage - 1) }))}
+                disabled={pagination.currentPage <= 1 || loading}
                 className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((num) => (
                 <button
                   key={num}
-                  onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${currentPage === num
-                      ? 'bg-blue-600 text-white'
+                  onClick={() => dispatch(setPagination({ currentPage: num }))}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    pagination.currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                    }`}
+                  }`}
                 >
                   {num}
                 </button>
               ))}
 
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages || loading}
+                onClick={() => dispatch(setPagination({ currentPage: Math.min(pagination.totalPages, pagination.currentPage + 1) }))}
+                disabled={pagination.currentPage >= pagination.totalPages || loading}
                 className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* FIXED 3-DOTS ACTION POPUP */}
-      {/* ========================================================================= */}
+      {/* 3-DOTS ACTION POPUP */}
       {menuPosition && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
-            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200"
+            className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
-              <p className="font-bold text-black dark:text-white truncate">{menuPosition.record.property_name}</p>
+              <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.record.property_name}</p>
               <p className="text-[10px] text-slate-400">E911 Options</p>
             </div>
 
-            {/* 1. View Details */}
             <button
               onClick={() => {
-                const record = menuPosition.record;
+                openDetailsModal(menuPosition.record, 'DETAILS');
                 setMenuPosition(null);
-                setSelectedRecordForDetails(record);
-                setShowDetailsDrawer(true);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> View Details
+              <Eye className="w-3.5 h-3.5 text-blue-500" />
+              <span>View Details</span>
             </button>
 
-            {/* 2. Edit E911 Record */}
             <button
               onClick={() => {
-                const record = menuPosition.record;
+                handleOpenEdit(menuPosition.record);
                 setMenuPosition(null);
-                handleOpenEdit(record);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Edit2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Edit Record
+              <Edit2 className="w-3.5 h-3.5 text-amber-500" />
+              <span>Edit Record</span>
             </button>
 
-            {/* 3. Correction Notes */}
             <button
               onClick={() => {
-                const record = menuPosition.record;
+                openDetailsModal(menuPosition.record, 'NOTES');
                 setMenuPosition(null);
-                handleOpenCorrectionNotes(record);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer border-t border-slate-100 dark:border-[#222430]"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Correction Notes
+              <MessageSquare className="w-3.5 h-3.5 text-purple-500" />
+              <span>Correction Notes</span>
             </button>
-          </motion.div>
+          </div>
         </>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. VIEW DETAILS DRAWER (No Light Gray Text, High Contrast) */}
-      {/* ========================================================================= */}
+      {/* 1. UNIFIED DETAILS & CORRECTION NOTES MODAL */}
       <AnimatePresence>
-        {showDetailsDrawer && selectedRecordForDetails && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-black dark:text-white">E911 Record Specifications</h3>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                      {selectedRecordForDetails.property_name}
-                    </p>
+        {showDetailsModal && selectedRecordForDetails && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <ShieldCheck className="w-4.5 h-4.5" />
                   </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">{selectedRecordForDetails.property_name}</h3>
+                    <p className="text-xs text-slate-400">Emergency Dispatch &amp; PSAP Record</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center p-1 bg-slate-100 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setModalActiveTab('DETAILS')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                        modalActiveTab === 'DETAILS'
+                          ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalActiveTab('NOTES')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                        modalActiveTab === 'NOTES'
+                          ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Correction Notes
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => setShowDetailsDrawer(false)}
-                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
+                    onClick={() => setShowDetailsModal(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
 
-                <div className="space-y-3.5 text-xs">
-                  {/* Emergency Address & PSAP */}
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Emergency Dispatch Configuration
-                    </h4>
-                    <div className="pt-0.5">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Registered Dispatch Address</span>
-                      <p className="font-bold text-black dark:text-white mt-1 text-sm">
+              {/* Tab 1: Details */}
+              {modalActiveTab === 'DETAILS' && (
+                <div className="p-5 overflow-y-auto space-y-4 text-xs">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Property Name</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
+                        {selectedRecordForDetails.property_name}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Assigned Organization</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
+                        {selectedRecordForDetails.organization_name}
+                      </p>
+                    </div>
+
+                    <div className="col-span-2 space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Emergency Dispatch Address</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
                         {selectedRecordForDetails.emergency_address}
                       </p>
                     </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">PSAP Routing ID</span>
-                      <span className="font-bold text-black dark:text-white">
-                        {selectedRecordForDetails.psap_id}
-                      </span>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Validation Status</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                        {selectedRecordForDetails.status}
+                      </p>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Validation Status</span>
-                      <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                        {getStatusBadge(selectedRecordForDetails.status).label}
-                      </span>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Ray Baum Compliance</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
+                        {selectedRecordForDetails.ray_baum_compliant ? 'Verified' : 'Audit Required'}
+                      </p>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {/* Compliance Verification */}
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Federal Regulatory Compliance
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Ray Baum's Act (Dispatchable Location)</span>
-                      <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Compliant
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Kari's Law (Direct 911 Dialing)</span>
-                      <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Enabled
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Property & Organization Details */}
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Tenant & Location
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Property</span>
-                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Organization</span>
-                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.organization_name}</span>
-                    </div>
-                  </div>
-
-                  {/* Correction Notes History */}
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Correction Notes & Audit Flags
-                    </h4>
+              {/* Tab 2: Correction Notes */}
+              {modalActiveTab === 'NOTES' && (
+                <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+                  <div>
+                    <h4 className="font-bold text-slate-900 dark:text-white mb-2">Audit History &amp; Correction Logs</h4>
                     {selectedRecordForDetails.correction_notes ? (
-                      <div className="bg-white dark:bg-[#111217] p-3 rounded-lg border border-slate-200 dark:border-[#222430] whitespace-pre-line text-slate-900 dark:text-slate-100 font-sans">
+                      <div className="p-3.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl space-y-2 whitespace-pre-wrap font-mono text-[11px] text-slate-800 dark:text-slate-200">
                         {selectedRecordForDetails.correction_notes}
                       </div>
                     ) : (
-                      <p className="text-slate-500 font-medium italic">No correction notes or audit flags reported.</p>
+                      <p className="text-slate-400 italic p-4 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
+                        No correction notes logged for this location yet.
+                      </p>
                     )}
                   </div>
-                </div>
-              </div>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+                  {/* Add New Note */}
+                  <form onSubmit={handleAddCorrectionNote} className="pt-3 border-t border-slate-100 dark:border-[#222430] space-y-2.5">
+                    <label className="font-bold text-black dark:text-white block">Add Note / Carrier Feedback</label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={newCorrectionNote}
+                      onChange={(e) => setNewCorrectionNote(e.target.value)}
+                      placeholder="Enter verification notes, PSAP dispatch corrections, or room-level details..."
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                    />
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="submit"
+                        disabled={addingNote || !newCorrectionNote.trim()}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {addingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Append Note'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
                 <button
-                  type="button"
-                  onClick={() => setShowDetailsDrawer(false)}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#2c2e3c] transition cursor-pointer"
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer"
                 >
                   Close
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* ========================================================================= */}
-      {/* 2. EDIT E911 DRAWER */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {showEditDrawer && selectedRecordForEdit && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-black dark:text-white">Edit E911 Record</h3>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                      {selectedRecordForEdit.property_name}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowEditDrawer(false)}
-                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {formError && (
-                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-                  </div>
-                )}
-
-                <form onSubmit={handleSaveEdit} id="edit-e911-form" className="space-y-3.5 mt-5 text-xs">
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Emergency Dispatch Address *
-                    </label>
-                    <textarea
-                      rows={2}
-                      required
-                      value={formData.emergency_address}
-                      onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      PSAP Routing ID
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.psap_id}
-                      onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Validation Status
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
-                    >
-                      <option value="VERIFIED">PSAP Verified</option>
-                      <option value="CORRECTION_REQUIRED">Correction Required</option>
-                      <option value="PENDING">Validation Pending</option>
-                      <option value="FAILED">Routing Failed</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Correction Notes / Audit Details
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={formData.correction_notes}
-                      onChange={(e) => setFormData({ ...formData, correction_notes: e.target.value })}
-                      placeholder="e.g. Suite 400 location verification required by county PSAP."
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                    />
-                  </div>
-                </form>
-              </div>
-
-              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowEditDrawer(false)}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  type="submit"
-                  form="edit-e911-form"
-                  disabled={formLoading}
-                  className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
-                >
-                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Save Changes
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================================= */}
-      {/* 3. CORRECTION NOTES MODAL */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {showNotesModal && selectedRecordForNotes && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-sm font-bold text-black dark:text-white">Add E911 Correction Note</h3>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                    {selectedRecordForNotes.property_name}
-                  </p>
-                </div>
-                <button onClick={() => setShowNotesModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveCorrectionNote} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Correction / Audit Note *
-                  </label>
-                  <textarea
-                    required
-                    rows={3}
-                    value={correctionNoteInput}
-                    onChange={(e) => setCorrectionNoteInput(e.target.value)}
-                    placeholder="e.g. PSAP mismatch on floor/suite number; property contacted for clarification."
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-                    Saving will set the record to "Correction Required" and append to the audit log.
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowNotesModal(false)}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    type="submit"
-                    disabled={noteLoading || !correctionNoteInput.trim()}
-                    className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
-                  >
-                    {noteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                    Save Note
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================================= */}
-      {/* 4. CREATE E911 RECORD MODAL */}
-      {/* ========================================================================= */}
+      {/* 2. ADD E911 MODAL */}
       <AnimatePresence>
         {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-                <h3 className="text-sm font-bold text-black dark:text-white">Register E911 Dispatch Endpoint</h3>
-                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer">
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Add Emergency Dispatch Location</h3>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {formError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+              {createError && (
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                  {createError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
+              <form onSubmit={handleCreateSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+                {/* 1. Choose Property */}
                 <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Select Property & Organization *
+                  <label className="font-bold text-black dark:text-white block mb-1">
+                    Choose Property <span className="text-rose-500">*</span>
                   </label>
                   <select
                     required
-                    value={formData.org_property_id}
-                    onChange={(e) => {
-                      const selId = e.target.value;
-                      const opt = orgPropOptions.find((o) => o.org_property_id === selId);
-                      setFormData({
-                        ...formData,
-                        org_property_id: selId,
-                        emergency_address: opt?.address || formData.emergency_address,
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    value={createForm.property_id}
+                    onChange={(e) => handlePropertySelectInAdd(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
-                    <option value="">-- Choose Property --</option>
-                    {orgPropOptions.map((opt, idx) => (
-                      <option key={idx} value={opt.org_property_id}>
-                        {opt.property_name} &bull; {opt.organization_name}
+                    <option value="">Select Property...</option>
+                    {propertyList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.organization_name})
                       </option>
                     ))}
                   </select>
                 </div>
 
+                {/* 2. Emergency Dispatch Address */}
                 <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Emergency Dispatch Address *
+                  <label className="font-bold text-black dark:text-white block mb-1">
+                    Emergency Dispatch Address <span className="text-rose-500">*</span>
                   </label>
                   <textarea
-                    rows={2}
+                    rows={3}
                     required
-                    placeholder="e.g. 100 Ocean Drive, Suite 200, Miami, FL 33139"
-                    value={formData.emergency_address}
-                    onChange={(e) => setFormData({ ...formData, emergency_address: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    value={createForm.emergency_address}
+                    onChange={(e) => setCreateForm({ ...createForm, emergency_address: e.target.value })}
+                    placeholder="Enter full MSAG-compliant street address, suite/floor, city, state & zip..."
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
+                {/* 3. Validation Status */}
                 <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    PSAP Identifier (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. FL-MIA-PSAP-01"
-                    value={formData.psap_id}
-                    onChange={(e) => setFormData({ ...formData, psap_id: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Validation Status
-                  </label>
+                  <label className="font-bold text-black dark:text-white block mb-1">Validation Status</label>
                   <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as E911Status })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
                     <option value="PENDING">Validation Pending</option>
                     <option value="VERIFIED">PSAP Verified</option>
@@ -1432,27 +1160,105 @@ export default function AdminE911Page() {
                   </select>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                  <button
                     type="submit"
-                    disabled={formLoading}
-                    className="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                    disabled={createLoading}
+                    className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
-                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    Register Address
-                  </motion.button>
+                    {createLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Register Location'}
+                  </button>
                 </div>
               </form>
-            </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. EDIT E911 MODAL */}
+      <AnimatePresence>
+        {showEditModal && selectedRecordForEdit && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Edit E911 Record</h3>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {editError && (
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                  {editError}
+                </div>
+              )}
+
+              <form onSubmit={handleEditSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Property</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedRecordForEdit.property_name} ({selectedRecordForEdit.organization_name})
+                  </p>
+                </div>
+
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">
+                    Emergency Dispatch Address <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={editForm.emergency_address}
+                    onChange={(e) => setEditForm({ ...editForm, emergency_address: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Validation Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value as E911Status })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="PENDING">Validation Pending</option>
+                    <option value="VERIFIED">PSAP Verified</option>
+                    <option value="CORRECTION_REQUIRED">Correction Required</option>
+                    <option value="FAILED">Routing Failed</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editLoading}
+                    className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    {editLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </AnimatePresence>

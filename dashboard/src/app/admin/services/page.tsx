@@ -1,89 +1,66 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   PhoneCall,
   Search,
   Plus,
   Download,
   MoreVertical,
+  Edit2,
   Building2,
-  Phone,
   CheckCircle2,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
   X,
-  Edit2,
-  ArrowUpRight,
-  Loader2,
-  Check,
-  LayoutGrid,
-  List,
   Sparkles,
   RefreshCw,
   Info,
+  Check,
+  Eye,
+  Layers,
   Link as LinkIcon,
+  Loader2,
 } from 'lucide-react';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  fetchServices,
+  setSearchQuery,
+  setTypeFilter,
+  setStatusFilter,
+  setSortBy,
+  setPagination,
+  optimisticUpdateServiceStatus,
+  ServiceItem,
+  ServiceRecord,
+} from '@/store/slices/servicesSlice';
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05,
-    },
+    transition: { staggerChildren: 0.08 },
   },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 14 },
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1.0] as any },
+    transition: { type: 'spring', stiffness: 300, damping: 24 },
   },
 };
 
-// --- Interfaces ---
-interface AttachedProperty {
-  link_id?: string;
-  org_property_id?: string;
-  property_id?: string;
+interface PropertyOption {
+  id: string;
   name: string;
   city?: string;
   state?: string;
-  address?: string;
-  organization_id?: string;
   organization_name?: string;
-}
-
-interface ServiceRecord {
-  id: string;
-  phone_number: string;
-  service_type: string;
-  service_type_id?: string;
-  description: string | null;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DISCONNECTED';
-  attached_properties: AttachedProperty[];
-  attached_property_name: string;
-  attached_organization_name: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-interface OrgPropertyOption {
-  org_property_id: string;
-  property_id: string;
-  property_name: string;
-  property_city?: string;
-  property_state?: string;
-  organization_id: string;
-  organization_name: string;
 }
 
 interface Toast {
@@ -93,43 +70,52 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
+const SERVICE_TYPES_LIST = [
+  'Direct Inward Dial (DID)',
+  'SIP Trunk - 100 Channels',
+  'Toll-Free 800 Route',
+  'Analog Emergency FXS',
+  'Cloud PBX Extension',
+  'Ray Baum Dedicated E911',
+];
+
 export default function AdminServicesPage() {
-  // Services State
-  const [services, setServices] = useState<ServiceRecord[]>([]);
-  const [orgPropOptions, setOrgPropOptions] = useState<OrgPropertyOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    items: services,
+    loading,
+    error,
+    pagination,
+    metrics,
+    filters,
+  } = useAppSelector((state) => state.services);
 
-  // Server-Side Pagination (10 per page)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const itemsPerPage = 10;
+  const [searchInput, setSearchInput] = useState(filters.searchQuery);
+  const [propertyOptions, setPropertyOptions] = useState<PropertyOption[]>([]);
 
-  // Real Database Metrics (No fake data)
-  const [metrics, setMetrics] = useState({
-    totalServicesCount: 0,
-    activeServicesCount: 0,
-    assignedServicesCount: 0,
-    inactiveOrSuspendedCount: 0,
-  });
+  // Modals & Drawers
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedServiceForEdit, setSelectedServiceForEdit] = useState<ServiceItem | null>(null);
 
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState('ALL');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
-  const [sortBy, setSortBy] = useState('NEWEST');
-  const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
+  // View Details Drawer
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [selectedServiceForDetails, setSelectedServiceForDetails] = useState<ServiceItem | null>(null);
 
-  // Debounce search (300ms)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
+  // Assign to Property Modal
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedServiceForAssign, setSelectedServiceForAssign] = useState<ServiceItem | null>(null);
+  const [targetPropertyId, setTargetPropertyId] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  // Status Slider Modal
+  const [showStatusSliderModal, setShowStatusSliderModal] = useState(false);
+  const [selectedServiceForStatus, setSelectedServiceForStatus] = useState<ServiceItem | null>(null);
+  const [statusSliderValue, setStatusSliderValue] = useState<'ACTIVE' | 'INACTIVE' | 'SUSPENDED'>('ACTIVE');
+  const [statusSliderLoading, setStatusSliderLoading] = useState(false);
+
+  // 3-Dots Action Menu Position
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; service: ServiceItem } | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -141,140 +127,165 @@ export default function AdminServicesPage() {
     }, 4000);
   }, []);
 
-  // Fixed 3-Dots Action Menu Overlay
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; service: ServiceRecord } | null>(null);
-
-  // Drawers & Modals State
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditDrawer, setShowEditDrawer] = useState(false);
-  const [selectedServiceForEdit, setSelectedServiceForEdit] = useState<ServiceRecord | null>(null);
-
-  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
-  const [selectedServiceForDetails, setSelectedServiceForDetails] = useState<ServiceRecord | null>(null);
-
-  const [showPropertiesDrawer, setShowPropertiesDrawer] = useState(false);
-  const [selectedServiceForProps, setSelectedServiceForProps] = useState<ServiceRecord | null>(null);
-
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedServiceForAssign, setSelectedServiceForAssign] = useState<ServiceRecord | null>(null);
-  const [selectedOrgPropId, setSelectedOrgPropId] = useState<string>('');
-  const [assignLoading, setAssignLoading] = useState(false);
-
-  // Form State for Provision / Edit
+  // Form State for Add / Edit
   const [formData, setFormData] = useState({
+    custom_service_id: '',
+    service_name: '',
     phone_number: '',
     service_type_name: 'Direct Inward Dial (DID)',
-    org_property_id: '',
+    custom_type_input: '',
+    is_custom_type: false,
+    property_id: '',
     description: '',
-    status: 'ACTIVE',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED',
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Load Property/Org Options for dropdowns
-  const loadOrgPropertyOptions = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/properties?limit=100');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        const options: OrgPropertyOption[] = [];
-        data.data.forEach((p: any) => {
-          const links = Array.isArray(p.org_links) ? p.org_links : (p.org_links ? [p.org_links] : []);
-          if (links.length > 0) {
-            links.forEach((l: any) => {
-              if (l && l.organization) {
-                options.push({
-                  org_property_id: l.id,
-                  property_id: p.id,
-                  property_name: p.name,
-                  property_city: p.city,
-                  property_state: p.state,
-                  organization_id: l.organization.id,
-                  organization_name: l.organization.name,
-                });
-              }
-            });
-          } else {
-            // Unattached property option
-            options.push({
-              org_property_id: '',
-              property_id: p.id,
-              property_name: p.name,
-              property_city: p.city,
-              property_state: p.state,
-              organization_id: '',
-              organization_name: 'Unassigned',
-            });
-          }
-        });
-        setOrgPropOptions(options);
+  // Load properties for dropdown
+  useEffect(() => {
+    async function loadProps() {
+      try {
+        const res = await fetch('/api/admin/properties?limit=100');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setPropertyOptions(
+            data.data.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              city: p.city,
+              state: p.state,
+              organization_name: p.primary_organization?.name || p.organizations?.[0]?.name || 'Unassigned',
+            }))
+          );
+        }
+      } catch (err) {
+        console.warn('Could not load properties:', err);
       }
-    } catch (err) {
-      console.warn('Could not load org property options:', err);
     }
+    loadProps();
   }, []);
 
-  useEffect(() => {
-    loadOrgPropertyOptions();
-  }, [loadOrgPropertyOptions]);
-
-  // Fetch Services (Server-Side Paginated)
-  const fetchServices = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-        search: debouncedSearch,
-        serviceType: selectedTypeFilter,
-        status: selectedStatusFilter,
-        sortBy: sortBy,
-      });
-
-      const res = await fetch(`/api/admin/services?${params.toString()}`);
-      const result = await res.json();
-
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Failed to fetch services.');
-      }
-
-      setServices(result.data || []);
-      if (result.pagination) {
-        setTotalCount(result.pagination.totalCount);
-        setTotalPages(result.pagination.totalPages);
-      }
-      if (result.metrics) {
-        setMetrics(result.metrics);
-      }
-    } catch (err: any) {
-      console.error('Error fetching services:', err);
-      setError(err.message || 'Error loading services data.');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, debouncedSearch, selectedTypeFilter, selectedStatusFilter, sortBy]);
+  // Fetch Services via Redux
+  const loadData = useCallback(() => {
+    dispatch(
+      fetchServices({
+        page: pagination.currentPage,
+        limit: pagination.limit,
+        searchQuery: filters.searchQuery,
+        serviceType: filters.selectedType,
+        status: filters.selectedStatus,
+        sortBy: filters.sortBy,
+      })
+    );
+  }, [dispatch, pagination.currentPage, pagination.limit, filters]);
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    loadData();
+  }, [loadData]);
 
-  // Open 3-Dots Fixed Menu
-  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, service: ServiceRecord) => {
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const menuWidth = 230;
-    const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, service });
+  // Search input handler (char-by-char)
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    dispatch(setSearchQuery(val));
   };
 
-  // --- Handlers: Create Service ---
+  // Open 3-Dots Menu
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, svc: ServiceItem) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 200;
+    const left = Math.max(16, rect.right - menuWidth);
+    const top = rect.bottom + 4;
+    setMenuPosition({ top, left, service: svc });
+  };
+
+  // Open Status Slider Modal
+  const handleOpenStatusSlider = (e: React.MouseEvent, svc: ServiceItem) => {
+    e.stopPropagation();
+    setSelectedServiceForStatus(svc);
+    setStatusSliderValue((svc.status as any) || 'ACTIVE');
+    setShowStatusSliderModal(true);
+  };
+
+  // Confirm Status Slider Update
+  const handleConfirmStatusSlider = async () => {
+    if (!selectedServiceForStatus) return;
+
+    // Optimistic Redux instant update (< 1ms zero reload)
+    dispatch(optimisticUpdateServiceStatus({ id: selectedServiceForStatus.id, status: statusSliderValue }));
+
+    try {
+      setStatusSliderLoading(true);
+      const res = await fetch(`/api/admin/services/${selectedServiceForStatus.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: statusSliderValue }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update status.');
+
+      showToast('Status Updated', `${selectedServiceForStatus.phone_number} is now ${statusSliderValue}.`, 'success');
+      setShowStatusSliderModal(false);
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+      loadData();
+    } finally {
+      setStatusSliderLoading(false);
+    }
+  };
+
+  // Handle Assign to Property
+  const handleOpenAssignModal = (svc: ServiceItem) => {
+    setSelectedServiceForAssign(svc);
+    setTargetPropertyId(svc.property_id || '');
+    setShowAssignModal(true);
+  };
+
+  const handleConfirmAssignProperty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedServiceForAssign || !targetPropertyId) return;
+
+    try {
+      setAssignLoading(true);
+      const res = await fetch(`/api/admin/services/${selectedServiceForAssign.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: targetPropertyId }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to assign property.');
+
+      const assignedProp = propertyOptions.find((p) => p.id === targetPropertyId);
+      showToast(
+        'Property Assigned',
+        `${selectedServiceForAssign.phone_number} linked to ${assignedProp?.name || 'property'}.`,
+        'success'
+      );
+      setShowAssignModal(false);
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  // Handle Create Service Submit
   const handleSaveCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const serviceId = formData.custom_service_id.trim();
+
+    if (!serviceId || serviceId.length < 6) {
+      setFormError('Service ID is mandatory and must be at least 6 characters.');
+      return;
+    }
+
     if (!formData.phone_number.trim()) {
-      setFormError('Phone number / DID identifier is required.');
+      setFormError('Service phone number / DID identifier is required.');
       return;
     }
 
@@ -282,18 +293,41 @@ export default function AdminServicesPage() {
       setFormLoading(true);
       setFormError(null);
 
+      const typeName = formData.is_custom_type
+        ? formData.custom_type_input.trim()
+        : formData.service_type_name;
+
       const res = await fetch('/api/admin/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          custom_service_id: serviceId,
+          service_name: formData.service_name.trim() || `Service ${formData.phone_number.trim()}`,
+          phone_number: formData.phone_number.trim(),
+          service_type_name: typeName,
+          property_id: formData.property_id || null,
+          description: formData.description.trim() || null,
+          status: formData.status,
+        }),
       });
 
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create service.');
 
-      showToast('Created', `${formData.phone_number} provisioned successfully.`, 'success');
+      showToast('Service Provisioned', `${serviceId} (${formData.phone_number}) created successfully.`, 'success');
       setShowCreateModal(false);
-      fetchServices();
+      setFormData({
+        custom_service_id: '',
+        service_name: '',
+        phone_number: '',
+        service_type_name: 'Direct Inward Dial (DID)',
+        custom_type_input: '',
+        is_custom_type: false,
+        property_id: '',
+        description: '',
+        status: 'ACTIVE',
+      });
+      loadData();
     } catch (err: any) {
       setFormError(err.message || 'Creation failed.');
       showToast('Error', err.message, 'error');
@@ -302,44 +336,62 @@ export default function AdminServicesPage() {
     }
   };
 
-  // --- Handlers: Edit Service ---
-  const handleOpenEdit = (service: ServiceRecord) => {
-    setSelectedServiceForEdit(service);
-    const primaryLink = service.attached_properties[0];
+  // Handle Edit Service Submit
+  const handleOpenEdit = (svc: ServiceItem) => {
+    setSelectedServiceForEdit(svc);
     setFormData({
-      phone_number: service.phone_number,
-      service_type_name: service.service_type,
-      org_property_id: primaryLink?.org_property_id || '',
-      description: service.description || '',
-      status: service.status,
+      custom_service_id: svc.custom_service_id || '',
+      service_name: svc.service_name || '',
+      phone_number: svc.phone_number || '',
+      service_type_name: svc.service_type || 'Direct Inward Dial (DID)',
+      custom_type_input: '',
+      is_custom_type: false,
+      property_id: svc.property_id || '',
+      description: svc.description || '',
+      status: (svc.status as any) || 'ACTIVE',
     });
     setFormError(null);
-    setShowEditDrawer(true);
+    setShowEditModal(true);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedServiceForEdit) return;
 
+    const serviceId = formData.custom_service_id.trim();
+    if (!serviceId || serviceId.length < 6) {
+      setFormError('Service ID is mandatory and must be at least 6 characters.');
+      return;
+    }
+
     try {
       setFormLoading(true);
       setFormError(null);
 
-      const res = await fetch('/api/admin/services', {
-        method: 'PUT',
+      const typeName = formData.is_custom_type
+        ? formData.custom_type_input.trim()
+        : formData.service_type_name;
+
+      const res = await fetch(`/api/admin/services/${selectedServiceForEdit.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: selectedServiceForEdit.id,
-          ...formData,
+          custom_service_id: serviceId,
+          service_name: formData.service_name.trim(),
+          phone_number: formData.phone_number.trim(),
+          service_type_name: typeName,
+          property_id: formData.property_id || null,
+          description: formData.description.trim() || null,
+          status: formData.status,
         }),
       });
 
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update service.');
 
-      showToast('Saved', `Service updated successfully.`, 'success');
-      setShowEditDrawer(false);
-      fetchServices();
+      showToast('Saved', `Service details updated successfully.`, 'success');
+      setShowEditModal(false);
+      loadData();
     } catch (err: any) {
       setFormError(err.message || 'Update failed.');
       showToast('Error', err.message, 'error');
@@ -348,76 +400,31 @@ export default function AdminServicesPage() {
     }
   };
 
-  // --- Handlers: Assign Service to Property ---
-  const handleOpenAssignModal = (service: ServiceRecord) => {
-    setSelectedServiceForAssign(service);
-    const primaryLink = service.attached_properties[0];
-    setSelectedOrgPropId(primaryLink?.org_property_id || 'UNASSIGNED');
-    setShowAssignModal(true);
-  };
-
-  const handleSaveAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedServiceForAssign) return;
-
-    try {
-      setAssignLoading(true);
-
-      const res = await fetch('/api/admin/services', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedServiceForAssign.id,
-          org_property_id: selectedOrgPropId === 'UNASSIGNED' ? '' : selectedOrgPropId,
-        }),
-      });
-
-      const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update property assignment.');
-
-      showToast('Assigned', 'Service property assignment updated.', 'success');
-      setShowAssignModal(false);
-      fetchServices();
-    } catch (err: any) {
-      showToast('Error', err.message, 'error');
-    } finally {
-      setAssignLoading(false);
-    }
-  };
-
   const resetAllFilters = () => {
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setSelectedTypeFilter('ALL');
-    setSelectedStatusFilter('ALL');
-    setSortBy('NEWEST');
-    setCurrentPage(1);
+    setSearchInput('');
+    dispatch(setSearchQuery(''));
+    dispatch(setTypeFilter('ALL'));
+    dispatch(setStatusFilter('ALL'));
+    dispatch(setSortBy('NEWEST'));
+    dispatch(setPagination({ currentPage: 1 }));
   };
 
-  const hasActiveFilters =
-    searchQuery.trim() !== '' ||
-    selectedTypeFilter !== 'ALL' ||
-    selectedStatusFilter !== 'ALL' ||
-    sortBy !== 'NEWEST';
+  const hasActiveFilters = filters.searchQuery.trim() !== '' || filters.selectedType !== 'ALL' || filters.selectedStatus !== 'ALL' || filters.sortBy !== 'NEWEST';
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="p-6 md:p-8 max-w-7xl mx-auto space-y-6"
-    >
-      {/* Toast Notification Container */}
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Toast Notifications */}
       <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${t.type === 'success'
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
+              t.type === 'success'
                 ? 'bg-slate-900/95 border-emerald-500/30 text-white'
                 : t.type === 'error'
-                  ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                  : 'bg-slate-900/95 border-blue-500/30 text-white'
-              }`}
+                ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                : 'bg-slate-900/95 border-blue-500/30 text-white'
+            }`}
           >
             {t.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -440,13 +447,13 @@ export default function AdminServicesPage() {
         ))}
       </div>
 
-      {/* Page Header (Clean: No Subtitle, No Mini Component) */}
+      {/* Page Header */}
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
-            <PhoneCall size={256} className="w-full h-full object-contain" />
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+            <PhoneCall size={256} className="text-black dark:text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Telephony Services</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Active Telecom Services</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -454,19 +461,19 @@ export default function AdminServicesPage() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              const headers = ['ID,PhoneNumber,ServiceType,Organization,AttachedProperty,Status\n'];
-              const rows = services.map((s) =>
-                `"${s.id}","${s.phone_number}","${s.service_type}","${s.attached_organization_name}","${s.attached_property_name}","${s.status}"`
+              const headers = ['Service ID,Name,Number,Type,Organization,Property,Status\n'];
+              const rows = services.map((s: ServiceRecord) =>
+                `"${s.custom_service_id}","${s.service_name}","${s.phone_number}","${s.service_type}","${s.attached_organization_name}","${s.attached_property_name}","${s.status}"`
               );
               const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `services-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `telecom-services-${new Date().toISOString().slice(0, 10)}.csv`;
               a.click();
               showToast('Exported', 'Services list exported as CSV.', 'info');
             }}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </motion.button>
@@ -474,7 +481,7 @@ export default function AdminServicesPage() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={resetAllFilters}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
           </motion.button>
@@ -483,9 +490,13 @@ export default function AdminServicesPage() {
             whileTap={{ scale: 0.97 }}
             onClick={() => {
               setFormData({
+                custom_service_id: '',
+                service_name: '',
                 phone_number: '',
                 service_type_name: 'Direct Inward Dial (DID)',
-                org_property_id: '',
+                custom_type_input: '',
+                is_custom_type: false,
+                property_id: '',
                 description: '',
                 status: 'ACTIVE',
               });
@@ -499,136 +510,121 @@ export default function AdminServicesPage() {
         </div>
       </motion.div>
 
-      {/* Real KPI Cards (5 Design System Variants with Hover Pop) */}
+      {/* Real KPI Cards - ONLY Variant 1 (Deep Blue) */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading && services.length === 0 ? (
-          [1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5 shadow-sm"
-            >
-              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
-              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
-              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
+        {/* Card 1: Total Services */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Total Services
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <PhoneCall size={18} />
             </div>
-          ))
-        ) : (
-          <>
-            {/* Card 1: Total Services -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Total Services
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <PhoneCall size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.totalServicesCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Lines</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Provisioned voice lines &amp; DIDs</p>
-            </motion.div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.totalServicesCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Provisioned</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">DIDs, SIP Trunks &amp; PBX Lines</p>
+        </motion.div>
 
-            {/* Card 2: Active Services -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Active Services
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <CheckCircle2 size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.activeServicesCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Connected</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Operational &amp; connected</p>
-            </motion.div>
+        {/* Card 2: Active Services */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Active Routing
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.activeServicesCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Active</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">100% operational traffic</p>
+        </motion.div>
 
-            {/* Card 3: Assigned Services -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Assigned Services
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <Building2 size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.assignedServicesCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Bound</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Bound to property locations</p>
-            </motion.div>
+        {/* Card 3: Property Linked */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Attached to Properties
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <Building2 size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.assignedServicesCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Mapped</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Single-property linked lines</p>
+        </motion.div>
 
-            {/* Card 4: Pending / Suspended -> Variant 1 (Deep Blue) */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Pending / Suspended
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <AlertCircle size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.inactiveOrSuspendedCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Attention</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Requires admin review</p>
-            </motion.div>
-          </>
-        )}
+        {/* Card 4: Inactive / Suspended */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Inactive / Suspended
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <AlertCircle size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.inactiveOrSuspendedCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Paused</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Suspended or unassigned</p>
+        </motion.div>
       </motion.div>
 
       {/* Search & Filter Toolbar */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-          {/* Search Box */}
+          {/* Search Box (char-by-char) */}
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search services by phone number, DID, description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+              placeholder="Search by Service ID, name, number, org, property..."
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
             />
-            {searchQuery && (
+            {searchInput && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => handleSearchChange('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
@@ -639,29 +635,13 @@ export default function AdminServicesPage() {
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <select
-              value={selectedTypeFilter}
+              value={filters.selectedStatus}
               onChange={(e) => {
-                setSelectedTypeFilter(e.target.value);
-                setCurrentPage(1);
+                dispatch(setStatusFilter(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Filter by service type"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
-            >
-              <option value="ALL">Type: All Types</option>
-              <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
-              <option value="SIP Trunk">SIP Trunk</option>
-              <option value="Emergency PRI">Emergency PRI</option>
-              <option value="Toll-Free DID">Toll-Free DID</option>
-            </select>
-
-            <select
-              value={selectedStatusFilter}
-              onChange={(e) => {
-                setSelectedStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              aria-label="Filter by status"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+              aria-label="Filter by service status"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">Status: All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -670,70 +650,55 @@ export default function AdminServicesPage() {
             </select>
 
             <select
-              value={sortBy}
+              value={filters.selectedType}
               onChange={(e) => {
-                setSortBy(e.target.value);
-                setCurrentPage(1);
+                dispatch(setTypeFilter(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Sort services"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+              aria-label="Filter by service type"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="NEWEST">Sort: Recently Created</option>
-              <option value="NUMBER_ASC">Sort: Phone Number (A-Z)</option>
-              <option value="NUMBER_DESC">Sort: Phone Number (Z-A)</option>
-              <option value="TYPE_ASC">Sort: Service Type</option>
+              <option value="ALL">Type: All Service Types</option>
+              {SERVICE_TYPES_LIST.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
             </select>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center p-0.5 bg-slate-100 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg">
-              <button
-                onClick={() => setViewMode('LIST')}
-                aria-label="List View"
-                className={`p-1 rounded transition cursor-pointer ${viewMode === 'LIST'
-                    ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-600'
-                  }`}
-              >
-                <List className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setViewMode('GRID')}
-                aria-label="Grid View"
-                className={`p-1 rounded transition cursor-pointer ${viewMode === 'GRID'
-                    ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-600'
-                  }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <select
+              value={filters.sortBy}
+              onChange={(e) => {
+                dispatch(setSortBy(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
+              }}
+              aria-label="Sort services"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="NEWEST">Sort: Recently Added</option>
+              <option value="NUMBER_ASC">Sort: Number (Asc)</option>
+              <option value="NUMBER_DESC">Sort: Number (Desc)</option>
+              <option value="TYPE_ASC">Sort: Service Type</option>
+            </select>
           </div>
         </div>
 
-        {/* Active Filters Bar */}
+        {/* Active Filters Pill Bar */}
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
             <span className="text-slate-400">Active Filters:</span>
-            {searchQuery && (
+            {filters.searchQuery && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                "{searchQuery}"
-                <button onClick={() => setSearchQuery('')} className="cursor-pointer">
+                "{filters.searchQuery}"
+                <button onClick={() => handleSearchChange('')} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
             )}
-            {selectedTypeFilter !== 'ALL' && (
+            {filters.selectedStatus !== 'ALL' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                {selectedTypeFilter}
-                <button onClick={() => setSelectedTypeFilter('ALL')} className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {selectedStatusFilter !== 'ALL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                {selectedStatusFilter}
-                <button onClick={() => setSelectedStatusFilter('ALL')} className="cursor-pointer">
+                Status: {filters.selectedStatus}
+                <button onClick={() => dispatch(setStatusFilter('ALL'))} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -746,48 +711,41 @@ export default function AdminServicesPage() {
             </button>
           </div>
         )}
-      </motion.div>
+      </div>
 
-      {/* Main Table / Grid View */}
+      {/* Main Table View */}
       {error ? (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
           <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load services</p>
           <p className="text-xs text-slate-400 mt-0.5">{error}</p>
           <button
-            onClick={() => fetchServices()}
-            className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+            onClick={loadData}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
-        </motion.div>
+        </div>
       ) : loading && services.length === 0 ? (
-        // Skeleton Loader
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
-              <div className="flex items-center gap-3 w-1/4">
-                <div className="w-8 h-8 bg-slate-200 dark:bg-[#222430] rounded-lg"></div>
-                <div className="space-y-1 flex-1">
-                  <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-3/4"></div>
-                  <div className="h-2.5 bg-slate-200 dark:bg-[#222430] rounded w-1/2"></div>
-                </div>
-              </div>
+              <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
               <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
-              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
               <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
               <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
             </div>
           ))}
-        </motion.div>
+        </div>
       ) : services.length === 0 ? (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
           <PhoneCall className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
           <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Services Found</h4>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
             {hasActiveFilters
-              ? 'No services matched the selected filters.'
-              : 'Get started by provisioning your first telephony voice line or DID.'}
+              ? 'No services match the selected filters.'
+              : 'Provision your first voice trunk or DID line.'}
           </p>
           <div className="mt-4 flex justify-center gap-2">
             {hasActiveFilters && (
@@ -798,124 +756,134 @@ export default function AdminServicesPage() {
                 Clear Filters
               </button>
             )}
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
+            <button
               onClick={() => {
                 setFormData({
+                  custom_service_id: '',
+                  service_name: '',
                   phone_number: '',
                   service_type_name: 'Direct Inward Dial (DID)',
-                  org_property_id: '',
+                  custom_type_input: '',
+                  is_custom_type: false,
+                  property_id: '',
                   description: '',
                   status: 'ACTIVE',
                 });
                 setShowCreateModal(true);
               }}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" /> Provision Service
-            </motion.button>
+            </button>
           </div>
-        </motion.div>
-      ) : viewMode === 'LIST' ? (
-        // Table View: Pure Black Headers & Pure Black Phone Number & ONLY Org Name
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">SERVICE & PHONE NUMBER</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">SERVICE TYPE</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ORGANIZATION</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ATTACHED PROPERTY</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE ID</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE NAME</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE NUMBER</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE TYPE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
-                {services.map((service) => {
+                {services.map((svc: ServiceRecord) => {
                   return (
-                    <tr key={service.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
-                      {/* 1. Service & Phone Number (Arimo Font, No font-mono) */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-blue-100 dark:border-blue-900/40">
-                            <Phone className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <span className="font-semibold text-black dark:text-white text-sm block">
-                              {service.phone_number}
-                            </span>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[200px]">
-                              {service.description || 'Voice Service Line'}
-                            </p>
-                          </div>
-                        </div>
+                    <tr
+                      key={svc.id}
+                      onClick={() => {
+                        setSelectedServiceForDetails(svc);
+                        setShowDetailsDrawer(true);
+                      }}
+                      className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition cursor-pointer"
+                    >
+                      {/* 1. Service ID */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-mono font-bold text-black dark:text-white text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430]">
+                          {svc.custom_service_id || svc.id.slice(0, 8).toUpperCase()}
+                        </span>
                       </td>
 
-                      {/* 2. Service Type */}
-                      <td className="py-3.5 px-4">
+                      {/* 2. Service Name */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-bold text-black dark:text-white text-sm block">
+                          {svc.service_name || `Service ${svc.phone_number}`}
+                        </span>
+                      </td>
+
+                      {/* 3. Service Number (NO phone icon) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {svc.phone_number}
+                        </span>
+                      </td>
+
+                      {/* 4. Service Type */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40">
+                          {svc.service_type || 'Voice Line'}
+                        </span>
+                      </td>
+
+                      {/* 5. Organization (Auto-resolved via single property) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-semibold text-slate-800 dark:text-white">
-                          {service.service_type}
+                          {svc.attached_organization_name || 'Unassigned'}
                         </span>
                       </td>
 
-                      {/* 3. Organization (ONLY NAME) */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-semibold text-black dark:text-white">
-                          {service.attached_organization_name || 'Unassigned'}
+                      {/* 6. Property */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-slate-700 dark:text-slate-300">
+                          {svc.attached_property_name || 'Unassigned'}
                         </span>
                       </td>
 
-                      {/* 4. Attached Property */}
-                      <td className="py-3.5 px-4">
-                        {service.attached_property_name !== 'Unassigned' ? (
-                          <div className="space-y-0.5">
-                            <span className="font-medium text-slate-800 dark:text-slate-200 block truncate max-w-[170px]">
-                              {service.attached_property_name}
-                            </span>
-                            {service.attached_properties.length > 1 && (
-                              <button
-                                onClick={() => {
-                                  setSelectedServiceForProps(service);
-                                  setShowPropertiesDrawer(true);
-                                }}
-                                className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline inline-block cursor-pointer"
-                              >
-                                +{service.attached_properties.length - 1} more locations &rarr;
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs font-normal">Unassigned</span>
-                        )}
-                      </td>
-
-                      {/* 5. Status */}
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${service.status === 'ACTIVE'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40'
-                              : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40'
-                            }`}
+                      {/* 7. Status (Click opens Smooth Slider Modal) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => handleOpenStatusSlider(e, svc)}>
+                        <button
+                          type="button"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition ${
+                            svc.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
+                              : svc.status === 'SUSPENDED'
+                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
+                              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
+                          }`}
                         >
-                          {service.status}
-                        </span>
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              svc.status === 'ACTIVE'
+                                ? 'bg-emerald-500'
+                                : svc.status === 'SUSPENDED'
+                                ? 'bg-rose-500'
+                                : 'bg-amber-500'
+                            }`}
+                          />
+                          {svc.status === 'ACTIVE' ? 'Active' : svc.status === 'SUSPENDED' ? 'Suspended' : 'Inactive'}
+                        </button>
                       </td>
 
-                      {/* 6. Actions (3-Dots Trigger) */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      {/* 8. Actions (Pencil & Three Dots) */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleOpenEdit(service)}
-                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            onClick={() => handleOpenEdit(svc)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
                             title="Edit Service"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={(e) => handleOpenMenu(e, service)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                            onClick={(e) => handleOpenMenu(e, svc)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
                             title="More Actions"
                           >
                             <MoreVertical className="w-3.5 h-3.5" />
@@ -929,677 +897,624 @@ export default function AdminServicesPage() {
             </table>
           </div>
 
-          {/* Server-Side Pagination Bar (10 items per page) */}
+          {/* Server-Side Pagination Bar */}
           <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <span className="text-slate-500 dark:text-slate-400">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} services
+              Showing {(pagination.currentPage - 1) * pagination.limit + 1} to{' '}
+              {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount} services
             </span>
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1 || loading}
+                onClick={() => dispatch(setPagination({ currentPage: Math.max(1, pagination.currentPage - 1) }))}
+                disabled={pagination.currentPage <= 1 || loading}
                 className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((num) => (
                 <button
                   key={num}
-                  onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${currentPage === num
-                      ? 'bg-blue-600 text-white'
+                  onClick={() => dispatch(setPagination({ currentPage: num }))}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    pagination.currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                    }`}
+                  }`}
                 >
                   {num}
                 </button>
               ))}
 
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages || loading}
+                onClick={() => dispatch(setPagination({ currentPage: Math.min(pagination.totalPages, pagination.currentPage + 1) }))}
+                disabled={pagination.currentPage >= pagination.totalPages || loading}
                 className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
-        </motion.div>
-      ) : (
-        // Grid View
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((service) => (
-            <div
-              key={service.id}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-4 shadow-sm space-y-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
-                    <Phone className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-black dark:text-white text-sm block">
-                      {service.phone_number}
-                    </span>
-                    <p className="text-[11px] text-slate-400">{service.service_type}</p>
-                  </div>
-                </div>
-
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${service.status === 'ACTIVE'
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : 'bg-amber-50 text-amber-600'
-                    }`}
-                >
-                  {service.status}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#1f212c] text-xs">
-                <div>
-                  <span className="text-slate-400 text-[11px]">Organization</span>
-                  <p className="font-semibold text-black dark:text-white truncate">
-                    {service.attached_organization_name}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[11px]">Attached Property</span>
-                  <p className="font-medium text-slate-700 dark:text-slate-300 truncate">
-                    {service.attached_property_name}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[#1f212c]">
-                <span className="text-[11px] text-slate-400 truncate max-w-[180px]">
-                  {service.description || 'Voice Service'}
-                </span>
-                <button
-                  onClick={(e) => handleOpenMenu(e, service)}
-                  className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <MoreVertical className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </motion.div>
+        </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* FIXED 3-DOTS ACTION POPUP (4 Specified Options) */}
-      {/* ========================================================================= */}
+      {/* 3-DOTS ACTION POPUP */}
       {menuPosition && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
           <div
             style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
-            className="fixed z-50 w-56 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
+            className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
               <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.service.phone_number}</p>
               <p className="text-[10px] text-slate-400">Service Options</p>
             </div>
 
-            {/* Option 1: Edit Service */}
             <button
               onClick={() => {
-                const service = menuPosition.service;
+                handleOpenEdit(menuPosition.service);
                 setMenuPosition(null);
-                handleOpenEdit(service);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Edit2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Edit Service
+              <Edit2 className="w-3.5 h-3.5 text-amber-500" />
+              <span>Edit Service</span>
             </button>
 
-            {/* Option 2: View Details */}
             <button
               onClick={() => {
-                const service = menuPosition.service;
-                setMenuPosition(null);
-                setSelectedServiceForDetails(service);
+                setSelectedServiceForDetails(menuPosition.service);
                 setShowDetailsDrawer(true);
+                setMenuPosition(null);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> View Details
+              <Eye className="w-3.5 h-3.5 text-blue-500" />
+              <span>View Details</span>
             </button>
 
-            {/* Option 3: See Properties in which this service is attached */}
             <button
               onClick={() => {
-                const service = menuPosition.service;
+                handleOpenAssignModal(menuPosition.service);
                 setMenuPosition(null);
-                setSelectedServiceForProps(service);
-                setShowPropertiesDrawer(true);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Building2 className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" /> See Properties
-            </button>
-
-            {/* Option 4: Assign this service to property (dropdown modal) */}
-            <button
-              onClick={() => {
-                const service = menuPosition.service;
-                setMenuPosition(null);
-                handleOpenAssignModal(service);
-              }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 border-t border-slate-100 dark:border-[#222430] cursor-pointer"
-            >
-              <LinkIcon className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" /> Assign to Property
+              <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Assign to Property</span>
             </button>
           </div>
         </>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. VIEW SERVICE DETAILS DRAWER */}
-      {/* ========================================================================= */}
+      {/* 1. STATUS SLIDER MODAL (Smooth slider between Active, Inactive, Suspended) */}
       <AnimatePresence>
-        {showDetailsDrawer && selectedServiceForDetails && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Service Details</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Specifications & configuration</p>
-                  </div>
-                  <button
-                    onClick={() => setShowDetailsDrawer(false)}
-                    className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-3.5 text-xs">
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Telephony Identification
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Phone Number / DID</span>
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {selectedServiceForDetails.phone_number}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
-                      <span className="text-slate-400">Service Type</span>
-                      <span className="font-semibold text-slate-800 dark:text-white">
-                        {selectedServiceForDetails.service_type}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Organization & Property Association
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Organization</span>
-                      <span className="font-semibold text-black dark:text-white">
-                        {selectedServiceForDetails.attached_organization_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Attached Property</span>
-                      <span className="font-semibold text-slate-800 dark:text-white">
-                        {selectedServiceForDetails.attached_property_name}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Status & Description
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Status</span>
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        {selectedServiceForDetails.status}
-                      </span>
-                    </div>
-                    <div className="pt-1">
-                      <span className="text-slate-400">Description</span>
-                      <p className="font-medium text-slate-800 dark:text-white mt-0.5">
-                        {selectedServiceForDetails.description || 'No description provided'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
+        {showStatusSliderModal && selectedServiceForStatus && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">Update Service Status</h3>
                 <button
-                  type="button"
-                  onClick={() => setShowDetailsDrawer(false)}
-                  className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#2c2e3c] transition cursor-pointer"
+                  onClick={() => setShowStatusSliderModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================================= */}
-      {/* 2. SEE PROPERTIES DRAWER */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {showPropertiesDrawer && selectedServiceForProps && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Attached Properties</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Properties using <span className="font-semibold text-slate-900 dark:text-white">{selectedServiceForProps.phone_number}</span>
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowPropertiesDrawer(false)}
-                    className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {selectedServiceForProps.attached_properties.length === 0 && selectedServiceForProps.attached_property_name === 'Unassigned' ? (
-                  <div className="p-8 border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-center">
-                    <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-1.5 opacity-60" />
-                    <p className="text-xs font-semibold text-slate-800 dark:text-white">No properties attached</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">This service is currently not assigned to any property.</p>
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => {
-                        setShowPropertiesDrawer(false);
-                        handleOpenAssignModal(selectedServiceForProps);
-                      }}
-                      className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    >
-                      <LinkIcon className="w-3.5 h-3.5" /> Assign Property Now
-                    </motion.button>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {(selectedServiceForProps.attached_properties.length > 0
-                      ? selectedServiceForProps.attached_properties
-                      : [{ name: selectedServiceForProps.attached_property_name, organization_name: selectedServiceForProps.attached_organization_name }]
-                    ).map((prop: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs">
-                            <Building2 className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-900 dark:text-white">{prop.name}</p>
-                            <p className="text-[11px] text-slate-400">
-                              Organization: <span className="font-medium text-slate-700 dark:text-slate-300">{prop.organization_name || 'Unassigned'}</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        <Link
-                          href={`/admin/properties`}
-                          className="px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-                        >
-                          View <ArrowUpRight className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end">
-                <button
-                  onClick={() => setShowPropertiesDrawer(false)}
-                  className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#2c2e3c] transition cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================================= */}
-      {/* 3. ASSIGN SERVICE TO PROPERTY MODAL */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {showAssignModal && selectedServiceForAssign && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Service to Property</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{selectedServiceForAssign.phone_number}</p>
-                </div>
-                <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveAssignment} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Select Property & Organization
-                  </label>
-                  <select
-                    value={selectedOrgPropId}
-                    onChange={(e) => setSelectedOrgPropId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs cursor-pointer"
-                  >
-                    <option value="UNASSIGNED">-- Unassigned (No Property) --</option>
-                    {orgPropOptions.map((opt, idx) => (
-                      <option key={idx} value={opt.org_property_id || opt.property_id}>
-                        {opt.property_name} {opt.property_city ? `(${opt.property_city})` : ''} &bull; {opt.organization_name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Associating this service allows the property's PBX routing and DID allocation to activate.
+              <div className="mt-4 space-y-4 text-xs">
+                <p className="text-slate-600 dark:text-slate-400">
+                  Select operating state for <span className="font-bold text-black dark:text-white">{selectedServiceForStatus.phone_number}</span>:
+                </p>
+
+                {/* Smooth Slider Control */}
+                <div className="p-1.5 bg-slate-100 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] grid grid-cols-3 gap-1 relative">
+                  {(['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setStatusSliderValue(st)}
+                      className={`py-2 px-2 rounded-lg font-bold text-[11px] transition-all cursor-pointer relative z-10 flex flex-col items-center gap-1 ${
+                        statusSliderValue === st
+                          ? st === 'ACTIVE'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : st === 'SUSPENDED'
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'bg-amber-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>{st}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] text-[11px]">
+                  {statusSliderValue === 'ACTIVE' && (
+                    <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      • Traffic actively routes to PBX / SIP Trunks.
+                    </p>
+                  )}
+                  {statusSliderValue === 'INACTIVE' && (
+                    <p className="text-amber-600 dark:text-amber-400 font-medium">
+                      • Service is paused and traffic is not routed.
+                    </p>
+                  )}
+                  {statusSliderValue === 'SUSPENDED' && (
+                    <p className="text-rose-600 dark:text-rose-400 font-medium">
+                      • Inbound and outbound services suspended immediately.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 mt-5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <button
+                  onClick={() => setShowStatusSliderModal(false)}
+                  className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmStatusSlider}
+                  disabled={statusSliderLoading}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {statusSliderLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Apply Status'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. VIEW DETAILS SIDE DRAWER */}
+      <AnimatePresence>
+        {showDetailsDrawer && selectedServiceForDetails && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="fixed inset-0" onClick={() => setShowDetailsDrawer(false)} />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10"
+            >
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <PhoneCall className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Service Line Details</h3>
+                    <p className="text-xs text-slate-400">{selectedServiceForDetails.phone_number}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1">
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Service ID</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-mono font-bold text-slate-900 dark:text-white">
+                    {selectedServiceForDetails.custom_service_id || selectedServiceForDetails.id}
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAssignModal(false)}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    type="submit"
-                    disabled={assignLoading}
-                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
-                  >
-                    {assignLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                    Save Assignment
-                  </motion.button>
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Service Name</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
+                    {selectedServiceForDetails.service_name}
+                  </p>
                 </div>
-              </form>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">DID / Phone Number</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
+                    {selectedServiceForDetails.phone_number}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Service Type</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                    {selectedServiceForDetails.service_type}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Assigned Property</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                    {selectedServiceForDetails.attached_property_name || 'Unassigned'}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Assigned Organization</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                    {selectedServiceForDetails.attached_organization_name || 'Unassigned'}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Status</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    {selectedServiceForDetails.status}
+                  </p>
+                </div>
+
+                {selectedServiceForDetails.description && (
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block text-xs">Description</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-300">
+                      {selectedServiceForDetails.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end gap-2">
+                <button
+                  onClick={() => setShowDetailsDrawer(false)}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* ========================================================================= */}
-      {/* 4. EDIT SERVICE DRAWER */}
-      {/* ========================================================================= */}
+      {/* 3. ASSIGN TO PROPERTY MODAL */}
       <AnimatePresence>
-        {showEditDrawer && selectedServiceForEdit && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Edit Service</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{selectedServiceForEdit.phone_number}</p>
-                  </div>
-                  <button
-                    onClick={() => setShowEditDrawer(false)}
-                    className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+        {showAssignModal && selectedServiceForAssign && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <div className="flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">Assign Service to Property</h3>
+                </div>
+                <button
+                  onClick={() => setShowAssignModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmAssignProperty} className="mt-4 space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Service Identifier</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
+                    {selectedServiceForAssign.phone_number} ({selectedServiceForAssign.service_type})
+                  </p>
                 </div>
 
-                {formError && (
-                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-                  </div>
-                )}
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Select Property</label>
+                  <select
+                    value={targetPropertyId}
+                    onChange={(e) => setTargetPropertyId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">Choose property to link...</option>
+                    {propertyOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.organization_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                <form onSubmit={handleSaveEdit} id="edit-service-form" className="space-y-3.5 mt-5 text-xs">
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 rounded-xl text-[11px] text-blue-700 dark:text-blue-300">
+                  <Info className="w-3.5 h-3.5 inline mr-1" />
+                  Rule: One service can only be assigned to one property. Assigning this service will associate it with the selected property and its parent organization.
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignModal(false)}
+                    className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={assignLoading || !targetPropertyId}
+                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  >
+                    {assignLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Confirm Assignment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. PROVISION NEW SERVICE MODAL */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Provision New Service</h3>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">
+                    Service ID <span className="text-rose-500">* (Min 6 chars)</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    value={formData.custom_service_id}
+                    onChange={(e) => setFormData({ ...formData, custom_service_id: e.target.value })}
+                    placeholder="e.g. SVC-MIA-001"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Phone Number / DID *
+                    <label className="font-bold text-black dark:text-white block mb-1">Service Name</label>
+                    <input
+                      type="text"
+                      value={formData.service_name}
+                      onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                      placeholder="e.g. Main Lobby Line"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">
+                      Phone Number / DID <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={formData.phone_number}
                       onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Service Type
-                    </label>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-black dark:text-white block">Service Type</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_custom_type: !formData.is_custom_type })}
+                      className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                    >
+                      {formData.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                    </button>
+                  </div>
+
+                  {formData.is_custom_type ? (
+                    <input
+                      type="text"
+                      required
+                      value={formData.custom_type_input}
+                      onChange={(e) => setFormData({ ...formData, custom_type_input: e.target.value })}
+                      placeholder="Enter new custom service type..."
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  ) : (
                     <select
                       value={formData.service_type_name}
                       onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
-                      <option value="SIP Trunk">SIP Trunk</option>
-                      <option value="Emergency PRI">Emergency PRI</option>
-                      <option value="Toll-Free DID">Toll-Free DID</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Attached Property Location
-                    </label>
-                    <select
-                      value={formData.org_property_id}
-                      onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
-                    >
-                      <option value="">-- No Property (Unassigned) --</option>
-                      {orgPropOptions.map((opt, idx) => (
-                        <option key={idx} value={opt.org_property_id || opt.property_id}>
-                          {opt.property_name} ({opt.organization_name})
+                      {SERVICE_TYPES_LIST.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Description</label>
-                    <textarea
-                      rows={2}
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="e.g. Front Desk Direct Line"
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
-                    >
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
-                      <option value="SUSPENDED">Suspended</option>
-                    </select>
-                  </div>
-                </form>
-              </div>
-
-              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowEditDrawer(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  type="submit"
-                  form="edit-service-form"
-                  disabled={formLoading}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
-                >
-                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Save Changes
-                </motion.button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================================= */}
-      {/* 5. PROVISION SERVICE MODAL */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#222430]">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Provision New Service</h3>
-                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {formError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-                </div>
-              )}
-
-              <form onSubmit={handleSaveCreate} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Phone Number / DID *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="+1 (555) 000-0000"
-                    value={formData.phone_number}
-                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
+                  )}
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Service Type
-                  </label>
+                  <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
                   <select
-                    value={formData.service_type_name}
-                    onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    value={formData.property_id}
+                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
-                    <option value="Direct Inward Dial (DID)">Direct Inward Dial (DID)</option>
-                    <option value="SIP Trunk">SIP Trunk</option>
-                    <option value="Emergency PRI">Emergency PRI</option>
-                    <option value="Toll-Free DID">Toll-Free DID</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Attach to Property
-                  </label>
-                  <select
-                    value={formData.org_property_id}
-                    onChange={(e) => setFormData({ ...formData, org_property_id: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
-                  >
-                    <option value="">-- Leave Unassigned --</option>
-                    {orgPropOptions.map((opt, idx) => (
-                      <option key={idx} value={opt.org_property_id || opt.property_id}>
-                        {opt.property_name} ({opt.organization_name})
+                    <option value="">Unassigned</option>
+                    {propertyOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.organization_name})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Description / Label
-                  </label>
+                  <label className="font-bold text-black dark:text-white block mb-1">Description</label>
                   <textarea
                     rows={2}
-                    placeholder="e.g. Reservation Line"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                    placeholder="e.g. Primary inbound DID for front desk operations"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] transition cursor-pointer"
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                  <button
                     type="submit"
                     disabled={formLoading}
-                    className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                    className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
-                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    Provision Line
-                  </motion.button>
+                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Provision Service'}
+                  </button>
                 </div>
               </form>
-            </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 5. EDIT SERVICE MODAL */}
+      <AnimatePresence>
+        {showEditModal && selectedServiceForEdit && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Edit Service Details</h3>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">
+                    Service ID <span className="text-rose-500">* (Min 6 chars)</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    value={formData.custom_service_id}
+                    onChange={(e) => setFormData({ ...formData, custom_service_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Service Name</label>
+                    <input
+                      type="text"
+                      value={formData.service_name}
+                      onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.phone_number}
+                      onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Service Type</label>
+                  <select
+                    value={formData.service_type_name}
+                    onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    {SERVICE_TYPES_LIST.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
+                  <select
+                    value={formData.property_id}
+                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {propertyOptions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.organization_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-black dark:text-white block mb-1">Description</label>
+                  <textarea
+                    rows={2}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={formLoading}
+                    className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </AnimatePresence>

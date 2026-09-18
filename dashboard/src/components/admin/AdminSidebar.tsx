@@ -37,7 +37,7 @@ const navItems = [
   { label: 'Services & Lines', href: '/admin/services', icon: PhoneCall },
   { label: 'Onboarding', href: '/admin/onboarding-porting', icon: GitBranch },
   { label: 'E911 Compliance', href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
-  { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badge: '14', badgeColor: 'bg-[#f43f5e] text-white' },
+  { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white' },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock },
   { label: 'System Settings', href: '/admin/settings', icon: Settings },
 ];
@@ -129,7 +129,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
                       {item.statusDot && !isActive && (
                         <span className={`w-1.5 h-1.5 rounded-full ${item.statusDot}`} />
                       )}
-                      {item.badge && (
+                      {/* {item.badge && (
                         <span
                           className={`text-[10px] px-1.5 py-0.2 rounded-full font-medium ${
                             item.badgeColor || 'bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46]'
@@ -137,7 +137,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
                         >
                           {item.badge}
                         </span>
-                      )}
+                      )} */}
                     </div>
                   )}
                 </Link>

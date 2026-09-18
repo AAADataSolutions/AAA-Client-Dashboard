@@ -8,7 +8,6 @@ import {
   Plus,
   Download,
   MoreVertical,
-  Building2,
   CheckCircle2,
   AlertCircle,
   ChevronLeft,
@@ -20,12 +19,30 @@ import {
   Sparkles,
   RefreshCw,
   Info,
-  FileText,
   Clock,
   Loader2,
   Check,
   Hotel,
+  Copy,
+  Mail,
+  Phone,
+  MapPin,
+  Eye,
+  GitBranch,
+  ShieldCheck,
+  Building2,
 } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  fetchOnboardings,
+  setSearchQuery,
+  setStageFilter,
+  setSortBy,
+  setPagination,
+  optimisticUpdateStage,
+  OnboardingItem,
+  OnboardingRecord,
+} from '@/store/slices/onboardingSlice';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -54,58 +71,16 @@ export type OnboardingStatus =
   | 'FOC_RECEIVED'
   | 'COMPLETED';
 
-interface PropertyDetails {
-  id?: string;
-  name: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
-  zip_code?: string;
-  main_phone?: string;
-  contact_person_name?: string;
-  contact_person_email?: string;
-  general_manager_name?: string;
-}
-
-interface OrganizationDetails {
-  id?: string;
-  name: string;
-  primary_email?: string;
-  primary_phone?: string;
-  address_line1?: string;
-  city?: string;
-  state?: string;
-}
-
-interface OnboardingRecord {
-  id: string;
-  status: OnboardingStatus;
-  target_date: string | null;
-  contract_sent_at?: string | null;
-  signed_at?: string | null;
-  porting_waiting_at?: string | null;
-  porting_submitted_at?: string | null;
-  sof_waiting_at?: string | null;
-  foc_received_at?: string | null;
-  completed_at?: string | null;
-  progress_pct: number;
-  property_id?: string;
-  property_name: string;
-  organization_id?: string;
-  organization_name: string;
-  property_details?: PropertyDetails | null;
-  organization_details?: OrganizationDetails | null;
-  created_at: string;
-  updated_at?: string;
-}
-
-interface Toast {
-  id: string;
-  title: string;
-  message?: string;
-  type: 'success' | 'error' | 'info';
-}
+const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: string }[] = [
+  { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status' },
+  { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM' },
+  { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified' },
+  { key: 'PORTING_WAITING', label: 'Waiting for LOA', step: 4, desc: 'Awaiting LOA documentation and bill copy' },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5, desc: 'LSR submitted to winning carrier' },
+  { key: 'SOF_WAITING', label: 'SOF Review', step: 6, desc: 'Service Order Form technical review' },
+  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 7, desc: 'Firm Order Confirmation date locked' },
+  { key: 'COMPLETED', label: 'Live Cutover', step: 8, desc: 'Traffic migrated & property activated' },
+];
 
 function getStageBadge(status: OnboardingStatus): { label: string; bg: string; text: string; border: string; pct: number } {
   switch (status) {
@@ -130,39 +105,46 @@ function getStageBadge(status: OnboardingStatus): { label: string; bg: string; t
   }
 }
 
+interface OrgOption {
+  id: string;
+  name: string;
+}
+
+interface Toast {
+  id: string;
+  title: string;
+  message?: string;
+  type: 'success' | 'error' | 'info';
+}
+
 export default function AdminOnboardingPortingPage() {
-  const [onboardings, setOnboardings] = useState<OnboardingRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    items: onboardings,
+    loading,
+    error,
+    pagination,
+    metrics,
+    filters,
+  } = useAppSelector((state) => state.onboarding);
 
-  // Server-Side Pagination (10 per page)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const itemsPerPage = 10;
+  const [orgOptions, setOrgOptions] = useState<OrgOption[]>([]);
+  const [searchInput, setSearchInput] = useState(filters.searchQuery);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  // Real Database Metrics (No fake data)
-  const [metrics, setMetrics] = useState({
-    totalOnboardings: 0,
-    completedCount: 0,
-    inProgressCount: 0,
-    pendingReviewCount: 0,
-  });
+  // Modals & Drawers
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'DETAILS' | 'STAGE'>('DETAILS');
+  const [selectedRecord, setSelectedRecord] = useState<OnboardingItem | null>(null);
 
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
-  const [sortBy, setSortBy] = useState('NEWEST');
+  // Stage Edit State inside Unified Modal
+  const [editStageStatus, setEditStageStatus] = useState<OnboardingStatus>('DRAFT');
+  const [editTargetDate, setEditTargetDate] = useState<string>('');
+  const [updatingStage, setUpdatingStage] = useState(false);
 
-  // Debounce search (300ms)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
+  // 3-Dots Action Menu Position
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: OnboardingItem } | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -174,227 +156,232 @@ export default function AdminOnboardingPortingPage() {
     }, 4000);
   }, []);
 
-  // Fixed 3-Dots Action Menu Overlay
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: OnboardingRecord } | null>(null);
-
-  // Drawers & Modals
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditDrawer, setShowEditDrawer] = useState(false);
-  const [selectedRecordForEdit, setSelectedRecordForEdit] = useState<OnboardingRecord | null>(null);
-
-  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
-  const [selectedRecordForDetails, setSelectedRecordForDetails] = useState<OnboardingRecord | null>(null);
-
-  // Form State for creating a brand new property onboarding (NO Organization input needed)
-  const [newPropertyForm, setNewPropertyForm] = useState({
+  // Form State for creating new onboarding
+  const [createForm, setCreateForm] = useState({
     property_name: '',
+    organization_id: '',
     address: '',
     city: '',
     state: '',
     zip_code: '',
     general_manager_name: '',
-    contact_person_name: '',
-    contact_person_email: '',
-    main_phone: '',
-    status: 'DRAFT' as OnboardingStatus,
+    general_manager_phone: '',
+    general_manager_email: '',
     target_date: '',
+    e911_status: 'PENDING',
+    ray_baum_status: 'AUDIT_REQUIRED',
   });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  // Form State for editing
-  const [editFormData, setEditFormData] = useState({
-    status: 'DRAFT' as OnboardingStatus,
-    target_date: '',
-  });
-
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  // Fetch Onboardings (Server-Side Paginated)
-  const fetchOnboardings = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-        search: debouncedSearch,
-        stage: selectedStageFilter,
-        sortBy: sortBy,
-      });
-
-      const res = await fetch(`/api/admin/onboarding?${params.toString()}`);
-      const result = await res.json();
-
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || 'Failed to fetch onboarding records.');
+  // Load organizations for dropdown
+  useEffect(() => {
+    async function loadOrgs() {
+      try {
+        const res = await fetch('/api/admin/organizations?limit=100');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setOrgOptions(data.data.map((o: any) => ({ id: o.id, name: o.name })));
+        }
+      } catch (err) {
+        console.warn('Could not load org options:', err);
       }
-
-      setOnboardings(result.data || []);
-      if (result.pagination) {
-        setTotalCount(result.pagination.totalCount);
-        setTotalPages(result.pagination.totalPages);
-      }
-      if (result.metrics) {
-        setMetrics(result.metrics);
-      }
-    } catch (err: any) {
-      console.error('Error fetching onboarding:', err);
-      setError(err.message || 'Error loading onboarding records.');
-    } finally {
-      setLoading(false);
     }
-  }, [currentPage, debouncedSearch, selectedStageFilter, sortBy]);
+    loadOrgs();
+  }, []);
+
+  // Fetch Onboardings
+  const loadData = useCallback(() => {
+    dispatch(
+      fetchOnboardings({
+        page: pagination.currentPage,
+        limit: pagination.limit,
+        searchQuery: filters.searchQuery,
+        stage: filters.selectedStage,
+        sortBy: filters.sortBy,
+      })
+    );
+  }, [dispatch, pagination.currentPage, pagination.limit, filters]);
 
   useEffect(() => {
-    fetchOnboardings();
-  }, [fetchOnboardings]);
+    loadData();
+  }, [loadData]);
+
+  // Search input handler (char-by-char)
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    dispatch(setSearchQuery(val));
+  };
+
+  // Copy helper
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    showToast('Copied', `${text} copied to clipboard.`, 'info');
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   // Open 3-Dots Menu
-  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: OnboardingRecord) => {
+  const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: OnboardingItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const menuWidth = 220;
+    const menuWidth = 200;
     const left = Math.max(16, rect.right - menuWidth);
     const top = rect.bottom + 4;
     setMenuPosition({ top, left, record });
   };
 
-  // --- Handlers: Create Brand New Property Onboarding ---
-  const handleSaveCreate = async (e: React.FormEvent) => {
+  // Open Unified Modal
+  const openUnifiedModal = (record: OnboardingItem, defaultTab: 'DETAILS' | 'STAGE' = 'DETAILS') => {
+    setSelectedRecord(record);
+    setActiveTab(defaultTab);
+    setEditStageStatus(record.status as OnboardingStatus);
+    setEditTargetDate(record.target_date || '');
+    setShowUnifiedModal(true);
+  };
+
+  // Handle Save Create Onboarding
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPropertyForm.property_name.trim()) {
-      setFormError('Please enter the Property Name.');
+    if (!createForm.property_name.trim()) {
+      setCreateError('Property name is required.');
       return;
     }
 
     try {
-      setFormLoading(true);
-      setFormError(null);
+      setCreateLoading(true);
+      setCreateError(null);
 
       const res = await fetch('/api/admin/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPropertyForm),
+        body: JSON.stringify(createForm),
       });
 
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to initialize onboarding.');
 
-      showToast('Property Added & Onboarding Started', `${newPropertyForm.property_name} registered in database.`, 'success');
+      showToast('Onboarding Initialized', `${createForm.property_name} saved as Draft Initialized (INACTIVE).`, 'success');
       setShowCreateModal(false);
-      fetchOnboardings();
+      setCreateForm({
+        property_name: '',
+        organization_id: '',
+        address: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        general_manager_name: '',
+        general_manager_phone: '',
+        general_manager_email: '',
+        target_date: '',
+        e911_status: 'PENDING',
+        ray_baum_status: 'AUDIT_REQUIRED',
+      });
+      loadData();
     } catch (err: any) {
-      setFormError(err.message || 'Creation failed.');
+      setCreateError(err.message || 'Creation failed.');
       showToast('Error', err.message, 'error');
     } finally {
-      setFormLoading(false);
+      setCreateLoading(false);
     }
   };
 
-  // --- Handlers: Edit ---
-  const handleOpenEdit = (record: OnboardingRecord) => {
-    setSelectedRecordForEdit(record);
-    setEditFormData({
-      status: record.status,
-      target_date: record.target_date || '',
-    });
-    setFormError(null);
-    setShowEditDrawer(true);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
+  // Handle Update Stage
+  const handleUpdateStageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRecordForEdit) return;
+    if (!selectedRecord) return;
+
+    // Instant optimistic Redux update (< 1ms zero reload)
+    dispatch(optimisticUpdateStage({ id: selectedRecord.id, stage: editStageStatus, status: editStageStatus }));
 
     try {
-      setFormLoading(true);
-      setFormError(null);
-
+      setUpdatingStage(true);
       const res = await fetch('/api/admin/onboarding', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: selectedRecordForEdit.id,
-          status: editFormData.status,
-          target_date: editFormData.target_date || null,
+          id: selectedRecord.id,
+          status: editStageStatus,
+          target_date: editTargetDate || null,
         }),
       });
 
       const result = await res.json();
-      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update record.');
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update stage.');
 
-      showToast('Updated', 'Onboarding status updated.', 'success');
-      setShowEditDrawer(false);
-      fetchOnboardings();
+      if (editStageStatus === 'COMPLETED') {
+        showToast(
+          'Property Activated!',
+          `${selectedRecord.property_name} cutover complete — property is now ACTIVE!`,
+          'success'
+        );
+      } else {
+        showToast('Stage Updated', `Progress updated to ${getStageBadge(editStageStatus).label}.`, 'success');
+      }
+
+      setShowUnifiedModal(false);
+      loadData();
     } catch (err: any) {
-      setFormError(err.message || 'Update failed.');
       showToast('Error', err.message, 'error');
+      loadData();
     } finally {
-      setFormLoading(false);
+      setUpdatingStage(false);
     }
   };
 
   const resetAllFilters = () => {
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setSelectedStageFilter('ALL');
-    setSortBy('NEWEST');
-    setCurrentPage(1);
+    setSearchInput('');
+    dispatch(setSearchQuery(''));
+    dispatch(setStageFilter('ALL'));
+    dispatch(setSortBy('NEWEST'));
+    dispatch(setPagination({ currentPage: 1 }));
   };
 
-  const hasActiveFilters =
-    searchQuery.trim() !== '' ||
-    selectedStageFilter !== 'ALL' ||
-    sortBy !== 'NEWEST';
+  const hasActiveFilters = filters.searchQuery.trim() !== '' || filters.selectedStage !== 'ALL' || filters.sortBy !== 'NEWEST';
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Toast Notification Container */}
       <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-auto">
-        <AnimatePresence>
-          {toasts.map((t) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all ${t.type === 'success'
-                  ? 'bg-slate-900/95 border-emerald-500/30 text-white'
-                  : t.type === 'error'
-                    ? 'bg-slate-900/95 border-rose-500/30 text-white'
-                    : 'bg-slate-900/95 border-blue-500/30 text-white'
-                }`}
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`p-3.5 rounded-xl border shadow-lg flex items-start gap-3 backdrop-blur-md transition-all animate-in slide-in-from-top-3 ${
+              t.type === 'success'
+                ? 'bg-slate-900/95 border-emerald-500/30 text-white'
+                : t.type === 'error'
+                ? 'bg-slate-900/95 border-rose-500/30 text-white'
+                : 'bg-slate-900/95 border-blue-500/30 text-white'
+            }`}
+          >
+            {t.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            ) : t.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs">
+              <p className="font-semibold text-white">{t.title}</p>
+              {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
+            </div>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              className="text-slate-400 hover:text-white cursor-pointer"
             >
-              {t.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-              ) : t.type === 'error' ? (
-                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-              ) : (
-                <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 text-xs">
-                <p className="font-semibold text-white">{t.title}</p>
-                {t.message && <p className="text-slate-300 mt-0.5">{t.message}</p>}
-              </div>
-              <button
-                onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
-                className="text-slate-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
       </div>
 
-      {/* Page Header (Clean: No Subtitle, Raw Icon) */}
+      {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
-            <ArrowLeftRight size={256} className="w-full h-full object-contain" />
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+            <ArrowLeftRight size={256} className="text-black dark:text-white" />
           </div>
-          <h1 className="text-xl font-bold text-black dark:text-white tracking-tight">Onboarding &amp; Porting</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Onboarding &amp; Porting</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -402,19 +389,19 @@ export default function AdminOnboardingPortingPage() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              const headers = ['ID,Property,Organization,Status,Progress,TargetDate\n'];
-              const rows = onboardings.map((o) =>
-                `"${o.id}","${o.property_name}","${o.organization_name}","${o.status}","${o.progress_pct}%","${o.target_date || 'N/A'}"`
+              const headers = ['ID,Property,Organization,Stage,Target Date,GM Name,GM Phone,GM Email\n'];
+              const rows = onboardings.map((o: OnboardingRecord) =>
+                `"${o.id}","${o.property_name}","${o.organization_name}","${o.stage || o.status || ''}","${o.target_date || ''}","${o.general_manager_name || ''}","${o.general_manager_phone || ''}","${o.general_manager_email || ''}"`
               );
               const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `onboarding-tracker-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `onboardings-${new Date().toISOString().slice(0, 10)}.csv`;
               a.click();
-              showToast('Exported', 'Onboarding records exported as CSV.', 'info');
+              showToast('Exported', 'Onboardings exported as CSV.', 'info');
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
           </motion.button>
@@ -422,7 +409,7 @@ export default function AdminOnboardingPortingPage() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={resetAllFilters}
-            className="px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
           </motion.button>
@@ -430,159 +417,145 @@ export default function AdminOnboardingPortingPage() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              setNewPropertyForm({
+              setCreateForm({
                 property_name: '',
+                organization_id: '',
                 address: '',
                 city: '',
                 state: '',
                 zip_code: '',
                 general_manager_name: '',
-                contact_person_name: '',
-                contact_person_email: '',
-                main_phone: '',
-                status: 'DRAFT',
+                general_manager_phone: '',
+                general_manager_email: '',
                 target_date: '',
+                e911_status: 'PENDING',
+                ray_baum_status: 'AUDIT_REQUIRED',
               });
-              setFormError(null);
+              setCreateError(null);
               setShowCreateModal(true);
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" /> New Onboarding
+            <Plus className="w-3.5 h-3.5" /> Initialize Property Onboarding
           </motion.button>
         </div>
       </motion.div>
 
-      {/* Real KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading && onboardings.length === 0 ? (
-          [1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl animate-pulse space-y-2.5"
-            >
-              <div className="h-3 w-24 bg-slate-200 dark:bg-[#222430] rounded"></div>
-              <div className="h-7 w-12 bg-slate-200 dark:bg-[#222430] rounded"></div>
-              <div className="h-3 w-28 bg-slate-200 dark:bg-[#222430] rounded"></div>
+      {/* Real KPI Cards - ONLY Variant 1 (Deep Blue) */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Pipelines */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Total Pipelines
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <Hotel size={18} />
             </div>
-          ))
-        ) : (
-          <>
-            {/* Total Onboardings - Variant 1 Deep Blue */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Total Onboardings
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <Hotel size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.totalOnboardings}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Deployments</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Tracked client workflows</p>
-            </motion.div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.totalOnboardings}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Properties</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Active &amp; completed lifecycles</p>
+        </motion.div>
 
-            {/* Live Cutover - Variant 1 Deep Blue */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Live Cutover
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <CheckCircle2 size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.completedCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Completed</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Successful cutovers</p>
-            </motion.div>
+        {/* Card 2: Porting In-Flight */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Porting In-Flight
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <ArrowLeftRight size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.inProgressCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Orders</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">LOA, SOF &amp; FOC carrier stages</p>
+        </motion.div>
 
-            {/* Porting In-Flight - Variant 1 Deep Blue */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Porting In-Flight
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <Clock size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.inProgressCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">In Progress</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Carrier LOA / FOC stage</p>
-            </motion.div>
+        {/* Card 3: Pending Review */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Draft &amp; Pending
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.pendingReviewCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">Awaiting contract signing</p>
+        </motion.div>
 
-            {/* Draft & Contract - Variant 1 Deep Blue */}
-            <motion.div
-              variants={itemVariants}
-              whileHover={{ y: -4, scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-                  Draft &amp; Contract
-                </span>
-                <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-                  <FileText size={18} />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-bold text-slate-100 dark:text-white">
-                  {metrics.pendingReviewCount}
-                </span>
-                <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
-              </div>
-              <p className="text-[11px] text-slate-100 mt-2">Pending documentation / signatures</p>
-            </motion.div>
-          </>
-        )}
-      </div>
+        {/* Card 4: Cutover Complete */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -4, scale: 1.02 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
+              Cutover Complete
+            </span>
+            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-slate-100 dark:text-white">
+              {metrics.completedCount}
+            </span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Active</span>
+          </div>
+          <p className="text-[11px] text-slate-100 mt-2">100% migrated &amp; operational</p>
+        </motion.div>
+      </motion.div>
 
       {/* Search & Filter Toolbar */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-          {/* Search Box */}
+          {/* Search Box (char-by-char) */}
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search by property or organization name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="Search by property, address, GM, organization..."
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
             />
-            {searchQuery && (
+            {searchInput && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => handleSearchChange('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
@@ -590,62 +563,59 @@ export default function AdminOnboardingPortingPage() {
             )}
           </div>
 
-          {/* Filters */}
+          {/* Stage Filter */}
           <div className="flex items-center gap-2 flex-wrap">
             <select
-              value={selectedStageFilter}
+              value={filters.selectedStage}
               onChange={(e) => {
-                setSelectedStageFilter(e.target.value);
-                setCurrentPage(1);
+                dispatch(setStageFilter(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
               aria-label="Filter by stage"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">Stage: All Stages</option>
-              <option value="DRAFT">Draft Initialized</option>
-              <option value="CONTRACT_SENT">Contract Sent</option>
-              <option value="SIGNED">Contract Signed</option>
-              <option value="PORTING_WAITING">Waiting for LOA</option>
-              <option value="PORTING_SUBMITTED">Porting Submitted</option>
-              <option value="SOF_WAITING">SOF Review</option>
-              <option value="FOC_RECEIVED">FOC Confirmed</option>
-              <option value="COMPLETED">Live Cutover</option>
+              {STAGES_ROAD.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
             </select>
 
             <select
-              value={sortBy}
+              value={filters.sortBy}
               onChange={(e) => {
-                setSortBy(e.target.value);
-                setCurrentPage(1);
+                dispatch(setSortBy(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Sort records"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              aria-label="Sort pipelines"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="NEWEST">Sort: Recently Created</option>
-              <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
+              <option value="NEWEST">Sort: Recently Added</option>
+              <option value="PROP_ASC">Sort: Property (A-Z)</option>
               <option value="ORG_ASC">Sort: Organization (A-Z)</option>
-              <option value="STATUS">Sort: Progress % (High to Low)</option>
+              <option value="STATUS">Sort: Stage Progress</option>
             </select>
           </div>
         </div>
 
-        {/* Active Filters Bar */}
+        {/* Active Filters Pill Bar */}
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
             <span className="text-slate-400">Active Filters:</span>
-            {searchQuery && (
+            {filters.searchQuery && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                "{searchQuery}"
-                <button onClick={() => setSearchQuery('')} className="cursor-pointer">
-                  <X className="w-3.5 h-3.5" />
+                "{filters.searchQuery}"
+                <button onClick={() => handleSearchChange('')} className="cursor-pointer">
+                  <X className="w-3 h-3" />
                 </button>
               </span>
             )}
-            {selectedStageFilter !== 'ALL' && (
+            {filters.selectedStage !== 'ALL' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                {selectedStageFilter}
-                <button onClick={() => setSelectedStageFilter('ALL')} className="cursor-pointer">
-                  <X className="w-3.5 h-3.5" />
+                Stage: {filters.selectedStage}
+                <button onClick={() => dispatch(setStageFilter('ALL'))} className="cursor-pointer">
+                  <X className="w-3 h-3" />
                 </button>
               </span>
             )}
@@ -657,17 +627,17 @@ export default function AdminOnboardingPortingPage() {
             </button>
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* Main Table View */}
       {error ? (
         <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
           <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load onboarding records</p>
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load onboarding pipelines</p>
           <p className="text-xs text-slate-400 mt-0.5">{error}</p>
           <button
-            onClick={() => fetchOnboardings()}
-            className="mt-3 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 cursor-pointer"
+            onClick={loadData}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Retry
           </button>
@@ -676,145 +646,206 @@ export default function AdminOnboardingPortingPage() {
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-1/5"></div>
-              <div className="h-4 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+              <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
+              <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
             </div>
           ))}
         </div>
       ) : onboardings.length === 0 ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
-          <Hotel className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Onboarding Records</h4>
+          <ArrowLeftRight className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Onboarding Pipelines Found</h4>
           <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
             {hasActiveFilters
-              ? 'No records matched the selected filters.'
-              : 'Add a new property to start its onboarding and porting milestone tracker.'}
+              ? 'No onboarding records match the selected filters.'
+              : 'Initialize your first hotel property onboarding pipeline.'}
           </p>
           <div className="mt-4 flex justify-center gap-2">
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
-                className="px-3.5 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
               >
                 Clear Filters
               </button>
             )}
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
+            <button
               onClick={() => {
-                setNewPropertyForm({
+                setCreateForm({
                   property_name: '',
+                  organization_id: '',
                   address: '',
                   city: '',
                   state: '',
                   zip_code: '',
                   general_manager_name: '',
-                  contact_person_name: '',
-                  contact_person_email: '',
-                  main_phone: '',
-                  status: 'DRAFT',
+                  general_manager_phone: '',
+                  general_manager_email: '',
                   target_date: '',
+                  e911_status: 'PENDING',
+                  ray_baum_status: 'AUDIT_REQUIRED',
                 });
                 setShowCreateModal(true);
               }}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" /> New Onboarding
-            </motion.button>
+              <Plus className="w-3.5 h-3.5" /> Initialize Pipeline
+            </button>
           </div>
         </div>
       ) : (
-        <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">PROPERTY</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">ORGANIZATION</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">STAGE / MILESTONE</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold">TARGET CUTOVER</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right">ACTIONS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY NAME</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ADDRESS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STAGE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">TARGET CUTOVER DATE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM PHONE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM EMAIL</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
-                {onboardings.map((record) => {
-                  const badge = getStageBadge(record.status);
+                {onboardings.map((rec: OnboardingRecord) => {
+                  const stageBadge = getStageBadge(((rec as any).stage || rec.status) as OnboardingStatus);
+                  const fullAddress = rec.property_address || rec.address
+                    ? `${rec.property_address || rec.address}, ${(rec as any).property_city || rec.city || ''} ${(rec as any).property_state || rec.state || ''}`.trim()
+                    : 'Pending Address';
+
                   return (
                     <tr
-                      key={record.id}
-                      className="hover:bg-slate-50/70 dark:hover:bg-[#1a1b22] transition-colors"
+                      key={rec.id}
+                      onClick={() => openUnifiedModal(rec, 'DETAILS')}
+                      className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition cursor-pointer"
                     >
-                      {/* 1. Property Name */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center flex-shrink-0 text-xs border border-blue-100 dark:border-blue-900/40">
-                            <Building2 className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-black dark:text-white text-sm block">
-                              {record.property_name}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 2. Organization Name */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-semibold text-black dark:text-white">
-                          {record.organization_name}
+                      {/* 1. Property Name (NO building icon) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-bold text-black dark:text-white text-sm block">
+                          {rec.property_name}
                         </span>
                       </td>
 
-                      {/* 3. Stage & Progress */}
-                      <td className="py-3.5 px-4">
-                        <div className="space-y-1.5 max-w-[200px]">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
-                          >
-                            {badge.label}
-                          </span>
-                          <div className="w-full bg-slate-100 dark:bg-[#222430] h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className="bg-blue-600 h-full rounded-full transition-all duration-300"
-                              style={{ width: `${record.progress_pct}%` }}
-                            />
-                          </div>
+                      {/* 2. Address (Can Copy) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-700 dark:text-slate-300">{fullAddress}</span>
+                          {fullAddress !== 'Pending Address' && (
+                            <button
+                              onClick={() => handleCopy(fullAddress, `addr-${rec.id}`)}
+                              className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                              title="Copy Address"
+                            >
+                              {copiedField === `addr-${rec.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
 
-                      {/* 4. Target Cutover Date */}
-                      <td className="py-3.5 px-4">
-                        {record.target_date ? (
-                          <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{new Date(record.target_date).toLocaleDateString()}</span>
-                          </div>
+                      {/* 3. Organization */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-slate-800 dark:text-white">
+                          {rec.organization_name || 'Unassigned'}
+                        </span>
+                      </td>
+
+                      {/* 4. Stage */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${stageBadge.bg} ${stageBadge.text} ${stageBadge.border}`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                          {stageBadge.label}
+                        </span>
+                      </td>
+
+                      {/* 5. Target Cutover Date */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {rec.target_date ? (
+                          <span className="text-slate-700 dark:text-slate-300 font-medium">
+                            {new Date(rec.target_date).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
                         ) : (
-                          <span className="text-slate-400 text-xs font-normal">TBD</span>
+                          <span className="text-slate-400">TBD</span>
                         )}
                       </td>
 
-                      {/* 5. Actions (3-Dots Trigger) */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEdit(record)}
-                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => handleOpenMenu(e, record)}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-                            title="More Actions"
-                          >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      {/* 6. GM Name */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-slate-800 dark:text-white">
+                          {rec.general_manager_name || 'N/A'}
+                        </span>
+                      </td>
+
+                      {/* 7. GM Phone (Can Copy) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {rec.general_manager_phone && rec.general_manager_phone !== 'N/A' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-700 dark:text-slate-300">{rec.general_manager_phone}</span>
+                            <button
+                              onClick={() => handleCopy(rec.general_manager_phone || '', `gm-phone-${rec.id}`)}
+                              className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                              title="Copy GM Phone"
+                            >
+                              {copiedField === `gm-phone-${rec.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">N/A</span>
+                        )}
+                      </td>
+
+                      {/* 8. GM Email (Can Copy) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {rec.general_manager_email && rec.general_manager_email !== 'N/A' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-700 dark:text-slate-300">{rec.general_manager_email}</span>
+                            <button
+                              onClick={() => handleCopy(rec.general_manager_email || '', `gm-email-${rec.id}`)}
+                              className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                              title="Copy GM Email"
+                            >
+                              {copiedField === `gm-email-${rec.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">N/A</span>
+                        )}
+                      </td>
+
+                      {/* 9. Actions (Three Dots Only) */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => handleOpenMenu(e, rec)}
+                          className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                          title="Actions"
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -826,501 +857,535 @@ export default function AdminOnboardingPortingPage() {
           {/* Server-Side Pagination Bar */}
           <div className="p-3 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <span className="text-slate-500 dark:text-slate-400">
-              Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-              {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} records
+              Showing {(pagination.currentPage - 1) * pagination.limit + 1} to{' '}
+              {Math.min(pagination.currentPage * pagination.limit, pagination.totalCount)} of {pagination.totalCount} pipelines
             </span>
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1 || loading}
+                onClick={() => dispatch(setPagination({ currentPage: Math.max(1, pagination.currentPage - 1) }))}
+                disabled={pagination.currentPage <= 1 || loading}
                 className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 <ChevronLeft className="w-3 h-3" /> Previous
               </button>
 
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((num) => (
                 <button
                   key={num}
-                  onClick={() => setCurrentPage(num)}
-                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${currentPage === num
-                      ? 'bg-blue-600 text-white'
+                  onClick={() => dispatch(setPagination({ currentPage: num }))}
+                  className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    pagination.currentPage === num
+                      ? 'bg-[#4f46e5] text-white'
                       : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
-                    }`}
+                  }`}
                 >
                   {num}
                 </button>
               ))}
 
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages || loading}
+                onClick={() => dispatch(setPagination({ currentPage: Math.min(pagination.totalPages, pagination.currentPage + 1) }))}
+                disabled={pagination.currentPage >= pagination.totalPages || loading}
                 className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
               >
                 Next <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* FIXED 3-DOTS ACTION POPUP */}
-      {/* ========================================================================= */}
+      {/* 3-DOTS ACTION POPUP */}
       {menuPosition && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
-            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200"
+            className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
-              <p className="font-bold text-black dark:text-white truncate">{menuPosition.record.property_name}</p>
-              <p className="text-[10px] text-slate-400">Onboarding Options</p>
+              <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.record.property_name}</p>
+              <p className="text-[10px] text-slate-400">Pipeline Actions</p>
             </div>
 
-            {/* 1. View Details */}
             <button
               onClick={() => {
-                const record = menuPosition.record;
+                openUnifiedModal(menuPosition.record, 'DETAILS');
                 setMenuPosition(null);
-                setSelectedRecordForDetails(record);
-                setShowDetailsDrawer(true);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Info className="w-3.5 h-3.5 text-blue-500" /> View Details
+              <Eye className="w-3.5 h-3.5 text-blue-500" />
+              <span>View Details</span>
             </button>
 
-            {/* 2. Edit */}
             <button
               onClick={() => {
-                const record = menuPosition.record;
+                openUnifiedModal(menuPosition.record, 'STAGE');
                 setMenuPosition(null);
-                handleOpenEdit(record);
               }}
-              className="w-full px-3 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
-              <Edit2 className="w-3.5 h-3.5 text-blue-600" /> Edit Stage
+              <Edit2 className="w-3.5 h-3.5 text-amber-500" />
+              <span>Edit Stage</span>
             </button>
-          </motion.div>
+
+            <button
+              onClick={() => {
+                openUnifiedModal(menuPosition.record, 'STAGE');
+                setMenuPosition(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
+            >
+              <GitBranch className="w-3.5 h-3.5 text-emerald-500" />
+              <span>View Stage Road</span>
+            </button>
+          </div>
         </>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. VIEW DETAILS DRAWER */}
-      {/* ========================================================================= */}
+      {/* UNIFIED MODAL (DETAILS & STAGE TRACKING TABS WITH CURVED ROAD UI) */}
       <AnimatePresence>
-        {showDetailsDrawer && selectedRecordForDetails && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
-          >
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-black dark:text-white">Onboarding &amp; Porting Details</h3>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                      {selectedRecordForDetails.property_name}
-                    </p>
+        {showUnifiedModal && selectedRecord && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <ArrowLeftRight className="w-5 h-5" />
                   </div>
-                  <button
-                    onClick={() => setShowDetailsDrawer(false)}
-                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">{selectedRecord.property_name}</h3>
+                    <p className="text-xs text-slate-400">Onboarding &amp; Cutover Lifecycle</p>
+                  </div>
                 </div>
 
-                <div className="space-y-3.5 text-xs">
-                  {/* Status & Timeline */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Stage &amp; Timeline
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Current Milestone</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">
-                        {getStageBadge(selectedRecordForDetails.status).label}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Progress Completion</span>
-                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.progress_pct}%</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-[#222430]">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Target Cutover Date</span>
-                      <span className="font-bold text-black dark:text-white">
-                        {selectedRecordForDetails.target_date
-                          ? new Date(selectedRecordForDetails.target_date).toLocaleDateString()
-                          : 'Not Set'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Property Details */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Property Specifications
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Property Name</span>
-                      <span className="font-bold text-black dark:text-white">{selectedRecordForDetails.property_name}</span>
-                    </div>
-                    {selectedRecordForDetails.property_details && (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">General Manager</span>
-                          <span className="font-bold text-slate-900 dark:text-white">
-                            {selectedRecordForDetails.property_details.general_manager_name || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Primary Contact</span>
-                          <span className="font-bold text-slate-900 dark:text-white">
-                            {selectedRecordForDetails.property_details.contact_person_name || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Contact Email</span>
-                          <span className="font-bold text-slate-900 dark:text-white">
-                            {selectedRecordForDetails.property_details.contact_person_email || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Main Phone</span>
-                          <span className="font-bold text-slate-900 dark:text-white">
-                            {selectedRecordForDetails.property_details.main_phone || 'N/A'}
-                          </span>
-                        </div>
-                        <div className="pt-1">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Address</span>
-                          <p className="font-medium text-slate-900 dark:text-white mt-0.5">
-                            {selectedRecordForDetails.property_details.address || 'N/A'},{' '}
-                            {selectedRecordForDetails.property_details.city}{' '}
-                            {selectedRecordForDetails.property_details.state}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Organization Details */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#222430] space-y-2">
-                    <h4 className="font-bold text-black dark:text-white border-b border-slate-200/60 dark:border-[#222430] pb-1.5">
-                      Managing Organization
-                    </h4>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">Organization Name</span>
-                      <span className="font-bold text-black dark:text-white">
-                        {selectedRecordForDetails.organization_name}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowDetailsDrawer(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================================= */}
-      {/* 2. EDIT ONBOARDING DRAWER */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {showEditDrawer && selectedRecordForEdit && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs"
-          >
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full overflow-y-auto p-6 shadow-2xl flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                  <div>
-                    <h3 className="text-base font-bold text-black dark:text-white">Edit Onboarding Milestone</h3>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
-                      {selectedRecordForEdit.property_name}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowEditDrawer(false)}
-                    className="p-1 rounded text-slate-500 hover:text-black dark:hover:text-white cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {formError && (
-                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-                  </div>
-                )}
-
-                <form onSubmit={handleSaveEdit} id="edit-onboarding-form" className="space-y-3.5 mt-5 text-xs">
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Onboarding Stage / Milestone *
-                    </label>
-                    <select
-                      value={editFormData.status}
-                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                <div className="flex items-center gap-3">
+                  {/* Tab Navigation */}
+                  <div className="flex items-center p-1 bg-slate-100 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('DETAILS')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                        activeTab === 'DETAILS'
+                          ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
                     >
-                      <option value="DRAFT">Draft Initialized</option>
-                      <option value="CONTRACT_SENT">Contract Sent</option>
-                      <option value="SIGNED">Contract Signed</option>
-                      <option value="PORTING_WAITING">Waiting for LOA</option>
-                      <option value="PORTING_SUBMITTED">Porting Submitted</option>
-                      <option value="SOF_WAITING">SOF Review</option>
-                      <option value="FOC_RECEIVED">FOC Confirmed</option>
-                      <option value="COMPLETED">Live Cutover (Completed)</option>
-                    </select>
+                      Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('STAGE')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                        activeTab === 'STAGE'
+                          ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Stage Tracking
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Target Cutover Date
-                    </label>
-                    <input
-                      type="date"
-                      value={editFormData.target_date}
-                      onChange={(e) => setEditFormData({ ...editFormData, target_date: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                    />
-                  </div>
-                </form>
+                  <button
+                    onClick={() => setShowUnifiedModal(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowEditDrawer(false)}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  type="submit"
-                  form="edit-onboarding-form"
-                  disabled={formLoading}
-                  className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Save Changes
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
+              {/* Tab 1: Details */}
+              {activeTab === 'DETAILS' && (
+                <div className="p-6 overflow-y-auto space-y-4 text-xs">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">Property Name</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
+                        {selectedRecord.property_name}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">Assigned Organization</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
+                        {selectedRecord.organization_name || 'Direct Portfolio'}
+                      </p>
+                    </div>
+
+                    <div className="col-span-2 space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">Property Address</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                        {selectedRecord.property_address || 'Pending Address'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">General Manager Name</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                        {selectedRecord.general_manager_name || 'N/A'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">General Manager Phone</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                        {selectedRecord.general_manager_phone || 'N/A'}
+                      </p>
+                    </div>
+
+                    <div className="col-span-2 space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">General Manager Email</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                        {selectedRecord.general_manager_email || 'N/A'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">Target Cutover Date</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                        {selectedRecord.target_date
+                          ? new Date(selectedRecord.target_date).toLocaleDateString()
+                          : 'Not Scheduled'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block text-xs">Current Lifecycle Stage</label>
+                      <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-bold text-blue-600 dark:text-blue-400">
+                        {getStageBadge(((selectedRecord as any).stage || selectedRecord.status) as OnboardingStatus).label} ({selectedRecord.progress_pct ?? 0}%)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Stage Tracking (Curved Road with Animated Fill) */}
+              {activeTab === 'STAGE' && (
+                <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+                  {/* Stage Road Timeline */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
+                        Onboarding Progress Roadmap
+                      </h4>
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                        {getStageBadge(editStageStatus).pct}% Complete
+                      </span>
+                    </div>
+
+                    {/* Progress Bar with Fill Animation */}
+                    <div className="w-full h-2.5 bg-slate-100 dark:bg-[#111217] rounded-full overflow-hidden border border-slate-200 dark:border-[#222430]">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${getStageBadge(editStageStatus).pct}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                        className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500 rounded-full"
+                      />
+                    </div>
+
+                    {/* Curved Road Timeline Visualizer */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+                      {STAGES_ROAD.map((st, idx) => {
+                        const currentStepIndex = STAGES_ROAD.findIndex((s) => s.key === editStageStatus);
+                        const isDone = idx < currentStepIndex;
+                        const isCurrent = idx === currentStepIndex;
+
+                        return (
+                          <motion.div
+                            key={st.key}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: idx * 0.05 }}
+                            onClick={() => setEditStageStatus(st.key)}
+                            className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                              isCurrent
+                                ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 shadow-sm ring-2 ring-blue-500/20'
+                                : isDone
+                                ? 'border-emerald-500/40 bg-emerald-50/30 dark:bg-emerald-950/20'
+                                : 'border-slate-200 dark:border-[#222430] opacity-60 hover:opacity-100 hover:bg-slate-50 dark:hover:bg-[#181920]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span
+                                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                  isDone
+                                    ? 'bg-emerald-500 text-white'
+                                    : isCurrent
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-200 dark:bg-[#222430] text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                {isDone ? <Check className="w-3 h-3" /> : st.step}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-semibold">Stage {st.step}</span>
+                            </div>
+
+                            <p className="font-bold text-slate-900 dark:text-white text-xs">{st.label}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">{st.desc}</p>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Stage Update Form */}
+                  <form onSubmit={handleUpdateStageSubmit} className="pt-4 border-t border-slate-100 dark:border-[#222430] space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Set Next Lifecycle Stage</label>
+                        <select
+                          value={editStageStatus}
+                          onChange={(e) => setEditStageStatus(e.target.value as OnboardingStatus)}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                        >
+                          {STAGES_ROAD.map((s) => (
+                            <option key={s.key} value={s.key}>
+                              Stage {s.step}: {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Target Cutover Date</label>
+                        <input
+                          type="date"
+                          value={editTargetDate ? editTargetDate.split('T')[0] : ''}
+                          onChange={(e) => setEditTargetDate(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    {editStageStatus === 'COMPLETED' && (
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        <span>
+                          Setting stage to <strong>Live Cutover (COMPLETED)</strong> will automatically activate the property to <strong>ACTIVE</strong> in the database and audit trail.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowUnifiedModal(false)}
+                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={updatingStage}
+                        className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                      >
+                        {updatingStage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save & Update Stage'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* ========================================================================= */}
-      {/* 3. START NEW PROPERTY ONBOARDING MODAL */}
-      {/* ========================================================================= */}
+      {/* CREATE NEW ONBOARDING MODAL */}
       <AnimatePresence>
         {showCreateModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 16 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto my-8"
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div>
-                  <h3 className="text-sm font-bold text-black dark:text-white">Start New Property Onboarding</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                    Register a new hotel property to track contract and porting cutover
-                  </p>
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Initialize Onboarding Pipeline</h3>
                 </div>
-                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-black dark:hover:text-white cursor-pointer p-1 rounded-lg">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {formError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-600 text-xs flex items-center gap-2 font-medium">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
+              {createError && (
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                  {createError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveCreate} className="space-y-3.5 text-xs">
-                {/* 1. New Property Name */}
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Property Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Grand Hyatt Miami Downtown"
-                    value={newPropertyForm.property_name}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, property_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
+              <form onSubmit={handleCreateSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">
+                      Property Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={createForm.property_name}
+                      onChange={(e) => setCreateForm({ ...createForm, property_name: e.target.value })}
+                      placeholder="e.g. Hyatt Regency Miami"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
 
-                {/* 2. Physical Address */}
-                <div>
-                  <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                    Property Address
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. 100 Biscayne Boulevard"
-                    value={newPropertyForm.address}
-                    onChange={(e) => setNewPropertyForm({ ...newPropertyForm, address: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* 3. City, State, Zip */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">City</label>
-                    <input
-                      type="text"
-                      placeholder="Miami"
-                      value={newPropertyForm.city}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, city: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">State</label>
-                    <input
-                      type="text"
-                      placeholder="FL"
-                      value={newPropertyForm.state}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, state: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">Zip Code</label>
-                    <input
-                      type="text"
-                      placeholder="33131"
-                      value={newPropertyForm.zip_code}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, zip_code: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Contacts */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">General Manager</label>
-                    <input
-                      type="text"
-                      placeholder="GM Full Name"
-                      value={newPropertyForm.general_manager_name}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, general_manager_name: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">Main Phone</label>
-                    <input
-                      type="text"
-                      placeholder="+1 (305) 555-0100"
-                      value={newPropertyForm.main_phone}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, main_phone: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* 5. Stage & Date */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Initial Stage
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">
+                      Organization <span className="text-rose-500">*</span>
                     </label>
                     <select
-                      value={newPropertyForm.status}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, status: e.target.value as any })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      value={createForm.organization_id}
+                      onChange={(e) => setCreateForm({ ...createForm, organization_id: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="DRAFT">Draft Initialized</option>
-                      <option value="CONTRACT_SENT">Contract Sent</option>
-                      <option value="SIGNED">Contract Signed</option>
-                      <option value="PORTING_WAITING">Waiting for LOA</option>
+                      <option value="">Select Organization</option>
+                      {orgOptions.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-900 dark:text-white mb-1">
-                      Target Cutover Date
-                    </label>
+
+                  <div className="col-span-2 space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Street Address</label>
+                    <input
+                      type="text"
+                      value={createForm.address}
+                      onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
+                      placeholder="400 SE 2nd Ave"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">City</label>
+                    <input
+                      type="text"
+                      value={createForm.city}
+                      onChange={(e) => setCreateForm({ ...createForm, city: e.target.value })}
+                      placeholder="Miami"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">State & ZIP</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={createForm.state}
+                        onChange={(e) => setCreateForm({ ...createForm, state: e.target.value })}
+                        placeholder="FL"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                      <input
+                        type="text"
+                        value={createForm.zip_code}
+                        onChange={(e) => setCreateForm({ ...createForm, zip_code: e.target.value })}
+                        placeholder="33131"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">General Manager Name</label>
+                    <input
+                      type="text"
+                      value={createForm.general_manager_name}
+                      onChange={(e) => setCreateForm({ ...createForm, general_manager_name: e.target.value })}
+                      placeholder="e.g. David Vance"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">GM Phone</label>
+                    <input
+                      type="tel"
+                      value={createForm.general_manager_phone}
+                      onChange={(e) => setCreateForm({ ...createForm, general_manager_phone: e.target.value })}
+                      placeholder="+1 (555) 234-5678"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">GM Email</label>
+                    <input
+                      type="email"
+                      value={createForm.general_manager_email}
+                      onChange={(e) => setCreateForm({ ...createForm, general_manager_email: e.target.value })}
+                      placeholder="david@hyattmiami.com"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Target Cutover Date</label>
                     <input
                       type="date"
-                      value={newPropertyForm.target_date}
-                      onChange={(e) => setNewPropertyForm({ ...newPropertyForm, target_date: e.target.value })}
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      value={createForm.target_date}
+                      onChange={(e) => setCreateForm({ ...createForm, target_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">E911 Validation Status</label>
+                    <select
+                      value={createForm.e911_status}
+                      onChange={(e) => setCreateForm({ ...createForm, e911_status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="PENDING">Pending Verification</option>
+                      <option value="VERIFIED">PSAP Verified</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Ray Baum Status</label>
+                    <select
+                      value={createForm.ray_baum_status}
+                      onChange={(e) => setCreateForm({ ...createForm, ray_baum_status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="AUDIT_REQUIRED">Audit Required</option>
+                      <option value="VERIFIED">Ray Baum Verified</option>
+                    </select>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 dark:border-[#222430] flex justify-end gap-2">
+                <div className="p-3 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-[11px] text-slate-600 dark:text-slate-400">
+                  <Info className="w-3.5 h-3.5 inline mr-1 text-blue-500" />
+                  Upon initialization, the property will automatically be created in <strong>INACTIVE</strong> status with initial stage <strong>Draft Initialized</strong>. It will automatically switch to <strong>ACTIVE</strong> upon Live Cutover completion.
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 cursor-pointer"
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                  <button
                     type="submit"
-                    disabled={formLoading}
-                    className="px-4 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                    disabled={createLoading}
+                    className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
                   >
-                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    Create Tracker
-                  </motion.button>
+                    {createLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Initialize Pipeline'}
+                  </button>
                 </div>
               </form>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .neq('status', 'ACTIVE');
 
-    // 2. Fetch Properties with Org Links
+    // 2. Fetch Properties with Org Links, Onboardings & Services
     let query = supabase
       .from('properties')
       .select(`
@@ -41,12 +42,14 @@ export async function GET(request: NextRequest) {
         org_links:organization_properties(
           id,
           status,
-          organization:organizations(id, name, email, phone)
+          organization:organizations(id, name, email, phone),
+          onboardings(id, status, target_date),
+          services_links:organization_property_services(id, service_id)
         )
       `, { count: 'exact' });
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%,address.ilike.%${search}%,general_manager_name.ilike.%${search}%,contact_person_name.ilike.%${search}%`);
+      query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%,address.ilike.%${search}%,general_manager_name.ilike.%${search}%,contact_person_name.ilike.%${search}%,general_manager_email.ilike.%${search}%`);
     }
 
     if (status !== 'ALL') {
@@ -73,10 +76,15 @@ export async function GET(request: NextRequest) {
 
       const processedFallback = (fallbackProps || []).map((p: any) => ({
         ...p,
+        general_manager_name: p.general_manager_name || p.contact_person_name || 'N/A',
+        general_manager_phone: p.general_manager_phone || p.main_phone || 'N/A',
+        general_manager_email: p.general_manager_email || p.contact_person_email || 'N/A',
         organizations_count: 0,
         organizations: [],
         services_count: 0,
+        onboarding_stage: 'Draft Initialized',
         e911_status: p.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
+        ray_baum_status: p.ray_baud_and_logs_enabled ? 'Verified' : 'Not-Verified',
       }));
 
       return NextResponse.json({
@@ -103,11 +111,30 @@ export async function GET(request: NextRequest) {
       const orgs = orgLinks.map((ol: any) => ol.organization).filter(Boolean);
       const primaryOrg = orgs[0] || null;
 
-      const words = (prop.name || 'Prop').split(' ');
-      const initials =
-        words.length > 1
-          ? `${words[0][0]}${words[1][0]}`.toUpperCase()
-          : prop.name.substring(0, 2).toUpperCase();
+      // Calculate dynamic count of services
+      let dynamicServiceCount = 0;
+      orgLinks.forEach((ol: any) => {
+        if (Array.isArray(ol.services_links)) {
+          dynamicServiceCount += ol.services_links.length;
+        }
+      });
+
+      // Calculate onboarding stage
+      let stage = 'Draft Initialized';
+      orgLinks.forEach((ol: any) => {
+        if (Array.isArray(ol.onboardings) && ol.onboardings.length > 0) {
+          const onb = ol.onboardings[0];
+          if (onb.status) {
+            stage = onb.status.replace(/_/g, ' ');
+          }
+        }
+      });
+
+      const gmName = prop.general_manager_name || prop.contact_person_name || 'N/A';
+      const gmPhone = prop.general_manager_phone || prop.main_phone || 'N/A';
+      const gmEmail = prop.general_manager_email || prop.contact_person_email || 'N/A';
+
+      const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
 
       return {
         id: prop.id,
@@ -122,14 +149,18 @@ export async function GET(request: NextRequest) {
         fax: prop.fax,
         contact_person_name: prop.contact_person_name,
         contact_person_email: prop.contact_person_email,
-        general_manager_name: prop.general_manager_name,
-        ray_baud_and_logs_enabled: Boolean(prop.ray_baud_and_logs_enabled),
+        general_manager_name: gmName,
+        general_manager_phone: gmPhone,
+        general_manager_email: gmEmail,
+        ray_baud_and_logs_enabled: isE911Verified,
         status: prop.status || 'ACTIVE',
         organizations_count: orgs.length,
         organizations: orgs,
         primary_organization: primaryOrg,
-        services_count: 6, // Provisioned SIP Trunks & DIDs
-        e911_status: prop.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
+        services_count: dynamicServiceCount,
+        onboarding_stage: stage,
+        e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
+        ray_baum_status: isE911Verified ? 'Verified' : 'Not-Verified',
         created_at: prop.created_at,
         updated_at: prop.updated_at || prop.created_at,
       };
@@ -207,6 +238,8 @@ export async function POST(request: NextRequest) {
       contact_person_name,
       contact_person_email,
       general_manager_name,
+      general_manager_phone,
+      general_manager_email,
       ray_baud_and_logs_enabled,
       status,
     } = body;
@@ -236,6 +269,8 @@ export async function POST(request: NextRequest) {
         contact_person_name: contact_person_name?.trim() || null,
         contact_person_email: contact_person_email?.trim() || null,
         general_manager_name: general_manager_name?.trim() || null,
+        general_manager_phone: general_manager_phone?.trim() || null,
+        general_manager_email: general_manager_email?.trim() || null,
         ray_baud_and_logs_enabled: ray_baud_and_logs_enabled ?? true,
         status: status || 'ACTIVE',
       })
@@ -246,14 +281,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: propErr.message }, { status: 400 });
     }
 
-    // Link to organization if specified
+    // Link to organization if specified (Rule 1: One property can be assigned to only one organization)
+    let orgName = 'Unassigned';
     if (organization_id) {
+      const { data: org } = await supabase.from('organizations').select('name').eq('id', organization_id).maybeSingle();
+      if (org) orgName = org.name;
+
       await supabase.from('organization_properties').insert({
         organization_id,
         property_id: newProp.id,
         status: status || 'ACTIVE',
       });
     }
+
+    // Central Audit Log
+    await logAuditEvent({
+      action: 'PROPERTY_CREATED',
+      entity_type: 'PROPERTY',
+      entity_id: newProp.id,
+      entity_name: newProp.name,
+      changes: {
+        name: newProp.name,
+        address: newProp.address,
+        city: newProp.city,
+        state: newProp.state,
+        zip_code: newProp.zip_code,
+        organization_id,
+        organization_name: orgName,
+        status: newProp.status,
+      },
+    });
 
     return NextResponse.json({ success: true, data: newProp });
   } catch (err: any) {

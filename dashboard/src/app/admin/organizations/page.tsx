@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Building2,
@@ -31,10 +31,26 @@ import {
   ShieldCheck,
   Building,
   UserPlus,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  setOrganizations,
+  setOrgContacts,
+  addOrgContactOptimistic,
+  removeOrgContactOptimistic,
+  updateOrgStatusOptimistic,
+  updateOrganizationOptimistic,
+  setPrimaryContactOptimistic,
+  unassignOrgPropertyOptimistic,
+  setFilters,
+  setLoading,
+  setError,
+  type OrgRecord,
+  type OrgContact,
+} from '@/store/slices/organizationsSlice';
 import { CreateOrgModal } from '@/components/admin/CreateOrgModal';
-import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -48,7 +64,7 @@ const containerVariants: Variants = {
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 22, scale: 0.97 },
+  hidden: { opacity: 0, y: 16, scale: 0.98 },
   visible: {
     opacity: 1,
     y: 0,
@@ -61,35 +77,6 @@ const itemVariants: Variants = {
   },
 };
 
-// --- Interfaces ---
-interface OrgRecord {
-  id: string;
-  name: string;
-  type?: string;
-  address: string;
-  street_address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  country: string;
-  primary_contact_name: string;
-  email: string;
-  phone: string;
-  properties_count: number;
-  properties?: any[];
-  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED' | 'SUSPENDED' | 'PENDING_ONBOARDING';
-  invite: {
-    status: string;
-    url: string | null;
-    expires_at: string | null;
-    id: string | null;
-  };
-  members?: any[];
-  contacts_count?: number;
-  created_at: string;
-  updated_at?: string;
-}
-
 interface PropertyItem {
   id: string;
   name: string;
@@ -100,42 +87,23 @@ interface PropertyItem {
   status?: string;
 }
 
-interface ContactItem {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: string;
-  is_primary: boolean;
-  status: string;
-}
-
 export default function AdminOrganizationsPage() {
-  // State: Organizations & Meta
-  const [organizations, setOrganizations] = useState<OrgRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    items: organizations,
+    metrics,
+    totalCount,
+    totalPages,
+    currentPage,
+    searchQuery,
+    selectedStatus,
+    selectedPropFilter,
+    loading,
+    error,
+    orgContacts,
+  } = useAppSelector((state) => state.organizations);
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const itemsPerPage = 10;
-
-  // 5 Exact KPI Metrics per Task.md
-  const [metrics, setMetrics] = useState({
-    totalOrganizations: 0,
-    activeOrganizations: 0,
-    pendingOrInvited: 0,
-    totalProperties: 0,
-    noPropertiesOrganizations: 0,
-  });
-
-  // Search & Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [selectedPropFilter, setSelectedPropFilter] = useState('ALL');
+  // Local Sort state
   const [sortBy, setSortBy] = useState('NEWEST');
 
   // Copy state
@@ -150,8 +118,6 @@ export default function AdminOrganizationsPage() {
 
   // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [selectedOrgForInvite, setSelectedOrgForInvite] = useState<OrgRecord | null>(null);
 
   // Edit Organization Drawer
   const [showEditDrawer, setShowEditDrawer] = useState(false);
@@ -162,7 +128,6 @@ export default function AdminOrganizationsPage() {
     city: '',
     state: '',
     zip_code: '',
-    country: 'USA',
     phone: '',
     email: '',
     status: 'ACTIVE',
@@ -183,7 +148,6 @@ export default function AdminOrganizationsPage() {
   // Contacts Drawer & Add Contact Modal
   const [showContactsDrawer, setShowContactsDrawer] = useState(false);
   const [selectedOrgForContacts, setSelectedOrgForContacts] = useState<OrgRecord | null>(null);
-  const [orgContactsList, setOrgContactsList] = useState<ContactItem[]>([]);
   const [loadingOrgContacts, setLoadingOrgContacts] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
   const [contactFormData, setContactFormData] = useState({
@@ -194,6 +158,10 @@ export default function AdminOrganizationsPage() {
   });
   const [savingContact, setSavingContact] = useState(false);
 
+  // Delete Contact Confirmation Modal
+  const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deletingContact, setDeletingContact] = useState(false);
+
   // Toast feedback
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
@@ -201,25 +169,16 @@ export default function AdminOrganizationsPage() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  // Debounce search
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
-
-  // Fetch Organizations
+  // Fetch Organizations from backend
   const fetchOrganizations = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      dispatch(setLoading(true));
+      dispatch(setError(null));
 
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-        search: debouncedSearch,
+        limit: '10',
+        search: searchQuery,
         status: selectedStatus,
         has_properties: selectedPropFilter,
         sortBy: sortBy,
@@ -232,65 +191,96 @@ export default function AdminOrganizationsPage() {
         throw new Error(json.error || 'Failed to fetch organizations.');
       }
 
-      setOrganizations(json.data || []);
-      if (json.pagination) {
-        setTotalCount(json.pagination.totalCount);
-        setTotalPages(json.pagination.totalPages);
-      }
-      if (json.metrics) {
-        setMetrics(json.metrics);
-      }
+      dispatch(
+        setOrganizations({
+          data: json.data || [],
+          pagination: json.pagination,
+          metrics: json.metrics,
+        })
+      );
     } catch (err: any) {
       console.error('Error fetching organizations:', err);
-      setError(err.message || 'Error loading organizations.');
-    } finally {
-      setLoading(false);
+      dispatch(setError(err.message || 'Error loading organizations.'));
     }
-  }, [currentPage, debouncedSearch, selectedStatus, selectedPropFilter, sortBy]);
+  }, [currentPage, searchQuery, selectedStatus, selectedPropFilter, sortBy, dispatch]);
 
   useEffect(() => {
     fetchOrganizations();
   }, [fetchOrganizations]);
 
-  // Open 3-Dots Action Menu (Opens upside above trigger button)
+  // Client-side Instant Filtered Items (Keystroke reactivity)
+  const displayedOrganizations = useMemo(() => {
+    if (!searchQuery.trim()) return organizations;
+    const lower = searchQuery.toLowerCase();
+    return organizations.filter(
+      (org: OrgRecord) =>
+        org.name.toLowerCase().includes(lower) ||
+        (org.address && org.address.toLowerCase().includes(lower)) ||
+        (org.contact_name && org.contact_name.toLowerCase().includes(lower)) ||
+        (org.email && org.email.toLowerCase().includes(lower)) ||
+        (org.phone && org.phone.toLowerCase().includes(lower))
+    );
+  }, [organizations, searchQuery]);
+
+  // Open 3-Dots Action Menu (Upside detection)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, org: OrgRecord) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 240;
     const left = Math.max(16, rect.right - menuWidth);
-    const bottom = Math.max(16, window.innerHeight - rect.top + 6);
+    const bottom = window.innerHeight - rect.top + 8;
     setMenuPosition({ bottom, left, org });
   };
 
-  // Copy Quick Action
+  useEffect(() => {
+    const handleClose = () => setMenuPosition(null);
+    window.addEventListener('click', handleClose);
+    window.addEventListener('scroll', handleClose, true);
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('scroll', handleClose, true);
+    };
+  }, []);
+
   const handleCopyText = (text: string, label: string, id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!text) return;
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    showToast(`${label} copied to clipboard`);
+    showToast(`Copied ${label} to clipboard!`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Open Invite Manager
-  const handleOpenInvite = (org: OrgRecord) => {
-    setSelectedOrgForInvite(org);
-    setShowInviteModal(true);
+  // Status Change handler with instant Redux state update
+  const handleUpdateStatus = async (orgId: string, newStatus: string) => {
+    dispatch(updateOrgStatusOptimistic({ id: orgId, status: newStatus }));
     setMenuPosition(null);
+    showToast(`Organization status updated to ${newStatus}.`);
+
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update status');
+    } catch (err: any) {
+      showToast(err.message || 'Error updating status', 'error');
+      fetchOrganizations();
+    }
   };
 
   // Open Edit Drawer
-  const handleOpenEdit = (org: OrgRecord) => {
+  const handleOpenEditDrawer = (org: OrgRecord) => {
     setSelectedOrgForEdit(org);
     setEditFormData({
       name: org.name || '',
-      address: org.street_address || '',
+      address: org.street_address || org.address || '',
       city: org.city || '',
       state: org.state || '',
       zip_code: org.zip_code || '',
-      country: org.country || 'USA',
-      phone: org.phone !== '—' ? org.phone : '',
-      email: org.email !== '—' ? org.email : '',
+      phone: org.phone && org.phone !== '—' ? org.phone : '',
+      email: org.email && org.email !== '—' ? org.email : '',
       status: org.status || 'ACTIVE',
     });
     setShowEditDrawer(true);
@@ -301,6 +291,23 @@ export default function AdminOrganizationsPage() {
     e.preventDefault();
     if (!selectedOrgForEdit) return;
     setEditSaving(true);
+
+    const updates = {
+      name: editFormData.name.trim(),
+      address: editFormData.address.trim(),
+      street_address: editFormData.address.trim(),
+      city: editFormData.city.trim(),
+      state: editFormData.state.trim(),
+      zip_code: editFormData.zip_code.trim(),
+      phone: editFormData.phone.trim() || '—',
+      email: editFormData.email.trim() || '—',
+      status: editFormData.status as any,
+    };
+
+    dispatch(updateOrganizationOptimistic({ id: selectedOrgForEdit.id, updates }));
+    setShowEditDrawer(false);
+    showToast('Organization details updated successfully.');
+
     try {
       const res = await fetch(`/api/admin/organizations/${selectedOrgForEdit.id}`, {
         method: 'PATCH',
@@ -308,39 +315,16 @@ export default function AdminOrganizationsPage() {
         body: JSON.stringify(editFormData),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Failed to update organization');
-      }
-      showToast('Organization updated successfully.');
-      setShowEditDrawer(false);
-      fetchOrganizations();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update organization');
     } catch (err: any) {
       showToast(err.message || 'Error updating organization', 'error');
+      fetchOrganizations();
     } finally {
       setEditSaving(false);
     }
   };
 
-  // Status Toggle
-  const handleToggleStatus = async (org: OrgRecord) => {
-    const nextStatus = org.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    try {
-      const res = await fetch(`/api/admin/organizations/${org.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to toggle status');
-      showToast(`Organization set to ${nextStatus}.`);
-      setMenuPosition(null);
-      fetchOrganizations();
-    } catch (err: any) {
-      showToast(err.message || 'Error updating status', 'error');
-    }
-  };
-
-  // Open Properties Drawer
+  // Properties Drawer
   const handleOpenProperties = async (org: OrgRecord) => {
     setSelectedOrgForProps(org);
     setShowPropertiesDrawer(true);
@@ -353,27 +337,30 @@ export default function AdminOrganizationsPage() {
         setOrgPropertiesList(json.data || []);
       }
     } catch (err) {
-      console.error('Error fetching org properties:', err);
+      console.error('Error loading org properties:', err);
     } finally {
       setLoadingOrgProps(false);
     }
   };
 
-  // Open Assign Property Modal
-  const handleOpenAssignPropModal = async () => {
+  const handleOpenAssignModal = async () => {
     setShowAssignPropModal(true);
     setLoadingAvailableProps(true);
     try {
-      const res = await fetch('/api/admin/properties?limit=100');
+      const res = await fetch('/api/admin/properties?status=ACTIVE&limit=100');
       const json = await res.json();
       if (json.success) {
-        setAllAvailableProps(json.data || []);
-        if (json.data?.length > 0) {
-          setSelectedPropToAssign(json.data[0].id);
+        // Only allow unassigned properties (Rule 1)
+        const unassigned = (json.data || []).filter(
+          (p: any) => !p.organization_id || p.organization_id === selectedOrgForProps?.id
+        );
+        setAllAvailableProps(unassigned);
+        if (unassigned.length > 0) {
+          setSelectedPropToAssign(unassigned[0].id);
         }
       }
     } catch (err) {
-      console.error('Error loading properties catalog:', err);
+      console.error('Error fetching available properties:', err);
     } finally {
       setLoadingAvailableProps(false);
     }
@@ -404,24 +391,7 @@ export default function AdminOrganizationsPage() {
     }
   };
 
-  const handleUnassignProperty = async (propertyId: string) => {
-    if (!selectedOrgForProps) return;
-    try {
-      const res = await fetch(
-        `/api/admin/organizations/${selectedOrgForProps.id}/properties?propertyId=${propertyId}`,
-        { method: 'DELETE' }
-      );
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to unassign property');
-      showToast('Property unassigned from organization.');
-      handleOpenProperties(selectedOrgForProps);
-      fetchOrganizations();
-    } catch (err: any) {
-      showToast(err.message || 'Error unassigning property', 'error');
-    }
-  };
-
-  // Open Contacts Drawer
+  // Contacts Drawer
   const handleOpenContacts = async (org: OrgRecord) => {
     setSelectedOrgForContacts(org);
     setShowContactsDrawer(true);
@@ -431,7 +401,7 @@ export default function AdminOrganizationsPage() {
       const res = await fetch(`/api/admin/organizations/${org.id}/contacts`);
       const json = await res.json();
       if (json.success) {
-        setOrgContactsList(json.data || []);
+        dispatch(setOrgContacts({ orgId: org.id, contacts: json.data || [] }));
       }
     } catch (err) {
       console.error('Error loading org contacts:', err);
@@ -440,8 +410,19 @@ export default function AdminOrganizationsPage() {
     }
   };
 
-  const handleDeleteContactFromDrawer = async (contactId: string) => {
-    if (!selectedOrgForContacts) return;
+  const currentOrgContactsList = selectedOrgForContacts
+    ? orgContacts[selectedOrgForContacts.id] || []
+    : [];
+
+  const handleConfirmDeleteContact = async () => {
+    if (!selectedOrgForContacts || !contactToDelete) return;
+    setDeletingContact(true);
+
+    const contactId = contactToDelete.id;
+    dispatch(removeOrgContactOptimistic({ orgId: selectedOrgForContacts.id, contactId }));
+    setContactToDelete(null);
+    showToast('Contact removed successfully.');
+
     try {
       const res = await fetch(
         `/api/admin/organizations/${selectedOrgForContacts.id}/contacts?member_id=${contactId}`,
@@ -449,11 +430,11 @@ export default function AdminOrganizationsPage() {
       );
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to remove contact');
-      showToast('Contact removed successfully.');
-      handleOpenContacts(selectedOrgForContacts);
-      fetchOrganizations();
     } catch (err: any) {
       showToast(err.message || 'Error removing contact', 'error');
+      if (selectedOrgForContacts) handleOpenContacts(selectedOrgForContacts);
+    } finally {
+      setDeletingContact(false);
     }
   };
 
@@ -461,6 +442,34 @@ export default function AdminOrganizationsPage() {
     e.preventDefault();
     if (!selectedOrgForContacts) return;
     setSavingContact(true);
+
+    const newContact: OrgContact = {
+      id: `temp-${Date.now()}`,
+      name: contactFormData.full_name.trim(),
+      email: contactFormData.email.trim(),
+      phone: contactFormData.phone_number.trim() || '—',
+      role: contactFormData.is_primary ? 'ADMIN' : 'USER',
+      is_primary: contactFormData.is_primary,
+      status: 'ACTIVE',
+    };
+
+    dispatch(addOrgContactOptimistic({ orgId: selectedOrgForContacts.id, contact: newContact }));
+    if (contactFormData.is_primary) {
+      dispatch(
+        setPrimaryContactOptimistic({
+          orgId: selectedOrgForContacts.id,
+          contactId: newContact.id,
+          name: newContact.name,
+          email: newContact.email,
+          phone: newContact.phone,
+        })
+      );
+    }
+
+    setShowAddContactModal(false);
+    setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
+    showToast('Contact added successfully.');
+
     try {
       const res = await fetch(`/api/admin/organizations/${selectedOrgForContacts.id}/contacts`, {
         method: 'POST',
@@ -471,13 +480,12 @@ export default function AdminOrganizationsPage() {
       if (!res.ok || !json.success) {
         throw new Error(json.error || 'Failed to add contact');
       }
-      showToast('Contact added successfully.');
-      setShowAddContactModal(false);
-      setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
-      handleOpenContacts(selectedOrgForContacts);
-      fetchOrganizations();
+      if (json.data && selectedOrgForContacts) {
+        handleOpenContacts(selectedOrgForContacts);
+      }
     } catch (err: any) {
       showToast(err.message || 'Error adding contact', 'error');
+      if (selectedOrgForContacts) handleOpenContacts(selectedOrgForContacts);
     } finally {
       setSavingContact(false);
     }
@@ -495,12 +503,17 @@ export default function AdminOrganizationsPage() {
       {/* Toast alert */}
       {toastMsg && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-bottom-5 duration-200 ${toastMsg.type === 'error'
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-bottom-5 duration-200 ${
+            toastMsg.type === 'error'
               ? 'bg-rose-600 text-white'
               : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-            }`}
+          }`}
         >
-          {toastMsg.type === 'error' ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+          {toastMsg.type === 'error' ? (
+            <AlertCircle className="w-4 h-4" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          )}
           <span>{toastMsg.text}</span>
         </div>
       )}
@@ -510,16 +523,14 @@ export default function AdminOrganizationsPage() {
         variants={itemVariants}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl text-black dark:text-white flex items-center justify-center">
-              <Building2 size={256} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Client Organizations
-              </h1>
-            </div>
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl text-black dark:text-white flex items-center justify-center">
+            <Building2 size={256} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Client Organizations
+            </h1>
           </div>
         </div>
 
@@ -536,7 +547,7 @@ export default function AdminOrganizationsPage() {
         </div>
       </motion.div>
 
-      {/* 2. KPI Cards (5 Cards as specified in Task.md) */}
+      {/* 2. Top KPI Cards Row (5 Variant 1 Deep Blue Standardized Cards) */}
       <motion.div
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5"
@@ -654,7 +665,7 @@ export default function AdminOrganizationsPage() {
           </div>
           <div className="mt-3">
             <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.noPropertiesOrganizations}
+              {metrics.noPropertiesCount}
             </span>
             <span className="text-xs text-slate-100 ml-1.5 font-medium">Unassigned</span>
           </div>
@@ -665,19 +676,19 @@ export default function AdminOrganizationsPage() {
       {/* 3. Search & Filters Bar */}
       <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col lg:flex-row items-center justify-between gap-3">
         <div className="flex flex-1 flex-wrap items-center gap-2.5 w-full">
-          {/* Search Input */}
+          {/* Search Input (Instant char-by-char) */}
           <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => dispatch(setFilters({ searchQuery: e.target.value, currentPage: 1 }))}
               placeholder="Search by organization, address, contact, email, or phone..."
               className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => dispatch(setFilters({ searchQuery: '', currentPage: 1 }))}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
@@ -688,27 +699,22 @@ export default function AdminOrganizationsPage() {
           {/* Status Filter */}
           <select
             value={selectedStatus}
-            onChange={(e) => {
-              setSelectedStatus(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => dispatch(setFilters({ selectedStatus: e.target.value, currentPage: 1 }))}
             aria-label="Filter by organization status"
             className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
-            <option value="PENDING_ONBOARDING">Pending Onboarding</option>
             <option value="INACTIVE">Inactive</option>
+            <option value="PENDING_ONBOARDING">Pending Onboarding</option>
             <option value="SUSPENDED">Suspended</option>
+            <option value="ARCHIVED">Archived</option>
           </select>
 
           {/* Properties Assignment Filter */}
           <select
             value={selectedPropFilter}
-            onChange={(e) => {
-              setSelectedPropFilter(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => dispatch(setFilters({ selectedPropFilter: e.target.value, currentPage: 1 }))}
             aria-label="Filter by assigned properties"
             className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
@@ -720,10 +726,7 @@ export default function AdminOrganizationsPage() {
           {/* Sorting */}
           <select
             value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => setSortBy(e.target.value)}
             aria-label="Sort organizations"
             className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
@@ -737,11 +740,8 @@ export default function AdminOrganizationsPage() {
         {hasActiveFilters && (
           <button
             onClick={() => {
-              setSearchQuery('');
-              setSelectedStatus('ALL');
-              setSelectedPropFilter('ALL');
+              dispatch(setFilters({ searchQuery: '', selectedStatus: 'ALL', selectedPropFilter: 'ALL', currentPage: 1 }));
               setSortBy('NEWEST');
-              setCurrentPage(1);
             }}
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
           >
@@ -750,7 +750,7 @@ export default function AdminOrganizationsPage() {
         )}
       </div>
 
-      {/* 4. Organization Table (10 Distinct Unmixed Columns per Task.md) */}
+      {/* 4. Organization Table */}
       {loading ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 space-y-4 shadow-xs animate-pulse">
           <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/4" />
@@ -773,7 +773,7 @@ export default function AdminOrganizationsPage() {
             Retry
           </button>
         </div>
-      ) : organizations.length === 0 ? (
+      ) : displayedOrganizations.length === 0 ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-xs">
           <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
             <Building2 className="w-6 h-6" />
@@ -803,41 +803,41 @@ export default function AdminOrganizationsPage() {
             <table className="w-full text-left border-collapse min-w-[1320px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[190px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[200px]">
                     Organization Name
                   </th>
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[240px]">
                     Address
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[140px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[150px]">
                     Primary Contact
                   </th>
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[180px]">
                     Email
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[110px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[120px]">
                     Phone
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center whitespace-nowrap min-w-[90px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center whitespace-nowrap min-w-[100px]">
+                    People Count
+                  </th>
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center whitespace-nowrap min-w-[100px]">
                     Properties
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[100px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[110px]">
                     Status
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[120px]">
-                    Invite
-                  </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[105px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[110px]">
                     Created At
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap min-w-[105px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap min-w-[110px]">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
-                {organizations.map((org) => {
-                  const initials = org.name.substring(0, 2).toUpperCase();
+                {displayedOrganizations.map((org: OrgRecord) => {
+                  const peopleCount = org.people_count || (org as any).contacts_count || (org.members?.length || 1);
 
                   return (
                     <tr
@@ -845,128 +845,130 @@ export default function AdminOrganizationsPage() {
                       className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors group"
                     >
                       {/* Column 1: Organization Name */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[190px]">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[200px]">
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/admin/organizations/${org.id}`}
-                            target="_blank"
-                            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap"
+                            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer flex items-center gap-1.5"
                           >
                             <span>{org.name}</span>
-                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 text-blue-600 transition-opacity shrink-0" />
+                            <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </Link>
                         </div>
                       </td>
 
                       {/* Column 2: Address */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[240px]">
-                        <span
-                          className="text-slate-700 dark:text-slate-300 block max-w-[240px] truncate"
-                          title={org.address}
-                        >
-                          {org.address}
-                        </span>
+                        <div className="text-slate-700 dark:text-slate-300 truncate max-w-[230px]" title={org.address}>
+                          {org.address || 'Address not specified'}
+                        </div>
                       </td>
 
-                      {/* Column 3: Primary Contact */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[140px]">
-                        <span className="font-semibold text-slate-900 dark:text-white block truncate max-w-[160px]">
-                          {org.primary_contact_name}
+                      {/* Column 3: Primary Contact Name */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[150px]">
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {org.contact_name || (org as any).primary_contact_name || '—'}
                         </span>
                       </td>
 
                       {/* Column 4: Email */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[180px]">
-                        <div className="flex items-center gap-1 text-[11px]">
-                          <span className="text-slate-700 dark:text-slate-300 truncate max-w-[170px]" title={org.email}>
-                            {org.email}
-                          </span>
-                          {org.email !== '—' && (
-                            <button
-                              onClick={(e) => handleCopyText(org.email, 'Email', `email-${org.id}`, e)}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer shrink-0"
-                              title="Copy email"
-                            >
-                              {copiedId === `email-${org.id}` ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          )}
-                        </div>
+                        {org.email && org.email !== '—' ? (
+                          <button
+                            onClick={(e) => handleCopyText(org.email, 'Email', `email-${org.id}`, e)}
+                            className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer group/copy"
+                          >
+                            <span>{org.email}</span>
+                            {copiedId === `email-${org.id}` ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3 opacity-0 group-hover/copy:opacity-100 text-slate-400" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
                       {/* Column 5: Phone */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[110px]">
-                        <span className="text-slate-700 dark:text-slate-300 text-[11px] whitespace-nowrap">
-                          {org.phone}
-                        </span>
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[120px]">
+                        {org.phone && org.phone !== '—' ? (
+                          <button
+                            onClick={(e) => handleCopyText(org.phone, 'Phone', `phone-${org.id}`, e)}
+                            className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer group/copy"
+                          >
+                            <span>{org.phone}</span>
+                            {copiedId === `phone-${org.id}` ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3 opacity-0 group-hover/copy:opacity-100 text-slate-400" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
-                      {/* Column 6: Properties */}
-                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap min-w-[90px]">
+                      {/* Column 6: People Count */}
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap min-w-[100px]">
                         <button
-                          onClick={() => handleOpenProperties(org)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold transition cursor-pointer ${org.properties_count > 0
-                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200/60 hover:bg-purple-100'
-                              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/60 hover:bg-rose-100'
-                            }`}
-                          title="Click to view & assign properties"
+                          onClick={() => handleOpenContacts(org)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-blue-50 dark:bg-[#1f212a] dark:hover:bg-blue-950/40 text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 font-semibold text-xs transition cursor-pointer"
                         >
-                          <Layers className="w-3 h-3" />
-                          <span>{org.properties_count}</span>
+                          <Users className="w-3 h-3 text-slate-400" />
+                          <span>{peopleCount}</span>
                         </button>
                       </td>
 
-                      {/* Column 7: Status */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[100px]">
+                      {/* Column 7: Properties Count */}
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap min-w-[100px]">
+                        <button
+                          onClick={() => handleOpenProperties(org)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-blue-50 dark:bg-[#1f212a] dark:hover:bg-blue-950/40 text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 font-semibold text-xs transition cursor-pointer"
+                        >
+                          <Layers className="w-3 h-3 text-slate-400" />
+                          <span>{org.properties_count || 0}</span>
+                        </button>
+                      </td>
+
+                      {/* Column 8: Status */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[110px]">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold ${org.status === 'ACTIVE'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            org.status === 'ACTIVE'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                              : org.status === 'INACTIVE'
+                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                               : org.status === 'PENDING_ONBOARDING'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                            }`}
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                              : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
+                          }`}
                         >
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${org.status === 'ACTIVE'
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              org.status === 'ACTIVE'
                                 ? 'bg-emerald-500'
+                                : org.status === 'INACTIVE'
+                                ? 'bg-rose-500'
                                 : org.status === 'PENDING_ONBOARDING'
-                                  ? 'bg-amber-500'
-                                  : 'bg-slate-400'
-                              }`}
+                                ? 'bg-amber-500'
+                                : 'bg-slate-400'
+                            }`}
                           />
-                          {org.status === 'PENDING_ONBOARDING' ? 'Pending' : org.status}
+                          {org.status === 'ACTIVE'
+                            ? 'Active'
+                            : org.status === 'INACTIVE'
+                            ? 'Inactive'
+                            : org.status === 'PENDING_ONBOARDING'
+                            ? 'Pending'
+                            : org.status === 'SUSPENDED'
+                            ? 'Suspended'
+                            : 'Archived'}
                         </span>
                       </td>
 
-                      {/* Column 8: Invite */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[120px]">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold ${org.invite.status === 'PENDING'
-                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200/50'
-                                : org.invite.status === 'APPROVED' || org.invite.status === 'ACCEPTED'
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/50'
-                                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                              }`}
-                          >
-                            <Mail className="w-3 h-3" />
-                            <span>{org.invite.status === 'NO_INVITE' ? 'None' : org.invite.status}</span>
-                          </span>
-                          <button
-                            onClick={() => handleOpenInvite(org)}
-                            className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
-                            title="Manage invite link"
-                          >
-                            <Send className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </td>
-
                       {/* Column 9: Created At */}
-                      <td className="py-3.5 px-3.5 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap min-w-[105px]">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[110px] text-slate-500 dark:text-slate-400 text-xs">
                         {new Date(org.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -974,24 +976,23 @@ export default function AdminOrganizationsPage() {
                         })}
                       </td>
 
-                      {/* Column 10: Actions */}
-                      <td className="py-3.5 px-3.5 text-right whitespace-nowrap min-w-[105px]">
-                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {/* Column 10: Actions (3-Dots Trigger) */}
+                      <td className="py-3.5 px-3.5 text-right whitespace-nowrap min-w-[110px]">
+                        <div className="flex items-center justify-end gap-1.5">
                           <Link
                             href={`/admin/organizations/${org.id}`}
-                            target="_blank"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
-                            title="Open organization workspace in new tab"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                            title="View Organization Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>View</span>
                           </Link>
+
                           <button
                             onClick={(e) => handleOpenMenu(e, org)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
-                            aria-label="More organization actions"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222a] transition cursor-pointer"
+                            title="More Actions"
                           >
-                            <MoreVertical className="w-4 h-4" />
+                            <MoreVertical className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -1001,151 +1002,288 @@ export default function AdminOrganizationsPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
-      {/* 5. Pagination */}
-      {totalCount > itemsPerPage && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] px-4 py-3 rounded-xl shadow-xs flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <div>
-            Showing <strong className="text-slate-800 dark:text-slate-200">{(currentPage - 1) * itemsPerPage + 1}</strong> to{' '}
-            <strong className="text-slate-800 dark:text-slate-200">
-              {Math.min(currentPage * itemsPerPage, totalCount)}
-            </strong>{' '}
-            of <strong className="text-slate-800 dark:text-slate-200">{totalCount}</strong> organizations
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1f212a] cursor-pointer"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-2 font-semibold">
-              Page {currentPage} of {totalPages}
+          {/* Pagination Controls */}
+          <div className="p-3.5 border-t border-slate-200/80 dark:border-[#222430] bg-slate-50/50 dark:bg-[#12131a]/50 flex items-center justify-between text-xs">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">
+              Showing <strong className="text-slate-900 dark:text-white">{displayedOrganizations.length}</strong> of{' '}
+              <strong className="text-slate-900 dark:text-white">{totalCount}</strong> organizations
             </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1f212a] cursor-pointer"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => dispatch(setFilters({ currentPage: Math.max(1, currentPage - 1) }))}
+                disabled={currentPage <= 1}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-2 font-semibold text-slate-700 dark:text-slate-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => dispatch(setFilters({ currentPage: Math.min(totalPages, currentPage + 1) }))}
+                disabled={currentPage >= totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 6. Fixed 3-Dots Overlay Action Menu */}
+      {/* Fixed 3-Dots Action Menu (Upside Floating) */}
       {menuPosition && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setMenuPosition(null)}
-            aria-hidden="true"
-          />
-          <div
-            style={{
-              position: 'fixed',
-              bottom: `${menuPosition.bottom}px`,
-              left: `${menuPosition.left}px`,
-            }}
-            className="z-50 w-60 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100 max-h-[calc(100vh-32px)] overflow-y-auto"
-          >
-            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#252733]">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                Organization Actions
-              </span>
-              <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                {menuPosition.org.name}
-              </span>
-            </div>
-
-            {/* View in New Tab */}
-            <Link
-              href={`/admin/organizations/${menuPosition.org.id}`}
-              target="_blank"
-              onClick={() => setMenuPosition(null)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer text-slate-800 dark:text-slate-200 font-semibold"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-blue-600" />
-              <span>Open Workspace (New Tab)</span>
-            </Link>
-
-            {/* Contacts */}
-            <button
-              onClick={() => handleOpenContacts(menuPosition.org)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <Users className="w-3.5 h-3.5 text-blue-500" />
-              <span>Manage Contacts</span>
-            </button>
-
-            {/* Properties */}
-            <button
-              onClick={() => handleOpenProperties(menuPosition.org)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <Layers className="w-3.5 h-3.5 text-purple-500" />
-              <span>Manage Properties ({menuPosition.org.properties_count})</span>
-            </button>
-
-            {/* Invitation URL */}
-            <button
-              onClick={() => handleOpenInvite(menuPosition.org)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer text-amber-600 dark:text-amber-400 font-medium"
-            >
-              <Mail className="w-3.5 h-3.5 text-amber-500" />
-              <span>Invitation URL &amp; Token</span>
-            </button>
-
-            <div className="border-t border-slate-100 dark:border-[#252733] my-1" />
-
-            {/* Edit details */}
-            <button
-              onClick={() => handleOpenEdit(menuPosition.org)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>Edit Organization Details</span>
-            </button>
-
-            {/* Activate / Deactivate */}
-            <button
-              onClick={() => handleToggleStatus(menuPosition.org)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{menuPosition.org.status === 'ACTIVE' ? 'Deactivate Organization' : 'Activate Organization'}</span>
-            </button>
+        <div
+          style={{
+            position: 'fixed',
+            bottom: `${menuPosition.bottom}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 9999,
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-56 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#252733] rounded-xl shadow-2xl py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100"
+        >
+          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430]">
+            <p className="font-bold text-slate-900 dark:text-white truncate">{menuPosition.org.name}</p>
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+              Action Menu
+            </span>
           </div>
-        </>
+
+          <Link
+            href={`/admin/organizations/${menuPosition.org.id}`}
+            onClick={() => setMenuPosition(null)}
+            className="flex items-center gap-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>View Full Details</span>
+          </Link>
+
+          <button
+            onClick={() => handleOpenEditDrawer(menuPosition.org)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212a] transition cursor-pointer text-left"
+          >
+            <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+            <span>Edit Organization</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenContacts(menuPosition.org)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212a] transition cursor-pointer text-left"
+          >
+            <Users className="w-3.5 h-3.5 text-slate-400" />
+            <span>Manage Contacts</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenProperties(menuPosition.org)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212a] transition cursor-pointer text-left"
+          >
+            <Layers className="w-3.5 h-3.5 text-slate-400" />
+            <span>Assigned Properties</span>
+          </button>
+
+          <div className="border-t border-slate-100 dark:border-[#222430] my-1" />
+
+          {menuPosition.org.status !== 'ACTIVE' && (
+            <button
+              onClick={() => handleUpdateStatus(menuPosition.org.id, 'ACTIVE')}
+              className="w-full flex items-center gap-2 px-3 py-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer text-left font-semibold"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Set as Active</span>
+            </button>
+          )}
+
+          {menuPosition.org.status !== 'INACTIVE' && (
+            <button
+              onClick={() => handleUpdateStatus(menuPosition.org.id, 'INACTIVE')}
+              className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer text-left font-semibold"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Set as Inactive</span>
+            </button>
+          )}
+
+          {menuPosition.org.status !== 'SUSPENDED' && (
+            <button
+              onClick={() => handleUpdateStatus(menuPosition.org.id, 'SUSPENDED')}
+              className="w-full flex items-center gap-2 px-3 py-2 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer text-left font-semibold"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Suspend Tenant</span>
+            </button>
+          )}
+        </div>
       )}
 
-      {/* 7. Create Organization Modal */}
+      {/* Create Organization Modal */}
       <CreateOrgModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSuccess={() => fetchOrganizations()}
+        onSuccess={() => {
+          showToast('Client organization created successfully.');
+          fetchOrganizations();
+        }}
       />
 
-      {/* 8. Invite Manager Modal */}
-      {selectedOrgForInvite && (
-        <InviteManagerModal
-          isOpen={showInviteModal}
-          onClose={() => {
-            setShowInviteModal(false);
-            setSelectedOrgForInvite(null);
-          }}
-          orgId={selectedOrgForInvite.id}
-          orgName={selectedOrgForInvite.name}
-          onSuccess={() => fetchOrganizations()}
-        />
-      )}
+      {/* Edit Organization Drawer */}
+      <AnimatePresence>
+        {showEditDrawer && selectedOrgForEdit && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowEditDrawer(false)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-50 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl"
+            >
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <Edit2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{selectedOrgForEdit.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditDrawer(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-      {/* 9. Properties Drawer */}
+              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Organization Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Street Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editFormData.address}
+                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">City</label>
+                    <input
+                      type="text"
+                      value={editFormData.city}
+                      onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">State</label>
+                    <input
+                      type="text"
+                      value={editFormData.state}
+                      onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">ZIP</label>
+                    <input
+                      type="text"
+                      value={editFormData.zip_code}
+                      onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
+                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">Phone</label>
+                    <input
+                      type="text"
+                      value={editFormData.phone}
+                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">Email</label>
+                    <input
+                      type="email"
+                      value={editFormData.email}
+                      onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Status</label>
+                  <select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="PENDING_ONBOARDING">Pending Onboarding</option>
+                    <option value="SUSPENDED">Suspended</option>
+                    <option value="ARCHIVED">Archived</option>
+                  </select>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditDrawer(false)}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    type="submit"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    disabled={editSaving}
+                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {editSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    <span>Save Changes</span>
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Properties Drawer */}
       <AnimatePresence>
         {showPropertiesDrawer && selectedOrgForProps && (
           <>
@@ -1155,7 +1293,7 @@ export default function AdminOrganizationsPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setShowPropertiesDrawer(false)}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+              className="fixed inset-0 min-h-screen w-screen h-screen z-50 bg-black/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ x: '100%', opacity: 0 }}
@@ -1164,18 +1302,15 @@ export default function AdminOrganizationsPage() {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl"
             >
-              {/* Header */}
               <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
                 <div className="flex items-center gap-3">
                   <div className="text-black dark:text-white flex items-center justify-center">
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Assigned Properties
-                    </h3>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Assigned Properties</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {selectedOrgForProps.name} ({orgPropertiesList.length} Assigned)
+                      {selectedOrgForProps.name} ({orgPropertiesList.length} Properties)
                     </p>
                   </div>
                 </div>
@@ -1187,34 +1322,33 @@ export default function AdminOrganizationsPage() {
                 </button>
               </div>
 
-              {/* Body */}
               <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Property Portfolio
+                    Properties Managed
                   </span>
                   <motion.button
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={handleOpenAssignPropModal}
+                    onClick={handleOpenAssignModal}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Assign New Property</span>
+                    <span>Assign Property</span>
                   </motion.button>
                 </div>
 
                 {loadingOrgProps ? (
                   <div className="py-8 flex flex-col items-center justify-center space-y-2">
                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                    <span className="text-xs text-slate-400">Loading assigned properties...</span>
+                    <span className="text-xs text-slate-400">Loading properties...</span>
                   </div>
                 ) : orgPropertiesList.length === 0 ? (
                   <div className="p-8 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-center space-y-2">
-                    <Layers className="w-8 h-8 text-slate-400 mx-auto" />
+                    <Building2 className="w-8 h-8 text-slate-400 mx-auto" />
                     <p className="font-bold text-slate-800 dark:text-white">No properties assigned</p>
                     <p className="text-slate-400 text-[11px]">
-                      Click &quot;Assign New Property&quot; to associate an existing property with this organization.
+                      Click &quot;Assign Property&quot; to link properties to this organization portfolio.
                     </p>
                   </div>
                 ) : (
@@ -1228,26 +1362,19 @@ export default function AdminOrganizationsPage() {
                           <span className="font-bold text-slate-900 dark:text-white text-xs block">
                             {prop.name}
                           </span>
-                          <span className="text-[11px] text-slate-400 block mt-0.5">
-                            {prop.address || `${prop.city}, ${prop.state}`}
-                          </span>
-                          <span className="text-[10.5px] text-slate-500 mt-0.5 block">
-                            Main Phone: {prop.main_phone || '—'}
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                            {prop.address || `${prop.city || ''}, ${prop.state || ''}`}
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleUnassignProperty(prop.id)}
-                          className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs font-semibold transition cursor-pointer"
-                        >
-                          Unassign
-                        </button>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {prop.status || 'ACTIVE'}
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Footer */}
               <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end">
                 <button
                   onClick={() => setShowPropertiesDrawer(false)}
@@ -1261,7 +1388,7 @@ export default function AdminOrganizationsPage() {
         )}
       </AnimatePresence>
 
-      {/* 10. Assign Property Modal */}
+      {/* Assign Property Modal */}
       <AnimatePresence>
         {showAssignPropModal && (
           <>
@@ -1271,9 +1398,9 @@ export default function AdminOrganizationsPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setShowAssignPropModal(false)}
-              className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs"
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
             />
-            <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1283,9 +1410,12 @@ export default function AdminOrganizationsPage() {
               >
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Assign Existing Property
+                    Assign Property to {selectedOrgForProps?.name}
                   </h3>
-                  <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button
+                    onClick={() => setShowAssignPropModal(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -1293,10 +1423,10 @@ export default function AdminOrganizationsPage() {
                 <form onSubmit={handleAssignPropertySubmit} className="space-y-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                      Select Property from Database
+                      Select Property to Link
                     </label>
                     {loadingAvailableProps ? (
-                      <div className="p-3 bg-slate-50 dark:bg-[#181920] rounded-lg text-center text-slate-400">
+                      <div className="p-3 bg-slate-50 dark:bg-[#111217] rounded-lg text-slate-400">
                         Loading properties...
                       </div>
                     ) : (
@@ -1339,7 +1469,7 @@ export default function AdminOrganizationsPage() {
         )}
       </AnimatePresence>
 
-      {/* 11. Contacts Drawer */}
+      {/* Contacts Drawer */}
       <AnimatePresence>
         {showContactsDrawer && selectedOrgForContacts && (
           <>
@@ -1349,7 +1479,7 @@ export default function AdminOrganizationsPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setShowContactsDrawer(false)}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
+              className="fixed inset-0 min-h-screen w-screen h-screen z-50 bg-black/60 backdrop-blur-sm"
             />
             <motion.div
               initial={{ x: '100%', opacity: 0 }}
@@ -1369,7 +1499,7 @@ export default function AdminOrganizationsPage() {
                       Organization Contacts
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {selectedOrgForContacts.name} ({orgContactsList.length} Contacts)
+                      {selectedOrgForContacts.name} ({currentOrgContactsList.length} Contacts)
                     </p>
                   </div>
                 </div>
@@ -1403,7 +1533,7 @@ export default function AdminOrganizationsPage() {
                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     <span className="text-xs text-slate-400">Loading contacts...</span>
                   </div>
-                ) : orgContactsList.length === 0 ? (
+                ) : currentOrgContactsList.length === 0 ? (
                   <div className="p-8 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-center space-y-2">
                     <Users className="w-8 h-8 text-slate-400 mx-auto" />
                     <p className="font-bold text-slate-800 dark:text-white">No contacts listed</p>
@@ -1413,7 +1543,7 @@ export default function AdminOrganizationsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {orgContactsList.map((contact) => (
+                    {currentOrgContactsList.map((contact: OrgContact) => (
                       <div
                         key={contact.id}
                         className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between"
@@ -1425,7 +1555,7 @@ export default function AdminOrganizationsPage() {
                             </span>
                             {contact.is_primary && (
                               <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60">
-                                Primary Admin
+                                Primary Contact
                               </span>
                             )}
                             <span className="text-[10px] font-semibold text-slate-400">
@@ -1440,28 +1570,23 @@ export default function AdminOrganizationsPage() {
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
-                          {(contact as any).invite_url && (
-                            <button
-                              onClick={(e) => handleCopyText((contact as any).invite_url, 'Invite URL', `url-${contact.id}`, e)}
-                              className="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer"
-                              title="Copy Invitation URL"
-                            >
-                              {copiedId === `url-${contact.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Mail className="w-3.5 h-3.5" />}
-                            </button>
-                          )}
                           <button
                             onClick={(e) => handleCopyText(contact.email, 'Email', `c-email-${contact.id}`, e)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-[#252836] transition cursor-pointer"
                             title="Copy Email"
                           >
-                            {copiedId === `c-email-${contact.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedId === `c-email-${contact.id}` ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
                           </button>
                           <button
-                            onClick={() => handleDeleteContactFromDrawer(contact.id)}
+                            onClick={() => setContactToDelete({ id: contact.id, name: contact.name })}
                             className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                             title="Remove Contact"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -1484,7 +1609,61 @@ export default function AdminOrganizationsPage() {
         )}
       </AnimatePresence>
 
-      {/* 12. Add Contact Modal */}
+      {/* Delete Contact Confirmation Dialog */}
+      <AnimatePresence>
+        {contactToDelete && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setContactToDelete(null)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-70 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-70 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="text-center space-y-1">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">Remove Contact?</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Are you sure you want to remove <strong className="text-slate-900 dark:text-white">{contactToDelete.name}</strong> from this organization?
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setContactToDelete(null)}
+                    disabled={deletingContact}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1a1b22]"
+                  >
+                    No, Cancel
+                  </button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleConfirmDeleteContact}
+                    disabled={deletingContact}
+                    className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    {deletingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    <span>Yes, Remove</span>
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Add Contact Modal */}
       <AnimatePresence>
         {showAddContactModal && (
           <>
@@ -1494,9 +1673,9 @@ export default function AdminOrganizationsPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setShowAddContactModal(false)}
-              className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs"
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
             />
-            <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1558,17 +1737,17 @@ export default function AdminOrganizationsPage() {
                   <div className="flex items-center gap-2 pt-1">
                     <input
                       type="checkbox"
-                      id="is_primary_checkbox"
+                      id="is_primary"
                       checked={contactFormData.is_primary}
                       onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
-                    <label htmlFor="is_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
-                      Set as Primary Administrator
+                    <label htmlFor="is_primary" className="text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
+                      Designate as Primary Contact for this Organization
                     </label>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
                     <button
                       type="button"
                       onClick={() => setShowAddContactModal(false)}
@@ -1581,177 +1760,15 @@ export default function AdminOrganizationsPage() {
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       disabled={savingContact}
-                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                     >
-                      {savingContact ? 'Saving...' : 'Add Contact'}
+                      {savingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Save Contact</span>
                     </motion.button>
                   </div>
                 </form>
               </motion.div>
             </div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* 13. Edit Organization Drawer */}
-      <AnimatePresence>
-        {showEditDrawer && selectedOrgForEdit && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setShowEditDrawer(false)}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs"
-            />
-            <motion.div
-              initial={{ x: '100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl"
-            >
-              {/* Header */}
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-[#111217]/50">
-                <div className="flex items-center gap-3">
-                  <div className="text-black dark:text-white flex items-center justify-center">
-                    <Edit2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Edit Organization Details
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {selectedOrgForEdit.name}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowEditDrawer(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Organization Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Street Address
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={editFormData.address}
-                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">City</label>
-                    <input
-                      type="text"
-                      value={editFormData.city}
-                      onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
-                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">State</label>
-                    <input
-                      type="text"
-                      value={editFormData.state}
-                      onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
-                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">ZIP</label>
-                    <input
-                      type="text"
-                      value={editFormData.zip_code}
-                      onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
-                      className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Main Phone
-                  </label>
-                  <input
-                    type="text"
-                    value={editFormData.phone}
-                    onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Primary Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editFormData.email}
-                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Operational Status
-                  </label>
-                  <select
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
-                    <option value="INACTIVE">INACTIVE</option>
-                    <option value="SUSPENDED">SUSPENDED</option>
-                  </select>
-                </div>
-
-                <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditDrawer(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    type="submit"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    disabled={editSaving}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {editSaving ? 'Saving Changes...' : 'Save Organization'}
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
           </>
         )}
       </AnimatePresence>

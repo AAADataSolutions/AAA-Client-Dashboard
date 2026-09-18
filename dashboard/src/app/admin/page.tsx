@@ -151,7 +151,7 @@ export default function AdminOverviewPage() {
       {/* 2. Top KPI Cards Row (6 Gradient Variant Cards with Framer Motion Hover Pop) */}
       <motion.div
         variants={itemVariants}
-        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3.5"
       >
         {/* Card 1: Organizations (Variant 1: Deep Blue) */}
         <motion.div

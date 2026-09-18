@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const {
+      property_id,
       organization_property_id,
       subject,
       description,
@@ -67,11 +69,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Ticket subject is required.' }, { status: 400 });
     }
 
+    let targetOrgPropId = organization_property_id;
+
+    if (!targetOrgPropId && property_id) {
+      const { data: orgProp } = await supabase
+        .from('organization_properties')
+        .select('id')
+        .eq('property_id', property_id)
+        .maybeSingle();
+
+      if (orgProp) {
+        targetOrgPropId = orgProp.id;
+      }
+    }
+
     const { data: newTicket, error } = await supabase
       .from('tickets')
       .insert({
-        organization_property_id,
-        created_by: user?.id,
+        organization_property_id: targetOrgPropId || null,
+        created_by: user?.id || null,
         assigned_to: assigned_to || null,
         subject: subject.trim(),
         description: description?.trim() || '',
@@ -84,6 +100,20 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    // Central Audit Log
+    await logAuditEvent({
+      action: 'TICKET_CREATED',
+      entity_type: 'TICKET',
+      entity_id: newTicket.id,
+      entity_name: newTicket.subject,
+      changes: {
+        ticket_id: newTicket.id,
+        subject: newTicket.subject,
+        priority: newTicket.priority,
+        status: newTicket.status,
+      },
+    });
 
     return NextResponse.json({ success: true, data: newTicket });
   } catch (err: any) {

@@ -1,27 +1,30 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   FileClock,
   Search,
   Download,
-  Filter,
-  Shield,
+  Eye,
+  X,
+  RefreshCw,
   SlidersHorizontal,
   Clock,
-  UserCheck,
+  CheckCircle2,
+  AlertCircle,
   Building2,
-  Hotel,
-  ShieldCheck,
   PhoneCall,
-  GitBranch,
+  ArrowLeftRight,
   LifeBuoy,
-  X,
-  Eye,
-  Key,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  fetchAuditLogs,
+  setSearchQuery,
+  setActionFilter,
+  AuditLogItem,
+} from '@/store/slices/auditLogsSlice';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -40,276 +43,375 @@ const itemVariants: Variants = {
   },
 };
 
-interface AuditLogRecord {
-  id: string;
-  actor_email: string;
-  actor_role: string;
-  action: string;
-  entity_type: string;
-  entity_name?: string;
-  ip_address: string;
-  changes?: Record<string, any>;
-  created_at: string;
-}
-
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState<AuditLogRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedActionFilter, setSelectedActionFilter] = useState('ALL');
-  const [selectedLog, setSelectedLog] = useState<AuditLogRecord | null>(null);
+  const dispatch = useAppDispatch();
+  const {
+    items: logs,
+    loading,
+    error,
+    filters,
+  } = useAppSelector((state) => state.auditLogs);
 
-  const loadAuditLogs = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/admin/audit-logs');
-      const result = await res.json();
+  const [searchInput, setSearchInput] = useState(filters.searchQuery);
+  const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
 
-      if (result.success && Array.isArray(result.data)) {
-        const mapped: AuditLogRecord[] = result.data.map((item: any) => ({
-          id: item.id,
-          actor_email: item.actor?.email || item.actor_email || 'admin@aaasolutions.com',
-          actor_role: item.actor?.role || item.actor_role || 'SUPER_ADMIN',
-          action: item.action || 'ACTIVITY_LOGGED',
-          entity_type: item.entity_type || 'SYSTEM',
-          entity_name: item.entity_name || item.organization?.name || 'Mesh Entity',
-          ip_address: item.ip_address || '127.0.0.1',
-          changes: item.changes || undefined,
-          created_at: item.created_at,
-        }));
-        setLogs(mapped);
-      } else {
-        setLogs([]);
-      }
-    } catch (err) {
-      console.error('Error fetching audit logs:', err);
-      setLogs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch Audit Logs via Redux
+  const loadData = useCallback(() => {
+    dispatch(fetchAuditLogs());
+  }, [dispatch]);
 
   useEffect(() => {
-    loadAuditLogs();
-  }, []);
+    loadData();
+  }, [loadData]);
 
-  const filteredLogs = useMemo(() => {
-    return logs.filter((l) => {
-      const matchesSearch =
-        l.actor_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        l.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (l.entity_name && l.entity_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        l.ip_address.includes(searchQuery);
-
-      const matchesAction = selectedActionFilter === 'ALL' || l.action.includes(selectedActionFilter);
-
-      return matchesSearch && matchesAction;
-    });
-  }, [logs, searchQuery, selectedActionFilter]);
-
-  const handleExportCSV = () => {
-    const headers = ['Timestamp', 'Actor Email', 'Role', 'Action', 'Entity Type', 'Target Name', 'IP Address'];
-    const rows = filteredLogs.map((l) => [
-      new Date(l.created_at).toISOString(),
-      l.actor_email,
-      l.actor_role,
-      l.action,
-      l.entity_type,
-      `"${(l.entity_name || '').replace(/"/g, '""')}"`,
-      l.ip_address,
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AAA_Audit_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Search input handler (char-by-char)
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    dispatch(setSearchQuery(val));
   };
 
+  // Filter logs in memory
+  const filteredLogs = logs.filter((l: AuditLogItem) => {
+    const q = filters.searchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      l.action.toLowerCase().includes(q) ||
+      l.actor_email.toLowerCase().includes(q) ||
+      (l.description && l.description.toLowerCase().includes(q)) ||
+      (l.entity_name && l.entity_name.toLowerCase().includes(q));
+
+    const matchesAction =
+      filters.selectedAction === 'ALL' ||
+      (l.raw_action && l.raw_action.includes(filters.selectedAction)) ||
+      l.action.toLowerCase().includes(filters.selectedAction.toLowerCase());
+
+    return matchesSearch && matchesAction;
+  });
+
+  const handleExportCSV = () => {
+    const headers = ['Action,Timestamp,Actor,Description,Entity,IP Address\n'];
+    const rows = filteredLogs.map((l: AuditLogItem) =>
+      `"${l.action}","${new Date(l.created_at).toISOString()}","${l.actor_email}","${(l.description || '').replace(/"/g, '""')}","${l.entity_name || ''}","${l.ip_address}"`
+    );
+    const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
+  const resetAllFilters = () => {
+    setSearchInput('');
+    dispatch(setSearchQuery(''));
+    dispatch(setActionFilter('ALL'));
+  };
+
+  const hasActiveFilters = filters.searchQuery.trim() !== '' || filters.selectedAction !== 'ALL';
+
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6 pb-12">
-      {/* 1. Header Section */}
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
-            <FileClock size={256} className="w-full h-full object-contain" />
+          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
+            <FileClock size={256} className="text-black dark:text-white" />
           </div>
-          <h1 className="text-xl font-bold text-black dark:text-white tracking-tight">Security &amp; Audit Logs</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Audit &amp; Activity Ledger</h1>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2.5">
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-[#16171d] border border-slate-200 dark:border-[#232530] hover:bg-slate-50 dark:hover:bg-[#1e1f27] text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors shadow-sm cursor-pointer"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-            <span>Export Audit Trail (CSV)</span>
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Export Audit Log (CSV)
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={resetAllFilters}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> Reset Filters
           </motion.button>
         </div>
       </motion.div>
 
-      {/* 2. Search & Filter Bar */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] p-3 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search actor email, action, entity, IP address..."
-            className="w-full bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-[#1a1b22] rounded-lg pl-9 pr-12 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-all"
-          />
-        </div>
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          {/* Search Box (char-by-char) */}
+          <div className="relative flex-1">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by action, description, actor, entity..."
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+            />
+            {searchInput && (
+              <button
+                onClick={() => handleSearchChange('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530] rounded-lg px-2.5 py-1.5">
-            <span className="text-slate-500 dark:text-slate-400 font-medium">Action:</span>
+          {/* Action Filter */}
+          <div className="flex items-center gap-2 flex-wrap">
             <select
-              value={selectedActionFilter}
-              onChange={(e) => setSelectedActionFilter(e.target.value)}
-              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold outline-none cursor-pointer focus:border-blue-500"
+              value={filters.selectedAction}
+              onChange={(e) => dispatch(setActionFilter(e.target.value))}
+              aria-label="Filter by action type"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="ALL" className="dark:bg-[#15161c]">All Actions</option>
-              <option value="E911" className="dark:bg-[#15161c]">E911 Events</option>
-              <option value="PORTING" className="dark:bg-[#15161c]">Porting Events</option>
-              <option value="ORGANIZATION" className="dark:bg-[#15161c]">Organization Events</option>
-              <option value="INVITATION" className="dark:bg-[#15161c]">Invitation Approvals</option>
-              <option value="TICKET" className="dark:bg-[#15161c]">Ticket Events</option>
+              <option value="ALL">All Event Types</option>
+              <option value="PROPERTY">Property Events</option>
+              <option value="ORGANIZATION">Organization Events</option>
+              <option value="SERVICE">Service Events</option>
+              <option value="ONBOARDING">Onboarding Events</option>
+              <option value="TICKET">Ticket Events</option>
+              <option value="E911">E911 Events</option>
             </select>
           </div>
         </div>
-      </motion.div>
 
-      {/* 3. Audit Log Table */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8fafc] dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <th className="py-3 px-4">Timestamp &amp; Actor</th>
-                <th className="py-3 px-4">Action Event</th>
-                <th className="py-3 px-4">Target Entity</th>
-                <th className="py-3 px-4">IP Address</th>
-                <th className="py-3 px-4 text-right">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a] text-xs">
-              {filteredLogs.map((log) => (
-                <tr
-                  key={log.id}
-                  className="hover:bg-slate-50/70 dark:hover:bg-[#1a1b22] transition-colors group cursor-pointer"
-                  onClick={() => setSelectedLog(log)}
-                >
-                  {/* Timestamp & Actor */}
-                  <td className="py-3.5 px-4 whitespace-nowrap">
-                    <div className="font-semibold text-slate-900 dark:text-white">{log.actor_email}</div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                      <span className="text-blue-600 dark:text-blue-400 font-semibold">{log.actor_role}</span>
-                      <span>•</span>
-                      <span>{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                  </td>
+        {/* Active Filters Pill Bar */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
+            <span className="text-slate-400">Active Filters:</span>
+            {filters.searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
+                "{filters.searchQuery}"
+                <button onClick={() => handleSearchChange('')} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filters.selectedAction !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
+                Type: {filters.selectedAction}
+                <button onClick={() => dispatch(setActionFilter('ALL'))} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            <button
+              onClick={resetAllFilters}
+              className="text-slate-500 hover:text-blue-600 text-xs font-medium underline ml-auto cursor-pointer"
+            >
+              Clear All
+            </button>
+          </div>
+        )}
+      </div>
 
-                  {/* Action */}
-                  <td className="py-3.5 px-4 whitespace-nowrap">
-                    <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-slate-100 dark:bg-[#20222a] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#2e313e]">
-                      {log.action}
-                    </span>
-                  </td>
-
-                  {/* Entity */}
-                  <td className="py-3.5 px-4">
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">{log.entity_name}</div>
-                    <span className="text-[11px] text-slate-400">{log.entity_type}</span>
-                  </td>
-
-                  {/* IP Address */}
-                  <td className="py-3.5 px-4 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
-                    {log.ip_address}
-                  </td>
-
-                  {/* Details Button */}
-                  <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setSelectedLog(log)}
-                      className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-[#282a36] text-slate-400 hover:text-blue-600 cursor-pointer transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Main Table View */}
+      {error ? (
+        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load audit logs</p>
+          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
+          <button
+            onClick={loadData}
+            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
         </div>
-      </motion.div>
+      ) : loading && logs.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
+              <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-1/3"></div>
+              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-32"></div>
+              <div className="h-7 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
+            </div>
+          ))}
+        </div>
+      ) : filteredLogs.length === 0 ? (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
+          <FileClock className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Audit Events Logged</h4>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+            {hasActiveFilters
+              ? 'No audit log entries match the selected filters.'
+              : 'Actions performed across properties, services, and onboardings will automatically be recorded here.'}
+          </p>
+          {hasActiveFilters && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={resetAllFilters}
+                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ACTION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">TIME PERFORMED</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">DETAILS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
+                {filteredLogs.map((log: AuditLogItem) => {
+                  return (
+                    <tr
+                      key={log.id}
+                      onClick={() => setSelectedLog(log)}
+                      className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition cursor-pointer"
+                    >
+                      {/* 1. Action (e.g. "New property created") */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-bold text-slate-900 dark:text-white text-sm">
+                            {log.action}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40">
+                            {log.entity_type}
+                          </span>
+                        </div>
+                      </td>
 
-      {/* 4. Log Inspection Modal */}
+                      {/* 2. Time at which performed */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-slate-600 dark:text-slate-300 font-medium">
+                          {new Date(log.created_at).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}{' '}
+                          at{' '}
+                          {new Date(log.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}
+                        </span>
+                      </td>
+
+                      {/* 3. Details (View Button) */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setSelectedLog(log)}
+                          className="px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-semibold text-xs transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* LOG INSPECTION SIDE MODAL (SHOWS NARRATIVE DESCRIPTION & FULL CHANGES) */}
       <AnimatePresence>
         {selectedLog && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
-          >
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="fixed inset-0" onClick={() => setSelectedLog(null)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430] shadow-2xl max-w-lg w-full p-6"
+              className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#222430]">
-                <div className="flex items-center gap-2">
-                  <FileClock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  <h3 className="font-bold text-slate-900 dark:text-white">Audit Event Details</h3>
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <FileClock className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">{selectedLog.action}</h3>
+                    <p className="text-xs text-slate-400">Audit Ledger Record</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setSelectedLog(null)}
-                  className="text-slate-400 hover:text-slate-200 cursor-pointer p-1 rounded-lg"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="mt-4 space-y-3 text-xs">
-                <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430]">
+              <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs">
+                {/* Narrative Description Banner */}
+                <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 space-y-1">
+                  <span className="font-bold text-blue-900 dark:text-blue-300 uppercase text-[10px] tracking-wider">
+                    Event Narrative
+                  </span>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white leading-relaxed">
+                    {selectedLog.description}
+                  </p>
+                </div>
+
+                {/* Metadata Grid */}
+                <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430]">
                   <div>
-                    <span className="text-slate-400 text-[10px] uppercase font-bold">Actor Email</span>
-                    <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{selectedLog.actor_email}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Timestamp</span>
+                    <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                      {new Date(selectedLog.created_at).toLocaleString()}
+                    </p>
                   </div>
                   <div>
-                    <span className="text-slate-400 text-[10px] uppercase font-bold">Role</span>
-                    <p className="font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{selectedLog.actor_role}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Actor Email</span>
+                    <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                      {selectedLog.actor_email}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Target Entity</span>
+                    <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                      {selectedLog.entity_name || 'System'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">IP Address</span>
+                    <p className="font-semibold text-slate-900 dark:text-white mt-0.5">
+                      {selectedLog.ip_address}
+                    </p>
                   </div>
                 </div>
 
+                {/* State Modifications JSON */}
                 <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">State Modifications (JSON)</span>
-                  <pre className="p-3 rounded-xl bg-slate-900 text-emerald-400 text-[11px] overflow-x-auto">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1.5">
+                    Modifications &amp; Parameters (JSON)
+                  </span>
+                  <pre className="p-3.5 rounded-xl bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto border border-slate-800">
                     {JSON.stringify(selectedLog.changes || {}, null, 2)}
                   </pre>
                 </div>
               </div>
 
-              <div className="mt-5 flex justify-end">
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
+                <button
                   onClick={() => setSelectedLog(null)}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer shadow-sm"
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer shadow-xs"
                 >
                   Close
-                </motion.button>
+                </button>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

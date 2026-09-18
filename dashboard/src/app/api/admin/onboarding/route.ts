@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,7 +52,6 @@ export async function GET(request: NextRequest) {
     const { data: rawOnboardings, error } = await query;
 
     if (error) {
-      // Fallback query
       const { data: fallbackList, error: fErr } = await supabase
         .from('onboardings')
         .select('*')
@@ -123,8 +123,17 @@ export async function GET(request: NextRequest) {
         progress_pct: pct,
         property_id: prop?.id || '',
         property_name: prop?.name || 'New Property',
+        property_address: prop?.address || '',
+        property_city: prop?.city || '',
+        property_state: prop?.state || '',
+        property_zip: prop?.zip_code || '',
+        general_manager_name: prop?.general_manager_name || prop?.contact_person_name || 'N/A',
+        general_manager_phone: prop?.general_manager_phone || prop?.main_phone || 'N/A',
+        general_manager_email: prop?.general_manager_email || prop?.contact_person_email || 'N/A',
+        property_status: prop?.status || 'INACTIVE',
+        ray_baud_and_logs_enabled: prop?.ray_baud_and_logs_enabled ?? false,
         organization_id: org?.id || '',
-        organization_name: org?.name || 'Direct Portfolio',
+        organization_name: org?.name || 'Unassigned Organization',
         property_details: prop || null,
         organization_details: org || null,
       };
@@ -136,7 +145,9 @@ export async function GET(request: NextRequest) {
       formatted = formatted.filter(
         (o: any) =>
           o.property_name.toLowerCase().includes(lowerSearch) ||
-          o.organization_name.toLowerCase().includes(lowerSearch)
+          o.organization_name.toLowerCase().includes(lowerSearch) ||
+          o.property_address.toLowerCase().includes(lowerSearch) ||
+          o.general_manager_name.toLowerCase().includes(lowerSearch)
       );
     }
 
@@ -148,7 +159,6 @@ export async function GET(request: NextRequest) {
     } else if (sortBy === 'STATUS') {
       formatted.sort((a: any, b: any) => b.progress_pct - a.progress_pct);
     } else {
-      // NEWEST
       formatted.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
@@ -183,23 +193,26 @@ export async function POST(request: NextRequest) {
 
     const {
       property_name,
+      organization_id,
       address,
       city,
       state,
       zip_code,
-      main_phone,
-      contact_person_name,
-      contact_person_email,
       general_manager_name,
-      status,
+      general_manager_phone,
+      general_manager_email,
       target_date,
+      e911_status,
+      ray_baum_status,
     } = body;
 
     if (!property_name || !property_name.trim()) {
       return NextResponse.json({ success: false, error: 'Property name is required.' }, { status: 400 });
     }
 
-    // 1. Create the brand new property in `public.properties`
+    const isE911Verified = e911_status === 'VERIFIED' || ray_baum_status === 'VERIFIED';
+
+    // 1. Create the brand new property with status: 'INACTIVE'
     const { data: newProp, error: propErr } = await supabase
       .from('properties')
       .insert({
@@ -209,12 +222,14 @@ export async function POST(request: NextRequest) {
         state: state?.trim() || 'TBD',
         zip_code: zip_code?.trim() || '00000',
         country: 'USA',
-        main_phone: main_phone?.trim() || null,
-        contact_person_name: contact_person_name?.trim() || null,
-        contact_person_email: contact_person_email?.trim() || null,
+        main_phone: general_manager_phone?.trim() || null,
+        contact_person_name: general_manager_name?.trim() || null,
+        contact_person_email: general_manager_email?.trim() || null,
         general_manager_name: general_manager_name?.trim() || null,
-        status: 'ACTIVE',
-        ray_baud_and_logs_enabled: false,
+        general_manager_phone: general_manager_phone?.trim() || null,
+        general_manager_email: general_manager_email?.trim() || null,
+        status: 'INACTIVE', // Automatically INACTIVE upon creation
+        ray_baud_and_logs_enabled: isE911Verified,
       })
       .select()
       .single();
@@ -223,20 +238,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Failed to create property: ${propErr.message}` }, { status: 400 });
     }
 
-    // 2. Fetch the default / first client organization to associate with
-    let targetOrgId = body.organization_id;
+    // 2. Associate with Organization (Rule 1: One property can only be assigned to one organization)
+    let targetOrgId = organization_id;
+    let orgName = 'Unassigned';
+
     if (!targetOrgId) {
       const { data: firstOrg } = await supabase
         .from('organizations')
-        .select('id')
+        .select('id, name')
         .limit(1)
         .maybeSingle();
 
       targetOrgId = firstOrg?.id;
+      if (firstOrg) orgName = firstOrg.name;
+    } else {
+      const { data: chosenOrg } = await supabase.from('organizations').select('name').eq('id', targetOrgId).maybeSingle();
+      if (chosenOrg) orgName = chosenOrg.name;
     }
 
     if (!targetOrgId) {
-      // If no organization exists, create a default Primary Portfolio organization
       const { data: defaultOrg } = await supabase
         .from('organizations')
         .insert({
@@ -244,12 +264,13 @@ export async function POST(request: NextRequest) {
           primary_email: 'admin@aaasolutions.com',
           status: 'ACTIVE',
         })
-        .select('id')
+        .select('id, name')
         .single();
       targetOrgId = defaultOrg?.id;
+      if (defaultOrg) orgName = defaultOrg.name;
     }
 
-    // 3. Link this new property in `public.organization_properties`
+    // 3. Link this new property in organization_properties
     const { data: newLink, error: linkErr } = await supabase
       .from('organization_properties')
       .insert({
@@ -264,15 +285,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Failed to link property: ${linkErr.message}` }, { status: 400 });
     }
 
-    // 4. Create the onboarding record in `public.onboardings` (WITHOUT notes column)
-    const initialStatus = status || 'DRAFT';
+    // 4. Create onboarding record with initial stage "DRAFT" ("Draft Initialized")
     const { data: newOnboarding, error: onbErr } = await supabase
       .from('onboardings')
       .insert({
         organization_property_id: newLink.id,
-        status: initialStatus,
+        status: 'DRAFT',
         target_date: target_date || null,
-        contract_sent_at: initialStatus === 'CONTRACT_SENT' ? new Date().toISOString() : null,
       })
       .select()
       .single();
@@ -280,6 +299,22 @@ export async function POST(request: NextRequest) {
     if (onbErr) {
       return NextResponse.json({ success: false, error: `Failed to create onboarding tracker: ${onbErr.message}` }, { status: 400 });
     }
+
+    // Central Audit Log
+    await logAuditEvent({
+      action: 'ONBOARDING_INITIALIZED',
+      entity_type: 'ONBOARDING',
+      entity_id: newOnboarding.id,
+      entity_name: newProp.name,
+      changes: {
+        property_name: newProp.name,
+        organization_id: targetOrgId,
+        organization_name: orgName,
+        stage: 'DRAFT',
+        property_status: 'INACTIVE',
+        target_date,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -298,11 +333,7 @@ export async function PUT(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    const {
-      id,
-      status,
-      target_date,
-    } = body;
+    const { id, status, target_date } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Onboarding ID is required.' }, { status: 400 });
@@ -327,14 +358,49 @@ export async function PUT(request: NextRequest) {
       .from('onboardings')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select(`
+        *,
+        org_property:organization_properties(
+          id,
+          property_id,
+          property:properties(id, name, status)
+        )
+      `)
       .single();
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data: updated });
+    // Rule: Once stage becomes COMPLETED, automatically activate the property!
+    let activatedProperty = false;
+    if (status === 'COMPLETED' && updated.org_property?.property_id) {
+      await supabase
+        .from('properties')
+        .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
+        .eq('id', updated.org_property.property_id);
+      activatedProperty = true;
+    }
+
+    // Central Audit Log
+    const propName = updated.org_property?.property?.name || 'Property';
+    await logAuditEvent({
+      action: status === 'COMPLETED' ? 'ONBOARDING_COMPLETED_PROPERTY_ACTIVATED' : 'ONBOARDING_STAGE_UPDATED',
+      entity_type: 'ONBOARDING',
+      entity_id: id,
+      entity_name: propName,
+      changes: {
+        stage: status,
+        property_id: updated.org_property?.property_id,
+        property_activated: activatedProperty,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+      propertyActivated: activatedProperty,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

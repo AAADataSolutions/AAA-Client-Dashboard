@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logAdminAction } from '@/lib/audit/logger';
 import crypto from 'crypto';
 
 export async function GET(
@@ -101,7 +102,7 @@ export async function GET(
     }
 
     // If no contacts yet, add the organization's primary contact from metadata
-    if (contacts.length === 0 && org) {
+    if (contacts.length === 0 && org && org.email) {
       contacts.push({
         id: `org-admin-${org.id}`,
         profile_id: null,
@@ -167,7 +168,6 @@ export async function POST(
 
     if (existingProfile) {
       profileId = existingProfile.id;
-      // Update profile info
       await dbClient
         .from('profiles')
         .update({
@@ -177,7 +177,6 @@ export async function POST(
         })
         .eq('id', profileId);
     } else if (adminClient) {
-      // 2. Try creating in auth.users via service role if available
       try {
         const { data: authList } = await adminClient.auth.admin.listUsers();
         const existingAuth = authList?.users?.find(
@@ -226,7 +225,7 @@ export async function POST(
     // If profile exists, link to organization_members
     let memberRecord: any = null;
     if (profileId) {
-      // If setting as primary ADMIN, demote other admins
+      // If setting as primary ADMIN, demote other admins to regular USER without deleting them
       if (is_primary || contactRole === 'ADMIN') {
         await dbClient
           .from('organization_members')
@@ -255,7 +254,7 @@ export async function POST(
       }
     }
 
-    // If primary, also update organization primary metadata
+    // If primary, update organization primary metadata
     if (is_primary || contactRole === 'ADMIN') {
       await dbClient
         .from('organizations')
@@ -268,52 +267,16 @@ export async function POST(
         .eq('id', organizationId);
     }
 
-    // Determine a valid inviter profile ID for the foreign key
-    let inviterId: string | null = callerUser?.id || null;
-    if (inviterId) {
-      const { data: inviterProfile } = await dbClient
-        .from('profiles')
-        .select('id')
-        .eq('id', inviterId)
-        .maybeSingle();
-
-      if (!inviterProfile) {
-        const { data: anyAdmin } = await dbClient
-          .from('profiles')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        inviterId = anyAdmin?.id || null;
-      }
-    } else {
-      const { data: anyAdmin } = await dbClient
-        .from('profiles')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      inviterId = anyAdmin?.id || null;
-    }
-
-    // Generate secure invitation record for this contact
-    const rawToken = crypto.randomBytes(24).toString('hex');
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    if (inviterId) {
-      await dbClient.from('invitations').insert({
-        email: cleanEmail,
-        token_hash: rawToken,
-        invite_type: 'CLIENT_MEMBER',
-        organization_id: organizationId,
-        target_org_role: contactRole,
-        invited_by: inviterId,
-        status: 'PENDING',
-        expires_at: expiresAt,
-      });
-    }
-
-    const host = request.headers.get('host') || 'localhost:3000';
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const inviteUrl = `${protocol}://${host}/invite/${rawToken}`;
+    // Audit log
+    await logAdminAction({
+      action: is_primary ? 'PRIMARY_CONTACT_ASSIGNED' : 'CONTACT_ADDED',
+      entityType: 'ORGANIZATION',
+      entityId: organizationId,
+      entityName: cleanName,
+      organizationId,
+      description: `Added contact ${cleanName} (${cleanEmail}) to organization${is_primary ? ' as Primary Contact' : ''}`,
+      changes: { name: cleanName, email: cleanEmail, is_primary, role: contactRole },
+    });
 
     return NextResponse.json({
       success: true,
@@ -324,10 +287,9 @@ export async function POST(
         phone: cleanPhone,
         role: contactRole,
         is_primary: is_primary || contactRole === 'ADMIN',
-        status: 'INVITED',
+        status: 'ACTIVE',
       },
-      inviteUrl,
-      message: 'Contact added and invitation generated successfully.',
+      message: 'Contact saved successfully.',
     });
   } catch (err: any) {
     console.error('Add contact error:', err);
@@ -348,10 +310,19 @@ export async function PATCH(
     const dbClient = createAdminClient() || supabase;
     const body = await request.json();
 
-    const { member_id, role, status, full_name, phone_number } = body;
+    const { member_id, role, status, full_name, phone_number, is_primary } = body;
 
     if (!member_id) {
       return NextResponse.json({ success: false, error: 'member_id is required' }, { status: 400 });
+    }
+
+    if (is_primary || role === 'ADMIN') {
+      // Demote all other admins in org
+      await dbClient
+        .from('organization_members')
+        .update({ role: 'USER', updated_at: new Date().toISOString() })
+        .eq('organization_id', organizationId)
+        .eq('role', 'ADMIN');
     }
 
     if (member_id.startsWith('invite-')) {
@@ -390,7 +361,6 @@ export async function PATCH(
 
     if (memErr) throw memErr;
 
-    // If full_name or phone_number provided, update profile
     if ((full_name || phone_number) && updatedMember?.profile_id) {
       await dbClient
         .from('profiles')
@@ -432,14 +402,39 @@ export async function DELETE(
 
     if (memberId.startsWith('invite-')) {
       const inviteId = memberId.replace('invite-', '');
-      const { error } = await dbClient
+      await dbClient
         .from('invitations')
         .update({ status: 'REVOKED', updated_at: new Date().toISOString() })
         .eq('id', inviteId)
         .eq('organization_id', organizationId);
 
-      if (error) throw error;
+      await logAdminAction({
+        action: 'INVITATION_REVOKED',
+        entityType: 'INVITATION',
+        entityId: inviteId,
+        organizationId,
+        description: `Revoked invitation ${inviteId} for organization ${organizationId}`,
+      });
+
       return NextResponse.json({ success: true, message: 'Invitation revoked successfully.' });
+    }
+
+    if (memberId.startsWith('org-admin-')) {
+      // Clear contact_name & email on organization table
+      await dbClient
+        .from('organizations')
+        .update({ contact_name: null, email: null, phone: null, updated_at: new Date().toISOString() })
+        .eq('id', organizationId);
+
+      await logAdminAction({
+        action: 'CONTACT_REMOVED',
+        entityType: 'ORGANIZATION',
+        entityId: organizationId,
+        organizationId,
+        description: `Removed primary contact metadata from organization`,
+      });
+
+      return NextResponse.json({ success: true, message: 'Contact metadata cleared successfully.' });
     }
 
     const { error } = await dbClient
@@ -450,6 +445,14 @@ export async function DELETE(
 
     if (error) throw error;
 
+    await logAdminAction({
+      action: 'CONTACT_REMOVED',
+      entityType: 'ORGANIZATION_MEMBER',
+      entityId: memberId,
+      organizationId,
+      description: `Removed contact member ${memberId} from organization`,
+    });
+
     return NextResponse.json({ success: true, message: 'Contact removed successfully.' });
   } catch (err: any) {
     return NextResponse.json(
@@ -458,3 +461,4 @@ export async function DELETE(
     );
   }
 }
+

@@ -15,6 +15,8 @@ export const metadata: Metadata = {
   description: "Enterprise operational management platform for communication infrastructure, properties, onboarding, porting, and E911 compliance.",
 };
 
+import StoreProvider from "@/store/StoreProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,11 +25,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full dark ${arimo.variable}`}>
       <body className={`${arimo.className} min-h-full flex flex-col bg-background text-foreground antialiased selection:bg-orange-500/20 selection:text-orange-400 font-sans`}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <StoreProvider>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </StoreProvider>
       </body>
     </html>
   );
 }
+
 

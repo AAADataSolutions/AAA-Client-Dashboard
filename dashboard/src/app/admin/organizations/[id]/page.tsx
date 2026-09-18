@@ -34,8 +34,12 @@ import {
   Send,
   Loader2,
   X,
+  Trash2,
+  MoreVertical,
+  SlidersHorizontal,
+  Settings,
+  Eye,
 } from 'lucide-react';
-import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -110,8 +114,7 @@ export default function OrganizationDetailPage({
     'OVERVIEW' | 'CONTACTS' | 'PROPERTIES' | 'ONBOARDING' | 'SERVICES' | 'PORTING' | 'E911'
   >('OVERVIEW');
 
-  // Modals & Action States
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  // Edit Organization Modal
   const [showEditOrgModal, setShowEditOrgModal] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: '',
@@ -119,6 +122,7 @@ export default function OrganizationDetailPage({
     city: '',
     state: '',
     zip_code: '',
+    country: 'USA',
     phone: '',
     email: '',
     status: 'ACTIVE',
@@ -135,14 +139,35 @@ export default function OrganizationDetailPage({
   });
   const [savingContact, setSavingContact] = useState(false);
 
+  // Delete Contact Confirmation
+  const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deletingContact, setDeletingContact] = useState(false);
+
   // Assign Property Modal
   const [showAssignPropModal, setShowAssignPropModal] = useState(false);
   const [availableProps, setAvailableProps] = useState<any[]>([]);
   const [selectedPropToAssign, setSelectedPropToAssign] = useState<string>('');
   const [assigningLoading, setAssigningLoading] = useState(false);
 
-  // Copy state
+  // Unassign Property Confirmation Modal
+  const [unassignTarget, setUnassignTarget] = useState<{ propertyId: string; name: string } | null>(null);
+  const [unassigningLoading, setUnassigningLoading] = useState(false);
+
+  // Property Actions: View Details, View Services, Change Status, Manage Contacts
+  const [viewingPropDetails, setViewingPropDetails] = useState<any | null>(null);
+  const [viewingPropServices, setViewingPropServices] = useState<{ propName: string; services: any[] } | null>(null);
+  const [loadingPropServices, setLoadingPropServices] = useState(false);
+  const [statusPropTarget, setStatusPropTarget] = useState<any | null>(null);
+  const [savingPropStatus, setSavingPropStatus] = useState(false);
+
+  // Copy state & toast
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   const fetchOrgDetails = async () => {
     try {
@@ -158,6 +183,7 @@ export default function OrganizationDetailPage({
           city: json.data.city || '',
           state: json.data.state || '',
           zip_code: json.data.zip_code || '',
+          country: json.data.country || 'USA',
           phone: json.data.phone !== '—' ? json.data.phone : '',
           email: json.data.email !== '—' ? json.data.email : '',
           status: json.data.status || 'ACTIVE',
@@ -173,16 +199,32 @@ export default function OrganizationDetailPage({
     }
   };
 
+  // Fetch assigned properties list with full rich fields
+  const fetchOrgProperties = async () => {
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/properties`);
+      const json = await res.json();
+      if (json.success && json.data && org) {
+        setOrg((prev) => (prev ? { ...prev, properties: json.data } : null));
+      }
+    } catch (err) {
+      console.error('Error refreshing org properties:', err);
+    }
+  };
+
   useEffect(() => {
     fetchOrgDetails();
   }, [orgId]);
 
-  const handleCopy = (text: string, id: string) => {
+  const handleCopy = (text: string, id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    showToast(`Copied ${text} to clipboard!`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Save Edit Org
   const handleSaveOrgEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditSaving(true);
@@ -193,17 +235,20 @@ export default function OrganizationDetailPage({
         body: JSON.stringify(editFormData),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Update failed');
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update organization');
+
+      showToast('Organization profile updated successfully.');
       setShowEditOrgModal(false);
       fetchOrgDetails();
     } catch (err: any) {
-      alert(err.message || 'Failed to save changes');
+      showToast(err.message || 'Error updating organization', 'error');
     } finally {
       setEditSaving(false);
     }
   };
 
-  const handleAddContact = async (e: React.FormEvent) => {
+  // Add Contact
+  const handleAddContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingContact(true);
     try {
@@ -214,31 +259,59 @@ export default function OrganizationDetailPage({
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add contact');
+
+      showToast('Contact added successfully.');
       setShowAddContactModal(false);
       setContactFormData({ full_name: '', email: '', phone_number: '', is_primary: false });
       fetchOrgDetails();
     } catch (err: any) {
-      alert(err.message || 'Error adding contact');
+      showToast(err.message || 'Error adding contact', 'error');
     } finally {
       setSavingContact(false);
     }
   };
 
-  const handleOpenAssignProp = async () => {
-    setShowAssignPropModal(true);
+  // Confirm Delete Contact
+  const handleConfirmDeleteContact = async () => {
+    if (!contactToDelete) return;
+    setDeletingContact(true);
     try {
-      const res = await fetch('/api/admin/properties?limit=100');
+      const res = await fetch(
+        `/api/admin/organizations/${orgId}/contacts?member_id=${contactToDelete.id}`,
+        { method: 'DELETE' }
+      );
       const json = await res.json();
-      if (json.success && json.data) {
-        setAvailableProps(json.data);
-        if (json.data.length > 0) setSelectedPropToAssign(json.data[0].id);
-      }
-    } catch (err) {
-      console.error('Error loading properties catalog:', err);
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to remove contact');
+
+      showToast('Contact removed successfully.');
+      setContactToDelete(null);
+      fetchOrgDetails();
+    } catch (err: any) {
+      showToast(err.message || 'Error removing contact', 'error');
+    } finally {
+      setDeletingContact(false);
     }
   };
 
-  const handleAssignProp = async (e: React.FormEvent) => {
+  // Open Assign Property Modal
+  const handleOpenAssignModal = async () => {
+    setShowAssignPropModal(true);
+    try {
+      const res = await fetch('/api/admin/properties?status=ACTIVE&limit=100');
+      const json = await res.json();
+      if (json.success) {
+        const unassigned = (json.data || []).filter(
+          (p: any) => !p.organization_id || p.organization_id === orgId
+        );
+        setAvailableProps(unassigned);
+        if (unassigned.length > 0) setSelectedPropToAssign(unassigned[0].id);
+      }
+    } catch (err) {
+      console.error('Error fetching available properties:', err);
+    }
+  };
+
+  const handleAssignPropertySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPropToAssign) return;
     setAssigningLoading(true);
@@ -250,190 +323,218 @@ export default function OrganizationDetailPage({
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to assign property');
+
+      showToast('Property assigned successfully.');
       setShowAssignPropModal(false);
+      fetchOrgProperties();
       fetchOrgDetails();
     } catch (err: any) {
-      alert(err.message || 'Error assigning property');
+      showToast(err.message || 'Error assigning property', 'error');
     } finally {
       setAssigningLoading(false);
     }
   };
 
-  const handleUnassignProp = async (propId: string) => {
-    if (!confirm('Are you sure you want to unassign this property from this organization?')) return;
+  // Confirm Unassign Property
+  const handleConfirmUnassign = async () => {
+    if (!unassignTarget) return;
+    setUnassigningLoading(true);
     try {
-      const res = await fetch(`/api/admin/organizations/${orgId}/properties?propertyId=${propId}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(
+        `/api/admin/organizations/${orgId}/properties?propertyId=${unassignTarget.propertyId}`,
+        { method: 'DELETE' }
+      );
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to unassign property');
+
+      showToast('Property unassigned from organization.');
+      setUnassignTarget(null);
+      fetchOrgProperties();
       fetchOrgDetails();
     } catch (err: any) {
-      alert(err.message || 'Error unassigning property');
+      showToast(err.message || 'Error unassigning property', 'error');
+    } finally {
+      setUnassigningLoading(false);
     }
   };
 
-  const handleDeleteContact = async (contactId: string) => {
-    if (!confirm('Are you sure you want to remove this contact?')) return;
+  // View Services for Property
+  const handleViewPropertyServices = async (prop: any) => {
+    setLoadingPropServices(true);
+    setViewingPropServices({ propName: prop.name, services: [] });
     try {
-      const res = await fetch(`/api/admin/organizations/${orgId}/contacts?member_id=${contactId}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/admin/services?limit=100`);
+      const json = await res.json();
+      if (json.success) {
+        const matching = (json.data || []).filter(
+          (s: any) => s.attached_property_name === prop.name || s.attached_property_id === prop.id
+        );
+        setViewingPropServices({ propName: prop.name, services: matching });
+      }
+    } catch (err) {
+      console.error('Error fetching property services:', err);
+    } finally {
+      setLoadingPropServices(false);
+    }
+  };
+
+  // Change Property Status
+  const handleSavePropertyStatus = async (newStatus: string) => {
+    if (!statusPropTarget) return;
+    setSavingPropStatus(true);
+    try {
+      const res = await fetch(`/api/admin/properties/${statusPropTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to remove contact');
-      fetchOrgDetails();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update property status');
+
+      showToast(`Property status updated to ${newStatus}.`);
+      setStatusPropTarget(null);
+      fetchOrgProperties();
     } catch (err: any) {
-      alert(err.message || 'Error removing contact');
+      showToast(err.message || 'Error updating status', 'error');
+    } finally {
+      setSavingPropStatus(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-pulse font-sans">
-        <div className="h-6 w-36 bg-slate-200 dark:bg-[#222430] rounded"></div>
-        <div className="h-32 bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430]"></div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-white dark:bg-[#15161c] rounded-xl border border-slate-200 dark:border-[#222430]"></div>
-          ))}
-        </div>
-        <div className="h-96 bg-white dark:bg-[#15161c] rounded-2xl border border-slate-200 dark:border-[#222430]"></div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <p className="text-sm font-semibold text-slate-500">Loading client organization workspace...</p>
       </div>
     );
   }
 
   if (error || !org) {
     return (
-      <div className="p-6 md:p-8 max-w-4xl mx-auto text-center py-20 font-sans">
-        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Organization Workspace Error</h2>
-        <p className="text-slate-500 dark:text-slate-400 mb-6">{error || 'Organization record could not be loaded.'}</p>
-        <div className="flex justify-center gap-3">
-          <button
-            onClick={() => router.push('/admin/organizations')}
-            className="px-4 py-2 bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold"
-          >
-            Back to Organizations
-          </button>
-          <button
-            onClick={fetchOrgDetails}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Retry
-          </button>
-        </div>
+      <div className="p-8 max-w-xl mx-auto my-12 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-2xl text-center space-y-4">
+        <AlertTriangle className="w-10 h-10 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-rose-900 dark:text-rose-200">Organization Not Found</h2>
+        <p className="text-xs text-rose-700 dark:text-rose-300">{error || 'This organization does not exist.'}</p>
+        <button
+          onClick={() => router.push('/admin/organizations')}
+          className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold rounded-lg hover:opacity-90 transition cursor-pointer"
+        >
+          Back to Organizations Directory
+        </button>
       </div>
     );
   }
-
-  const initials = org.name.substring(0, 2).toUpperCase();
 
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 font-sans pb-16"
+      className="space-y-6 pb-12 font-sans"
     >
-      {/* Top Breadcrumbs */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
+      {/* Toast Alert */}
+      {toastMsg && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-bottom-5 duration-200 ${
+            toastMsg.type === 'error'
+              ? 'bg-rose-600 text-white'
+              : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+          }`}
+        >
+          {toastMsg.type === 'error' ? (
+            <AlertCircle className="w-4 h-4" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          )}
+          <span>{toastMsg.text}</span>
+        </div>
+      )}
+
+      {/* Navigation Breadcrumb */}
+      <motion.div variants={itemVariants} className="flex items-center gap-2 text-xs font-medium text-slate-500">
         <Link
           href="/admin/organizations"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition"
+          className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1 cursor-pointer"
         >
-          <ChevronLeft className="w-4 h-4" /> Back to Organizations
+          <ChevronLeft className="w-3.5 h-3.5" />
+          <span>Organizations Directory</span>
         </Link>
-        <span className="text-[11px] text-slate-400">
-          Created: {new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </span>
+        <span>/</span>
+        <span className="text-slate-900 dark:text-white font-semibold">{org.name}</span>
       </motion.div>
 
-      {/* Header Card */}
-      <motion.div variants={itemVariants} className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-2xl shrink-0 border border-blue-200/50 dark:border-blue-900/50">
-              {initials}
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{org.name}</h1>
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${org.status === 'ACTIVE'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                      : org.status === 'PENDING_ONBOARDING'
-                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                    }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${org.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                  {org.status}
-                </span>
-              </div>
-
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                <span>{org.address}</span>
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 mt-2.5 text-xs text-slate-500 dark:text-slate-400">
-                {org.email !== '—' && (
-                  <span className="flex items-center gap-1">
-                    <Mail className="w-3.5 h-3.5" /> {org.email}
-                  </span>
-                )}
-                {org.phone !== '—' && (
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5" /> {org.phone}
-                  </span>
-                )}
-              </div>
-            </div>
+      {/* Page Header */}
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] p-6 rounded-2xl shadow-xs"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-lg shrink-0">
+            <Building2 className="w-6 h-6" />
           </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setShowInviteModal(true)}
-              className="px-3.5 py-2 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Mail className="w-3.5 h-3.5 text-blue-600" />
-              <span>Invite Manager / Credentials</span>
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setShowEditOrgModal(true)}
-              className="px-3.5 py-2 bg-slate-100 dark:bg-[#1a1c24] hover:bg-slate-200 dark:hover:bg-[#222430] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#2a2c3a] rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-blue-600" />
-              <span>Edit Details</span>
-            </motion.button>
-
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-              <Link
-                href="/dashboard"
-                target="_blank"
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-xs cursor-pointer inline-flex"
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{org.name}</h1>
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                  org.status === 'ACTIVE'
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                    : org.status === 'INACTIVE'
+                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                }`}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Open Client Portal View</span>
-              </Link>
-            </motion.div>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    org.status === 'ACTIVE' ? 'bg-emerald-500' : org.status === 'INACTIVE' ? 'bg-rose-500' : 'bg-amber-500'
+                  }`}
+                />
+                {org.status}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span>{org.address}</span>
+            </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowEditOrgModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#252733] hover:bg-slate-50 dark:hover:bg-[#1f212a] text-slate-700 dark:text-slate-300 font-semibold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            <span>Edit Details</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowAddContactModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Add Contact</span>
+          </motion.button>
         </div>
       </motion.div>
 
-      {/* Tabs Navigation (7 Dedicated Tabs as specified in Task.md) */}
-      <motion.div variants={itemVariants} className="flex border-b border-slate-200 dark:border-[#222430] gap-1 overflow-x-auto [scrollbar-width:thin]">
+      {/* Navigation Tabs */}
+      <motion.div
+        variants={itemVariants}
+        className="flex items-center gap-2 border-b border-slate-200 dark:border-[#222430] overflow-x-auto pb-1 text-xs"
+      >
         <button
           onClick={() => setActiveTab('OVERVIEW')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'OVERVIEW'
+          className={`px-3.5 py-2 font-semibold transition border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'OVERVIEW'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+          }`}
         >
           <Building2 className="w-4 h-4" />
           <span>Overview</span>
@@ -441,65 +542,62 @@ export default function OrganizationDetailPage({
 
         <button
           onClick={() => setActiveTab('CONTACTS')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'CONTACTS'
+          className={`px-3.5 py-2 font-semibold transition border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'CONTACTS'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+          }`}
         >
           <Users className="w-4 h-4" />
-          <span>Contacts ({org.stats?.contactsCount || org.contacts?.length || 0})</span>
+          <span>Contacts ({org.contacts?.length || 0})</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('PROPERTIES')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'PROPERTIES'
+          onClick={() => {
+            setActiveTab('PROPERTIES');
+            fetchOrgProperties();
+          }}
+          className={`px-3.5 py-2 font-semibold transition border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'PROPERTIES'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+          }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Assigned Properties ({org.stats?.propertiesCount || org.properties?.length || 0})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ONBOARDING')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'ONBOARDING'
-              ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Onboarding ({org.stats?.onboardingsCount || org.onboardings?.length || 0})</span>
+          <Hotel className="w-4 h-4" />
+          <span>Assigned Properties ({org.properties?.length || 0})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('SERVICES')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'SERVICES'
+          className={`px-3.5 py-2 font-semibold transition border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'SERVICES'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+          }`}
         >
           <PhoneCall className="w-4 h-4" />
-          <span>Services &amp; Lines ({org.stats?.servicesCount || org.services?.length || 0})</span>
+          <span>Services &amp; Lines ({org.services?.length || 0})</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('PORTING')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'PORTING'
+          onClick={() => setActiveTab('ONBOARDING')}
+          className={`px-3.5 py-2 font-semibold transition border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'ONBOARDING'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+          }`}
         >
-          <GitBranch className="w-4 h-4" />
-          <span>Porting ({org.stats?.portingsCount || org.portings?.length || 0})</span>
+          <Clock className="w-4 h-4" />
+          <span>Onboarding ({org.onboardings?.length || 0})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('E911')}
-          className={`pb-3 px-3.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${activeTab === 'E911'
+          className={`px-3.5 py-2 font-semibold transition border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeTab === 'E911'
               ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
+          }`}
         >
           <ShieldCheck className="w-4 h-4" />
           <span>E911 Compliance ({org.e911?.length || 0})</span>
@@ -509,7 +607,7 @@ export default function OrganizationDetailPage({
       {/* Tab 1: OVERVIEW */}
       {activeTab === 'OVERVIEW' && (
         <div className="space-y-6">
-          {/* Top Quick Stats */}
+          {/* Top Quick Stats Row (4 Deep Blue Standardized Cards) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <motion.div
               variants={itemVariants}
@@ -606,12 +704,9 @@ export default function OrganizationDetailPage({
 
           {/* Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Organization Info */}
             <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-5 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                  Organization Profile
-                </h3>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">Organization Profile</h3>
                 <button
                   onClick={() => setShowEditOrgModal(true)}
                   className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-semibold cursor-pointer"
@@ -646,17 +741,14 @@ export default function OrganizationDetailPage({
               </div>
             </div>
 
-            {/* Primary Contact & Invite */}
             <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl p-5 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                  Primary Contact &amp; Onboarding Invite
-                </h3>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">Primary Administrator</h3>
                 <button
-                  onClick={() => setShowInviteModal(true)}
+                  onClick={() => setShowAddContactModal(true)}
                   className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-semibold cursor-pointer"
                 >
-                  Manage Invite
+                  Add Contact
                 </button>
               </div>
 
@@ -680,29 +772,11 @@ export default function OrganizationDetailPage({
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-[#222430]">
-                  <span className="text-slate-400">Invitation Status:</span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${org.activeInvite?.status === 'PENDING'
-                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                        : org.activeInvite?.status === 'APPROVED' || org.activeInvite?.status === 'ACCEPTED'
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                      }`}
-                  >
-                    {org.activeInvite?.status || 'NO ACTIVE INVITE'}
+                  <span className="text-slate-400">Designation:</span>
+                  <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
+                    Primary Admin
                   </span>
                 </div>
-                {org.activeInvite?.invite_url && (
-                  <div className="pt-2">
-                    <button
-                      onClick={() => handleCopy(org.activeInvite.invite_url, 'invite-url')}
-                      className="w-full py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-blue-200 dark:border-blue-900/40"
-                    >
-                      {copiedId === 'invite-url' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedId === 'invite-url' ? 'Copied URL' : 'Copy Onboarding Invite URL'}</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -723,7 +797,7 @@ export default function OrganizationDetailPage({
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setShowAddContactModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Add Contact</span>
@@ -732,14 +806,14 @@ export default function OrganizationDetailPage({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-500 dark:text-slate-400 uppercase text-[11px]">
                 <tr>
-                  <th className="py-3 px-4 font-bold">Name</th>
-                  <th className="py-3 px-4 font-bold">Email</th>
-                  <th className="py-3 px-4 font-bold">Phone</th>
-                  <th className="py-3 px-4 font-bold">Role</th>
-                  <th className="py-3 px-4 font-bold">Status</th>
-                  <th className="py-3 px-4 font-bold text-right">Actions</th>
+                  <th className="py-3 px-4 font-bold whitespace-nowrap">Name</th>
+                  <th className="py-3 px-4 font-bold whitespace-nowrap">Email</th>
+                  <th className="py-3 px-4 font-bold whitespace-nowrap">Phone</th>
+                  <th className="py-3 px-4 font-bold whitespace-nowrap">Role</th>
+                  <th className="py-3 px-4 font-bold whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 font-bold text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
@@ -750,51 +824,51 @@ export default function OrganizationDetailPage({
                     </td>
                   </tr>
                 ) : (
-                  org.contacts?.map((c: any) => (
-                    <tr key={c.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {c.name}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                        {c.email}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
-                        {c.phone}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                          {c.role}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-                          {c.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {c.invite_url && (
-                            <button
-                              onClick={() => handleCopy(c.invite_url, `copy-url-${c.id}`)}
-                              className="p-1.5 rounded-lg text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition cursor-pointer"
-                              title="Copy Invitation URL"
-                            >
-                              {copiedId === `copy-url-${c.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Mail className="w-3.5 h-3.5" />}
-                            </button>
+                  org.contacts?.map((contact: any) => (
+                    <tr key={contact.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920] transition">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span>{contact.name}</span>
+                          {contact.is_primary && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
+                              Primary
+                            </span>
                           )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {contact.email}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {contact.phone}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        {contact.role}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {contact.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleCopy(c.email, `copy-c-${c.id}`)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
+                            onClick={(e) => handleCopy(contact.email, `c-email-${contact.id}`, e)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
                             title="Copy Email"
                           >
-                            {copiedId === `copy-c-${c.id}` ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedId === `c-email-${contact.id}` ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
                           </button>
                           <button
-                            onClick={() => handleDeleteContact(c.id)}
+                            onClick={() => setContactToDelete({ id: contact.id, name: contact.name })}
                             className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                             title="Remove Contact"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -807,135 +881,172 @@ export default function OrganizationDetailPage({
         </div>
       )}
 
-      {/* Tab 3: PROPERTIES */}
+      {/* Tab 3: ASSIGNED PROPERTIES (Comprehensive Columns & Actions) */}
       {activeTab === 'PROPERTIES' && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-slate-200 dark:border-[#222430] flex items-center justify-between">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs space-y-4">
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Assigned Properties</h3>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">Assigned Properties Directory</h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Physical property locations assigned to {org.name}.
+                Physical property assets and hotel locations linked to {org.name}.
               </p>
             </div>
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              onClick={handleOpenAssignProp}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
+              onClick={handleOpenAssignModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Assign Property</span>
+              <span>Assign New Property</span>
             </motion.button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
+          <div className="overflow-x-auto [scrollbar-width:thin]">
+            <table className="w-full text-left text-xs border-collapse min-w-[1300px]">
+              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-500 dark:text-slate-400 uppercase text-[11px]">
                 <tr>
-                  <th className="py-3 px-4 font-bold">Property Name</th>
-                  <th className="py-3 px-4 font-bold">Address</th>
-                  <th className="py-3 px-4 font-bold">Status</th>
-                  <th className="py-3 px-4 font-bold">Services</th>
-                  <th className="py-3 px-4 font-bold text-right">Actions</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">Property Name</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[220px]">Property Address</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[100px]">Status</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">Onboarding</th>
+                  <th className="py-3 px-3.5 font-bold text-center whitespace-nowrap min-w-[90px]">Services</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">GM Name</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">GM Phone</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">GM Email</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[120px]">Ray Baum</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">E911 Status</th>
+                  <th className="py-3 px-3.5 font-bold text-right whitespace-nowrap min-w-[130px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
                 {org.properties?.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                      No properties assigned yet. Click &quot;Assign Property&quot; above.
+                    <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
+                      No properties assigned to this organization yet.
                     </td>
                   </tr>
                 ) : (
-                  org.properties?.map((p: any) => (
-                    <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        <Link href="/admin/properties" className="hover:text-blue-600 transition">
-                          {p.name}
+                  org.properties?.map((prop: any) => (
+                    <tr key={prop.id || prop.link_id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920] transition">
+                      {/* Property Name */}
+                      <td className="py-3.5 px-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                        <Link
+                          href={`/admin/properties`}
+                          className="hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer"
+                        >
+                          {prop.name}
                         </Link>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        {p.address}
+
+                      {/* Property Address */}
+                      <td className="py-3.5 px-3.5 text-slate-700 dark:text-slate-300 whitespace-nowrap truncate max-w-[210px]" title={prop.address}>
+                        {prop.address || 'Address not specified'}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200/50">
-                          {p.status}
+
+                      {/* Property Status */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {prop.status || 'ACTIVE'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                        {p.services_count || 6} Lines
+
+                      {/* Onboarding Stage */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
+                          {prop.onboarding_stage || 'Live'}
+                        </span>
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+
+                      {/* No. of Services */}
+                      <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
                         <button
-                          onClick={() => handleUnassignProp(p.id)}
-                          className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-xs font-semibold transition cursor-pointer"
+                          onClick={() => handleViewPropertyServices(prop)}
+                          className="px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-blue-50 dark:bg-[#1f212a] dark:hover:bg-blue-950/40 text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 font-semibold cursor-pointer"
                         >
-                          Unassign
+                          {prop.services_count || 0} Lines
                         </button>
                       </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {/* Tab 4: ONBOARDING */}
-      {activeTab === 'ONBOARDING' && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Onboarding Processes</h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Onboarding pipeline stages belonging to {org.name}.
-            </p>
-          </div>
+                      {/* GM Name */}
+                      <td className="py-3.5 px-3.5 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {prop.general_manager_name || '—'}
+                      </td>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
-                <tr>
-                  <th className="py-3 px-4 font-bold">Property</th>
-                  <th className="py-3 px-4 font-bold">Current Stage</th>
-                  <th className="py-3 px-4 font-bold">Status</th>
-                  <th className="py-3 px-4 font-bold">Target Date</th>
-                  <th className="py-3 px-4 font-bold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
-                {org.onboardings?.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
-                      No active onboarding requests on record.
-                    </td>
-                  </tr>
-                ) : (
-                  org.onboardings?.map((o: any) => (
-                    <tr key={o.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {o.property_name}
+                      {/* GM Phone */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        {prop.general_manager_phone && prop.general_manager_phone !== '—' ? (
+                          <button
+                            onClick={(e) => handleCopy(prop.general_manager_phone, `gm-p-${prop.id}`, e)}
+                            className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 cursor-pointer"
+                          >
+                            <span>{prop.general_manager_phone}</span>
+                            {copiedId === `gm-p-${prop.id}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200/60">
-                          {o.stage?.replace(/_/g, ' ')}
-                        </span>
+
+                      {/* GM Email */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        {prop.general_manager_email && prop.general_manager_email !== '—' ? (
+                          <button
+                            onClick={(e) => handleCopy(prop.general_manager_email, `gm-e-${prop.id}`, e)}
+                            className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 cursor-pointer"
+                          >
+                            <span>{prop.general_manager_email}</span>
+                            {copiedId === `gm-e-${prop.id}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400">
-                          {o.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        {o.target_date ? new Date(o.target_date).toLocaleDateString() : '—'}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <Link
-                          href="/admin/onboarding-porting"
-                          className="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+
+                      {/* Ray Baum Status */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10.5px] font-semibold ${
+                            prop.ray_baum_status === 'Verified'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                          }`}
                         >
-                          View Pipeline &rarr;
-                        </Link>
+                          {prop.ray_baum_status || 'Not-Verified'}
+                        </span>
+                      </td>
+
+                      {/* E911 Status */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-slate-100 dark:bg-[#1f212a] text-slate-700 dark:text-slate-300">
+                          {prop.e911_status || 'Verified'}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setViewingPropDetails(prop)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                            title="View Property Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setStatusPropTarget(prop)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222a] transition cursor-pointer"
+                            title="Change Status"
+                          >
+                            <SlidersHorizontal className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setUnassignTarget({ propertyId: prop.id, name: prop.name })}
+                            className="px-2 py-1 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-semibold text-[11px] transition cursor-pointer"
+                          >
+                            Unassign
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -946,23 +1057,26 @@ export default function OrganizationDetailPage({
         </div>
       )}
 
-      {/* Tab 5: SERVICES & LINES */}
+      {/* Tab 4: SERVICES */}
       {activeTab === 'SERVICES' && (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Telecom Inventory</h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Provisioned voice services, SIP trunks, and phone numbers for {org.name}.
-            </p>
+          <div className="p-4 border-b border-slate-200 dark:border-[#222430] flex items-center justify-between">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Active Telecom Services</h3>
+            <Link
+              href="/admin/services"
+              className="text-blue-600 dark:text-blue-400 text-xs font-semibold hover:underline cursor-pointer"
+            >
+              Open Services Catalog
+            </Link>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
                 <tr>
-                  <th className="py-3 px-4 font-bold">Property</th>
+                  <th className="py-3 px-4 font-bold">Property Location</th>
                   <th className="py-3 px-4 font-bold">Service Type</th>
-                  <th className="py-3 px-4 font-bold">Phone Number</th>
+                  <th className="py-3 px-4 font-bold">Service Number / DID</th>
                   <th className="py-3 px-4 font-bold">Status</th>
                 </tr>
               </thead>
@@ -970,24 +1084,18 @@ export default function OrganizationDetailPage({
                 {org.services?.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
-                      No telecom services currently active.
+                      No services assigned yet.
                     </td>
                   </tr>
                 ) : (
-                  org.services?.map((s: any) => (
-                    <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {s.property_name}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 font-semibold">
-                        {s.service_type}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {s.phone_number}
-                      </td>
+                  org.services?.map((srv: any) => (
+                    <tr key={srv.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{srv.property_name}</td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">{srv.service_type}</td>
+                      <td className="py-3.5 px-4 font-mono text-slate-900 dark:text-white">{srv.phone_number}</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
-                          {s.status}
+                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          {srv.status}
                         </span>
                       </td>
                     </tr>
@@ -999,14 +1107,11 @@ export default function OrganizationDetailPage({
         </div>
       )}
 
-      {/* Tab 6: PORTING */}
-      {activeTab === 'PORTING' && (
+      {/* Tab 5: ONBOARDING */}
+      {activeTab === 'ONBOARDING' && (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
           <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Number Porting Requests</h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Phone number transfers and carrier migration orders for {org.name}.
-            </p>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Onboarding &amp; Porting Pipelines</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -1014,34 +1119,30 @@ export default function OrganizationDetailPage({
               <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
                 <tr>
                   <th className="py-3 px-4 font-bold">Property</th>
-                  <th className="py-3 px-4 font-bold">Numbers in Batch</th>
-                  <th className="py-3 px-4 font-bold">Status</th>
-                  <th className="py-3 px-4 font-bold">Target / FOC Date</th>
+                  <th className="py-3 px-4 font-bold">Location</th>
+                  <th className="py-3 px-4 font-bold">Current Stage</th>
+                  <th className="py-3 px-4 font-bold">Target Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
-                {org.portings?.length === 0 ? (
+                {org.onboardings?.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
-                      No porting orders on record.
+                      No onboarding pipelines recorded.
                     </td>
                   </tr>
                 ) : (
-                  org.portings?.map((pr: any) => (
-                    <tr key={pr.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {pr.property_name}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                        {pr.numbers_count} Line(s)
-                      </td>
+                  org.onboardings?.map((onb: any) => (
+                    <tr key={onb.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{onb.property_name}</td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">{onb.property_location}</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/30">
-                          {pr.status?.replace(/_/g, ' ')}
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400">
+                          {onb.stage}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300">
-                        {pr.target_date ? new Date(pr.target_date).toLocaleDateString() : 'Pending FOC'}
+                      <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
+                        {onb.target_date ? new Date(onb.target_date).toLocaleDateString() : 'TBD'}
                       </td>
                     </tr>
                   ))
@@ -1052,14 +1153,11 @@ export default function OrganizationDetailPage({
         </div>
       )}
 
-      {/* Tab 7: E911 */}
+      {/* Tab 6: E911 */}
       {activeTab === 'E911' && (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl overflow-hidden shadow-xs">
           <div className="p-4 border-b border-slate-200 dark:border-[#222430]">
             <h3 className="font-bold text-sm text-slate-900 dark:text-white">E911 Emergency Location Compliance</h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              PSAP dispatch emergency addresses configured for {org.name} locations.
-            </p>
           </div>
 
           <div className="overflow-x-auto">
@@ -1067,9 +1165,9 @@ export default function OrganizationDetailPage({
               <thead className="bg-slate-50 dark:bg-[#111217] text-slate-400 uppercase text-[11px]">
                 <tr>
                   <th className="py-3 px-4 font-bold">Property</th>
-                  <th className="py-3 px-4 font-bold">Registered Emergency Address</th>
-                  <th className="py-3 px-4 font-bold">PSAP Status</th>
-                  <th className="py-3 px-4 font-bold">Verified At</th>
+                  <th className="py-3 px-4 font-bold">Emergency Dispatch Address</th>
+                  <th className="py-3 px-4 font-bold">Status</th>
+                  <th className="py-3 px-4 font-bold">Verified Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
@@ -1082,14 +1180,10 @@ export default function OrganizationDetailPage({
                 ) : (
                   org.e911?.map((rec: any) => (
                     <tr key={rec.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920]">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
-                        {rec.property_name}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">
-                        {rec.emergency_address}
-                      </td>
+                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{rec.property_name}</td>
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300">{rec.emergency_address}</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                           {rec.status}
                         </span>
                       </td>
@@ -1105,279 +1199,620 @@ export default function OrganizationDetailPage({
         </div>
       )}
 
-      {/* Invite Manager Modal */}
-      <InviteManagerModal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        orgId={org.id}
-        orgName={org.name}
-        onSuccess={fetchOrgDetails}
-      />
-
-      {/* Edit Organization Modal */}
+      {/* Edit Organization Modal (With Clear Visible Labels on all inputs) */}
       <AnimatePresence>
         {showEditOrgModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
-            <div className="fixed inset-0" onClick={() => setShowEditOrgModal(false)} aria-hidden="true" />
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization Profile</h3>
-                <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveOrgEdit} className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Organization Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEditOrgModal(false)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-50 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization Profile</h3>
+                  <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Street Address</label>
-                  <textarea
-                    rows={2}
-                    value={editFormData.address}
-                    onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="text"
-                    placeholder="City"
-                    value={editFormData.city}
-                    onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
-                    className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
-                  <input
-                    type="text"
-                    placeholder="State"
-                    value={editFormData.state}
-                    onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
-                    className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
-                  <input
-                    type="text"
-                    placeholder="ZIP"
-                    value={editFormData.zip_code}
-                    onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
-                    className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Main Phone</label>
+                <form onSubmit={handleSaveOrgEdit} className="space-y-3.5 text-xs">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
+                      Organization Name <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
-                      value={editFormData.phone}
-                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                      required
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500"
                     />
                   </div>
-                  <div>
-                    <label className="font-semibold text-slate-800 dark:text-slate-200 block mb-1">Status</label>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
+                      Street Address
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editFormData.address}
+                      onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">City</label>
+                      <input
+                        type="text"
+                        value={editFormData.city}
+                        onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+                        className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">State</label>
+                      <input
+                        type="text"
+                        value={editFormData.state}
+                        onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                        className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">ZIP Code</label>
+                      <input
+                        type="text"
+                        value={editFormData.zip_code}
+                        onChange={(e) => setEditFormData({ ...editFormData, zip_code: e.target.value })}
+                        className="w-full px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">Phone Number</label>
+                      <input
+                        type="text"
+                        value={editFormData.phone}
+                        onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">Email Address</label>
+                      <input
+                        type="email"
+                        value={editFormData.email}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">Organization Status</label>
                     <select
                       value={editFormData.status}
                       onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
                     >
                       <option value="ACTIVE">ACTIVE</option>
-                      <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
                       <option value="INACTIVE">INACTIVE</option>
+                      <option value="PENDING_ONBOARDING">PENDING_ONBOARDING</option>
                       <option value="SUSPENDED">SUSPENDED</option>
+                      <option value="ARCHIVED">ARCHIVED</option>
                     </select>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditOrgModal(false)}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    type="submit"
-                    disabled={editSaving}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {editSaving ? 'Saving...' : 'Save Changes'}
-                  </motion.button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
+                  <div className="pt-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditOrgModal(false)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      disabled={editSaving}
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {editSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Save Changes</span>
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
 
-      {/* Add Contact Modal */}
+      {/* Delete Contact Confirmation Dialog */}
       <AnimatePresence>
-        {showAddContactModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
-            <div className="fixed inset-0" onClick={() => setShowAddContactModal(false)} aria-hidden="true" />
+        {contactToDelete && (
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Organization Contact</h3>
-                <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddContact} className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={contactFormData.full_name}
-                    onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
-                    placeholder="Alex Johnson"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setContactToDelete(null)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-70 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-70 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/50 text-rose-600 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-5 h-5" />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    value={contactFormData.email}
-                    onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
-                    placeholder="alex@company.com"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
+                <div className="text-center space-y-1">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">Remove Contact?</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Are you sure you want to remove <strong className="text-slate-900 dark:text-white">{contactToDelete.name}</strong> from this organization?
+                  </p>
                 </div>
-
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Phone Number</label>
-                  <input
-                    type="text"
-                    value={contactFormData.phone_number}
-                    onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
-                    placeholder="+1 (555) 019-2834"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="detail_primary_checkbox"
-                    checked={contactFormData.is_primary}
-                    onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  />
-                  <label htmlFor="detail_primary_checkbox" className="text-slate-700 dark:text-slate-300 cursor-pointer">
-                    Set as Primary Administrator
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex items-center justify-center gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => setShowAddContactModal(false)}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                    onClick={() => setContactToDelete(null)}
+                    disabled={deletingContact}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1a1b22]"
                   >
-                    Cancel
+                    No, Cancel
                   </button>
                   <motion.button
+                    type="button"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
-                    type="submit"
-                    disabled={savingContact}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
+                    onClick={handleConfirmDeleteContact}
+                    disabled={deletingContact}
+                    className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs cursor-pointer flex items-center gap-1.5"
                   >
-                    {savingContact ? 'Saving...' : 'Add Contact'}
+                    {deletingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    <span>Yes, Remove</span>
                   </motion.button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Unassign Property Confirmation Modal */}
+      <AnimatePresence>
+        {unassignTarget && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setUnassignTarget(null)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-70 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-70 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="text-center space-y-1">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">Unassign Property?</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Are you sure you want to unassign <strong className="text-slate-900 dark:text-white">{unassignTarget.name}</strong> from {org.name}?
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setUnassignTarget(null)}
+                    disabled={unassigningLoading}
+                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1a1b22]"
+                  >
+                    No, Cancel
+                  </button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleConfirmUnassign}
+                    disabled={unassigningLoading}
+                    className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    {unassigningLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    <span>Yes, Unassign</span>
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
 
       {/* Assign Property Modal */}
       <AnimatePresence>
         {showAssignPropModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs font-sans">
-            <div className="fixed inset-0" onClick={() => setShowAssignPropModal(false)} aria-hidden="true" />
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property</h3>
-                <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleAssignProp} className="space-y-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Select Property from Database
-                  </label>
-                  <select
-                    value={selectedPropToAssign}
-                    onChange={(e) => setSelectedPropToAssign(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                  >
-                    {availableProps.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.city || 'US'}, {p.state || 'Location'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
-                  <button
-                    type="button"
-                    onClick={() => setShowAssignPropModal(false)}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
-                  >
-                    Cancel
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAssignPropModal(false)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property to {org.name}</h3>
+                  <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
                   </button>
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    type="submit"
-                    disabled={assigningLoading || !selectedPropToAssign}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
-                  </motion.button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
+
+                <form onSubmit={handleAssignPropertySubmit} className="space-y-4 text-xs">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
+                      Select Available Property
+                    </label>
+                    <select
+                      value={selectedPropToAssign}
+                      onChange={(e) => setSelectedPropToAssign(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                    >
+                      {availableProps.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.city || 'US'}, {p.state || 'Location'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                    <button
+                      type="button"
+                      onClick={() => setShowAssignPropModal(false)}
+                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      disabled={assigningLoading || !selectedPropToAssign}
+                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {assigningLoading ? 'Assigning...' : 'Confirm Assignment'}
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Add Contact Modal */}
+      <AnimatePresence>
+        {showAddContactModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddContactModal(false)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Contact to {org.name}</h3>
+                  <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddContactSubmit} className="space-y-3.5 text-xs">
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={contactFormData.full_name}
+                      onChange={(e) => setContactFormData({ ...contactFormData, full_name: e.target.value })}
+                      placeholder="e.g., Alex Johnson"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
+                      Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={contactFormData.email}
+                      onChange={(e) => setContactFormData({ ...contactFormData, email: e.target.value })}
+                      placeholder="alex@organization.com"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">Phone Number</label>
+                    <input
+                      type="text"
+                      value={contactFormData.phone_number}
+                      onChange={(e) => setContactFormData({ ...contactFormData, phone_number: e.target.value })}
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="is_primary_org_detail"
+                      checked={contactFormData.is_primary}
+                      onChange={(e) => setContactFormData({ ...contactFormData, is_primary: e.target.checked })}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="is_primary_org_detail" className="text-slate-700 dark:text-slate-300 font-medium cursor-pointer">
+                      Designate as Primary Contact for {org.name}
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddContactModal(false)}
+                      className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <motion.button
+                      type="submit"
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      disabled={savingContact}
+                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                    >
+                      {savingContact ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                      <span>Save Contact</span>
+                    </motion.button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* View Property Details Modal */}
+      <AnimatePresence>
+        {viewingPropDetails && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setViewingPropDetails(null)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Property Details</h3>
+                  <button onClick={() => setViewingPropDetails(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
+                    <span className="font-bold text-slate-900 dark:text-white">Property Name:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{viewingPropDetails.name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
+                    <span className="font-bold text-slate-900 dark:text-white">Physical Address:</span>
+                    <span className="text-slate-700 dark:text-slate-300 text-right">{viewingPropDetails.address}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
+                    <span className="font-bold text-slate-900 dark:text-white">General Manager:</span>
+                    <span className="text-slate-700 dark:text-slate-300">{viewingPropDetails.general_manager_name}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
+                    <span className="font-bold text-slate-900 dark:text-white">GM Contact:</span>
+                    <span className="text-slate-700 dark:text-slate-300">{viewingPropDetails.general_manager_phone} | {viewingPropDetails.general_manager_email}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
+                    <span className="font-bold text-slate-900 dark:text-white">E911 PSAP Status:</span>
+                    <span className="font-semibold text-emerald-600">{viewingPropDetails.e911_status}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
+                    <span className="font-bold text-slate-900 dark:text-white">Ray Baum Compliance:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{viewingPropDetails.ray_baum_status}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span className="font-bold text-slate-900 dark:text-white">Operational Status:</span>
+                    <span className="font-semibold text-emerald-600">{viewingPropDetails.status}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    onClick={() => setViewingPropDetails(null)}
+                    className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* View Property Services Modal */}
+      <AnimatePresence>
+        {viewingPropServices && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setViewingPropServices(null)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Services Assigned to {viewingPropServices.propName}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Provisioned voice lines and telecom trunks.
+                    </p>
+                  </div>
+                  <button onClick={() => setViewingPropServices(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {loadingPropServices ? (
+                  <div className="py-8 flex justify-center items-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  </div>
+                ) : viewingPropServices.services.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-xs">
+                    No active voice services found attached to this property.
+                  </div>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {viewingPropServices.services.map((s: any) => (
+                      <div
+                        key={s.id}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-900 dark:text-white block">{s.phone_number}</span>
+                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">{s.service_type}</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          {s.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <button
+                    onClick={() => setViewingPropServices(null)}
+                    className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Change Property Status Modal */}
+      <AnimatePresence>
+        {statusPropTarget && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setStatusPropTarget(null)}
+              className="fixed inset-0 min-h-screen w-screen h-screen z-60 bg-black/60 backdrop-blur-sm"
+            />
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="relative w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Change Status: {statusPropTarget.name}
+                  </h3>
+                  <button onClick={() => setStatusPropTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  {['ACTIVE', 'INACTIVE', 'ONBOARDING', 'ARCHIVED'].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => handleSavePropertyStatus(st)}
+                      disabled={savingPropStatus}
+                      className={`w-full p-2.5 rounded-xl border text-left font-semibold transition cursor-pointer flex items-center justify-between ${
+                        statusPropTarget.status === st
+                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                          : 'border-slate-200 dark:border-[#222430] hover:bg-slate-50 dark:hover:bg-[#1a1b22] text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <span>{st}</span>
+                      {statusPropTarget.status === st && <Check className="w-4 h-4 text-blue-600" />}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
     </motion.div>
