@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         created_at,
+        organization:organizations(id, name),
         property:properties(id, name, address, city, state, zip_code, main_phone, ray_baud_and_logs_enabled),
         e911:e911_records(id, status, emergency_address, correction_notes, verified_at, updated_at)
       `)
@@ -60,18 +61,20 @@ export async function GET(request: NextRequest) {
           org_property_id: op.id,
           property_id: prop.id,
           property_name: prop.name,
+          organization_name: op.organization?.name || 'Organization',
           property_location: `${prop.city}, ${prop.state}`,
           property_phone: prop.main_phone,
-          property_address: `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}`,
-          emergency_address: e911?.emergency_address || `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}`,
+          property_address: `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}`.trim(),
+          emergency_address: e911?.emergency_address || `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}`.trim(),
           status: e911?.status || 'PENDING',
           correction_notes: e911?.correction_notes || (e911?.status === 'VERIFIED' ? 'Verified with local PSAP dispatch database.' : null),
           verified_at: e911?.verified_at || null,
-          ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled,
+          ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
           updated_at: e911?.updated_at || op.created_at,
         };
       })
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
+
 
     // Metrics as specified in Task.md:
     // Total Properties, Verified, Pending, Action Required (Correction Required + Failed)

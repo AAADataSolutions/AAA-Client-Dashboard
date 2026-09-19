@@ -8,6 +8,7 @@ import e911Reducer from './slices/e911Slice';
 import ticketsReducer from './slices/ticketsSlice';
 import auditLogsReducer from './slices/auditLogsSlice';
 import uiReducer from './slices/uiSlice';
+import portingReducer from './slices/portingSlice';
 
 export const rootReducer = combineReducers({
   auth: authReducer,
@@ -19,6 +20,7 @@ export const rootReducer = combineReducers({
   tickets: ticketsReducer,
   auditLogs: auditLogsReducer,
   ui: uiReducer,
+  porting: portingReducer,
 });
 
 export const makeStore = () => {

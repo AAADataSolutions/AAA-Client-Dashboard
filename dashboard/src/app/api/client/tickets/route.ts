@@ -284,22 +284,26 @@ export async function POST(request: NextRequest) {
           const { error: uploadErr } = await supabase.storage
             .from('ticket-attachments')
             .upload(storagePath, buffer, {
-              contentType: file.type,
-              upsert: false,
+              contentType: file.type || 'image/png',
+              upsert: true,
             });
 
-          if (!uploadErr) {
-            // Insert attachment record
-            await supabase.from('ticket_attachments').insert({
-              ticket_id: newTicket.id,
-              uploaded_by: user.id,
-              file_name: file.name,
-              file_size: file.size,
-              mime_type: file.type,
-              storage_path: storagePath,
-            });
-          } else {
-            console.error('File upload error:', uploadErr.message);
+          if (uploadErr) {
+            console.error('Supabase storage upload error:', uploadErr.message);
+          }
+
+          // Insert attachment record into database
+          const { error: attInsertErr } = await supabase.from('ticket_attachments').insert({
+            ticket_id: newTicket.id,
+            uploaded_by: user.id,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type || 'image/png',
+            storage_path: storagePath,
+          });
+
+          if (attInsertErr) {
+            console.error('ticket_attachments table insert error:', attInsertErr);
           }
         }
       }

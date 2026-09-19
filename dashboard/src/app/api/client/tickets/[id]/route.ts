@@ -82,26 +82,26 @@ export async function GET(
       .filter((c: any) => !c.is_internal)
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-    // Generate signed URLs for attachments
+    // Generate direct Supabase public URLs for attachments
     const attachmentsWithUrls = await Promise.all(
       (ticket.attachments || []).map(async (att: any) => {
         let url = '';
-        try {
-          const { data: signedData } = await supabase.storage
+        if (att.storage_path?.startsWith('http') || att.storage_path?.startsWith('data:')) {
+          url = att.storage_path;
+        } else if (att.storage_path) {
+          const { data: publicData } = supabase.storage
             .from('ticket-attachments')
-            .createSignedUrl(att.storage_path, 3600); // 1 hour expiry
-          url = signedData?.signedUrl || '';
-        } catch {
-          url = '';
+            .getPublicUrl(att.storage_path);
+          url = publicData?.publicUrl || '';
         }
         return {
           ...att,
-          url,
+          url: url || '',
         };
       })
     );
 
-    // Extract category from description if it exists
+    // Extract category and related items from description if they exist
     let category = null;
     let cleanDescription = ticket.description || '';
     const categoryMatch = cleanDescription.match(/^\[Category: ([^\]]+)\]\n\n/);
@@ -110,15 +110,65 @@ export async function GET(
       cleanDescription = cleanDescription.replace(categoryMatch[0], '');
     }
 
+    // Extract attachments from description if stored in metadata block
+    let metadataAttachments: any[] = [];
+    const attachmentsMatch = cleanDescription.match(/\n\n--- Attachments ---\n([\s\S]*)$/);
+    if (attachmentsMatch) {
+      try {
+        metadataAttachments = JSON.parse(attachmentsMatch[1].trim());
+      } catch (e) {
+        console.warn('Failed to parse attachments JSON from description:', e);
+      }
+      cleanDescription = cleanDescription.replace(attachmentsMatch[0], '').trim();
+    }
+
+    const relatedItems: {
+      property?: string;
+      e911?: string;
+      onboarding?: string;
+      service?: string;
+      porting?: string;
+    } = {};
+
+    const relatedMatch = cleanDescription.match(/\n\n--- Related Items ---\n([\s\S]*)$/);
+    if (relatedMatch) {
+      const block = relatedMatch[1];
+      cleanDescription = cleanDescription.replace(relatedMatch[0], '').trim();
+      const pMatch = block.match(/Property: (.+)/);
+      if (pMatch) relatedItems.property = pMatch[1].trim();
+      const eMatch = block.match(/E911: (.+)/);
+      if (eMatch) relatedItems.e911 = eMatch[1].trim();
+      const oMatch = block.match(/Onboarding: (.+)/);
+      if (oMatch) relatedItems.onboarding = oMatch[1].trim();
+      const sMatch = block.match(/Service: (.+)/);
+      if (sMatch) relatedItems.service = sMatch[1].trim();
+      const portMatch = block.match(/Porting: (.+)/);
+      if (portMatch) relatedItems.porting = portMatch[1].trim();
+    }
+
+    // Combine attachments from table and description metadata
+    let finalAttachments = attachmentsWithUrls;
+    if (finalAttachments.length === 0 && metadataAttachments.length > 0) {
+      finalAttachments = metadataAttachments.map((m: any, idx: number) => ({
+        id: `att-meta-${idx}`,
+        file_name: m.file_name,
+        file_size: m.file_size,
+        mime_type: m.mime_type,
+        url: m.url || m.storage_path,
+        storage_path: m.storage_path || m.url,
+      }));
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         ...ticket,
         ticket_number: generateTicketNumber(ticket.id),
         category,
+        related_items: Object.keys(relatedItems).length > 0 ? relatedItems : null,
         clean_description: cleanDescription,
         comments: visibleComments,
-        attachments: attachmentsWithUrls,
+        attachments: finalAttachments,
       },
     });
   } catch (err: any) {

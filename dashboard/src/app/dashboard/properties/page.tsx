@@ -7,6 +7,7 @@ import {
   X,
   MapPin,
   Phone,
+  Mail,
   ShieldCheck,
   PhoneCall,
   MoreVertical,
@@ -26,10 +27,15 @@ import {
   Radio,
   ExternalLink,
   Eye,
+  Edit2,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useToast } from '@/components/client/ClientToast';
 import { PropertyDetailDrawer } from '@/components/client/PropertyDetailDrawer';
 import { CreateTicketModal } from '@/components/client/CreateTicketModal';
+import { EditGMModal } from '@/components/client/EditGMModal';
+import { OnboardingTimelineModal, getStageBadge } from '@/components/client/OnboardingTimelineModal';
 import { motion, type Variants } from 'framer-motion';
 
 const containerVariants: Variants = {
@@ -58,13 +64,17 @@ interface PropertyRecord {
   state: string;
   zip_code: string;
   country: string;
+  organization_name?: string;
   main_phone: string | null;
   fax: string | null;
   contact_person_name: string | null;
   contact_person_email: string | null;
   general_manager_name: string | null;
+  general_manager_phone: string | null;
+  general_manager_email: string | null;
   ray_baud_and_logs_enabled: boolean;
   status: string;
+  stage?: string;
   services_count: number;
   services: any[];
   e911_status: string;
@@ -80,6 +90,7 @@ interface PropertyRecord {
 export default function ClientPropertiesPage() {
   const { orgMembership } = useAuth();
   const orgName = orgMembership?.organization?.name || 'Organization';
+  const toast = useToast();
 
   // Data state
   const [properties, setProperties] = useState<PropertyRecord[]>([]);
@@ -113,6 +124,12 @@ export default function ClientPropertiesPage() {
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [ticketPropId, setTicketPropId] = useState<string | null>(null);
 
+  // Edit GM & Onboarding Timeline Modals
+  const [editingGMProp, setEditingGMProp] = useState<PropertyRecord | null>(null);
+  const [showEditGMModal, setShowEditGMModal] = useState(false);
+  const [viewingTimelineProp, setViewingTimelineProp] = useState<PropertyRecord | null>(null);
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
+
   // 3-Dots Fixed Action Menu state
   const [menuPosition, setMenuPosition] = useState<{
     top?: number;
@@ -121,8 +138,8 @@ export default function ClientPropertiesPage() {
     prop: PropertyRecord;
   } | null>(null);
 
-  // Copy phone state
-  const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
+  // Copy state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchProperties = useCallback(async () => {
     setLoading(true);
@@ -163,9 +180,9 @@ export default function ClientPropertiesPage() {
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, prop: PropertyRecord) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const menuWidth = 230;
+    const menuWidth = 240;
     const left = Math.max(16, rect.right - menuWidth);
-    const isNearBottom = rect.bottom + 230 > window.innerHeight;
+    const isNearBottom = rect.bottom + 270 > window.innerHeight;
     if (isNearBottom) {
       setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, prop });
     } else {
@@ -186,45 +203,28 @@ export default function ClientPropertiesPage() {
     setMenuPosition(null);
   };
 
-  const handleCopyPhone = (phone: string, id: string, e: React.MouseEvent) => {
+  const handleOpenEditGM = (prop: PropertyRecord) => {
+    setEditingGMProp(prop);
+    setShowEditGMModal(true);
+    setMenuPosition(null);
+  };
+
+  const handleOpenTimeline = (prop: PropertyRecord) => {
+    setViewingTimelineProp(prop);
+    setShowTimelineModal(true);
+    setMenuPosition(null);
+  };
+
+  const handleCopyText = (text: string, id: string, label: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(phone);
-    setCopiedPhoneId(id);
-    setTimeout(() => setCopiedPhoneId(null), 2000);
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast.success(`Copied ${label} to clipboard`);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || onboardingFilter !== 'ALL' || stateFilter !== 'ALL';
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
-
-  // Donut chart calculations
-  const donutData = useMemo(() => {
-    const total = metrics.totalProperties || 0;
-    const circumference = 2 * Math.PI * 38; // ~238.76
-    if (total === 0) {
-      return {
-        activePct: 0,
-        onboardingPct: 0,
-        inactivePct: 0,
-        circumference,
-        activeLength: 0,
-        onboardingLength: 0,
-        inactiveLength: 0,
-      };
-    }
-    const activeLength = (metrics.activeProperties / total) * circumference;
-    const onboardingLength = (metrics.onboardingProperties / total) * circumference;
-    const inactiveLength = (metrics.inactiveProperties / total) * circumference;
-
-    return {
-      activePct: Math.round((metrics.activeProperties / total) * 100),
-      onboardingPct: Math.round((metrics.onboardingProperties / total) * 100),
-      inactivePct: Math.round((metrics.inactiveProperties / total) * 100),
-      circumference,
-      activeLength,
-      onboardingLength,
-      inactiveLength,
-    };
-  }, [metrics]);
 
   return (
     <motion.div
@@ -233,32 +233,38 @@ export default function ClientPropertiesPage() {
       animate="visible"
       className="space-y-6 pb-12 font-sans"
     >
-      {/* 1. Page Header */}
+      {/* 1. Header with Breadcrumb & KPI Summary */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
             <Hotel size={256} className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-black dark:text-white">
-            Properties &amp; Locations
-          </h1>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Properties &amp; Locations
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Overview of all hospitality properties managed under <strong className="text-slate-700 dark:text-slate-200">{orgName}</strong>
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5">
           <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => handleOpenTicketModalForProp('')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={fetchProperties}
+            className="p-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1c24] transition cursor-pointer"
+            title="Refresh list"
+            aria-label="Refresh properties list"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Raise Property Ticket</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </motion.button>
         </div>
       </motion.div>
 
-      {/* 2. Top KPI Cards Row - ALL VARIANT 1 ONLY */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 2. Top Metric Cards - Blue Variant 1 */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Properties */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
@@ -274,36 +280,14 @@ export default function ClientPropertiesPage() {
           </div>
           <div className="mt-3">
             <span className="text-2xl font-bold text-white">
-              {metrics.totalProperties}
+              {metrics.totalProperties || properties.length}
             </span>
             <span className="text-xs text-slate-200 ml-1.5 font-medium">Locations</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">Active portfolio facilities</p>
+          <p className="text-[11px] text-slate-200 mt-2">{metrics.activeProperties} Live Active properties</p>
         </motion.div>
 
-        {/* Card 2: Active Properties */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Active Properties
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
-              {metrics.activeProperties}
-            </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Live In Service</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">Fully operational facilities</p>
-        </motion.div>
-
-        {/* Card 3: In Onboarding */}
+        {/* Card 2: In Onboarding */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
           className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
@@ -320,19 +304,19 @@ export default function ClientPropertiesPage() {
             <span className="text-2xl font-bold text-white">
               {metrics.onboardingProperties}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Pipeline</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Pipelines</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">Provisioning in progress</p>
+          <p className="text-[11px] text-slate-200 mt-2">Cutover pipelines active</p>
         </motion.div>
 
-        {/* Card 4: Services & Lines */}
+        {/* Card 3: Assigned Voice Lines */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
           className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Total Services &amp; Lines
+              Assigned Voice Lines
             </span>
             <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
               <PhoneCall className="w-4 h-4 text-white" />
@@ -342,9 +326,31 @@ export default function ClientPropertiesPage() {
             <span className="text-2xl font-bold text-white">
               {metrics.totalServices}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Lines</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Telecom DIDs</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">DIDs, SIP trunks &amp; circuits</p>
+          <p className="text-[11px] text-slate-200 mt-2">Active telecom lines provisioned</p>
+        </motion.div>
+
+        {/* Card 4: E911 PSAP Verified */}
+        <motion.div
+          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              E911 PSAP Verified
+            </span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl font-bold text-white">
+              {metrics.e911VerifiedProperties}
+            </span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Compliant</span>
+          </div>
+          <p className="text-[11px] text-slate-200 mt-2">Emergency dispatch ready</p>
         </motion.div>
       </motion.div>
 
@@ -361,8 +367,8 @@ export default function ClientPropertiesPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by property name, address, or main phone..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition"
+              placeholder="Search by property, city, state, GM name, phone, or email..."
+              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
             />
             {searchQuery && (
               <button
@@ -382,13 +388,12 @@ export default function ClientPropertiesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter properties by operational status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="ONBOARDING">Onboarding</option>
             <option value="INACTIVE">Inactive</option>
-            <option value="OFFBOARDED">Offboarded</option>
           </select>
 
           {/* Onboarding Stage Filter */}
@@ -399,12 +404,11 @@ export default function ClientPropertiesPage() {
               setCurrentPage(1);
             }}
             aria-label="Filter properties by onboarding pipeline status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
-            <option value="ALL">All Onboarding</option>
+            <option value="ALL">All Stages</option>
             <option value="ONBOARDING">In Onboarding</option>
             <option value="COMPLETED">Completed</option>
-            <option value="NONE">Not in Onboarding</option>
           </select>
         </div>
 
@@ -430,7 +434,7 @@ export default function ClientPropertiesPage() {
               onClick={() => setViewMode('LIST')}
               className={`p-1.5 rounded-md text-xs transition cursor-pointer ${
                 viewMode === 'LIST'
-                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-2xs'
+                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title="Table View"
@@ -442,7 +446,7 @@ export default function ClientPropertiesPage() {
               onClick={() => setViewMode('GRID')}
               className={`p-1.5 rounded-md text-xs transition cursor-pointer ${
                 viewMode === 'GRID'
-                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-2xs'
+                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title="Grid View"
@@ -472,7 +476,7 @@ export default function ClientPropertiesPage() {
           </div>
           <button
             onClick={fetchProperties}
-            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-2xs transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs transition cursor-pointer"
           >
             Retry
           </button>
@@ -492,163 +496,235 @@ export default function ClientPropertiesPage() {
           </p>
         </div>
       ) : viewMode === 'LIST' ? (
-        /* TABLE VIEW — Strictly separate individual columns */
+        /* TABLE VIEW — Strictly Required Columns */
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto [scrollbar-width:thin]">
-            <table className="w-full text-left border-collapse min-w-[850px]">
+            <table className="w-full text-left border-collapse min-w-[1200px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Property Name
+                    PROPERTY
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Address
+                    LOCATION
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Contact Person
+                    NO. OF SERVICES
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Phone
+                    E911 STATUS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Services
+                    RAY BAUM STATUS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Status
+                    GM NAME
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Onboarding
+                    GM PHONE
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    GM EMAIL
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    PROPERTY STATUS
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    STAGE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
-                    Actions
+                    ACTIONS
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
-                {properties.map((prop) => (
-                  <tr
-                    key={prop.id}
-                    onClick={() => handleOpenPropertyDetails(prop)}
-                    className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
-                  >
-                    {/* Column 1: Property Name */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
-                          <Hotel className="w-4 h-4" />
+                {properties.map((prop) => {
+                  const gmName = prop.general_manager_name || prop.contact_person_name || '—';
+                  const gmPhone = prop.general_manager_phone || prop.main_phone || null;
+                  const gmEmail = prop.general_manager_email || prop.contact_person_email || null;
+                  const stageKey = prop.stage || prop.onboarding_status || (prop.status === 'ACTIVE' ? 'COMPLETED' : 'DRAFT');
+                  const stageBadge = getStageBadge(stageKey);
+
+                  return (
+                    <tr
+                      key={prop.id}
+                      onClick={() => handleOpenPropertyDetails(prop)}
+                      className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
+                    >
+                      {/* Column 1: PROPERTY */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
+                            <Hotel className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {prop.name}
+                            </span>
+                            <span className="block text-[10.5px] text-slate-400 truncate max-w-[160px]">
+                              {prop.address}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {prop.name}
+                      </td>
+
+                      {/* Column 2: LOCATION */}
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{prop.city}, {prop.state}</span>
+                        </div>
+                      </td>
+
+                      {/* Column 3: NO. OF SERVICES */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          <PhoneCall className="w-3 h-3 text-blue-500" />
+                          <span>{prop.services_count} {prop.services_count === 1 ? 'Line' : 'Lines'}</span>
+                        </span>
+                      </td>
+
+                      {/* Column 4: E911 STATUS */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
+                            prop.e911_status === 'VERIFIED'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                              : prop.e911_status === 'FAILED' || prop.e911_status === 'CORRECTION_REQUIRED'
+                              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
+                              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
+                          }`}
+                        >
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>{prop.e911_status || 'PENDING'}</span>
+                        </span>
+                      </td>
+
+                      {/* Column 5: RAY BAUM STATUS */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+                            prop.ray_baud_and_logs_enabled
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                          }`}
+                        >
+                          {prop.ray_baud_and_logs_enabled ? 'COMPLIANT' : 'DISABLED'}
+                        </span>
+                      </td>
+
+                      {/* Column 6: GM NAME */}
+                      <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 whitespace-nowrap font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[130px]" title={gmName}>
+                            {gmName}
                           </span>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Column 2: Address */}
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      <span className="block max-w-[200px] truncate" title={`${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}`}>
-                        {prop.address ? `${prop.address}, ${prop.city}, ${prop.state}` : `${prop.city}, ${prop.state}`}
-                      </span>
-                    </td>
+                      {/* Column 7: GM PHONE */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {gmPhone && gmPhone !== 'N/A' ? (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{gmPhone}</span>
+                            <button
+                              onClick={(e) => handleCopyText(gmPhone, `${prop.id}-phone`, 'GM phone', e)}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                              title="Copy phone"
+                            >
+                              {copiedId === `${prop.id}-phone` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
 
-                    {/* Column 3: Contact Person */}
-                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate max-w-[140px]">
-                          {prop.contact_person_name || prop.general_manager_name || '—'}
+                      {/* Column 8: GM EMAIL */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {gmEmail && gmEmail !== 'N/A' ? (
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[150px]" title={gmEmail}>
+                              {gmEmail}
+                            </span>
+                            <button
+                              onClick={(e) => handleCopyText(gmEmail, `${prop.id}-email`, 'GM email', e)}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                              title="Copy email"
+                            >
+                              {copiedId === `${prop.id}-email` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Column 9: PROPERTY STATUS */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                            prop.status === 'ACTIVE'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                              : prop.status === 'ONBOARDING'
+                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              prop.status === 'ACTIVE'
+                                ? 'bg-emerald-500'
+                                : prop.status === 'ONBOARDING'
+                                ? 'bg-purple-500'
+                                : 'bg-slate-400'
+                            }`}
+                          />
+                          {prop.status}
                         </span>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Column 4: Phone */}
-                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {prop.main_phone ? (
-                        <div className="flex items-center gap-1.5">
-                          <span>{prop.main_phone}</span>
+                      {/* Column 10: STAGE */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ${stageBadge.bg} ${stageBadge.text} border ${stageBadge.border}`}>
+                          <GitBranch className="w-3 h-3" />
+                          <span>{stageBadge.label}</span>
+                        </span>
+                      </td>
+
+                      {/* Column 11: ACTIONS */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={(e) => handleCopyPhone(prop.main_phone!, prop.id, e)}
-                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                            title="Copy phone"
+                            onClick={() => handleOpenPropertyDetails(prop)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
                           >
-                            {copiedPhoneId === prop.id ? (
-                              <Check className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
+                          </button>
+                          <button
+                            onClick={(e) => handleOpenMenu(e, prop)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
+                            aria-label="More property actions"
+                          >
+                            <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-
-                    {/* Column 5: Services */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        <PhoneCall className="w-3 h-3 text-blue-500" />
-                        <span>{prop.services_count} {prop.services_count === 1 ? 'Line' : 'Lines'}</span>
-                      </span>
-                    </td>
-
-                    {/* Column 6: Status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          prop.status === 'ACTIVE'
-                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                            : prop.status === 'ONBOARDING'
-                            ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60'
-                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            prop.status === 'ACTIVE'
-                              ? 'bg-emerald-500'
-                              : prop.status === 'ONBOARDING'
-                              ? 'bg-purple-500'
-                              : 'bg-slate-400'
-                          }`}
-                        />
-                        {prop.status}
-                      </span>
-                    </td>
-
-                    {/* Column 7: Onboarding */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      {prop.onboarding_status ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                          <GitBranch className="w-3 h-3" />
-                          <span>{prop.onboarding_status}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-[11px]">N/A</span>
-                      )}
-                    </td>
-
-                    {/* Column 8: Actions */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleOpenPropertyDetails(prop)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          onClick={(e) => handleOpenMenu(e, prop)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
-                          aria-label="More property actions"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -692,21 +768,21 @@ export default function ClientPropertiesPage() {
 
                 <div className="space-y-2 text-xs py-2 border-t border-b border-slate-100 dark:border-[#20222c] my-2 text-slate-600 dark:text-slate-300">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Main Phone:</span>
-                    <span className="font-medium text-slate-900 dark:text-white">
-                      {prop.main_phone || '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Contact Person:</span>
+                    <span className="text-slate-400 text-[11px]">General Manager:</span>
                     <span className="font-medium text-slate-900 dark:text-white truncate max-w-[150px]">
-                      {prop.contact_person_name || prop.general_manager_name || '—'}
+                      {prop.general_manager_name || prop.contact_person_name || '—'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 text-[11px]">Active Services:</span>
                     <span className="font-semibold text-blue-600 dark:text-blue-400">
                       {prop.services_count} Lines
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">Stage:</span>
+                    <span className="font-semibold text-purple-600 dark:text-purple-400">
+                      {getStageBadge(prop.stage || prop.onboarding_status || 'DRAFT').label}
                     </span>
                   </div>
                 </div>
@@ -787,7 +863,7 @@ export default function ClientPropertiesPage() {
         </div>
       )}
 
-      {/* 6. Fixed 3-Dots Overlay Action Menu */}
+      {/* 6. Fixed 3-Dots Overlay Action Menu with all requested actions */}
       {menuPosition && (
         <>
           <div
@@ -802,7 +878,7 @@ export default function ClientPropertiesPage() {
               ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
               left: `${menuPosition.left}px`,
             }}
-            className="z-50 w-56 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
+            className="z-50 w-60 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#252733]">
               <span className="text-[10.5px] uppercase font-bold text-slate-400 block tracking-wider">
@@ -813,6 +889,7 @@ export default function ClientPropertiesPage() {
               </span>
             </div>
 
+            {/* Action 1: View property details */}
             <button
               onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'OVERVIEW')}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
@@ -821,44 +898,55 @@ export default function ClientPropertiesPage() {
               <span>View Property Details</span>
             </button>
 
+            {/* Action 2: View services */}
             <button
               onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'SERVICES')}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
               <PhoneCall className="w-3.5 h-3.5 text-blue-500" />
-              <span>View Assigned Services ({menuPosition.prop.services_count})</span>
+              <span>View Services ({menuPosition.prop.services_count})</span>
             </button>
 
+            {/* Action 3: Manage contacts */}
             <button
-              onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'E911')}
+              onClick={() => handleOpenEditGM(menuPosition.prop)}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>View E911 Status</span>
+              <Users className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Manage Contacts</span>
             </button>
 
+            {/* Action 4: View tickets */}
             <button
-              onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'ONBOARDING')}
+              onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'TICKETS')}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
+            >
+              <LifeBuoy className="w-3.5 h-3.5 text-amber-500" />
+              <span>View Tickets ({menuPosition.prop.tickets?.length || 0})</span>
+            </button>
+
+            {/* Action 5: View onboarding stage */}
+            <button
+              onClick={() => handleOpenTimeline(menuPosition.prop)}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
             >
               <GitBranch className="w-3.5 h-3.5 text-purple-500" />
-              <span>View Onboarding Progress</span>
+              <span>View Onboarding Stage</span>
             </button>
 
-            <div className="border-t border-slate-100 dark:border-[#252733] my-1" />
-
+            {/* Action 6: Edit GM details */}
             <button
-              onClick={() => handleOpenTicketModalForProp(menuPosition.prop.id)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2 transition cursor-pointer"
+              onClick={() => handleOpenEditGM(menuPosition.prop)}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-2 transition cursor-pointer"
             >
-              <LifeBuoy className="w-3.5 h-3.5 text-blue-500" />
-              <span>Raise Support Ticket</span>
+              <Edit2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Edit GM Details</span>
             </button>
           </div>
         </>
       )}
 
-      {/* 7. Property 360 Details Slide-Over Drawer */}
+      {/* 7. Property Details Slide-Over Drawer */}
       {showDrawer && selectedPropForDrawer && (
         <PropertyDetailDrawer
           property={selectedPropForDrawer}
@@ -884,6 +972,43 @@ export default function ClientPropertiesPage() {
           preselectedPropertyId={ticketPropId || undefined}
           onSuccess={() => {
             fetchProperties();
+          }}
+        />
+      )}
+
+      {/* 9. Edit GM Details Modal */}
+      {showEditGMModal && editingGMProp && (
+        <EditGMModal
+          isOpen={showEditGMModal}
+          onClose={() => {
+            setShowEditGMModal(false);
+            setEditingGMProp(null);
+          }}
+          property={editingGMProp}
+          onSuccess={() => {
+            fetchProperties();
+          }}
+        />
+      )}
+
+      {/* 10. Onboarding Timeline Modal (Admin UI Roadmap) */}
+      {showTimelineModal && viewingTimelineProp && (
+        <OnboardingTimelineModal
+          isOpen={showTimelineModal}
+          onClose={() => {
+            setShowTimelineModal(false);
+            setViewingTimelineProp(null);
+          }}
+          record={{
+            property_name: viewingTimelineProp.name,
+            organization_name: viewingTimelineProp.organization_name || orgName,
+            property_address: `${viewingTimelineProp.address}, ${viewingTimelineProp.city}, ${viewingTimelineProp.state}`,
+            status: viewingTimelineProp.stage || viewingTimelineProp.onboarding_status || 'DRAFT',
+            stage: viewingTimelineProp.stage || viewingTimelineProp.onboarding_status || 'DRAFT',
+            target_date: viewingTimelineProp.onboarding_target_date,
+            general_manager_name: viewingTimelineProp.general_manager_name,
+            general_manager_phone: viewingTimelineProp.general_manager_phone,
+            general_manager_email: viewingTimelineProp.general_manager_email,
           }}
         />
       )}

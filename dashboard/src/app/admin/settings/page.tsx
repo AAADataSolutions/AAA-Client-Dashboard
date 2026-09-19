@@ -4,12 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Settings,
-  ShieldCheck,
   Shield,
-  Database,
-  Lock,
-  Bell,
-  Server,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
@@ -22,8 +17,8 @@ import {
   Trash2,
   Check,
   Loader2,
-  Sliders,
   X,
+  Info,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -61,7 +56,7 @@ export default function AdminSettingsPage() {
   const { profile, effectiveRole, refreshProfile } = useAuth();
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'TEAM' | 'NOTIFICATIONS' | 'SECURITY'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'TEAM'>('PROFILE');
 
   // Profile Form state
   const [fullName, setFullName] = useState('');
@@ -83,19 +78,6 @@ export default function AdminSettingsPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'ADMIN' | 'USER'>('ADMIN');
   const [sendingInvite, setSendingInvite] = useState(false);
-
-  // Notifications toggles
-  const [notifications, setNotifications] = useState({
-    ticketReplies: true,
-    e911Alerts: true,
-    onboardingMilestones: true,
-    portingCutovers: true,
-    auditAlerts: true,
-  });
-
-  // Health Test
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
-  const [connectionSuccess, setConnectionSuccess] = useState(false);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -216,16 +198,6 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleTestConnection = () => {
-    setIsTestingConnection(true);
-    setTimeout(() => {
-      setIsTestingConnection(false);
-      setConnectionSuccess(true);
-      showToast('System Healthy', 'PostgreSQL database and Edge cluster connection verified.', 'success');
-      setTimeout(() => setConnectionSuccess(false), 3500);
-    }, 900);
-  };
-
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, member: any) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -272,7 +244,7 @@ export default function AdminSettingsPage() {
           >
             {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />}
             {t.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />}
-            {t.type === 'info' && <Bell className="w-5 h-5 text-blue-500 shrink-0" />}
+            {t.type === 'info' && <Info className="w-5 h-5 text-blue-500 shrink-0" />}
             <div>
               <p className="font-semibold">{t.title}</p>
               {t.message && <p className="text-xs opacity-90">{t.message}</p>}
@@ -298,7 +270,7 @@ export default function AdminSettingsPage() {
               System Settings
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Manage platform configurations, administrator access, and notification rules.
+              Manage platform configurations and administrator access.
             </p>
           </div>
         </div>
@@ -315,23 +287,6 @@ export default function AdminSettingsPage() {
               <span>Invite Admin</span>
             </motion.button>
           )}
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleTestConnection}
-            disabled={isTestingConnection}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-          >
-            {isTestingConnection ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : connectionSuccess ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            ) : (
-              <Server className="w-3.5 h-3.5" />
-            )}
-            <span>{isTestingConnection ? 'Checking...' : connectionSuccess ? 'System Healthy' : 'Test Health'}</span>
-          </motion.button>
         </div>
       </motion.div>
 
@@ -356,26 +311,6 @@ export default function AdminSettingsPage() {
           }`}
         >
           Admin Team Members ({members.length || '—'})
-        </button>
-        <button
-          onClick={() => setActiveTab('NOTIFICATIONS')}
-          className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-            activeTab === 'NOTIFICATIONS'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#181920]'
-          }`}
-        >
-          Notifications
-        </button>
-        <button
-          onClick={() => setActiveTab('SECURITY')}
-          className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer ${
-            activeTab === 'SECURITY'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#181920]'
-          }`}
-        >
-          Security &amp; Infrastructure
         </button>
       </motion.div>
 
@@ -499,57 +434,62 @@ export default function AdminSettingsPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
-                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">MEMBER NAME</th>
-                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">EMAIL ADDRESS</th>
-                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">SYSTEM ROLE</th>
-                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">PHONE</th>
-                    <th className="py-3.5 px-4 font-bold whitespace-nowrap">JOINED DATE</th>
-                    <th className="py-3.5 px-4 font-bold text-right whitespace-nowrap">ACTIONS</th>
+                    <th className="py-3 px-4">Member Name</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Joined Date</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
-                  {members.map((mem) => {
-                    const isSelf = mem.id === profile?.id;
+                <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-slate-700 dark:text-slate-300">
+                  {members.map((m) => {
+                    const isCurrentUser = m.user_id === profile?.id;
+                    const roleBadge =
+                      m.role === 'ADMIN'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-900/40'
+                        : 'bg-slate-50 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 
                     return (
-                      <tr key={mem.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition-colors">
-                        <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-2">
-                            <span>{mem.full_name || 'Admin User'}</span>
-                            {isSelf && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 font-semibold">
-                                You
+                      <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-[#1a1b22]/50 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold text-[11px]">
+                            {(m.full_name || m.email || 'A').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="leading-tight">{m.full_name || 'System Staff'}</p>
+                            {isCurrentUser && (
+                              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                                (You)
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                          {mem.email}
+                        <td className="py-3 px-4 text-slate-500 dark:text-slate-400">
+                          {m.email}
                         </td>
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              mem.role === 'ADMIN'
-                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40'
-                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                            }`}
-                          >
-                            {mem.role === 'ADMIN' ? 'Admin' : 'Staff / User'}
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold border ${roleBadge}`}>
+                            {m.role === 'ADMIN' ? 'Administrator' : 'User / Staff'}
                           </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                          {mem.phone_number || '—'}
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <Check className="w-3 h-3" />
+                            Active
+                          </span>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-400 text-xs whitespace-nowrap">
-                          {mem.created_at ? new Date(mem.created_at).toLocaleDateString() : '—'}
+                        <td className="py-3 px-4 text-slate-400">
+                          {m.created_at ? new Date(m.created_at).toLocaleDateString() : 'N/A'}
                         </td>
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                          {!isSelf && (
+                        <td className="py-3 px-4 text-right">
+                          {!isCurrentUser && (
                             <button
-                              onClick={(e) => handleOpenMenu(e, mem)}
-                              className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#222430] transition cursor-pointer"
+                              onClick={(e) => handleOpenMenu(e, m)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1f2128] transition cursor-pointer"
+                              title="Member Options"
                             >
-                              <MoreVertical className="w-3.5 h-3.5" />
+                              <MoreVertical className="w-4 h-4" />
                             </button>
                           )}
                         </td>
@@ -565,204 +505,6 @@ export default function AdminSettingsPage() {
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* TAB 3: NOTIFICATIONS */}
-      {activeTab === 'NOTIFICATIONS' && (
-        <motion.div variants={itemVariants} className="max-w-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 shadow-xs space-y-6">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Admin Alert Rules &amp; Notifications</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Configure trigger conditions for automated notifications sent to admin inboxes and feeds.
-            </p>
-          </div>
-
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
-              <div>
-                <span className="font-semibold text-slate-900 dark:text-white block">
-                  Support Ticket Incoming &amp; Client Replies
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Notify immediately when a customer logs a new ticket or replies to an active thread.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={notifications.ticketReplies}
-                onChange={(e) =>
-                  setNotifications({ ...notifications, ticketReplies: e.target.checked })
-                }
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
-              <div>
-                <span className="font-semibold text-slate-900 dark:text-white block">
-                  E911 &amp; Ray Baum Compliance Discrepancies
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Trigger high-priority alert if an unverified emergency address or PSAP routing error is detected.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={notifications.e911Alerts}
-                onChange={(e) =>
-                  setNotifications({ ...notifications, e911Alerts: e.target.checked })
-                }
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
-              <div>
-                <span className="font-semibold text-slate-900 dark:text-white block">
-                  Onboarding Property Milestones
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Notify when a property reaches Site Survey, SOF Signed, or Ready for Cutover.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={notifications.onboardingMilestones}
-                onChange={(e) =>
-                  setNotifications({ ...notifications, onboardingMilestones: e.target.checked })
-                }
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
-              <div>
-                <span className="font-semibold text-slate-900 dark:text-white block">
-                  Porting Cutover (FOC) Deadlines
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Alert 48 hours prior to carrier live number porting cutovers.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={notifications.portingCutovers}
-                onChange={(e) =>
-                  setNotifications({ ...notifications, portingCutovers: e.target.checked })
-                }
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
-              <div>
-                <span className="font-semibold text-slate-900 dark:text-white block">
-                  System Audit Ledger Critical Mutations
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Instant log dispatch on tenant deactivations, primary contact reassignment, and status changes.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={notifications.auditAlerts}
-                onChange={(e) =>
-                  setNotifications({ ...notifications, auditAlerts: e.target.checked })
-                }
-                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-              />
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* TAB 4: SECURITY & INFRASTRUCTURE */}
-      {activeTab === 'SECURITY' && (
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Security & Access */}
-          <div className="p-6 rounded-xl bg-white dark:bg-[#10141b] border border-gray-200 dark:border-[#212833] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-black dark:text-white font-semibold text-sm">
-                <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Role-Based Access Enforcement</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                Active
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              Row Level Security (RLS) is strictly enforced at the database layer, isolating customer organization data across all tenant queries.
-            </p>
-            <div className="pt-2 border-t border-gray-100 dark:border-[#212833] flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Current Role Session:</span>
-              <span className="font-semibold text-black dark:text-white capitalize">{effectiveRole || 'Super Admin'}</span>
-            </div>
-          </div>
-
-          {/* Database & Infrastructure */}
-          <div className="p-6 rounded-xl bg-white dark:bg-[#10141b] border border-gray-200 dark:border-[#212833] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-black dark:text-white font-semibold text-sm">
-                <Database className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>PostgreSQL &amp; Supabase Engine</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                Healthy
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              Realtime subscriptions, auth triggers, and stored procedures are synchronized with edge clusters for low latency execution.
-            </p>
-            <div className="pt-2 border-t border-gray-100 dark:border-[#212833] flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Cluster Status:</span>
-              <span className="font-semibold text-black dark:text-white">US-East Primary (Active)</span>
-            </div>
-          </div>
-
-          {/* Authentication Policies */}
-          <div className="p-6 rounded-xl bg-white dark:bg-[#10141b] border border-gray-200 dark:border-[#212833] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-black dark:text-white font-semibold text-sm">
-                <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Authentication &amp; Session Policies</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                Enforced
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              Magic links and passwordless OTP verification are prioritized. JWT expiration is strictly governed with auto-refresh rotation.
-            </p>
-            <div className="pt-2 border-t border-gray-100 dark:border-[#212833] flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Session Timeout:</span>
-              <span className="font-semibold text-black dark:text-white">12 Hours (Auto Renewal)</span>
-            </div>
-          </div>
-
-          {/* Realtime Telemetry */}
-          <div className="p-6 rounded-xl bg-white dark:bg-[#10141b] border border-gray-200 dark:border-[#212833] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 text-black dark:text-white font-semibold text-sm">
-                <Sliders className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                <span>Redux Instant State Engine</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                Active
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              Global Redux Toolkit slice synchronization active with zero-reload optimistic mutation state and auth persistence.
-            </p>
-            <div className="pt-2 border-t border-gray-100 dark:border-[#212833] flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>State Latency:</span>
-              <span className="font-semibold text-black dark:text-white">&lt; 1 ms (Optimistic)</span>
             </div>
           </div>
         </motion.div>

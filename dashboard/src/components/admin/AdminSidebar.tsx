@@ -21,6 +21,7 @@ import {
   ChevronRight,
   PhoneCall,
   ArrowRight,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -36,6 +37,7 @@ const navItems = [
   { label: 'Properties', href: '/admin/properties', icon: Hotel },
   { label: 'Services & Lines', href: '/admin/services', icon: PhoneCall },
   { label: 'Onboarding', href: '/admin/onboarding-porting', icon: GitBranch },
+  { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
   { label: 'E911 Compliance', href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white' },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock },

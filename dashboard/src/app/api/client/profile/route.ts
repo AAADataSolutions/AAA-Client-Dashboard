@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET() {
   try {
@@ -13,13 +14,15 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
+    const dbClient = createAdminClient() || supabase;
+
+    const { data: profile } = await dbClient
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
-    const { data: member } = await supabase
+    const { data: member } = await dbClient
       .from('organization_members')
       .select('*, organization:organizations(*)')
       .eq('profile_id', user.id)
@@ -56,10 +59,12 @@ export async function PATCH(request: NextRequest) {
     const { full_name, phone_number } = body;
 
     const updates: any = { updated_at: new Date().toISOString() };
-    if (full_name && full_name.trim()) updates.full_name = full_name.trim();
+    if (full_name !== undefined) updates.full_name = full_name ? full_name.trim() : null;
     if (phone_number !== undefined) updates.phone_number = phone_number ? phone_number.trim() : null;
 
-    const { data: updatedProfile, error } = await supabase
+    const dbClient = createAdminClient() || supabase;
+
+    const { data: updatedProfile, error } = await dbClient
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
@@ -81,3 +86,4 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+

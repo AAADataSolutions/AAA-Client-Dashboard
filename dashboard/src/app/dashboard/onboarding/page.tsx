@@ -10,24 +10,28 @@ import {
   CheckCircle2,
   AlertCircle,
   MoreVertical,
-  LifeBuoy,
   RefreshCw,
   Plus,
-  ArrowRight,
   MapPin,
   Calendar,
   Layers,
   AlertTriangle,
   Eye,
-  Send,
-  FileText,
+  Edit2,
+  Copy,
+  Check,
+  Building2,
+  User,
+  Phone,
+  Mail,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { CreateTicketModal } from '@/components/client/CreateTicketModal';
-import { OnboardingDetailDrawer } from '@/components/client/OnboardingDetailDrawer';
+import { useToast } from '@/components/client/ClientToast';
 import { StartOnboardingModal } from '@/components/client/StartOnboardingModal';
+import { EditGMModal } from '@/components/client/EditGMModal';
+import { OnboardingTimelineModal, getStageBadge } from '@/components/client/OnboardingTimelineModal';
 import { motion, type Variants } from 'framer-motion';
 
 const containerVariants: Variants = {
@@ -52,13 +56,18 @@ interface OnboardingRecordItem {
   org_property_id: string;
   property_id: string;
   property_name: string;
+  organization_name?: string;
   property_address: string;
   property_location: string;
   property_phone: string;
   contact_person_name: string;
+  general_manager_name?: string | null;
+  general_manager_phone?: string | null;
+  general_manager_email?: string | null;
   services: any[];
   services_count: number;
   status: string;
+  stage?: string;
   stage_label: string;
   step_index: number;
   is_waiting_on_client: boolean;
@@ -80,6 +89,7 @@ interface OnboardingRecordItem {
 export default function ClientOnboardingPage() {
   const { orgMembership } = useAuth();
   const orgName = orgMembership?.organization?.name || 'Organization';
+  const toast = useToast();
 
   // Data state
   const [onboardings, setOnboardings] = useState<OnboardingRecordItem[]>([]);
@@ -98,12 +108,12 @@ export default function ClientOnboardingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  // Modals & Drawers
-  const [selectedOnboardingForDrawer, setSelectedOnboardingForDrawer] = useState<OnboardingRecordItem | null>(null);
-  const [showDrawer, setShowDrawer] = useState(false);
+  // Modals state
+  const [selectedOnboardingForTimeline, setSelectedOnboardingForTimeline] = useState<OnboardingRecordItem | null>(null);
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
+  const [editingGMOnboarding, setEditingGMOnboarding] = useState<OnboardingRecordItem | null>(null);
+  const [showEditGMModal, setShowEditGMModal] = useState(false);
   const [showStartOnboardingModal, setShowStartOnboardingModal] = useState(false);
-  const [showTicketModal, setShowTicketModal] = useState(false);
-  const [ticketPropId, setTicketPropId] = useState<string | null>(null);
 
   // 3-Dots Fixed Action Menu
   const [menuPosition, setMenuPosition] = useState<{
@@ -112,6 +122,9 @@ export default function ClientOnboardingPage() {
     left: number;
     record: OnboardingRecordItem;
   } | null>(null);
+
+  // Copy state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchOnboardings = useCallback(async () => {
     setLoading(true);
@@ -147,9 +160,9 @@ export default function ClientOnboardingPage() {
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: OnboardingRecordItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const menuWidth = 230;
+    const menuWidth = 220;
     const left = Math.max(16, rect.right - menuWidth);
-    const isNearBottom = rect.bottom + 230 > window.innerHeight;
+    const isNearBottom = rect.bottom + 180 > window.innerHeight;
     if (isNearBottom) {
       setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, record });
     } else {
@@ -157,21 +170,27 @@ export default function ClientOnboardingPage() {
     }
   };
 
-  const handleOpenDrawer = (record: OnboardingRecordItem) => {
-    setSelectedOnboardingForDrawer(record);
-    setShowDrawer(true);
+  const handleOpenTimeline = (record: OnboardingRecordItem) => {
+    setSelectedOnboardingForTimeline(record);
+    setShowTimelineModal(true);
     setMenuPosition(null);
   };
 
-  const handleOpenTicketModal = (propId: string) => {
-    setTicketPropId(propId);
-    setShowTicketModal(true);
+  const handleOpenEditGM = (record: OnboardingRecordItem) => {
+    setEditingGMOnboarding(record);
+    setShowEditGMModal(true);
     setMenuPosition(null);
+  };
+
+  const handleCopyText = (text: string, id: string, label: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast.success(`Copied ${label} to clipboard`);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
-
-  // Client-side pagination
   const totalRecords = onboardings.length;
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
   const paginatedRecords = onboardings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -189,57 +208,52 @@ export default function ClientOnboardingPage() {
           <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
             <GitBranch size={256} className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-black dark:text-white">
-            Property Onboarding Tracker
-          </h1>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Property Onboarding Tracker
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Cutover milestones &amp; lifecycle progress for <strong className="text-slate-700 dark:text-slate-200">{orgName}</strong>
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5">
           <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => handleOpenTicketModal('')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-[#1e202a] border border-slate-200 dark:border-[#2b2d3b] hover:bg-slate-50 dark:hover:bg-[#252733] text-slate-700 dark:text-slate-200 font-semibold text-xs transition shadow-sm cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={fetchOnboardings}
+            className="p-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1c24] transition cursor-pointer"
+            title="Refresh onboardings"
+            aria-label="Refresh onboardings list"
           >
-            <LifeBuoy className="w-3.5 h-3.5 text-slate-400" />
-            <span>Raise Ticket</span>
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setShowStartOnboardingModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Start New Onboarding</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </motion.button>
         </div>
       </motion.div>
 
-      {/* 2. KPI Cards (4 Cards) - ALL VARIANT 1 ONLY */}
+      {/* 2. Metric KPI Cards - Blue Variant 1 */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Onboardings */}
+        {/* Card 1: Total Pipelines */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
           className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Total Onboardings
+              Total Pipelines
             </span>
             <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <Layers className="w-4 h-4 text-white" />
+              <GitBranch className="w-4 h-4 text-white" />
             </div>
           </div>
           <div className="mt-3">
             <span className="text-2xl font-bold text-white">
-              {metrics.total}
+              {metrics.total || onboardings.length}
             </span>
             <span className="text-xs text-slate-200 ml-1.5 font-medium">Properties</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">
-            Total onboarding lifecycles recorded
-          </p>
+          <p className="text-[11px] text-slate-200 mt-2">Tracked onboarding properties</p>
         </motion.div>
 
         {/* Card 2: In Progress */}
@@ -259,21 +273,19 @@ export default function ClientOnboardingPage() {
             <span className="text-2xl font-bold text-white">
               {metrics.inProgress}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Active Pipelines</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Active</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">
-            Properties actively undergoing provisioning
-          </p>
+          <p className="text-[11px] text-slate-200 mt-2">Active carrier cutover steps</p>
         </motion.div>
 
-        {/* Card 3: Waiting on Client */}
+        {/* Card 3: Waiting Sign-Off */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
           className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Waiting on Client
+              Waiting Sign-Off
             </span>
             <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
               <AlertTriangle className="w-4 h-4 text-white" />
@@ -283,21 +295,19 @@ export default function ClientOnboardingPage() {
             <span className="text-2xl font-bold text-white">
               {metrics.waitingOnClient}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Pending Sign-off</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Review</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">
-            Action or documentation required from tenant
-          </p>
+          <p className="text-[11px] text-slate-200 mt-2">Contract / SOF Review needed</p>
         </motion.div>
 
-        {/* Card 4: Completed */}
+        {/* Card 4: Live Cutover */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
           className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Completed
+              Live Cutover
             </span>
             <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-white" />
@@ -307,17 +317,14 @@ export default function ClientOnboardingPage() {
             <span className="text-2xl font-bold text-white">
               {metrics.completed}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Live Properties</span>
+            <span className="text-xs text-slate-200 ml-1.5 font-medium">Complete</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">
-            Successfully cutover and operational
-          </p>
+          <p className="text-[11px] text-slate-200 mt-2">Fully operational properties</p>
         </motion.div>
       </motion.div>
 
-      {/* 3. Search & Filters Bar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Search */}
+      {/* 3. Search & Filter Bar */}
+      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex flex-1 items-center gap-2.5 w-full">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -328,8 +335,8 @@ export default function ClientOnboardingPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by property name, location, or stage..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition"
+              placeholder="Search by property name, address, GM, or stage..."
+              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
             />
             {searchQuery && (
               <button
@@ -341,23 +348,19 @@ export default function ClientOnboardingPage() {
             )}
           </div>
 
+          {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            aria-label="Filter onboarding processes by stage status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            aria-label="Filter onboarding by status"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Stages</option>
             <option value="IN_PROGRESS">In Progress</option>
-            <option value="WAITING_ON_CLIENT">Waiting on Client</option>
-            <option value="CONTRACT_SENT">Contract Sent</option>
-            <option value="SIGNED">Signed</option>
-            <option value="PORTING_SUBMITTED">Porting Submitted</option>
-            <option value="SOF_WAITING">SOF Waiting</option>
-            <option value="FOC_RECEIVED">FOC Received</option>
+            <option value="WAITING_ON_CLIENT">Waiting Sign-off</option>
             <option value="COMPLETED">Completed</option>
           </select>
         </div>
@@ -369,14 +372,14 @@ export default function ClientOnboardingPage() {
               setStatusFilter('ALL');
               setCurrentPage(1);
             }}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end sm:self-auto"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium"
           >
             Reset Filters
           </button>
         )}
       </div>
 
-      {/* 4. Main Onboarding Table */}
+      {/* 4. Table UI — Strictly Required Columns */}
       {loading ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 space-y-4 shadow-xs animate-pulse">
           <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/4" />
@@ -394,194 +397,204 @@ export default function ClientOnboardingPage() {
           </div>
           <button
             onClick={fetchOnboardings}
-            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-2xs transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs transition cursor-pointer"
           >
             Retry
           </button>
         </div>
       ) : onboardings.length === 0 ? (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/50 text-purple-500 flex items-center justify-center mx-auto mb-3">
             <GitBranch className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            No onboarding records found
+            No onboarding pipelines found
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
             {hasActiveFilters
-              ? 'No onboarding processes match your current search and stage filters.'
-              : 'There are no active or completed property onboardings currently listed.'}
+              ? 'No records match your active search filters.'
+              : 'There are no property locations currently in onboarding for your organization.'}
           </p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto [scrollbar-width:thin]">
-            <table className="w-full text-left border-collapse min-w-[850px]">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Property
+                    PROPERTY NAME
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Location
+                    ADDRESS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Current Stage
+                    ORGANIZATION
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Progress
+                    STAGE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Target Date
+                    TARGET CUTOVER DATE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Status
+                    GM NAME
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Last Updated
+                    GM PHONE
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    GM EMAIL
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
-                    Action
+                    ACTIONS
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
-                {paginatedRecords.map((item) => (
-                  <tr
-                    key={item.id}
-                    onClick={() => handleOpenDrawer(item)}
-                    className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
-                  >
-                    {/* Column 1: Property */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
-                          <Hotel className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {item.property_name}
-                          </span>
-                          {item.services_count > 0 && (
-                            <span className="block text-[10.5px] text-slate-400">
-                              {item.services_count} {item.services_count === 1 ? 'line' : 'lines'} configured
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
+                {paginatedRecords.map((item) => {
+                  const stageBadge = getStageBadge(item.stage || item.status);
+                  const gmName = item.general_manager_name || item.contact_person_name || '—';
+                  const gmPhone = item.general_manager_phone || item.property_phone || null;
+                  const gmEmail = item.general_manager_email || null;
+                  const organization = item.organization_name || orgName;
 
-                    {/* Column 2: Location */}
-                    <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>
-                          {item.property_location || item.property_address}
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={() => handleOpenTimeline(item)}
+                      className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
+                    >
+                      {/* Column 1: PROPERTY NAME */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
+                            <Hotel className="w-4 h-4" />
+                          </div>
+                          <span>{item.property_name}</span>
+                        </div>
+                      </td>
+
+                      {/* Column 2: ADDRESS */}
+                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        <span className="truncate max-w-[200px] block" title={item.property_address || item.property_location}>
+                          {item.property_address || item.property_location || 'Address pending'}
                         </span>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Column 3: Current Stage */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
-                        <GitBranch className="w-3 h-3" />
-                        <span>Stage {item.step_index}: {item.stage_label}</span>
-                      </span>
-                    </td>
-
-                    {/* Column 4: Progress */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="w-32 space-y-1">
-                        <div className="flex items-center justify-between text-[10.5px]">
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">
-                            {Math.round(item.progress_percentage)}%
-                          </span>
-                          <span className="text-slate-400">
-                            {item.step_index}/8
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              item.status === 'COMPLETED'
-                                ? 'bg-emerald-500'
-                                : item.is_waiting_on_client
-                                ? 'bg-amber-500'
-                                : 'bg-blue-600'
-                            }`}
-                            style={{ width: `${item.progress_percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Column 5: Target Date */}
-                    <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {item.target_date ? (
+                      {/* Column 3: ORGANIZATION */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap font-medium">
                         <div className="flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[140px]">{organization}</span>
+                        </div>
+                      </td>
+
+                      {/* Column 4: STAGE */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${stageBadge.bg} ${stageBadge.text} border ${stageBadge.border}`}>
+                          <GitBranch className="w-3 h-3" />
+                          <span>{stageBadge.label}</span>
+                        </span>
+                      </td>
+
+                      {/* Column 5: TARGET CUTOVER DATE */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-medium">
                           <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-medium">
-                            {new Date(item.target_date).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
+                          <span>
+                            {item.target_date
+                              ? new Date(item.target_date).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })
+                              : 'Pending Schedule'}
                           </span>
                         </div>
-                      ) : (
-                        <span className="text-slate-400 italic text-[11px]">TBD</span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Column 6: Status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      {item.status === 'COMPLETED' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Completed</span>
-                        </span>
-                      ) : item.is_waiting_on_client ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 animate-pulse">
-                          <AlertTriangle className="w-3 h-3" />
-                          <span>Waiting on Client</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60">
-                          <Clock className="w-3 h-3" />
-                          <span>In Progress</span>
-                        </span>
-                      )}
-                    </td>
+                      {/* Column 6: GM NAME */}
+                      <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 whitespace-nowrap font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate max-w-[130px]" title={gmName}>
+                            {gmName}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Column 7: Last Updated */}
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
-                      {new Date(item.updated_at || item.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </td>
+                      {/* Column 7: GM PHONE */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {gmPhone && gmPhone !== 'N/A' ? (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{gmPhone}</span>
+                            <button
+                              onClick={(e) => handleCopyText(gmPhone, `${item.id}-phone`, 'GM phone', e)}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                              title="Copy phone"
+                            >
+                              {copiedId === `${item.id}-phone` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
 
-                    {/* Column 8: Action */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleOpenDrawer(item)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          onClick={(e) => handleOpenMenu(e, item)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
-                          aria-label="More onboarding actions"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Column 8: GM EMAIL */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        {gmEmail && gmEmail !== 'N/A' ? (
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[150px]" title={gmEmail}>
+                              {gmEmail}
+                            </span>
+                            <button
+                              onClick={(e) => handleCopyText(gmEmail, `${item.id}-email`, 'GM email', e)}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                              title="Copy email"
+                            >
+                              {copiedId === `${item.id}-email` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Column 9: ACTIONS */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleOpenTimeline(item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 text-xs font-semibold transition cursor-pointer border border-blue-200 dark:border-blue-900/40"
+                          >
+                            <GitBranch className="w-3.5 h-3.5" />
+                            <span>View Timeline</span>
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditGM(item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-slate-200 dark:hover:bg-[#282a3a] text-slate-700 dark:text-slate-300 text-xs font-semibold transition cursor-pointer"
+                            title="Edit GM Details"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Edit GM</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -596,7 +609,7 @@ export default function ClientOnboardingPage() {
             <strong className="text-slate-800 dark:text-slate-200">
               {Math.min(currentPage * pageSize, totalRecords)}
             </strong>{' '}
-            of <strong className="text-slate-800 dark:text-slate-200">{totalRecords}</strong> onboardings
+            of <strong className="text-slate-800 dark:text-slate-200">{totalRecords}</strong> pipelines
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -622,105 +635,46 @@ export default function ClientOnboardingPage() {
         </div>
       )}
 
-      {/* 6. Fixed 3-Dots Overlay Action Menu */}
-      {menuPosition && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setMenuPosition(null)}
-            aria-hidden="true"
-          />
-          <div
-            style={{
-              position: 'fixed',
-              ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
-              ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
-              left: `${menuPosition.left}px`,
-            }}
-            className="z-50 w-56 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
-          >
-            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#252733]">
-              <span className="text-[10.5px] uppercase font-bold text-slate-400 block tracking-wider">
-                Onboarding Actions
-              </span>
-              <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                {menuPosition.record.property_name}
-              </span>
-            </div>
-
-            <button
-              onClick={() => handleOpenDrawer(menuPosition.record)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5 text-blue-500" />
-              <span>View Onboarding Timeline</span>
-            </button>
-
-            {menuPosition.record.is_waiting_on_client && (
-              <button
-                onClick={() => handleOpenDrawer(menuPosition.record)}
-                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-2 transition cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5 text-amber-500" />
-                <span>Submit Client Documentation</span>
-              </button>
-            )}
-
-            <div className="border-t border-slate-100 dark:border-[#252733] my-1" />
-
-            <button
-              onClick={() => handleOpenTicketModal(menuPosition.record.property_id)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2 transition cursor-pointer"
-            >
-              <LifeBuoy className="w-3.5 h-3.5 text-blue-500" />
-              <span>Raise Onboarding Ticket</span>
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* 7. Onboarding Detail Slide-Over Drawer */}
-      {showDrawer && selectedOnboardingForDrawer && (
-        <OnboardingDetailDrawer
-          onboarding={selectedOnboardingForDrawer}
+      {/* 6. Onboarding Timeline Modal (Admin UI Roadmap) */}
+      {showTimelineModal && selectedOnboardingForTimeline && (
+        <OnboardingTimelineModal
+          isOpen={showTimelineModal}
           onClose={() => {
-            setShowDrawer(false);
-            setSelectedOnboardingForDrawer(null);
+            setShowTimelineModal(false);
+            setSelectedOnboardingForTimeline(null);
           }}
-          onCreateTicket={(propId) => {
-            setShowDrawer(false);
-            handleOpenTicketModal(propId);
+          record={{
+            property_name: selectedOnboardingForTimeline.property_name,
+            organization_name: selectedOnboardingForTimeline.organization_name || orgName,
+            property_address: selectedOnboardingForTimeline.property_address || selectedOnboardingForTimeline.property_location,
+            status: selectedOnboardingForTimeline.stage || selectedOnboardingForTimeline.status,
+            stage: selectedOnboardingForTimeline.stage || selectedOnboardingForTimeline.status,
+            target_date: selectedOnboardingForTimeline.target_date,
+            general_manager_name: selectedOnboardingForTimeline.general_manager_name,
+            general_manager_phone: selectedOnboardingForTimeline.general_manager_phone,
+            general_manager_email: selectedOnboardingForTimeline.general_manager_email,
           }}
-          onRefresh={() => fetchOnboardings()}
         />
       )}
 
-      {/* 8. Support Ticket Modal */}
-      {showTicketModal && (
-        <CreateTicketModal
-          isOpen={showTicketModal}
+      {/* 7. Edit GM Details Modal */}
+      {showEditGMModal && editingGMOnboarding && (
+        <EditGMModal
+          isOpen={showEditGMModal}
           onClose={() => {
-            setShowTicketModal(false);
-            setTicketPropId(null);
+            setShowEditGMModal(false);
+            setEditingGMOnboarding(null);
           }}
-          preselectedPropertyId={ticketPropId || undefined}
+          property={{
+            id: editingGMOnboarding.property_id,
+            property_name: editingGMOnboarding.property_name,
+            general_manager_name: editingGMOnboarding.general_manager_name,
+            general_manager_phone: editingGMOnboarding.general_manager_phone,
+            general_manager_email: editingGMOnboarding.general_manager_email,
+            contact_person_name: editingGMOnboarding.contact_person_name,
+          }}
           onSuccess={() => {
             fetchOnboardings();
-          }}
-        />
-      )}
-
-      {/* 9. Start New Onboarding Modal (Existing or New Property) */}
-      {showStartOnboardingModal && (
-        <StartOnboardingModal
-          isOpen={showStartOnboardingModal}
-          onClose={() => setShowStartOnboardingModal(false)}
-          onSuccess={(newOnb) => {
-            fetchOnboardings();
-            if (newOnb) {
-              setSelectedOnboardingForDrawer(newOnb);
-              setShowDrawer(true);
-            }
           }}
         />
       )}

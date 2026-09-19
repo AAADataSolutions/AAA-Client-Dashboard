@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         id,
         status,
         created_at,
+        organization:organizations(id, name),
         property:properties(
           id,
           name,
@@ -62,6 +63,8 @@ export async function GET(request: NextRequest) {
           contact_person_name,
           contact_person_email,
           general_manager_name,
+          general_manager_phone,
+          general_manager_email,
           ray_baud_and_logs_enabled,
           status,
           created_at
@@ -86,7 +89,7 @@ export async function GET(request: NextRequest) {
     let totalOpenTicketsCount = 0;
 
     const allRecords = (orgProps || [])
-      .map((op) => {
+      .map((op: any) => {
         const prop: any = op.property;
         if (!prop) return null;
 
@@ -110,6 +113,9 @@ export async function GET(request: NextRequest) {
         totalOpenTicketsCount += openTix.length;
 
         const propStatus = op.status || prop.status || 'ACTIVE';
+        const gmName = prop.general_manager_name || prop.contact_person_name || 'N/A';
+        const gmPhone = prop.general_manager_phone || prop.main_phone || 'N/A';
+        const gmEmail = prop.general_manager_email || prop.contact_person_email || 'N/A';
 
         return {
           id: prop.id,
@@ -122,11 +128,15 @@ export async function GET(request: NextRequest) {
           country: prop.country,
           main_phone: prop.main_phone,
           fax: prop.fax,
+          organization_name: op.organization?.name || 'Organization',
           contact_person_name: prop.contact_person_name || prop.general_manager_name,
           contact_person_email: prop.contact_person_email,
-          general_manager_name: prop.general_manager_name,
-          ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled,
+          general_manager_name: gmName,
+          general_manager_phone: gmPhone,
+          general_manager_email: gmEmail,
+          ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
           status: propStatus,
+          stage: onboardingRecord?.status || (propStatus === 'ACTIVE' ? 'COMPLETED' : 'DRAFT'),
           services_count: servicesList.length,
           services: servicesList,
           e911_status: e911Record?.status || 'PENDING',
@@ -140,6 +150,7 @@ export async function GET(request: NextRequest) {
         };
       })
       .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
 
     // Global Metrics for Donut & KPI Cards
     const totalProperties = allRecords.length;

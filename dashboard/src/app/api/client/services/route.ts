@@ -74,11 +74,14 @@ export async function GET(request: NextRequest) {
         created_at,
         organization_property:organization_properties(
           id,
+          organization:organizations(id, name),
           property:properties(id, name, address, city, state, main_phone)
         ),
         service:services(
           id,
           phone_number,
+          service_name,
+          custom_service_id,
           status,
           description,
           created_at,
@@ -97,19 +100,23 @@ export async function GET(request: NextRequest) {
     }
 
     const allServices = (opsRecords || [])
-      .map((ops: any) => {
+      .map((ops: any, idx: number) => {
         const s = ops.service;
         if (!s) return null;
         const prop = ops.organization_property?.property;
+        const org = ops.organization_property?.organization;
         const portingLink = Array.isArray(s.porting_links) && s.porting_links.length > 0 ? s.porting_links[0] : null;
         const portingReq = portingLink?.porting_request;
 
         return {
           id: s.id,
           ops_id: ops.id,
+          custom_service_id: s.custom_service_id || `SVC-${s.id.slice(0, 6).toUpperCase()}`,
+          service_name: s.service_name || s.description || `Line ${idx + 1}`,
           phone_number: s.phone_number,
           service_type: s.service_type?.name || 'Voice Line',
           service_type_description: s.service_type?.description || '',
+          organization_name: org?.name || 'Organization',
           description: s.description || 'Standard Voice Line',
           status: s.status,
           property_id: prop?.id || null,
@@ -125,6 +132,7 @@ export async function GET(request: NextRequest) {
         };
       })
       .filter((s): s is NonNullable<typeof s> => Boolean(s));
+
 
     // KPI Cards:
     // Total Services, Active Services, Pending / Porting, Disconnected

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   Menu,
   Search,
-  Bell,
   RefreshCw,
   ChevronDown,
   LogOut,
@@ -30,9 +29,9 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
   const { profile, effectiveRole, orgMembership, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
 
   const userName = profile?.full_name || profile?.email?.split('@')[0] || 'Member';
   const initial = userName.charAt(0).toUpperCase();
@@ -103,72 +102,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
-
-        {/* Notifications Popover */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
-            title="Operational Alerts"
-            aria-label="Open notifications"
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500" />
-          </button>
-
-          {showNotifications && (
-            <>
-              <div
-                onClick={() => setShowNotifications(false)}
-                className="fixed inset-0 z-40"
-                aria-hidden="true"
-              />
-              <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#232530] rounded-xl shadow-xl p-4 z-50 space-y-3 animate-in fade-in zoom-in-95 duration-75">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-                  <span className="font-semibold text-xs text-slate-900 dark:text-slate-100">
-                    Operational Alerts
-                  </span>
-                  <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                  <div className="p-2.5 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200/80 dark:border-[#252733] flex items-start gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="text-slate-900 dark:text-slate-200 block font-semibold">
-                        E911 Dispatch Verification
-                      </strong>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Please review emergency civic addresses across your properties.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="p-2.5 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200/80 dark:border-[#252733] flex items-start gap-2">
-                    <LifeBuoy className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="text-slate-900 dark:text-slate-200 block font-semibold">
-                        Support Desk Live
-                      </strong>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Our engineering support team is online to assist with any line queries.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-slate-100 dark:border-[#222430] text-center">
-                  <Link
-                    href="/dashboard/tickets"
-                    onClick={() => setShowNotifications(false)}
-                    className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-block cursor-pointer"
-                  >
-                    View support portal &rarr;
-                  </Link>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
 
         {/* User Profile Pill & Dropdown */}
         <div className="relative">

@@ -58,7 +58,8 @@ export async function GET(request: NextRequest) {
         *,
         organization_property:organization_properties(
           id,
-          property:properties(id, name, address, city, state, zip_code, main_phone, contact_person_name, general_manager_name),
+          organization:organizations(id, name),
+          property:properties(id, name, address, city, state, zip_code, main_phone, contact_person_name, contact_person_email, general_manager_name, general_manager_phone, general_manager_email),
           services:organization_property_services(id, service:services(id, phone_number, status, service_type_id, service_type:service_types(name)))
         )
       `)
@@ -70,34 +71,44 @@ export async function GET(request: NextRequest) {
     }
 
     const stageWeights: Record<string, { percent: number; stepIndex: number; label: string; waitingClient: boolean }> = {
-      DRAFT: { percent: 12.5, stepIndex: 1, label: 'Draft', waitingClient: false },
+      DRAFT: { percent: 12.5, stepIndex: 1, label: 'Draft Initialized', waitingClient: false },
       CONTRACT_SENT: { percent: 25, stepIndex: 2, label: 'Contract Sent', waitingClient: true },
       SIGNED: { percent: 37.5, stepIndex: 3, label: 'Contract Signed', waitingClient: false },
-      PORTING_WAITING: { percent: 50, stepIndex: 4, label: 'Porting Waiting', waitingClient: false },
+      PORTING_WAITING: { percent: 50, stepIndex: 4, label: 'Waiting for LOA', waitingClient: false },
       PORTING_SUBMITTED: { percent: 62.5, stepIndex: 5, label: 'Porting Submitted', waitingClient: false },
-      SOF_WAITING: { percent: 75, stepIndex: 6, label: 'SOF Waiting', waitingClient: true },
-      FOC_RECEIVED: { percent: 87.5, stepIndex: 7, label: 'FOC Received', waitingClient: false },
-      COMPLETED: { percent: 100, stepIndex: 8, label: 'Completed', waitingClient: false },
+      SOF_WAITING: { percent: 75, stepIndex: 6, label: 'SOF Review', waitingClient: true },
+      FOC_RECEIVED: { percent: 87.5, stepIndex: 7, label: 'FOC Confirmed', waitingClient: false },
+      COMPLETED: { percent: 100, stepIndex: 8, label: 'Live Cutover', waitingClient: false },
     };
 
     const allOnboardings = (onbRecords || []).map((item: any) => {
       const op = item.organization_property;
       const prop = op?.property;
+      const org = op?.organization;
       const services = (op?.services || []).map((s: any) => s.service).filter(Boolean);
       const stageInfo = stageWeights[item.status] || { percent: 12.5, stepIndex: 1, label: item.status, waitingClient: false };
+
+      const gmName = prop?.general_manager_name || prop?.contact_person_name || 'N/A';
+      const gmPhone = prop?.general_manager_phone || prop?.main_phone || 'N/A';
+      const gmEmail = prop?.general_manager_email || prop?.contact_person_email || 'N/A';
 
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
         property_id: prop?.id,
         property_name: prop?.name || 'Property Location',
-        property_address: prop?.address || '',
+        organization_name: org?.name || 'Organization',
+        property_address: prop ? `${prop.address || ''}, ${prop.city || ''}, ${prop.state || ''} ${prop.zip_code || ''}`.trim() : '',
         property_location: prop ? `${prop.city}, ${prop.state}` : '',
         property_phone: prop?.main_phone || '',
         contact_person_name: prop?.contact_person_name || prop?.general_manager_name || '—',
+        general_manager_name: gmName,
+        general_manager_phone: gmPhone,
+        general_manager_email: gmEmail,
         services: services,
         services_count: services.length,
         status: item.status,
+        stage: item.status,
         stage_label: stageInfo.label,
         step_index: stageInfo.stepIndex,
         is_waiting_on_client: stageInfo.waitingClient,
@@ -116,6 +127,7 @@ export async function GET(request: NextRequest) {
         updated_at: item.updated_at,
       };
     });
+
 
     const total = allOnboardings.length;
     const completed = allOnboardings.filter((o) => o.status === 'COMPLETED').length;

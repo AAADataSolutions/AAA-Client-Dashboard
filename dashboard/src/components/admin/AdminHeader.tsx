@@ -1,16 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Menu,
   Search,
-  Bell,
   RefreshCw,
   ChevronDown,
-  LogOut,
-  X,
-  HelpCircle,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -25,7 +20,6 @@ interface AdminHeaderProps {
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSidebarOpen }) => {
   const { profile, effectiveRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const userName = profile?.full_name || 'Jason Smith';
@@ -83,54 +77,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
-
-        {/* Notifications Popover */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors cursor-pointer"
-            title="Operational Alerts"
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-blue-600" />
-          </button>
-
-          <AnimatePresence>
-            {showNotifications && (
-              <>
-                <div
-                  onClick={() => setShowNotifications(false)}
-                  className="fixed inset-0 z-40"
-                  aria-hidden="true"
-                />
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#232530] rounded-xl shadow-xl p-4 z-50 space-y-3"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
-                    <span className="font-semibold text-xs text-slate-900 dark:text-slate-100">Operational Triggers</span>
-                    <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                    <p className="p-2 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200 dark:border-[#252733]">
-                      <strong className="text-slate-900 dark:text-slate-200 block font-semibold">E911 Routing Mismatch</strong>
-                      5 properties require civic address correction.
-                    </p>
-                    <p className="p-2 bg-slate-50 dark:bg-[#1c1d25] rounded-lg border border-slate-200 dark:border-[#252733]">
-                      <strong className="text-slate-900 dark:text-slate-200 block font-semibold">FOC Confirmation</strong>
-                      Batch #44 cutover scheduled for Sep 14.
-                    </p>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        </div>
 
         {/* User Profile Pill */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-[#232530]">
