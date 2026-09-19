@@ -44,9 +44,9 @@ export const BrandPanel: React.FC = () => {
           className="space-y-3"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1275e2]/25 to-indigo-600/25 text-[#4c8df5] flex items-center justify-center shadow-inner border border-[#1275e2]/40 p-1.5">
+            {/* <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1275e2]/25 to-indigo-600/25 text-[#4c8df5] flex items-center justify-center shadow-inner border border-[#1275e2]/40 p-1.5">
               <img src="/logo.png" alt="AAA Logo" className="w-full h-full object-contain" />
-            </div>
+            </div> */}
             <div>
               <span className="text-base font-bold tracking-tight text-white block">
                 AAA Data Solutions

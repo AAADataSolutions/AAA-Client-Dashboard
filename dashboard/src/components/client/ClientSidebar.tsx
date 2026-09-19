@@ -17,6 +17,8 @@ import {
   ArrowRight,
   Sparkles,
   ArrowLeftRight,
+  Flame,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -26,10 +28,30 @@ interface ClientSidebarProps {
   onClose: () => void;
 }
 
-const navItems = [
+interface SubNavItem {
+  label: string;
+  href: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+interface NavItem {
+  label: string;
+  href?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children?: SubNavItem[];
+}
+
+const navItems: NavItem[] = [
   { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Properties', href: '/dashboard/properties', icon: Hotel },
-  { label: 'Services & Lines', href: '/dashboard/services', icon: PhoneCall },
+  {
+    label: 'Services',
+    icon: PhoneCall,
+    children: [
+      { label: 'Services and Lines', href: '/dashboard/services', icon: PhoneCall },
+      { label: 'Firelines', href: '/dashboard/firelines', icon: Flame },
+    ],
+  },
   { label: 'E911 Compliance', href: '/dashboard/e911', icon: ShieldCheck },
   { label: 'Onboarding Tracker', href: '/dashboard/onboarding', icon: GitBranch },
   { label: 'Porting Tracker', href: '/dashboard/porting', icon: ArrowLeftRight },
@@ -43,6 +65,8 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
 
   const orgName = orgMembership?.organization?.name || 'My Organization';
   const isClientAdmin = effectiveRole === 'ADMIN';
+
+  const [servicesExpanded, setServicesExpanded] = React.useState(true);
 
   return (
     <>
@@ -64,7 +88,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
         <div className="flex flex-col flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
-            <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
+            <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">
               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
                 <Radio className="w-4 h-4 text-white" />
               </div>
@@ -83,7 +107,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
             {/* Close Button for Mobile */}
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-[#71717a] hover:text-[#f4f4f5] lg:hidden"
+              className="p-1 rounded-md text-[#71717a] hover:text-[#f4f4f5] lg:hidden cursor-pointer"
               aria-label="Close sidebar"
             >
               <X className="w-5 h-5" />
@@ -120,21 +144,108 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
           <nav className="p-2.5 space-y-1 mt-1">
             {navItems.map((item) => {
               const Icon = item.icon;
+
+              // If item has nested sub-routes
+              if (item.children) {
+                const isGroupActive = item.children.some(
+                  (c) => pathname === c.href || pathname.startsWith(c.href)
+                );
+
+                return (
+                  <div key={item.label} className="space-y-1">
+                    {isOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setServicesExpanded(!servicesExpanded)}
+                        className={`w-full group flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                          isGroupActive
+                            ? 'bg-[#27272a]/70 text-white'
+                            : 'text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#222226]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 truncate">
+                          <Icon
+                            className={`w-4 h-4 shrink-0 transition-colors ${
+                              isGroupActive ? 'text-blue-400' : 'text-[#71717a] group-hover:text-[#a1a1aa]'
+                            }`}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 text-[#71717a] transition-transform duration-200 ${
+                            servicesExpanded ? 'rotate-0' : '-rotate-90'
+                          }`}
+                        />
+                      </button>
+                    ) : (
+                      <Link
+                        href={item.children[0].href}
+                        title={item.label}
+                        className={`group flex items-center justify-center px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                          isGroupActive
+                            ? 'bg-[#27272a] text-white shadow-xs'
+                            : 'text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#222226]'
+                        }`}
+                      >
+                        <Icon
+                          className={`w-4 h-4 shrink-0 transition-colors ${
+                            isGroupActive ? 'text-blue-400' : 'text-[#71717a] group-hover:text-[#a1a1aa]'
+                          }`}
+                        />
+                      </Link>
+                    )}
+
+                    {isOpen && servicesExpanded && (
+                      <div className="pl-4 ml-3 border-l border-[#2e2e34] space-y-1 my-1">
+                        {item.children.map((subItem) => {
+                          const isSubActive =
+                            pathname === subItem.href || pathname.startsWith(subItem.href);
+                          const SubIcon = subItem.icon || PhoneCall;
+                          return (
+                            <Link
+                              key={subItem.href}
+                              href={subItem.href}
+                              onClick={() => {
+                                if (window.innerWidth < 1024) onClose();
+                              }}
+                              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                                isSubActive
+                                  ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                                  : 'text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#222226]'
+                              }`}
+                            >
+                              <SubIcon
+                                className={`w-3.5 h-3.5 shrink-0 ${
+                                  isSubActive ? 'text-white' : 'text-[#71717a]'
+                                }`}
+                              />
+                              <span className="truncate">{subItem.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               // Match root `/dashboard` exactly, or subroutes starting with href
               const isActive =
                 item.href === '/dashboard'
                   ? pathname === '/dashboard'
-                  : pathname.startsWith(item.href);
+                  : item.href
+                  ? pathname.startsWith(item.href)
+                  : false;
 
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={item.href || item.label}
+                  href={item.href || '#'}
                   onClick={() => {
                     if (window.innerWidth < 1024) onClose();
                   }}
                   title={!isOpen ? item.label : undefined}
-                  className={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  className={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
                     isActive
                       ? 'bg-[#27272a] text-white shadow-xs'
                       : 'text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#222226]'
