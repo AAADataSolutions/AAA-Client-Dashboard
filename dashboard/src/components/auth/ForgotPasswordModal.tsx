@@ -121,8 +121,8 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                 )}
 
                 <div className="space-y-1.5">
-                  <label htmlFor="reset-email" className="block text-xs font-medium text-[#8d97a8]">
-                    Email address
+                  <label htmlFor="reset-email" className="block text-[13px] font-semibold text-white">
+                    Email address <span className="text-blue-400">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -132,7 +132,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@company.com"
                       required
-                      className="w-full bg-[#151b24] border border-[#212833] focus:border-[#4c7cf3] focus:ring-2 focus:ring-[#4c7cf3]/20 rounded-lg px-3.5 py-2.5 text-sm text-[#e8ecf2] placeholder-[#5b6472] outline-none transition-all"
+                      className="w-full bg-[#131720] border border-[#232936] focus:border-[#1275e2] focus:ring-2 focus:ring-[#1275e2]/25 rounded-xl px-3.5 py-2.5 text-[14px] text-white placeholder-slate-500 outline-none transition-all"
                     />
                   </div>
                 </div>
@@ -141,19 +141,19 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="px-4 py-2 text-sm font-medium text-[#8d97a8] hover:text-[#e8ecf2] transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="h-10 px-5 rounded-lg bg-[#4c7cf3] hover:bg-[#6e96f8] text-white font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50"
+                    className="h-10 px-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Sending...
+                        <span>Sending...</span>
                       </>
                     ) : (
                       'Send reset link'
@@ -168,3 +168,4 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     </AnimatePresence>
   );
 };
+

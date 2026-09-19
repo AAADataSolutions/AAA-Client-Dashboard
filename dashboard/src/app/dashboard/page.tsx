@@ -42,7 +42,6 @@ const itemVariants: Variants = {
 export default function ClientDashboardOverviewPage() {
   const { profile, orgMembership, effectiveRole } = useAuth();
   const userName = profile?.full_name || profile?.email?.split('@')[0] || 'User';
-  const orgName = orgMembership?.organization?.name || 'My Organization';
   const isClientAdmin = effectiveRole === 'ADMIN';
 
   // Modals state
@@ -54,6 +53,8 @@ export default function ClientDashboardOverviewPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const orgName = data?.organization?.name || orgMembership?.organization?.name || 'My Organization';
 
   const fetchOverview = async () => {
     setLoading(true);
@@ -113,7 +114,7 @@ export default function ClientDashboardOverviewPage() {
             {/* <img className='h-36' src={"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTZ88OMSYrb9ggBc2cMAWnSr6tc9evVTD33M4-Nlx_3SR40-NoJ8-z5DBE&s=10"} /> */}
           </div>
           <h1 className="text-xl font-bold tracking-tight text-black dark:text-white">
-            Client Overview
+            {orgName}
           </h1>
         </div>
 

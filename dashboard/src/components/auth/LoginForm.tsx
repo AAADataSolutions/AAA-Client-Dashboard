@@ -67,18 +67,27 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   return (
     <div className="w-full">
-      <div className="space-y-2">
-        <h2 className="text-2xl sm:text-[1.7rem] font-semibold tracking-[-0.01em] text-[#e8ecf2]">
+      {/* 3D Glassmorphic Logo Component */}
+      <div className="flex justify-center mb-6">          
+        <img
+            src="/logo.png"
+            alt="AAA Data Solutions Logo"
+            className="w-70 h-40 rounded-[36px] object-contain relative z-10 drop-shadow-md"
+          />
+      </div>
+
+      <div className="space-y-1.5 text-center sm:text-left">
+        <h2 className="text-2xl sm:text-[1.7rem] font-bold tracking-[-0.01em] text-white">
           Welcome back
         </h2>
-        <p className="text-[14.5px] text-[#8d97a8]">
-          Sign in to continue to your AAA Data Solutions workspace.
+        <p className="text-[14px] text-slate-400">
+          Sign in to continue to your AAA Data Solutions portal.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+      <form onSubmit={handleSubmit} className="mt-7 space-y-4">
         {error && (
-          <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/25 flex items-start gap-2.5 text-[13px] text-red-400">
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 flex items-start gap-2.5 text-[13px] text-rose-400">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span className="leading-snug">{error}</span>
           </div>
@@ -86,8 +95,8 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
         {/* Email Field */}
         <div className="space-y-1.5">
-          <label htmlFor="login-email" className="block text-[13px] font-medium text-[#8d97a8]">
-            Email
+          <label htmlFor="login-email" className="block text-[13px] font-semibold text-white">
+            Email address <span className="text-blue-400">*</span>
           </label>
           <input
             id="login-email"
@@ -97,14 +106,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             placeholder="you@company.com"
             autoComplete="email"
             required
-            className="w-full bg-[#151b24] border border-[#212833] focus:border-[#4c7cf3] focus:ring-2 focus:ring-[#4c7cf3]/25 rounded-lg px-3.5 py-2.5 text-[14.5px] text-[#e8ecf2] placeholder-[#5b6472] outline-none transition-all"
+            className="w-full bg-[#131720] border border-[#232936] focus:border-[#1275e2] focus:ring-2 focus:ring-[#1275e2]/25 rounded-xl px-3.5 py-2.5 text-[14px] text-white placeholder-slate-500 outline-none transition-all"
           />
         </div>
 
         {/* Password Field */}
         <div className="space-y-1.5">
-          <label htmlFor="login-password" className="block text-[13px] font-medium text-[#8d97a8]">
-            Password
+          <label htmlFor="login-password" className="block text-[13px] font-semibold text-white">
+            Password <span className="text-blue-400">*</span>
           </label>
           <div className="relative">
             <input
@@ -115,12 +124,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               placeholder="••••••••"
               autoComplete="current-password"
               required
-              className="w-full bg-[#151b24] border border-[#212833] focus:border-[#4c7cf3] focus:ring-2 focus:ring-[#4c7cf3]/25 rounded-lg px-3.5 py-2.5 pr-11 text-[14.5px] text-[#e8ecf2] placeholder-[#5b6472] outline-none transition-all"
+              className="w-full bg-[#131720] border border-[#232936] focus:border-[#1275e2] focus:ring-2 focus:ring-[#1275e2]/25 rounded-xl px-3.5 py-2.5 pr-11 text-[14px] text-white placeholder-slate-500 outline-none transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center text-[#5b6472] hover:text-[#8d97a8] transition-colors"
+              className="absolute right-0 top-0 bottom-0 w-11 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -133,7 +142,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           <button
             type="button"
             onClick={onForgotPassword}
-            className="text-[13px] text-[#8d97a8] hover:text-[#6e96f8] transition-colors"
+            className="text-[13px] text-slate-400 hover:text-blue-400 transition-colors cursor-pointer"
           >
             Forgot password?
           </button>
@@ -143,7 +152,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 mt-1 rounded-lg bg-[#4c7cf3] hover:bg-[#6e96f8] active:scale-[0.99] text-white font-medium text-[14.5px] flex items-center justify-center gap-2 transition-all shadow-md shadow-[#4c7cf3]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full h-11 mt-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold text-[14.5px] flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/25 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
         >
           {loading ? (
             <>
@@ -157,12 +166,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       </form>
 
       {/* Switch to Signup */}
-      <p className="mt-8 text-center text-[13.5px] text-[#8d97a8]">
+      <p className="mt-7 text-center text-[13.5px] text-slate-400">
         Don&apos;t have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToSignup}
-          className="font-medium text-[#6e96f8] hover:underline"
+          className="font-semibold text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
         >
           Sign up
         </button>

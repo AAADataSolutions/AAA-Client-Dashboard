@@ -143,3 +143,14 @@ html.dark ::-webkit-scrollbar-thumb {
 html.dark ::-webkit-scrollbar-thumb:hover {
   background: #45495e;
 }
+
+/* Global Selection Highlight - Default Blue */
+::selection {
+  background-color: rgba(37, 99, 235, 0.35);
+  color: inherit;
+}
+
+::-moz-selection {
+  background-color: rgba(37, 99, 235, 0.35);
+  color: inherit;
+}

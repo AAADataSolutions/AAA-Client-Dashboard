@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`h-full dark ${arimo.variable}`}>
-      <body className={`${arimo.className} min-h-full flex flex-col bg-background text-foreground antialiased selection:bg-orange-500/20 selection:text-orange-400 font-sans`}>
+      <body className={`${arimo.className} min-h-full flex flex-col bg-background text-foreground antialiased selection:bg-blue-600/30 selection:text-white font-sans`}>
         <StoreProvider>
           <ThemeProvider>
             {children}

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET() {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
+
     const {
       data: { user },
       error: authErr,
@@ -14,13 +18,13 @@ export async function GET() {
     }
 
     // Resolve user profile & organization membership
-    const { data: profile } = await supabase
+    const { data: profile } = await db
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .maybeSingle();
 
-    const { data: member } = await supabase
+    const { data: member } = await db
       .from('organization_members')
       .select('*, organization:organizations(*)')
       .eq('profile_id', user.id)
@@ -59,7 +63,7 @@ export async function GET() {
     }
 
     // 1. Fetch Organization Properties
-    const { data: orgProps } = await supabase
+    const { data: orgProps } = await db
       .from('organization_properties')
       .select('id, property:properties(*)')
       .eq('organization_id', orgId);
@@ -71,18 +75,20 @@ export async function GET() {
     // 2. Fetch Services Count
     let servicesCount = 0;
     if (orgPropIds.length > 0) {
-      const { count } = await supabase
+      const { data: servs } = await db
         .from('organization_property_services')
-        .select('*', { count: 'exact', head: true })
+        .select('id, did_count')
         .in('organization_property_id', orgPropIds);
-      servicesCount = count || 0;
+
+      const totalDids = (servs || []).reduce((acc, s) => acc + (Number(s.did_count) || 1), 0);
+      servicesCount = totalDids > 0 ? totalDids : (servs || []).length;
     }
 
     // 3. Fetch Onboardings
     let activeOnboardingsCount = 0;
     let onboardingRecords: any[] = [];
     if (orgPropIds.length > 0) {
-      const { data: onbs } = await supabase
+      const { data: onbs } = await db
         .from('onboardings')
         .select('*, organization_property:organization_properties(property:properties(name))')
         .in('organization_property_id', orgPropIds)
@@ -98,7 +104,7 @@ export async function GET() {
     let activePortingCount = 0;
     let portingRecords: any[] = [];
     if (orgPropIds.length > 0) {
-      const { data: ports } = await supabase
+      const { data: ports } = await db
         .from('porting_requests')
         .select('*, organization_property:organization_properties(property:properties(name))')
         .in('organization_property_id', orgPropIds)
@@ -117,7 +123,7 @@ export async function GET() {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     if (orgPropIds.length > 0) {
-      const { data: tickets } = await supabase
+      const { data: tickets } = await db
         .from('tickets')
         .select('*, creator:profiles!tickets_created_by_fkey(full_name), org_property:organization_properties(property:properties(name))')
         .in('organization_property_id', orgPropIds)
@@ -133,7 +139,7 @@ export async function GET() {
     // 6. Fetch E911 Records for Attention Required
     let e911Issues: any[] = [];
     if (orgPropIds.length > 0) {
-      const { data: e911s } = await supabase
+      const { data: e911s } = await db
         .from('e911_records')
         .select('*, organization_property:organization_properties(property:properties(name))')
         .in('organization_property_id', orgPropIds)
@@ -243,7 +249,7 @@ export async function GET() {
     };
 
     // Fetch Recent Activity Audit Logs
-    const { data: activityLogs } = await supabase
+    const { data: activityLogs } = await db
       .from('audit_logs')
       .select('*')
       .eq('organization_id', orgId)

@@ -22,6 +22,7 @@ import {
   PhoneCall,
   ArrowRight,
   ArrowLeftRight,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -31,7 +32,16 @@ interface AdminSidebarProps {
   onClose: () => void;
 }
 
-const navItems = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  statusDot?: string;
+  badgeColor?: string;
+  superAdminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Organizations', href: '/admin/organizations', icon: Building2 },
   { label: 'Properties', href: '/admin/properties', icon: Hotel },
@@ -40,13 +50,16 @@ const navItems = [
   { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
   { label: 'E911 Compliance', href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white' },
+  { label: 'Finances', href: '/admin/finances', icon: DollarSign, superAdminOnly: true },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock },
   { label: 'System Settings', href: '/admin/settings', icon: Settings },
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, onClose }) => {
   const pathname = usePathname();
-  const { signOut } = useAuth();
+  const { signOut, effectiveRole, profile } = useAuth();
+  const isSuperAdmin = effectiveRole === 'SUPER_ADMIN' || profile?.role === 'SUPER_ADMIN';
+  const visibleNavItems = navItems.filter((item) => !item.superAdminOnly || isSuperAdmin);
 
   return (
     <>
@@ -96,7 +109,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
 
           {/* Nav List */}
           <nav className="p-2.5 space-y-1">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
 

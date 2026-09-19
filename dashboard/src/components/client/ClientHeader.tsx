@@ -13,6 +13,9 @@ import {
   User,
   ShieldCheck,
   LifeBuoy,
+  Copy,
+  Check,
+  Building2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -31,12 +34,21 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
 
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [copiedOrgId, setCopiedOrgId] = useState(false);
 
   const userName = profile?.full_name || profile?.email?.split('@')[0] || 'Member';
   const initial = userName.charAt(0).toUpperCase();
   const isClientAdmin = effectiveRole === 'ADMIN';
   const orgName = orgMembership?.organization?.name || 'My Organization';
+  const orgId = orgMembership?.organization_id || orgMembership?.organization?.id;
+
+  const handleCopyOrgId = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!orgId) return;
+    navigator.clipboard.writeText(orgId);
+    setCopiedOrgId(true);
+    setTimeout(() => setCopiedOrgId(false), 2000);
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,8 +90,40 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
         </form>
       </div>
 
-      {/* Right: Theme Switcher, Notifications & User Profile */}
+      {/* Right: Org ID Pill, Theme Switcher, Notifications & User Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Organization ID Display & 1-Click Copy */}
+        {orgId && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#161822] border border-slate-200 dark:border-[#232536] text-xs">
+            <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            <div className="flex items-center gap-1 text-[11.5px] font-mono">
+              <span className="hidden md:inline text-slate-500 dark:text-slate-400 font-sans">Org ID:</span>
+              <span className="text-slate-700 dark:text-slate-200 font-medium">
+                {orgId.length > 8 ? `${orgId.substring(0, 8)}...` : orgId}
+              </span>
+            </div>
+            <button
+              onClick={handleCopyOrgId}
+              className={`p-1 rounded transition-colors flex items-center gap-1 cursor-pointer ${
+                copiedOrgId
+                  ? 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#202330]'
+              }`}
+              title="Copy Organization ID to share with team"
+              aria-label="Copy Organization ID"
+            >
+              {copiedOrgId ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-[10px] font-sans font-medium text-emerald-500 hidden lg:inline">Copied!</span>
+                </>
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Theme Switcher Toggle (Sun / Moon) */}
         <button
           onClick={toggleTheme}
@@ -127,10 +171,23 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
           {showUserMenu && (
             <>
               <div onClick={() => setShowUserMenu(false)} className="fixed inset-0 z-40" />
-              <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 z-50 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75">
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 z-50 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-[#222430]">
                   <p className="font-semibold text-slate-900 dark:text-white truncate">{userName}</p>
                   <p className="text-[10.5px] text-slate-400 truncate">{orgName}</p>
+                  {orgId && (
+                    <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-[#222430]/60 flex items-center justify-between gap-1 text-[10px]">
+                      <span className="text-slate-500 dark:text-slate-400 font-mono truncate max-w-[140px]">ID: {orgId}</span>
+                      <button
+                        onClick={handleCopyOrgId}
+                        className="text-blue-500 hover:text-blue-400 flex items-center gap-0.5 cursor-pointer font-medium"
+                        title="Copy Org ID"
+                      >
+                        {copiedOrgId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedOrgId ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <Link
@@ -148,7 +205,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                     setShowUserMenu(false);
                     signOut();
                   }}
-                  className="w-full px-3 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2"
+                  className="w-full px-3 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2 cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5 text-rose-500" /> Sign Out
                 </button>

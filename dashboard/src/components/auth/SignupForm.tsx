@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, Building2, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
@@ -16,6 +16,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
   const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'USER'>('ADMIN');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,11 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       return;
     }
 
+    if (selectedRole === 'USER' && !organizationId.trim()) {
+      setError('Please enter the Organization ID to join.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -46,6 +52,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             full_name: fullName.trim(),
             initial_org_role: selectedRole,
             role: 'CLIENT_USER',
+            target_org_id: selectedRole === 'USER' ? organizationId.trim() : null,
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -57,9 +64,26 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         return;
       }
 
-      // After user signup, route directly to onboarding to set up organization
+      // If user session is immediate (or email auto-confirmed)
       if (data?.session) {
-        router.push('/onboarding');
+        if (selectedRole === 'USER' && organizationId.trim()) {
+          try {
+            const joinRes = await fetch('/api/organizations/join', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ organization_id: organizationId.trim() }),
+            });
+            const joinJson = await joinRes.json();
+            if (!joinRes.ok || !joinJson.success) {
+              console.warn('Join organization warning:', joinJson.error);
+            }
+          } catch (e) {
+            console.warn('Could not auto-join organization:', e);
+          }
+          router.push('/dashboard');
+        } else {
+          router.push('/onboarding');
+        }
         router.refresh();
       } else if (data?.user) {
         setNeedsEmailConfirmation(true);
@@ -74,19 +98,19 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
   if (needsEmailConfirmation) {
     return (
       <div className="w-full space-y-6 text-center py-4">
-        <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 mx-auto flex items-center justify-center border border-emerald-500/25">
+        <div className="w-14 h-14 rounded-full bg-emerald-500/15 text-emerald-400 mx-auto flex items-center justify-center border border-emerald-500/30">
           <CheckCircle2 className="w-7 h-7" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-[#181c22]">Check your email</h3>
-          <p className="text-[14px] text-[#64748b] max-w-sm mx-auto leading-relaxed">
-            We sent a verification link to <strong className="text-[#181c22]">{email}</strong>. Please confirm your email to activate your account and proceed to Organization setup.
+          <h3 className="text-xl font-bold text-white">Check your email</h3>
+          <p className="text-[14px] text-slate-400 max-w-sm mx-auto leading-relaxed">
+            We sent a verification link to <strong className="text-white font-semibold">{email}</strong>. Please confirm your email to activate your account and access your workspace.
           </p>
         </div>
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="h-10 px-6 rounded-lg bg-[#1275e2] hover:bg-[#005cb8] text-white font-medium text-sm transition-colors shadow-2xs"
+          className="h-10 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm transition-all shadow-md cursor-pointer"
         >
           Proceed to Sign in
         </button>
@@ -96,44 +120,89 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
 
   return (
     <div className="w-full">
-      <div className="space-y-1.5">
-        <h2 className="text-2xl font-bold tracking-tight text-[#181c22]">
+      {/* 3D Glassmorphic Logo Component */}
+      <div className="flex justify-center mb-6">
+        <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-white/15 via-white/5 to-white/0 border border-white/20 p-3 shadow-2xl shadow-blue-500/20 backdrop-blur-md flex items-center justify-center group transform transition duration-300 hover:scale-105">
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-[#1275e2]/30 to-indigo-500/0 opacity-60 pointer-events-none" />
+          <img
+            src="/logo.png"
+            alt="AAA Data Solutions Logo"
+            className="w-full h-full object-contain relative z-10 drop-shadow-md"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5 text-center sm:text-left">
+        <h2 className="text-2xl font-bold tracking-tight text-white">
           Create your account
         </h2>
-        <p className="text-[14px] text-[#64748b]">
+        <p className="text-[14px] text-slate-400">
           Get started with AAA Data Solutions.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         {error && (
-          <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-[13px] text-rose-700">
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 flex items-start gap-2.5 text-[13px] text-rose-400">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <span className="leading-snug">{error}</span>
           </div>
         )}
 
+        {/* Role Selector Tabs */}
+        <div className="space-y-1.5">
+          <label className="block text-[13px] font-semibold text-white">
+            I want to <span className="text-blue-400">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-2 bg-[#131720] p-1.5 rounded-xl border border-[#232936]">
+            <button
+              type="button"
+              onClick={() => setSelectedRole('ADMIN')}
+              className={`py-2 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                selectedRole === 'ADMIN'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Create Organization</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedRole('USER')}
+              className={`py-2 px-3 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                selectedRole === 'USER'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Join Organization</span>
+            </button>
+          </div>
+        </div>
+
         {/* Full Name Field */}
         <div className="space-y-1.5">
-          <label htmlFor="signup-name" className="block text-[12.5px] font-semibold text-[#181c22]">
-            Full name
+          <label htmlFor="signup-name" className="block text-[13px] font-semibold text-white">
+            Full name <span className="text-blue-400">*</span>
           </label>
           <input
             id="signup-name"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            placeholder="Jordan Blake"
+            placeholder="e.g. Jordan Blake"
             autoComplete="name"
             required
-            className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white focus:ring-2 focus:ring-[#1275e2]/15 rounded-lg px-3.5 py-2.5 text-[13.5px] text-[#181c22] placeholder-[#94a3b8] outline-none transition-all"
+            className="w-full bg-[#131720] border border-[#232936] focus:border-[#1275e2] focus:ring-2 focus:ring-[#1275e2]/25 rounded-xl px-3.5 py-2.5 text-[14px] text-white placeholder-slate-500 outline-none transition-all"
           />
         </div>
 
         {/* Email Field */}
         <div className="space-y-1.5">
-          <label htmlFor="signup-email" className="block text-[12.5px] font-semibold text-[#181c22]">
-            Email
+          <label htmlFor="signup-email" className="block text-[13px] font-semibold text-white">
+            Email address <span className="text-blue-400">*</span>
           </label>
           <input
             id="signup-email"
@@ -143,14 +212,14 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             placeholder="you@company.com"
             autoComplete="email"
             required
-            className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white focus:ring-2 focus:ring-[#1275e2]/15 rounded-lg px-3.5 py-2.5 text-[13.5px] text-[#181c22] placeholder-[#94a3b8] outline-none transition-all"
+            className="w-full bg-[#131720] border border-[#232936] focus:border-[#1275e2] focus:ring-2 focus:ring-[#1275e2]/25 rounded-xl px-3.5 py-2.5 text-[14px] text-white placeholder-slate-500 outline-none transition-all"
           />
         </div>
 
         {/* Password Field */}
         <div className="space-y-1.5">
-          <label htmlFor="signup-password" className="block text-[12.5px] font-semibold text-[#181c22]">
-            Password
+          <label htmlFor="signup-password" className="block text-[13px] font-semibold text-white">
+            Password <span className="text-blue-400">*</span>
           </label>
           <div className="relative">
             <input
@@ -161,12 +230,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               placeholder="At least 8 characters"
               autoComplete="new-password"
               required
-              className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white focus:ring-2 focus:ring-[#1275e2]/15 rounded-lg px-3.5 py-2.5 pr-11 text-[13.5px] text-[#181c22] placeholder-[#94a3b8] outline-none transition-all"
+              className="w-full bg-[#131720] border border-[#232936] focus:border-[#1275e2] focus:ring-2 focus:ring-[#1275e2]/25 rounded-xl px-3.5 py-2.5 pr-11 text-[14px] text-white placeholder-slate-500 outline-none transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-0 top-0 bottom-0 w-10 flex items-center justify-center text-[#94a3b8] hover:text-[#181c22] transition-colors"
+              className="absolute right-0 top-0 bottom-0 w-11 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -174,64 +243,51 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           </div>
         </div>
 
-        {/* Role Selector */}
-        <div className="space-y-1.5 pt-1">
-          <label className="block text-[12.5px] font-semibold text-[#181c22]">
-            Role
-          </label>
-          <div className="grid grid-cols-2 gap-2 bg-[#f1f3fc] p-1 rounded-lg border border-[#e2e8f0]">
-            <button
-              type="button"
-              onClick={() => setSelectedRole('ADMIN')}
-              className={`py-2 text-xs font-semibold rounded-md transition-all ${
-                selectedRole === 'ADMIN'
-                  ? 'bg-white text-[#1275e2] shadow-xs'
-                  : 'text-[#64748b] hover:text-[#181c22]'
-              }`}
-            >
-              Admin (Create Organization)
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedRole('USER')}
-              className={`py-2 text-xs font-semibold rounded-md transition-all ${
-                selectedRole === 'USER'
-                  ? 'bg-white text-[#1275e2] shadow-xs'
-                  : 'text-[#64748b] hover:text-[#181c22]'
-              }`}
-            >
-              User (Join Organization)
-            </button>
+        {/* Join Organization: Organization ID Field */}
+        {selectedRole === 'USER' && (
+          <div className="space-y-1.5 p-3.5 rounded-xl bg-blue-950/20 border border-blue-800/40 animate-in fade-in duration-200">
+            <label htmlFor="signup-org-id" className="block text-[13px] font-semibold text-white">
+              Organization ID <span className="text-blue-400">*</span>
+            </label>
+            <input
+              id="signup-org-id"
+              type="text"
+              value={organizationId}
+              onChange={(e) => setOrganizationId(e.target.value)}
+              placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+              required
+              className="w-full bg-[#131720] border border-blue-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/25 rounded-xl px-3.5 py-2.5 text-[13px] text-white font-mono placeholder-slate-500 outline-none transition-all"
+            />
+            <p className="text-[11px] text-slate-400 leading-snug mt-1">
+              Ask your team administrator for their Organization ID from their dashboard top navbar.
+            </p>
           </div>
-          <p className="text-[11px] text-[#64748b]">
-            Admins will proceed directly to create and register their company profile.
-          </p>
-        </div>
+        )}
 
         {/* Submit Button */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 mt-2 rounded-lg bg-[#1275e2] hover:bg-[#005cb8] active:scale-[0.99] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full h-11 mt-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/25 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
         >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Creating account...</span>
+              <span>{selectedRole === 'USER' ? 'Joining Organization...' : 'Creating account...'}</span>
             </>
           ) : (
-            'Continue to Organization Setup'
+            selectedRole === 'USER' ? 'Join Organization & Continue' : 'Continue to Organization Setup'
           )}
         </button>
       </form>
 
       {/* Switch to Login */}
-      <p className="mt-6 text-center text-[13px] text-[#64748b]">
+      <p className="mt-6 text-center text-[13px] text-slate-400">
         Already have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="font-semibold text-[#1275e2] hover:underline"
+          className="font-semibold text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
         >
           Sign in
         </button>
