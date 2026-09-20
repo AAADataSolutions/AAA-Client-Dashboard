@@ -133,7 +133,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const inviteUrl = `${new URL(request.url).origin}/invite/${rawToken}`;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    const inviteUrl = `${baseUrl}/invite/${rawToken}`;
 
     // Look up organization name if this is a client member invite
     let orgName: string | undefined;

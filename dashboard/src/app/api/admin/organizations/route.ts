@@ -300,7 +300,8 @@ export async function POST(request: NextRequest) {
       if (!inviteErr && invite) {
         const host = request.headers.get('host') || 'localhost:3000';
         const protocol = request.headers.get('x-forwarded-proto') || 'http';
-        const inviteUrl = `${protocol}://${host}/invite/${rawToken}`;
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+        const inviteUrl = `${baseUrl}/invite/${rawToken}`;
 
         inviteInfo = {
           id: invite.id,
