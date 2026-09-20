@@ -105,6 +105,7 @@ export default function ClientTicketsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -130,6 +131,7 @@ export default function ClientTicketsPage() {
         q: searchQuery.trim(),
         status: statusFilter,
         priority: priorityFilter,
+        sortBy: sortBy,
       });
 
       const res = await fetch(`/api/client/tickets?${params.toString()}`);
@@ -149,7 +151,7 @@ export default function ClientTicketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, statusFilter, priorityFilter]);
+  }, [searchQuery, statusFilter, priorityFilter, sortBy]);
 
   useEffect(() => {
     fetchTickets();
@@ -199,7 +201,7 @@ export default function ClientTicketsPage() {
     }
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || priorityFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || sortBy !== 'NEWEST';
 
   // Pagination calc
   const totalPages = Math.ceil(tickets.length / ITEMS_PER_PAGE);
@@ -444,7 +446,7 @@ export default function ClientTicketsPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-xs text-slate-500">
               <Filter className="w-3.5 h-3.5" />
               <select
@@ -460,6 +462,32 @@ export default function ClientTicketsPage() {
                 <option value="LOW">Low</option>
               </select>
             </div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort support tickets"
+              className="text-xs px-3 py-2 rounded-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="NEWEST">Sort: Recently Added</option>
+              <option value="PRIORITY">Sort: Priority</option>
+              <option value="SUBJ_ASC">Sort: Subject (A-Z)</option>
+              <option value="PROP_ASC">Sort: Property (A-Z)</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('ALL');
+                  setPriorityFilter('ALL');
+                  setSortBy('NEWEST');
+                }}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium whitespace-nowrap"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         </div>
       </motion.div>

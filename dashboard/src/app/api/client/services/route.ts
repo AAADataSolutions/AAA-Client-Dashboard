@@ -172,6 +172,21 @@ export async function GET(request: NextRequest) {
       filtered = filtered.filter((s) => s.property_id === propertyFilter);
     }
 
+    // Sorting
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
+    if (sortBy === 'NUMBER_ASC') {
+      filtered.sort((a, b) => a.phone_number.localeCompare(b.phone_number));
+    } else if (sortBy === 'NUMBER_DESC') {
+      filtered.sort((a, b) => b.phone_number.localeCompare(a.phone_number));
+    } else if (sortBy === 'TYPE_ASC') {
+      filtered.sort((a, b) => a.service_type.localeCompare(b.service_type));
+    } else if (sortBy === 'PROP_ASC') {
+      filtered.sort((a, b) => a.property_name.localeCompare(b.property_name));
+    } else {
+      // NEWEST
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
     // Pagination
     const total = filtered.length;
     const startIndex = (page - 1) * limit;

@@ -146,6 +146,26 @@ export async function GET(request: NextRequest) {
       filtered = filtered.filter((t) => t.property_id === propertyFilter);
     }
 
+    // Sorting
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
+    const priorityWeights: Record<string, number> = {
+      URGENT: 4,
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    };
+
+    if (sortBy === 'PRIORITY') {
+      filtered.sort((a, b) => (priorityWeights[b.priority] || 0) - (priorityWeights[a.priority] || 0));
+    } else if (sortBy === 'SUBJ_ASC') {
+      filtered.sort((a, b) => a.subject.localeCompare(b.subject));
+    } else if (sortBy === 'PROP_ASC') {
+      filtered.sort((a, b) => a.property_name.localeCompare(b.property_name));
+    } else {
+      // NEWEST
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
     return NextResponse.json({
       success: true,
       data: filtered,

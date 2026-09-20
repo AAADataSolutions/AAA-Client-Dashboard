@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { logAdminAction } from '@/lib/audit/logger';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
@@ -122,6 +123,22 @@ export async function POST(request: Request) {
     }
 
     const inviteUrl = `${new URL(request.url).origin}/invite/${rawToken}`;
+
+    await logAdminAction({
+      action: invite_type === 'INTERNAL_TEAM' ? 'ADMIN_INVITATION_SENT' : 'INVITATION_SENT',
+      entity_type: 'INVITATION',
+      entity_id: invite.id,
+      entity_name: email.trim().toLowerCase(),
+      organization_id: organization_id || null,
+      description: `Generated ${invite_type === 'INTERNAL_TEAM' ? 'Sub-super Admin' : 'Client Member'} invitation for '${email.trim()}'`,
+      changes: {
+        invite_type,
+        target_app_role,
+        target_org_role,
+        organization_id,
+        email: email.trim().toLowerCase(),
+      },
+    });
 
     return NextResponse.json({
       success: true,

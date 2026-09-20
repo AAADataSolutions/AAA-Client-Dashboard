@@ -118,10 +118,14 @@ export const fetchOnboardings = createAsyncThunk(
   'onboarding/fetchOnboardings',
   async (params: any = {}) => {
     const q = new URLSearchParams();
-    if (params.search) q.set('search', params.search);
-    if (params.stage && params.stage !== 'ALL') q.set('stage', params.stage);
+    const searchVal = params.searchQuery || params.search;
+    if (searchVal) q.set('search', searchVal);
+    const stageVal = params.stage || params.selectedStage;
+    if (stageVal && stageVal !== 'ALL') q.set('stage', stageVal);
     if (params.page) q.set('page', String(params.page));
-    if (params.page_size) q.set('page_size', String(params.page_size));
+    const limitVal = params.limit || params.page_size;
+    if (limitVal) q.set('limit', String(limitVal));
+    if (params.sortBy) q.set('sortBy', params.sortBy);
 
     const res = await fetch(`/api/admin/onboarding?${q.toString()}`);
     const json = await res.json();

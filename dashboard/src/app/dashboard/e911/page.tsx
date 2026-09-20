@@ -84,6 +84,7 @@ export default function ClientE911Page() {
   // Filters & Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -100,6 +101,7 @@ export default function ClientE911Page() {
       const params = new URLSearchParams({
         q: searchQuery.trim(),
         status: statusFilter,
+        sortBy: sortBy,
       });
 
       const res = await fetch(`/api/client/e911?${params.toString()}`);
@@ -118,7 +120,7 @@ export default function ClientE911Page() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, sortBy]);
 
   useEffect(() => {
     fetchE911Records();
@@ -132,7 +134,7 @@ export default function ClientE911Page() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalRecords = records.length;
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
   const paginatedRecords = records.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -305,6 +307,22 @@ export default function ClientE911Page() {
             <option value="PENDING">Pending</option>
             <option value="ACTION_REQUIRED">Action Required</option>
           </select>
+
+          {/* Sort By Filter */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Sort E911 records"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="NEWEST">Sort: Recently Added</option>
+            <option value="PROP_ASC">Sort: Property (A-Z)</option>
+            <option value="PROP_DESC">Sort: Property (Z-A)</option>
+            <option value="STATUS">Sort: Status</option>
+          </select>
         </div>
 
         {hasActiveFilters && (
@@ -312,9 +330,10 @@ export default function ClientE911Page() {
             onClick={() => {
               setSearchQuery('');
               setStatusFilter('ALL');
+              setSortBy('NEWEST');
               setCurrentPage(1);
             }}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium whitespace-nowrap"
           >
             Reset Filters
           </button>

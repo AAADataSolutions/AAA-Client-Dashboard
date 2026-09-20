@@ -141,12 +141,16 @@ export const fetchTickets = createAsyncThunk(
   'tickets/fetchTickets',
   async (params: any = {}) => {
     const q = new URLSearchParams();
-    if (params.search) q.set('search', params.search);
+    const searchVal = params.searchQuery || params.search;
+    if (searchVal) q.set('search', searchVal);
     if (params.status && params.status !== 'ALL') q.set('status', params.status);
     if (params.priority && params.priority !== 'ALL') q.set('priority', params.priority);
-    if (params.org_id && params.org_id !== 'ALL') q.set('org_id', params.org_id);
+    const orgVal = params.orgId || params.org_id;
+    if (orgVal && orgVal !== 'ALL') q.set('org_id', orgVal);
     if (params.page) q.set('page', String(params.page));
-    if (params.page_size) q.set('page_size', String(params.page_size));
+    const limitVal = params.limit || params.page_size;
+    if (limitVal) q.set('limit', String(limitVal));
+    if (params.sortBy) q.set('sortBy', params.sortBy);
 
     const res = await fetch(`/api/admin/tickets?${q.toString()}`);
     const json = await res.json();

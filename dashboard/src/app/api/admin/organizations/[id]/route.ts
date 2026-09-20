@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function GET(
   request: NextRequest,
@@ -400,6 +401,19 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
+    // Log Audit Event
+    await logAdminAction({
+      action: body.status !== undefined ? 'ORGANIZATION_STATUS_CHANGED' : 'ORGANIZATION_UPDATED',
+      entity_type: 'ORGANIZATION',
+      entity_id: id,
+      entity_name: updatedOrg.name,
+      organization_id: id,
+      description: body.status !== undefined
+        ? `Changed organization '${updatedOrg.name}' status to ${body.status}`
+        : `Updated organization details for '${updatedOrg.name}'`,
+      changes: updatePayload,
+    });
+
     return NextResponse.json({ success: true, data: updatedOrg, message: 'Organization updated successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
@@ -415,6 +429,13 @@ export async function DELETE(
     const supabase = await createClient();
     const dbClient = createAdminClient() || supabase;
 
+    // Fetch org name for audit
+    const { data: orgData } = await dbClient
+      .from('organizations')
+      .select('name')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await dbClient
       .from('organizations')
       .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
@@ -423,6 +444,17 @@ export async function DELETE(
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    // Log Audit Event
+    await logAdminAction({
+      action: 'ORGANIZATION_ARCHIVED',
+      entity_type: 'ORGANIZATION',
+      entity_id: id,
+      entity_name: orgData?.name || `Organization ${id}`,
+      organization_id: id,
+      description: `Archived organization '${orgData?.name || id}'`,
+      changes: { status: 'ARCHIVED' },
+    });
 
     return NextResponse.json({ success: true, message: 'Organization archived successfully' });
   } catch (err: any) {

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { logAdminAction } from '@/lib/audit/logger';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -67,6 +68,15 @@ export async function POST(request: Request) {
         })
         .eq('id', invitationId);
 
+      await logAdminAction({
+        action: 'ADMIN_INVITATION_APPROVED',
+        entity_type: 'INVITATION',
+        entity_id: invitationId,
+        entity_name: invite.email,
+        description: `Approved internal Sub-super Admin access for '${invite.email}'`,
+        changes: { invitationId, email: invite.email, new_role: 'SUB_SUPER_ADMIN' },
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Internal team member approved and activated successfully.',
@@ -77,6 +87,15 @@ export async function POST(request: Request) {
         .update({ status: 'REJECTED' })
         .eq('id', invitationId);
 
+      await logAdminAction({
+        action: 'ADMIN_INVITATION_REJECTED',
+        entity_type: 'INVITATION',
+        entity_id: invitationId,
+        entity_name: invite.email,
+        description: `Rejected internal team invitation for '${invite.email}'`,
+        changes: { invitationId, email: invite.email },
+      });
+
       return NextResponse.json({
         success: true,
         message: 'Invitation rejected.',
@@ -86,6 +105,15 @@ export async function POST(request: Request) {
         .from('invitations')
         .update({ status: 'REVOKED' })
         .eq('id', invitationId);
+
+      await logAdminAction({
+        action: 'ADMIN_INVITATION_REVOKED',
+        entity_type: 'INVITATION',
+        entity_id: invitationId,
+        entity_name: invite.email,
+        description: `Revoked invitation for '${invite.email}'`,
+        changes: { invitationId, email: invite.email },
+      });
 
       return NextResponse.json({
         success: true,

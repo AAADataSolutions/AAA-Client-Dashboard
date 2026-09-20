@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -204,6 +205,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
+    // Audit Log
+    await logAdminAction({
+      action: 'E911_RECORD_CREATED',
+      entity_type: 'E911',
+      entity_id: newRecord.id,
+      entity_name: emergency_address,
+      description: `Registered new E911 emergency dispatch address '${emergency_address}' with status ${status || 'PENDING'}`,
+      changes: {
+        e911_id: newRecord.id,
+        emergency_address,
+        status: newRecord.status,
+        psap_id,
+      },
+    });
+
     return NextResponse.json({ success: true, data: newRecord });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
@@ -263,6 +279,24 @@ export async function PUT(request: NextRequest) {
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    // Audit Log
+    const actionType = status === 'VERIFIED'
+      ? 'E911_VERIFIED'
+      : (append_correction_note ? 'E911_CORRECTION_NOTE_ADDED' : 'E911_RECORD_UPDATED');
+
+    await logAdminAction({
+      action: actionType,
+      entity_type: 'E911',
+      entity_id: id,
+      entity_name: updated.emergency_address,
+      description: status === 'VERIFIED'
+        ? `Verified and approved E911 compliance for '${updated.emergency_address}'`
+        : (append_correction_note
+            ? `Appended compliance audit note to E911 record '${updated.emergency_address}'`
+            : `Updated E911 record for '${updated.emergency_address}'`),
+      changes: updates,
+    });
 
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {

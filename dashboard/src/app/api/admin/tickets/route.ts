@@ -5,12 +5,20 @@ import { logAuditEvent } from '@/lib/audit/logger';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.max(1, parseInt(searchParams.get('limit') || '10', 10));
+    const search = searchParams.get('search')?.trim().toLowerCase() || '';
+    const status = searchParams.get('status') || 'ALL';
+    const priority = searchParams.get('priority') || 'ALL';
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
 
     const { data: tickets, error } = await supabase
       .from('tickets')
       .select(`
         *,
-        creator:profiles!tickets_created_by_fkey(id, full_name, email),
+        creator:profiles!tickets_created_by_fkey(id, full_name, email, phone_number),
         assignee:profiles!tickets_assigned_to_fkey(id, full_name, email),
         org_property:organization_properties(
           id,
@@ -37,10 +45,153 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: sErr.message }, { status: 400 });
       }
 
-      return NextResponse.json({ success: true, data: simpleTickets || [] });
+      const formattedSimple = (simpleTickets || []).map((t: any) => ({
+        id: t.id,
+        ticket_number: `TCK-${t.id.slice(0, 6).toUpperCase()}`,
+        subject: t.subject,
+        description: t.description,
+        category: t.category || 'Properties',
+        organization_name: 'Unassigned',
+        organization_id: null,
+        property_name: 'Unassigned',
+        property_id: null,
+        organization_property_id: t.organization_property_id,
+        created_by_name: 'System User',
+        created_by_phone: '',
+        assigned_to_name: 'Engineering Support',
+        assigned_to: t.assigned_to,
+        priority: t.priority || 'MEDIUM',
+        status: t.status || 'OPEN',
+        comments_count: 0,
+        created_at: t.created_at,
+        updated_at: t.updated_at || t.created_at,
+      }));
+
+      return NextResponse.json({
+        success: true,
+        data: formattedSimple.slice((page - 1) * limit, page * limit),
+        pagination: {
+          totalCount: formattedSimple.length,
+          totalPages: Math.ceil(formattedSimple.length / limit) || 1,
+          currentPage: page,
+          limit,
+        },
+        metrics: {
+          totalOpen: formattedSimple.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length,
+          totalUrgent: formattedSimple.filter((t) => t.priority === 'URGENT').length,
+          totalWaiting: formattedSimple.filter((t) => t.status === 'WAITING_ON_CLIENT').length,
+          totalResolved: formattedSimple.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
+          openCount: formattedSimple.filter((t) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length,
+          urgentCount: formattedSimple.filter((t) => t.priority === 'URGENT').length,
+          waitingCount: formattedSimple.filter((t) => t.status === 'WAITING_ON_CLIENT').length,
+          resolvedCount: formattedSimple.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
+        },
+      });
     }
 
-    return NextResponse.json({ success: true, data: tickets || [] });
+    const allFormatted = (tickets || []).map((t: any) => {
+      const orgProp = t.org_property;
+      const prop = orgProp?.property;
+      const org = orgProp?.organization;
+      const creator = t.creator;
+      const assignee = t.assignee;
+      const comments = t.comments || [];
+
+      return {
+        id: t.id,
+        ticket_number: `TCK-${t.id.slice(0, 6).toUpperCase()}`,
+        subject: t.subject,
+        description: t.description,
+        category: t.category || 'Properties',
+        organization_name: org?.name || 'Unassigned',
+        organization_id: org?.id || null,
+        property_name: prop?.name || 'Unassigned',
+        property_id: prop?.id || null,
+        organization_property_id: t.organization_property_id,
+        created_by_name: creator?.full_name || creator?.email || 'System User',
+        created_by_phone: creator?.phone_number || '',
+        assigned_to_name: assignee?.full_name || assignee?.email || 'Unassigned Support',
+        assigned_to: t.assigned_to,
+        priority: t.priority || 'MEDIUM',
+        status: t.status || 'OPEN',
+        comments_count: comments.length,
+        created_at: t.created_at,
+        updated_at: t.updated_at || t.created_at,
+      };
+    });
+
+    // KPI Metrics calculation
+    const totalOpen = allFormatted.filter((t: any) => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
+    const totalUrgent = allFormatted.filter((t: any) => t.priority === 'URGENT').length;
+    const totalWaiting = allFormatted.filter((t: any) => t.status === 'WAITING_ON_CLIENT').length;
+    const totalResolved = allFormatted.filter((t: any) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
+
+    let filtered = allFormatted;
+
+    if (search) {
+      filtered = filtered.filter(
+        (t: any) =>
+          t.subject.toLowerCase().includes(search) ||
+          t.description?.toLowerCase().includes(search) ||
+          t.ticket_number.toLowerCase().includes(search) ||
+          t.property_name.toLowerCase().includes(search) ||
+          t.organization_name.toLowerCase().includes(search) ||
+          t.created_by_name.toLowerCase().includes(search)
+      );
+    }
+
+    if (status !== 'ALL') {
+      filtered = filtered.filter((t: any) => t.status === status);
+    }
+
+    if (priority !== 'ALL') {
+      filtered = filtered.filter((t: any) => t.priority === priority);
+    }
+
+    // Sorting
+    const priorityWeights: Record<string, number> = {
+      URGENT: 4,
+      HIGH: 3,
+      MEDIUM: 2,
+      LOW: 1,
+    };
+
+    filtered.sort((a: any, b: any) => {
+      switch (sortBy) {
+        case 'PRIORITY':
+          return (priorityWeights[b.priority] || 0) - (priorityWeights[a.priority] || 0);
+        case 'SUBJ_ASC':
+          return a.subject.localeCompare(b.subject);
+        case 'NEWEST':
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+
+    const totalFiltered = filtered.length;
+    const totalPages = Math.ceil(totalFiltered / limit) || 1;
+    const paginated = filtered.slice((page - 1) * limit, page * limit);
+
+    return NextResponse.json({
+      success: true,
+      data: paginated,
+      pagination: {
+        totalCount: totalFiltered,
+        totalPages,
+        currentPage: page,
+        limit,
+      },
+      metrics: {
+        totalOpen,
+        totalUrgent,
+        totalWaiting,
+        totalResolved,
+        openCount: totalOpen,
+        urgentCount: totalUrgent,
+        waitingCount: totalWaiting,
+        resolvedCount: totalResolved,
+      },
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

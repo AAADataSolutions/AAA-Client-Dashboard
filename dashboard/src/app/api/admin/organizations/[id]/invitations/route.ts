@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logAdminAction } from '@/lib/audit/logger';
 import crypto from 'crypto';
 
 export async function GET(
@@ -134,6 +135,22 @@ export async function POST(
     const host = request.headers.get('host') || 'localhost:3000';
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     const inviteUrl = `${protocol}://${host}/invite/${rawToken}`;
+
+    // Audit Log
+    await logAdminAction({
+      action: 'INVITATION_SENT',
+      entity_type: 'INVITATION',
+      entity_id: invite.id,
+      entity_name: inviteEmail,
+      organization_id: orgId,
+      description: `Sent ${role} invitation to '${inviteEmail}' for organization '${org.name}'`,
+      changes: {
+        invitation_id: invite.id,
+        email: inviteEmail,
+        role: role,
+        organization_name: org.name,
+      },
+    });
 
     return NextResponse.json({
       success: true,

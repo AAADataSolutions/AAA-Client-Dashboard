@@ -31,7 +31,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useToast } from '@/components/client/ClientToast';
 import { StartOnboardingModal } from '@/components/client/StartOnboardingModal';
 import { EditGMModal } from '@/components/client/EditGMModal';
-import { OnboardingTimelineModal, getStageBadge } from '@/components/client/OnboardingTimelineModal';
+import { OnboardingTimelineModal, getStageBadge, STAGES_ROAD } from '@/components/client/OnboardingTimelineModal';
 import { motion, type Variants } from 'framer-motion';
 
 const containerVariants: Variants = {
@@ -105,6 +105,7 @@ export default function ClientOnboardingPage() {
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -133,6 +134,7 @@ export default function ClientOnboardingPage() {
       const params = new URLSearchParams({
         q: searchQuery.trim(),
         status: statusFilter,
+        sortBy: sortBy,
       });
 
       const res = await fetch(`/api/client/onboarding?${params.toString()}`);
@@ -151,7 +153,7 @@ export default function ClientOnboardingPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, sortBy]);
 
   useEffect(() => {
     fetchOnboardings();
@@ -190,7 +192,7 @@ export default function ClientOnboardingPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalRecords = onboardings.length;
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
   const paginatedRecords = onboardings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -348,20 +350,45 @@ export default function ClientOnboardingPage() {
             )}
           </div>
 
-          {/* Status Filter */}
+          {/* Stage Filter */}
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            aria-label="Filter onboarding by status"
+            aria-label="Filter onboarding by stage"
             className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
           >
             <option value="ALL">All Stages</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="WAITING_ON_CLIENT">Waiting Sign-off</option>
-            <option value="COMPLETED">Completed</option>
+            <optgroup label="Stage Groups">
+              <option value="IN_PROGRESS">In Progress (Active)</option>
+              <option value="WAITING_ON_CLIENT">Waiting Sign-off</option>
+            </optgroup>
+            <optgroup label="All 8 Pipeline Stages">
+              {STAGES_ROAD.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.step}. {s.label}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+
+          {/* Sort By Filter */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Sort onboarding pipelines"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="NEWEST">Sort: Recently Added</option>
+            <option value="PROP_ASC">Sort: Property (A-Z)</option>
+            <option value="PROP_DESC">Sort: Property (Z-A)</option>
+            <option value="STAGE_DESC">Sort: Stage Progress</option>
+            <option value="TARGET_DATE">Sort: Target Date</option>
           </select>
         </div>
 
@@ -370,9 +397,10 @@ export default function ClientOnboardingPage() {
             onClick={() => {
               setSearchQuery('');
               setStatusFilter('ALL');
+              setSortBy('NEWEST');
               setCurrentPage(1);
             }}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium whitespace-nowrap"
           >
             Reset Filters
           </button>

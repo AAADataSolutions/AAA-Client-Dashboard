@@ -87,6 +87,7 @@ export default function ClientServicesPage() {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [propertyFilter, setPropertyFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const pageSize = 10;
@@ -108,6 +109,7 @@ export default function ClientServicesPage() {
         type: typeFilter,
         status: statusFilter,
         property_id: propertyFilter,
+        sortBy: sortBy,
       });
 
       const res = await fetch(`/api/client/services?${params.toString()}`);
@@ -131,7 +133,7 @@ export default function ClientServicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, typeFilter, statusFilter, propertyFilter]);
+  }, [currentPage, searchQuery, typeFilter, statusFilter, propertyFilter, sortBy]);
 
   useEffect(() => {
     fetchServices();
@@ -141,7 +143,7 @@ export default function ClientServicesPage() {
     e.stopPropagation();
     navigator.clipboard.writeText(phone);
     setCopiedId(id);
-    toast.success(`Copied ${phone} to clipboard`);
+    toast.success('Copied phone number to clipboard');
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -153,7 +155,7 @@ export default function ClientServicesPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const hasActiveFilters = searchQuery !== '' || typeFilter !== 'ALL' || statusFilter !== 'ALL' || propertyFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || typeFilter !== 'ALL' || statusFilter !== 'ALL' || propertyFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
   return (
@@ -341,6 +343,23 @@ export default function ClientServicesPage() {
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+
+          {/* Sort By Filter */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Sort telecom services"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="NEWEST">Sort: Recently Added</option>
+            <option value="NUMBER_ASC">Sort: Number (Ascending)</option>
+            <option value="NUMBER_DESC">Sort: Number (Descending)</option>
+            <option value="TYPE_ASC">Sort: Type (A-Z)</option>
+            <option value="PROP_ASC">Sort: Property (A-Z)</option>
+          </select>
         </div>
 
         {hasActiveFilters && (
@@ -350,9 +369,10 @@ export default function ClientServicesPage() {
               setTypeFilter('ALL');
               setStatusFilter('ALL');
               setPropertyFilter('ALL');
+              setSortBy('NEWEST');
               setCurrentPage(1);
             }}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium whitespace-nowrap"
           >
             Reset Filters
           </button>

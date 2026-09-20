@@ -340,6 +340,16 @@ export async function PATCH(
         .single();
 
       if (error) throw error;
+
+      await logAdminAction({
+        action: 'INVITATION_UPDATED',
+        entity_type: 'INVITATION',
+        entity_id: inviteId,
+        organization_id: organizationId,
+        description: `Updated invitation ${inviteId} status/role`,
+        changes: updates,
+      });
+
       return NextResponse.json({
         success: true,
         data: updatedInvite,
@@ -371,6 +381,24 @@ export async function PATCH(
         })
         .eq('id', updatedMember.profile_id);
     }
+
+    const contactName = full_name || updatedMember?.profile?.full_name || 'Contact';
+
+    await logAdminAction({
+      action: 'ORGANIZATION_CONTACT_UPDATED',
+      entity_type: 'ORGANIZATION_MEMBER',
+      entity_id: member_id,
+      entity_name: contactName,
+      organization_id: organizationId,
+      description: `Updated contact '${contactName}' in organization`,
+      changes: {
+        member_id,
+        role: updates.role,
+        status: updates.status,
+        full_name,
+        phone_number,
+      },
+    });
 
     return NextResponse.json({
       success: true,

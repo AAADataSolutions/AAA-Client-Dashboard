@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -31,6 +32,17 @@ export async function PATCH(
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    await logAdminAction({
+      action: body.status === 'VERIFIED' ? 'E911_VERIFIED' : 'E911_RECORD_UPDATED',
+      entity_type: 'E911',
+      entity_id: id,
+      entity_name: updatedRecord.emergency_address,
+      description: body.status === 'VERIFIED'
+        ? `Verified and approved E911 compliance for '${updatedRecord.emergency_address}'`
+        : `Updated E911 record for '${updatedRecord.emergency_address}'`,
+      changes: updatePayload,
+    });
 
     return NextResponse.json({ success: true, data: updatedRecord });
   } catch (err: any) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function GET(
   request: NextRequest,
@@ -74,6 +75,18 @@ export async function PATCH(
       });
     }
 
+    // Audit Log
+    await logAdminAction({
+      action: body.status !== undefined ? 'SERVICE_STATUS_CHANGED' : 'SERVICE_UPDATED',
+      entity_type: 'SERVICE',
+      entity_id: id,
+      entity_name: updatedService.service_name || updatedService.phone_number,
+      description: body.status !== undefined
+        ? `Changed service status of '${updatedService.phone_number}' to ${body.status}`
+        : `Updated service configuration for '${updatedService.phone_number}'`,
+      changes: updatePayload,
+    });
+
     return NextResponse.json({ success: true, data: updatedService });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
@@ -88,6 +101,12 @@ export async function DELETE(
     const { id } = await params;
     const supabase = await createClient();
 
+    const { data: existingSvc } = await supabase
+      .from('services')
+      .select('phone_number, service_name')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from('services')
       .update({ status: 'DISCONNECTED', updated_at: new Date().toISOString() })
@@ -96,6 +115,16 @@ export async function DELETE(
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    // Audit Log
+    await logAdminAction({
+      action: 'SERVICE_DISCONNECTED',
+      entity_type: 'SERVICE',
+      entity_id: id,
+      entity_name: existingSvc?.phone_number || `Service ${id}`,
+      description: `Disconnected service line '${existingSvc?.phone_number || id}'`,
+      changes: { status: 'DISCONNECTED' },
+    });
 
     return NextResponse.json({ success: true, message: 'Service disconnected successfully' });
   } catch (err: any) {

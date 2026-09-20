@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logAdminAction } from '@/lib/audit/logger';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -312,17 +313,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Log Audit Entry
-    try {
-      await dbClient.from('audit_logs').insert({
-        action: 'ORGANIZATION_CREATED',
-        entity_type: 'ORGANIZATION',
-        entity_id: newOrg.id,
-        entity_name: newOrg.name,
-        changes: { name: newOrg.name, status: newOrg.status, email: adminContactEmail },
+    // 3. Log Central Audit Entry
+    await logAdminAction({
+      action: 'ORGANIZATION_CREATED',
+      entity_type: 'ORGANIZATION',
+      entity_id: newOrg.id,
+      entity_name: newOrg.name,
+      organization_id: newOrg.id,
+      description: `Created new organization '${newOrg.name}' with status ${newOrg.status}`,
+      changes: {
+        id: newOrg.id,
+        name: newOrg.name,
+        status: newOrg.status,
+        address: newOrg.address,
+        city: newOrg.city,
+        state: newOrg.state,
+        zip_code: newOrg.zip_code,
+        phone: newOrg.phone,
+        email: adminContactEmail,
+      },
+    });
+
+    if (inviteInfo) {
+      await logAdminAction({
+        action: 'INVITATION_SENT',
+        entity_type: 'INVITATION',
+        entity_id: inviteInfo.id,
+        entity_name: adminContactEmail,
+        organization_id: newOrg.id,
+        description: `Generated organization administrator invitation for '${adminContactEmail}'`,
+        changes: {
+          invitation_id: inviteInfo.id,
+          email: adminContactEmail,
+          target_role: 'ADMIN',
+          organization_name: newOrg.name,
+        },
       });
-    } catch (auditErr) {
-      console.warn('Audit log write skipped:', auditErr);
     }
 
     return NextResponse.json({

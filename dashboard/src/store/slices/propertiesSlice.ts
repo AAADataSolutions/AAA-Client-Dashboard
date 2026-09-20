@@ -141,11 +141,17 @@ export const fetchProperties = createAsyncThunk(
   'properties/fetchProperties',
   async (params: any = {}) => {
     const q = new URLSearchParams();
-    if (params.search) q.set('search', params.search);
+    const searchVal = params.searchQuery || params.search;
+    if (searchVal) q.set('search', searchVal);
     if (params.status && params.status !== 'ALL') q.set('status', params.status);
-    if (params.org_id && params.org_id !== 'ALL') q.set('org_id', params.org_id);
+    const orgVal = params.orgId || params.org_id;
+    if (orgVal && orgVal !== 'ALL') q.set('orgId', orgVal);
+    const e911Val = params.e911Status || params.selectedE911 || params.e911;
+    if (e911Val && e911Val !== 'ALL') q.set('e911', e911Val);
     if (params.page) q.set('page', String(params.page));
-    if (params.page_size) q.set('page_size', String(params.page_size));
+    const limitVal = params.limit || params.page_size;
+    if (limitVal) q.set('limit', String(limitVal));
+    if (params.sortBy) q.set('sortBy', params.sortBy);
 
     const res = await fetch(`/api/admin/properties?${q.toString()}`);
     const json = await res.json();

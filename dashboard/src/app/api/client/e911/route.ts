@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         created_at,
         organization:organizations(id, name),
         property:properties(id, name, address, city, state, zip_code, main_phone, ray_baud_and_logs_enabled),
-        e911:e911_records(id, status, emergency_address, correction_notes, verified_at, updated_at)
+        e911:e911_records(id, status, emergency_address, correction_notes, verified_at, created_at, updated_at)
       `)
       .eq('organization_id', member.organization_id);
 
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
           correction_notes: e911?.correction_notes || (e911?.status === 'VERIFIED' ? 'Verified with local PSAP dispatch database.' : null),
           verified_at: e911?.verified_at || null,
           ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
+          created_at: e911?.created_at || op.created_at || new Date().toISOString(),
           updated_at: e911?.updated_at || op.created_at,
         };
       })
@@ -101,6 +102,19 @@ export async function GET(request: NextRequest) {
       } else {
         filtered = filtered.filter((r) => r.status === statusFilter);
       }
+    }
+
+    // Sorting
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
+    if (sortBy === 'PROP_ASC') {
+      filtered.sort((a, b) => a.property_name.localeCompare(b.property_name));
+    } else if (sortBy === 'PROP_DESC') {
+      filtered.sort((a, b) => b.property_name.localeCompare(a.property_name));
+    } else if (sortBy === 'STATUS') {
+      filtered.sort((a, b) => a.status.localeCompare(b.status));
+    } else {
+      // NEWEST
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
     return NextResponse.json({

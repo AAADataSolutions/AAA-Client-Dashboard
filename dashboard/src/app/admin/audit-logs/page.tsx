@@ -177,7 +177,10 @@ export default function AdminAuditLogsPage() {
               <option value="SERVICE">Service Events</option>
               <option value="ONBOARDING">Onboarding Events</option>
               <option value="TICKET">Ticket Events</option>
+              <option value="PORTING">Porting Events</option>
               <option value="E911">E911 Events</option>
+              <option value="INVITATION">Invitation Events</option>
+              <option value="USER">User & Team Events</option>
             </select>
           </div>
         </div>

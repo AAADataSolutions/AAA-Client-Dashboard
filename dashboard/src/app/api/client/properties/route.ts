@@ -194,6 +194,21 @@ export async function GET(request: NextRequest) {
       filtered = filtered.filter((p) => p.state === stateFilter);
     }
 
+    // Sorting
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
+    if (sortBy === 'NAME_ASC') {
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'NAME_DESC') {
+      filtered.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortBy === 'SERVICES_DESC') {
+      filtered.sort((a, b) => (b.services_count || 0) - (a.services_count || 0));
+    } else if (sortBy === 'TICKETS_DESC') {
+      filtered.sort((a, b) => (b.open_tickets_count || 0) - (a.open_tickets_count || 0));
+    } else {
+      // NEWEST
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
     // Pagination
     const total = filtered.length;
     const startIndex = (page - 1) * limit;

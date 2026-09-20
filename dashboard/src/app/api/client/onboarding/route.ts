@@ -156,6 +156,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
+
+    if (sortBy === 'PROP_ASC') {
+      filtered.sort((a, b) => a.property_name.localeCompare(b.property_name));
+    } else if (sortBy === 'PROP_DESC') {
+      filtered.sort((a, b) => b.property_name.localeCompare(a.property_name));
+    } else if (sortBy === 'STAGE_DESC') {
+      filtered.sort((a, b) => b.step_index - a.step_index);
+    } else if (sortBy === 'TARGET_DATE') {
+      filtered.sort((a, b) => {
+        if (!a.target_date) return 1;
+        if (!b.target_date) return -1;
+        return new Date(a.target_date).getTime() - new Date(b.target_date).getTime();
+      });
+    } else {
+      // NEWEST
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
     return NextResponse.json({
       success: true,
       data: filtered,

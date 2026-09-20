@@ -95,6 +95,7 @@ export default function ClientPortingPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [propertyFilter, setPropertyFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const pageSize = 10;
@@ -128,6 +129,7 @@ export default function ClientPortingPage() {
         q: searchQuery.trim(),
         status: statusFilter,
         property_id: propertyFilter,
+        sortBy: sortBy,
       });
 
       const res = await fetch(`/api/client/porting?${params.toString()}`);
@@ -213,7 +215,7 @@ export default function ClientPortingPage() {
     setMenuPosition(null);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || propertyFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || propertyFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
   return (
@@ -427,6 +429,22 @@ export default function ClientPortingPage() {
             <option value="REJECTED">Rejected</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
+
+          {/* Sort By Filter */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Sort porting requests"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="NEWEST">Sort: Recently Added</option>
+            <option value="PROP_ASC">Sort: Property (A-Z)</option>
+            <option value="TARGET_DATE">Sort: Target Date</option>
+            <option value="STATUS">Sort: Status</option>
+          </select>
         </div>
 
         {hasActiveFilters && (
@@ -435,9 +453,10 @@ export default function ClientPortingPage() {
               setSearchQuery('');
               setStatusFilter('ALL');
               setPropertyFilter('ALL');
+              setSortBy('NEWEST');
               setCurrentPage(1);
             }}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto whitespace-nowrap"
           >
             Reset Filters
           </button>

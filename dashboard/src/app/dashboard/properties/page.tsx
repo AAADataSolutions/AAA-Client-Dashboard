@@ -112,6 +112,7 @@ export default function ClientPropertiesPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [onboardingFilter, setOnboardingFilter] = useState('ALL');
   const [stateFilter, setStateFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [viewMode, setViewMode] = useState<'LIST' | 'GRID'>('LIST');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -152,6 +153,7 @@ export default function ClientPropertiesPage() {
         status: statusFilter,
         onboarding: onboardingFilter,
         state: stateFilter,
+        sortBy: sortBy,
       });
 
       const res = await fetch(`/api/client/properties?${params.toString()}`);
@@ -171,7 +173,7 @@ export default function ClientPropertiesPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, statusFilter, onboardingFilter, stateFilter]);
+  }, [currentPage, searchQuery, statusFilter, onboardingFilter, stateFilter, sortBy]);
 
   useEffect(() => {
     fetchProperties();
@@ -223,7 +225,7 @@ export default function ClientPropertiesPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || onboardingFilter !== 'ALL' || stateFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || onboardingFilter !== 'ALL' || stateFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
   return (
@@ -410,6 +412,23 @@ export default function ClientPropertiesPage() {
             <option value="ONBOARDING">In Onboarding</option>
             <option value="COMPLETED">Completed</option>
           </select>
+
+          {/* Sort By Filter */}
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Sort properties"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="NEWEST">Sort: Recently Added</option>
+            <option value="NAME_ASC">Sort: Name (A-Z)</option>
+            <option value="NAME_DESC">Sort: Name (Z-A)</option>
+            <option value="SERVICES_DESC">Sort: Most Voice Lines</option>
+            <option value="TICKETS_DESC">Sort: Open Tickets</option>
+          </select>
         </div>
 
         {/* View Toggle & Reset */}
@@ -421,9 +440,10 @@ export default function ClientPropertiesPage() {
                 setStatusFilter('ALL');
                 setOnboardingFilter('ALL');
                 setStateFilter('ALL');
+                setSortBy('NEWEST');
                 setCurrentPage(1);
               }}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium whitespace-nowrap"
             >
               Reset Filters
             </button>

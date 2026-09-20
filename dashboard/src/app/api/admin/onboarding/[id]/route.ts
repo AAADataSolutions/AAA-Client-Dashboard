@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logAdminAction } from '@/lib/audit/logger';
 
 export async function GET(
   request: NextRequest,
@@ -66,14 +67,49 @@ export async function PATCH(
       .from('onboardings')
       .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select(`
+        *,
+        org_property:organization_properties(
+          id,
+          property_id,
+          property:properties(id, name, status)
+        )
+      `)
       .single();
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, data: updatedOnboarding });
+    let activatedProperty = false;
+    if (body.status === 'COMPLETED' && updatedOnboarding?.org_property?.property_id) {
+      await supabase
+        .from('properties')
+        .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
+        .eq('id', updatedOnboarding.org_property.property_id);
+      activatedProperty = true;
+    }
+
+    const propName = updatedOnboarding?.org_property?.property?.name || 'Property';
+
+    // Audit Log
+    await logAdminAction({
+      action: body.status === 'COMPLETED' ? 'ONBOARDING_COMPLETED_PROPERTY_ACTIVATED' : 'ONBOARDING_STAGE_UPDATED',
+      entity_type: 'ONBOARDING',
+      entity_id: id,
+      entity_name: propName,
+      description: body.status === 'COMPLETED'
+        ? `Completed cutover for '${propName}', automatically setting property status to ACTIVE`
+        : `Updated onboarding stage for '${propName}' to ${body.status || 'updated'}`,
+      changes: {
+        stage: body.status,
+        target_date: body.target_date,
+        property_id: updatedOnboarding?.org_property?.property_id,
+        property_activated: activatedProperty,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: updatedOnboarding, propertyActivated: activatedProperty });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

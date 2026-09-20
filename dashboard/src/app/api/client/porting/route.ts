@@ -148,6 +148,24 @@ export async function GET(request: NextRequest) {
       filtered = filtered.filter((p) => p.property_id === propertyFilter);
     }
 
+    // Sorting
+    const sortBy = searchParams.get('sortBy') || 'NEWEST';
+    if (sortBy === 'PROP_ASC') {
+      filtered.sort((a, b) => a.property_name.localeCompare(b.property_name));
+    } else if (sortBy === 'TARGET_DATE') {
+      filtered.sort((a, b) => {
+        if (!a.target_date && !b.target_date) return 0;
+        if (!a.target_date) return 1;
+        if (!b.target_date) return -1;
+        return new Date(a.target_date).getTime() - new Date(b.target_date).getTime();
+      });
+    } else if (sortBy === 'STATUS') {
+      filtered.sort((a, b) => a.status.localeCompare(b.status));
+    } else {
+      // NEWEST
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
     // Unique properties for filter dropdown
     const propertyOptions = Array.from(
       new Map(

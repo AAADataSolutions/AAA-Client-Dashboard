@@ -105,11 +105,15 @@ export const fetchServices = createAsyncThunk(
   'services/fetchServices',
   async (params: any = {}) => {
     const q = new URLSearchParams();
-    if (params.search) q.set('search', params.search);
+    const searchVal = params.searchQuery || params.search;
+    if (searchVal) q.set('search', searchVal);
     if (params.status && params.status !== 'ALL') q.set('status', params.status);
-    if (params.type && params.type !== 'ALL') q.set('type', params.type);
+    const typeVal = params.serviceType || params.type;
+    if (typeVal && typeVal !== 'ALL') q.set('serviceType', typeVal);
     if (params.page) q.set('page', String(params.page));
-    if (params.page_size) q.set('page_size', String(params.page_size));
+    const limitVal = params.limit || params.page_size;
+    if (limitVal) q.set('limit', String(limitVal));
+    if (params.sortBy) q.set('sortBy', params.sortBy);
 
     const res = await fetch(`/api/admin/services?${q.toString()}`);
     const json = await res.json();

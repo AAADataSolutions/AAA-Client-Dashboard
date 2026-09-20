@@ -114,10 +114,15 @@ export const fetchE911Records = createAsyncThunk(
   'e911/fetchE911Records',
   async (params: any = {}) => {
     const q = new URLSearchParams();
-    if (params.search) q.set('search', params.search);
+    const searchVal = params.searchQuery || params.search;
+    if (searchVal) q.set('search', searchVal);
     if (params.status && params.status !== 'ALL') q.set('status', params.status);
+    const compVal = params.compliance || params.complianceFilter;
+    if (compVal && compVal !== 'ALL') q.set('compliance', compVal);
     if (params.page) q.set('page', String(params.page));
-    if (params.page_size) q.set('page_size', String(params.page_size));
+    const limitVal = params.limit || params.page_size;
+    if (limitVal) q.set('limit', String(limitVal));
+    if (params.sortBy) q.set('sortBy', params.sortBy);
 
     const res = await fetch(`/api/admin/e911?${q.toString()}`);
     const json = await res.json();
