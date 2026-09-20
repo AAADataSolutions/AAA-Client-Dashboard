@@ -14,6 +14,17 @@ export interface PortingRecord {
   target_date: string | null;
   completed_at: string | null;
   notes: string | null;
+  fax?: string;
+  carrier_details?: string;
+  is_activated?: boolean;
+  attachments?: {
+    id: string;
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+    storage_path: string;
+    created_at: string;
+  }[];
   services_count: number;
   services: {
     id: string;

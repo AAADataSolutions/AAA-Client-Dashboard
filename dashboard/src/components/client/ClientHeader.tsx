@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useTheme } from '@/lib/theme/theme-context';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface ClientHeaderProps {
   onOpenSidebar: () => void;
@@ -41,6 +42,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
   const isClientAdmin = effectiveRole === 'ADMIN';
   const orgName = orgMembership?.organization?.name || 'My Organization';
   const orgId = orgMembership?.organization_id || orgMembership?.organization?.id;
+  const logoUrl = orgMembership?.organization?.logo_url;
 
   const handleCopyOrgId = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,16 +60,27 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
 
   return (
     <header className="h-15 bg-white dark:bg-[#111217] border-b border-[#e2e8f0] dark:border-[#1f2128] px-5 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
-      {/* Left: Sidebar Toggle & Search Bar */}
-      <div className="flex items-center gap-3 flex-1 max-w-xl">
+      {/* Left: Sidebar Toggle, Client Logo & Search Bar */}
+      <div className="flex items-center gap-3 flex-1 max-w-2xl">
         <button
           onClick={onOpenSidebar}
-          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors"
+          className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1b22] transition-colors shrink-0"
           title={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           aria-label="Toggle navigation"
         >
           <Menu className="w-4 h-4" />
         </button>
+
+        {/* Client Organization Logo (after hamburger, before search) */}
+        {logoUrl && (
+          <div className="flex items-center shrink-0 max-h-9 px-1">
+            <img
+              src={logoUrl}
+              alt={orgName}
+              className="max-h-8 max-w-[140px] sm:max-w-[180px] w-auto object-contain rounded"
+            />
+          </div>
+        )}
 
         <form onSubmit={handleSearchSubmit} className="relative w-full max-w-md">
           <Search className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -146,6 +159,9 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
+
+        {/* Notification Bell */}
+        <NotificationBell isAdmin={false} />
 
         {/* User Profile Pill & Dropdown */}
         <div className="relative">

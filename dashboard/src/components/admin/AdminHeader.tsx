@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useTheme } from '@/lib/theme/theme-context';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface AdminHeaderProps {
   onOpenSidebar: () => void;
@@ -86,6 +87,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onOpenSidebar, isSideb
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
+
+        {/* Notification Bell */}
+        <NotificationBell isAdmin={true} />
 
         {/* User Profile Pill & Dropdown */}
         <div className="relative">

@@ -345,13 +345,19 @@ export async function PUT(request: NextRequest) {
       const now = new Date().toISOString();
       if (status === 'CONTRACT_SENT') updates.contract_sent_at = now;
       if (status === 'SIGNED') updates.signed_at = now;
-      if (status === 'PORTING_WAITING') updates.porting_waiting_at = now;
       if (status === 'PORTING_SUBMITTED') updates.porting_submitted_at = now;
       if (status === 'SOF_WAITING') updates.sof_waiting_at = now;
       if (status === 'FOC_RECEIVED') updates.foc_received_at = now;
       if (status === 'COMPLETED') updates.completed_at = now;
     }
     if (target_date !== undefined) updates.target_date = target_date;
+    if (body.draft_date !== undefined) updates.draft_date = body.draft_date || null;
+    if (body.contract_sent_date !== undefined) updates.contract_sent_date = body.contract_sent_date || null;
+    if (body.signed_date !== undefined) updates.signed_date = body.signed_date || null;
+    if (body.porting_submitted_date !== undefined) updates.porting_submitted_date = body.porting_submitted_date || null;
+    if (body.sof_review_date !== undefined) updates.sof_review_date = body.sof_review_date || null;
+    if (body.foc_confirmed_date !== undefined) updates.foc_confirmed_date = body.foc_confirmed_date || null;
+    if (body.live_cutover_date !== undefined) updates.live_cutover_date = body.live_cutover_date || null;
     updates.updated_at = new Date().toISOString();
 
     const { data: updated, error } = await supabase

@@ -65,39 +65,35 @@ export type OnboardingStatus =
   | 'DRAFT'
   | 'CONTRACT_SENT'
   | 'SIGNED'
-  | 'PORTING_WAITING'
   | 'PORTING_SUBMITTED'
   | 'SOF_WAITING'
   | 'FOC_RECEIVED'
   | 'COMPLETED';
 
-const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: string }[] = [
-  { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status' },
-  { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM' },
-  { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified' },
-  { key: 'PORTING_WAITING', label: 'Waiting for LOA', step: 4, desc: 'Awaiting LOA documentation and bill copy' },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5, desc: 'LSR submitted to winning carrier' },
-  { key: 'SOF_WAITING', label: 'SOF Review', step: 6, desc: 'Service Order Form technical review' },
-  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 7, desc: 'Firm Order Confirmation date locked' },
-  { key: 'COMPLETED', label: 'Live Cutover', step: 8, desc: 'Traffic migrated & property activated' },
+const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: string; dateField: string }[] = [
+  { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status', dateField: 'draft_date' },
+  { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM', dateField: 'contract_sent_date' },
+  { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified', dateField: 'signed_date' },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4, desc: 'LSR submitted to winning carrier', dateField: 'porting_submitted_date' },
+  { key: 'SOF_WAITING', label: 'SOF Review', step: 5, desc: 'Service Order Form technical review', dateField: 'sof_review_date' },
+  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6, desc: 'Firm Order Confirmation date locked', dateField: 'foc_confirmed_date' },
+  { key: 'COMPLETED', label: 'Live Cutover', step: 7, desc: 'Traffic migrated & property activated', dateField: 'live_cutover_date' },
 ];
 
 function getStageBadge(status: OnboardingStatus): { label: string; bg: string; text: string; border: string; pct: number } {
   switch (status) {
     case 'DRAFT':
-      return { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]', pct: 10 };
+      return { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]', pct: 14 };
     case 'CONTRACT_SENT':
-      return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 25 };
+      return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 28 };
     case 'SIGNED':
-      return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 40 };
-    case 'PORTING_WAITING':
-      return { label: 'Waiting for LOA', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 55 };
+      return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 42 };
     case 'PORTING_SUBMITTED':
-      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 70 };
+      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 57 };
     case 'SOF_WAITING':
-      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 80 };
+      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 71 };
     case 'FOC_RECEIVED':
-      return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 90 };
+      return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 85 };
     case 'COMPLETED':
       return { label: 'Live Cutover', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50', pct: 100 };
     default:
@@ -141,10 +137,19 @@ export default function AdminOnboardingPortingPage() {
   // Stage Edit State inside Unified Modal
   const [editStageStatus, setEditStageStatus] = useState<OnboardingStatus>('DRAFT');
   const [editTargetDate, setEditTargetDate] = useState<string>('');
+  const [stageDates, setStageDates] = useState({
+    draft_date: '',
+    contract_sent_date: '',
+    signed_date: '',
+    porting_submitted_date: '',
+    sof_review_date: '',
+    foc_confirmed_date: '',
+    live_cutover_date: '',
+  });
   const [updatingStage, setUpdatingStage] = useState(false);
 
-  // 3-Dots Action Menu Position
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; record: OnboardingItem } | null>(null);
+  // 3-Dots Action Menu Position (strictly opens ABOVE)
+  const [menuPosition, setMenuPosition] = useState<{ bottom: number; left: number; record: OnboardingItem } | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -221,14 +226,14 @@ export default function AdminOnboardingPortingPage() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  // Open 3-Dots Menu
+  // Open 3-Dots Menu strictly ABOVE the line (Rule 8)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: OnboardingItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 200;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, record });
+    const bottom = window.innerHeight - rect.top + 6;
+    setMenuPosition({ bottom, left, record });
   };
 
   // Open Unified Modal
@@ -237,6 +242,15 @@ export default function AdminOnboardingPortingPage() {
     setActiveTab(defaultTab);
     setEditStageStatus(record.status as OnboardingStatus);
     setEditTargetDate(record.target_date || '');
+    setStageDates({
+      draft_date: (record as any).draft_date ? (record as any).draft_date.split('T')[0] : '',
+      contract_sent_date: (record as any).contract_sent_date ? (record as any).contract_sent_date.split('T')[0] : '',
+      signed_date: (record as any).signed_date ? (record as any).signed_date.split('T')[0] : '',
+      porting_submitted_date: (record as any).porting_submitted_date ? (record as any).porting_submitted_date.split('T')[0] : '',
+      sof_review_date: (record as any).sof_review_date ? (record as any).sof_review_date.split('T')[0] : '',
+      foc_confirmed_date: (record as any).foc_confirmed_date ? (record as any).foc_confirmed_date.split('T')[0] : '',
+      live_cutover_date: (record as any).live_cutover_date ? (record as any).live_cutover_date.split('T')[0] : '',
+    });
     setShowUnifiedModal(true);
   };
 
@@ -303,6 +317,13 @@ export default function AdminOnboardingPortingPage() {
           id: selectedRecord.id,
           status: editStageStatus,
           target_date: editTargetDate || null,
+          draft_date: stageDates.draft_date || null,
+          contract_sent_date: stageDates.contract_sent_date || null,
+          signed_date: stageDates.signed_date || null,
+          porting_submitted_date: stageDates.porting_submitted_date || null,
+          sof_review_date: stageDates.sof_review_date || null,
+          foc_confirmed_date: stageDates.foc_confirmed_date || null,
+          live_cutover_date: stageDates.live_cutover_date || null,
         }),
       });
 
@@ -901,7 +922,7 @@ export default function AdminOnboardingPortingPage() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
           <div
-            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            style={{ bottom: `${menuPosition.bottom}px`, left: `${menuPosition.left}px` }}
             className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
@@ -1158,6 +1179,33 @@ export default function AdminOnboardingPortingPage() {
                           onChange={(e) => setEditTargetDate(e.target.value)}
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                         />
+                      </div>
+                    </div>
+
+                    {/* Milestone Expected Completion Dates */}
+                    <div className="p-3.5 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                          Milestone Expected Dates (All 7 Stages)
+                        </label>
+                        <span className="text-[10px] text-slate-400">Synced with client tracking view</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {STAGES_ROAD.map((s) => (
+                          <div key={s.dateField} className="space-y-1">
+                            <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 block truncate">
+                              Stage {s.step}: {s.label}
+                            </label>
+                            <input
+                              type="date"
+                              value={(stageDates as any)[s.dateField] || ''}
+                              onChange={(e) =>
+                                setStageDates((prev) => ({ ...prev, [s.dateField]: e.target.value }))
+                              }
+                              className="w-full px-2 py-1 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-[11px] focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
 

@@ -25,6 +25,7 @@ import {
   DollarSign,
   Flame,
   ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -60,11 +61,12 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Services and Lines', href: '/admin/services', icon: PhoneCall },
       { label: 'Firelines', href: '/admin/firelines', icon: Flame },
+      { label: 'Elevator Lines', href: '/admin/elevator-lines', icon: ArrowUpDown },
     ],
   },
   { label: 'Onboarding', href: '/admin/onboarding-porting', icon: GitBranch },
   { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
-  { label: 'E911 Compliance', href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
+  { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white' },
   { label: 'Finances', href: '/admin/finances', icon: DollarSign, superAdminOnly: true },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock },

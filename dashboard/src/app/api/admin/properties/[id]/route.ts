@@ -124,25 +124,40 @@ export async function DELETE(
 
     const { data: prop } = await supabase.from('properties').select('name').eq('id', id).maybeSingle();
 
-    const { error } = await supabase
-      .from('properties')
-      .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
-      .eq('id', id);
+    if (!prop) {
+      return NextResponse.json({ success: false, error: 'Property not found' }, { status: 404 });
+    }
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    // Try hard delete after unlinking relations
+    try {
+      await supabase.from('organization_properties').delete().eq('property_id', id);
+      await supabase.from('ray_baum_records').delete().eq('property_id', id);
+      await supabase.from('e911_records').delete().eq('property_id', id);
+      const { error: delErr } = await supabase.from('properties').delete().eq('id', id);
+      if (delErr) {
+        // Fallback to ARCHIVED if constraint still prevents deletion
+        await supabase
+          .from('properties')
+          .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
+          .eq('id', id);
+      }
+    } catch {
+      await supabase
+        .from('properties')
+        .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
+        .eq('id', id);
     }
 
     // Central Audit Log
     await logAuditEvent({
-      action: 'PROPERTY_ARCHIVED',
+      action: 'PROPERTY_DELETED',
       entity_type: 'PROPERTY',
       entity_id: id,
-      entity_name: prop?.name || `Property ID ${id}`,
-      changes: { status: 'ARCHIVED' },
+      entity_name: prop.name,
+      changes: { deleted: true },
     });
 
-    return NextResponse.json({ success: true, message: 'Property archived successfully' });
+    return NextResponse.json({ success: true, message: 'Property deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

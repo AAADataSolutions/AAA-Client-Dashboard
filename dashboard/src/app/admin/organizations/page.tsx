@@ -119,6 +119,10 @@ export default function AdminOrganizationsPage() {
   // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Delete Organization State
+  const [orgToDelete, setOrgToDelete] = useState<OrgRecord | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // Edit Organization Drawer
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<OrgRecord | null>(null);
@@ -267,6 +271,26 @@ export default function AdminOrganizationsPage() {
     } catch (err: any) {
       showToast(err.message || 'Error updating status', 'error');
       fetchOrganizations();
+    }
+  };
+
+  // Delete Organization Handler
+  const handleConfirmDeleteOrg = async () => {
+    if (!orgToDelete) return;
+    try {
+      setDeleteLoading(true);
+      const res = await fetch(`/api/admin/organizations/${orgToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete organization');
+      showToast(`Organization '${orgToDelete.name}' was removed.`, 'success');
+      setOrgToDelete(null);
+      fetchOrganizations();
+    } catch (err: any) {
+      showToast(err.message || 'Error deleting organization', 'error');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -1116,6 +1140,19 @@ export default function AdminOrganizationsPage() {
               <span>Suspend Tenant</span>
             </button>
           )}
+
+          <div className="border-t border-slate-100 dark:border-[#222430] my-1" />
+
+          <button
+            onClick={() => {
+              setOrgToDelete(menuPosition.org);
+              setMenuPosition(null);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer text-left font-semibold"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Organization</span>
+          </button>
         </div>
       )}
 
@@ -1772,6 +1809,46 @@ export default function AdminOrganizationsPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Delete Organization Confirmation Modal */}
+      <AnimatePresence>
+        {orgToDelete && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+              <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">Delete Organization</h3>
+                  <p className="text-xs text-slate-400 font-mono">{orgToDelete.name}</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
+                Are you sure you want to delete organization <span className="font-semibold text-slate-900 dark:text-white">"{orgToDelete.name}"</span>? This will unassign linked properties and remove tenant access.
+              </p>
+              <div className="flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setOrgToDelete(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1a1c24]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteOrg}
+                  disabled={deleteLoading}
+                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {deleteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Delete Organization'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
+

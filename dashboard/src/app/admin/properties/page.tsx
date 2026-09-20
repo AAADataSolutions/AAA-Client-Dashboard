@@ -40,6 +40,7 @@ import {
   Copy,
   Link as LinkIcon,
   Unlink,
+  ExternalLink,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -48,6 +49,7 @@ import {
   setStatusFilter,
   setOrgFilter,
   setE911Filter,
+  setRayBaumFilter,
   setSortBy,
   setPagination,
   optimisticUpdatePropertyStatus,
@@ -174,11 +176,21 @@ export default function AdminPropertiesPage() {
   const [targetStatus, setTargetStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ARCHIVED'>('ACTIVE');
   const [statusChangeLoading, setStatusChangeLoading] = useState(false);
 
-  // 3-Dots Action Menu Position
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; prop: PropertyItem } | null>(null);
+  // 3-Dots Action Menu Position (opens ABOVE the line)
+  const [menuPosition, setMenuPosition] = useState<{ bottom: number; left: number; prop: PropertyItem } | null>(null);
+
+  // Assign to Organization Modal State
+  const [showAssignOrgModal, setShowAssignOrgModal] = useState(false);
+  const [selectedPropForAssignOrg, setSelectedPropForAssignOrg] = useState<PropertyItem | null>(null);
+  const [targetOrgId, setTargetOrgId] = useState('');
+  const [assigningOrgLoading, setAssigningOrgLoading] = useState(false);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Delete Property State
+  const [propertyToDelete, setPropertyToDelete] = useState<PropertyItem | null>(null);
+  const [deletePropertyLoading, setDeletePropertyLoading] = useState(false);
   const showToast = useCallback((title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, title, message, type }]);
@@ -239,6 +251,7 @@ export default function AdminPropertiesPage() {
         orgId: filters.selectedOrg,
         status: filters.selectedStatus,
         e911: filters.selectedE911,
+        rayBaum: filters.rayBaum,
         sortBy: filters.sortBy,
       })
     );
@@ -256,14 +269,61 @@ export default function AdminPropertiesPage() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  // Open 3-Dots Menu
+  // Open 3-Dots Menu (opens ABOVE the line per Rule 8)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, prop: PropertyItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 230;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, prop });
+    const bottom = window.innerHeight - rect.top + 6;
+    setMenuPosition({ bottom, left, prop });
+  };
+
+  // Assign to Org Handler
+  const handleAssignOrgSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropForAssignOrg || !targetOrgId) return;
+    setAssigningOrgLoading(true);
+    try {
+      const res = await fetch(`/api/admin/organizations/${targetOrgId}/properties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: selectedPropForAssignOrg.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to assign property to organization');
+      }
+      showToast('Success', 'Property assigned to organization successfully.');
+      setShowAssignOrgModal(false);
+      setSelectedPropForAssignOrg(null);
+      setTargetOrgId('');
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to assign organization', 'error');
+    } finally {
+      setAssigningOrgLoading(false);
+    }
+  };
+
+  // Unassign from Org Handler
+  const handleUnassignFromOrg = async (prop: PropertyItem) => {
+    const orgId = prop.primary_organization?.id || (prop.organizations?.[0]?.id);
+    if (!orgId) return;
+    if (!confirm(`Are you sure you want to unassign "${prop.name}" from ${prop.primary_organization?.name || 'its organization'}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/organizations/${orgId}/properties?propertyId=${prop.id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to unassign property');
+      }
+      showToast('Success', 'Property unassigned from organization.');
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to unassign', 'error');
+    }
   };
 
   // --- Handlers: Contacts ---
@@ -349,6 +409,26 @@ export default function AdminPropertiesPage() {
       showToast('Error', err.message, 'error');
     } finally {
       setDeletingContact(false);
+    }
+  };
+
+  // Handle Confirm Delete Property
+  const handleConfirmDeleteProperty = async () => {
+    if (!propertyToDelete) return;
+    try {
+      setDeletePropertyLoading(true);
+      const res = await fetch(`/api/admin/properties/${propertyToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete property');
+      showToast('Deleted', `Property '${propertyToDelete.name}' was removed.`, 'success');
+      setPropertyToDelete(null);
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to delete property', 'error');
+    } finally {
+      setDeletePropertyLoading(false);
     }
   };
 
@@ -865,6 +945,20 @@ export default function AdminPropertiesPage() {
             </select>
 
             <select
+              value={filters.rayBaum || 'ALL'}
+              onChange={(e) => {
+                dispatch(setRayBaumFilter(e.target.value));
+                dispatch(setPagination({ currentPage: 1 }));
+              }}
+              aria-label="Filter by Ray Baum and Kary's Law"
+              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="ALL">Ray Baum: All</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+
+            <select
               value={filters.sortBy}
               onChange={(e) => {
                 dispatch(setSortBy(e.target.value));
@@ -998,9 +1092,10 @@ export default function AdminPropertiesPage() {
                 <tr>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">LOCATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">NO. OF SERVICES</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">E911 STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY'S LAW</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM PHONE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM EMAIL</th>
@@ -1027,7 +1122,27 @@ export default function AdminPropertiesPage() {
                         </span>
                       </td>
 
-                      {/* 3. No. of Associated Services (Dynamic) */}
+                      {/* 3. Organization */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {prop.primary_organization || (prop.organizations && prop.organizations.length > 0) ? (
+                          <a
+                            href={`/admin/organizations/${prop.primary_organization?.id || prop.organizations[0]?.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>{prop.primary_organization?.name || prop.organizations[0]?.name}</span>
+                            <ExternalLink className="w-3 h-3 opacity-60" />
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 bg-slate-50 dark:bg-slate-900/40">
+                            Unassigned
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 4. No. of Associated Services (Dynamic) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-semibold text-slate-800 dark:text-white">
                           {prop.services_count || 0}{' '}
@@ -1035,7 +1150,7 @@ export default function AdminPropertiesPage() {
                         </span>
                       </td>
 
-                      {/* 4. E911 Status */}
+                      {/* 5. E911 Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {prop.ray_baud_and_logs_enabled ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
@@ -1048,15 +1163,25 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 5. Ray Baum Status (Single Line Verified / Not-Verified) */}
+                      {/* 6. Ray Baum and Kary's Law (Active / Inactive) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {prop.ray_baud_and_logs_enabled ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
-                            <ShieldCheck className="w-3 h-3" /> Verified
-                          </span>
+                        {prop.ray_baum_status === 'Active' || prop.ray_baud_and_logs_enabled ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`/admin/ray-baum/${prop.id}`, '_blank');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                            title="Open Ray Baum and Kary's Law in a new tab"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Active</span>
+                            <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 whitespace-nowrap">
-                            <AlertCircle className="w-3 h-3" /> Not-Verified
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span>Inactive</span>
                           </span>
                         )}
                       </td>
@@ -1116,29 +1241,36 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 9. Property Status */}
+                      {/* 10. Property Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleOpenStatusModal(prop)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition whitespace-nowrap ${
-                            prop.status === 'ACTIVE'
-                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
-                              : prop.status === 'ARCHIVED'
-                              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
-                              : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
+                        {!prop.primary_organization && (!prop.organizations || prop.organizations.length === 0) ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-dashed border-slate-300 dark:border-slate-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            Unassigned
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenStatusModal(prop)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition whitespace-nowrap ${
                               prop.status === 'ACTIVE'
-                                ? 'bg-emerald-500'
+                                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
                                 : prop.status === 'ARCHIVED'
-                                ? 'bg-rose-500'
-                                : 'bg-amber-500'
+                                ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
+                                : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
                             }`}
-                          />
-                          {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' ? 'Archived' : 'Inactive'}
-                        </button>
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                prop.status === 'ACTIVE'
+                                  ? 'bg-emerald-500'
+                                  : prop.status === 'ARCHIVED'
+                                  ? 'bg-rose-500'
+                                  : 'bg-amber-500'
+                              }`}
+                            />
+                            {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' ? 'Archived' : 'Inactive'}
+                          </button>
+                        )}
                       </td>
 
                       {/* 10. Onboarding Stage */}
@@ -1221,7 +1353,7 @@ export default function AdminPropertiesPage() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
           <div
-            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            style={{ bottom: `${menuPosition.bottom}px`, left: `${menuPosition.left}px` }}
             className="fixed z-50 w-56 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
@@ -1252,16 +1384,49 @@ export default function AdminPropertiesPage() {
               <span>View Services</span>
             </button>
 
-            <button
-              onClick={() => {
-                handleOpenAssignServiceModal(menuPosition.prop);
-                setMenuPosition(null);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
-            >
-              <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Assign Service</span>
-            </button>
+            {/* If assigned to an org, show Assign Service */}
+            {(menuPosition.prop.primary_organization || (menuPosition.prop.organizations && menuPosition.prop.organizations.length > 0)) && (
+              <button
+                onClick={() => {
+                  handleOpenAssignServiceModal(menuPosition.prop);
+                  setMenuPosition(null);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
+              >
+                <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Assign Service</span>
+              </button>
+            )}
+
+            {/* If UNASSIGNED, show Assign to Organization */}
+            {!menuPosition.prop.primary_organization && (!menuPosition.prop.organizations || menuPosition.prop.organizations.length === 0) && (
+              <button
+                onClick={() => {
+                  setSelectedPropForAssignOrg(menuPosition.prop);
+                  setShowAssignOrgModal(true);
+                  setMenuPosition(null);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium text-blue-600 dark:text-blue-400"
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                <span>Assign to Organization</span>
+              </button>
+            )}
+
+            {/* If ASSIGNED, show Unassign from Organization */}
+            {(menuPosition.prop.primary_organization || (menuPosition.prop.organizations && menuPosition.prop.organizations.length > 0)) && (
+              <button
+                onClick={() => {
+                  const p = menuPosition.prop;
+                  setMenuPosition(null);
+                  handleUnassignFromOrg(p);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium text-amber-600 dark:text-amber-400"
+              >
+                <Unlink className="w-3.5 h-3.5 text-amber-500" />
+                <span>Unassign from Organization</span>
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -1296,6 +1461,17 @@ export default function AdminPropertiesPage() {
             >
               <Settings className="w-3.5 h-3.5 text-slate-500" />
               <span>Edit Property Settings</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setPropertyToDelete(menuPosition.prop);
+                setMenuPosition(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 cursor-pointer font-medium text-rose-600 dark:text-rose-400"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>Delete Property</span>
             </button>
           </div>
         </>
@@ -2158,6 +2334,112 @@ export default function AdminPropertiesPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ASSIGN TO ORGANIZATION MODAL */}
+      <AnimatePresence>
+        {showAssignOrgModal && selectedPropForAssignOrg && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#222430] pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Assign to Organization</h3>
+                    <p className="text-xs text-slate-400">{selectedPropForAssignOrg.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowAssignOrgModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAssignOrgSubmit} className="space-y-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Select Organization <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={targetOrgId}
+                    onChange={(e) => setTargetOrgId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                  >
+                    <option value="">Choose an organization...</option>
+                    {orgOptions.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 bg-blue-50/50 dark:bg-blue-950/20 p-2.5 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                  Assigning this property will set its status to <strong>ONBOARDING</strong> and initialize its 7-stage onboarding tracker at <strong>Draft Initialized</strong>.
+                </p>
+
+                <div className="pt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignOrgModal(false)}
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={assigningOrgLoading || !targetOrgId}
+                    className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    {assigningOrgLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    <span>Assign Property</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DELETE PROPERTY CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {propertyToDelete && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+              <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">Delete Property</h3>
+                  <p className="text-xs text-slate-400 font-mono">{propertyToDelete.name}</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
+                Are you sure you want to permanently delete property <span className="font-semibold text-slate-900 dark:text-white">"{propertyToDelete.name}"</span>? This will unassign linked services, compliance records, and tenant assignments.
+              </p>
+              <div className="flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPropertyToDelete(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1a1c24]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteProperty}
+                  disabled={deletePropertyLoading}
+                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {deletePropertyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Delete Property'}
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -51,14 +51,14 @@ export async function GET(request: NextRequest) {
       .from('porting_requests')
       .select(`
         *,
+        organization:organizations(id, name),
         organization_property:organization_properties(
           id,
           property:properties(id, name, address, city, state, zip_code, main_phone),
           organization:organizations(id, name)
         ),
-        porting_request_services(
-          id,
-          service:services(id, phone_number, status, description, service_type:service_types(name))
+        attachments:porting_attachments(
+          id, file_name, file_size, mime_type, storage_path, created_at
         )
       `, { count: 'exact' });
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const { data: rawPortings, error } = await query;
 
     if (error) {
-      // Fallback: flat query without joins
+      // Fallback simple query
       const { data: fallbackList, error: fErr } = await db
         .from('porting_requests')
         .select('*')
@@ -92,13 +92,12 @@ export async function GET(request: NextRequest) {
         success: true,
         data: paginated.map((item: any) => ({
           ...item,
-          property_name: 'Property',
-          property_address: '',
-          property_location: '',
-          property_phone: '',
+          property_name: item.property_name || 'Property',
+          property_address: item.property_address || '',
+          property_phone: item.property_phone || '',
           organization_name: 'Organization',
-          services_count: 0,
-          services: [],
+          is_activated: item.is_activated || false,
+          attachments: [],
         })),
         pagination: {
           totalCount: totalSimple,
@@ -121,40 +120,30 @@ export async function GET(request: NextRequest) {
     let formatted = (rawPortings || []).map((item: any) => {
       const orgProp = item.organization_property;
       const prop = Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property;
-      const org = Array.isArray(orgProp?.organization) ? orgProp?.organization[0] : orgProp?.organization;
-
-      const services = (item.porting_request_services || [])
-        .map((prs: any) => {
-          const s = prs.service;
-          if (!s) return null;
-          return {
-            id: s.id,
-            phone_number: s.phone_number,
-            status: s.status,
-            description: s.description,
-            service_type: s.service_type?.name || 'Voice Line',
-          };
-        })
-        .filter(Boolean);
+      const directOrg = Array.isArray(item.organization) ? item.organization[0] : item.organization;
+      const org = directOrg || (Array.isArray(orgProp?.organization) ? orgProp?.organization[0] : orgProp?.organization);
 
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
         property_id: prop?.id || '',
-        property_name: prop?.name || 'Property',
-        property_address: prop?.address
+        property_name: item.property_name || prop?.name || 'New Property',
+        property_address: item.property_address || (prop?.address
           ? `${prop.address}, ${prop.city || ''}, ${prop.state || ''} ${prop.zip_code || ''}`.trim()
-          : '',
-        property_location: prop ? `${prop.city || ''}, ${prop.state || ''}`.trim() : '',
-        property_phone: prop?.main_phone || '',
-        organization_id: org?.id || '',
+          : 'Address pending'),
+        property_phone: item.property_phone || prop?.main_phone || '—',
+        fax: item.fax || '—',
+        carrier_details: item.carrier_details || '',
+        organization_id: org?.id || item.organization_id || '',
         organization_name: org?.name || 'Organization',
-        status: item.status || 'DRAFT',
+        status: item.status || 'SUBMITTED',
         target_date: item.target_date,
+        foc_date: item.foc_date,
         completed_at: item.completed_at,
+        rejection_reason: item.rejection_reason,
         notes: item.notes,
-        services_count: services.length,
-        services,
+        is_activated: item.is_activated || false,
+        attachments: item.attachments || [],
         created_at: item.created_at,
         updated_at: item.updated_at || item.created_at,
       };
@@ -167,48 +156,33 @@ export async function GET(request: NextRequest) {
         (p: any) =>
           p.property_name.toLowerCase().includes(lowerSearch) ||
           p.organization_name.toLowerCase().includes(lowerSearch) ||
-          (p.notes && p.notes.toLowerCase().includes(lowerSearch)) ||
-          p.services.some((s: any) => s.phone_number?.toLowerCase().includes(lowerSearch))
+          p.property_phone.toLowerCase().includes(lowerSearch) ||
+          (p.notes && p.notes.toLowerCase().includes(lowerSearch))
       );
     }
 
     // 5. Sorting
-    if (sortBy === 'PROP_ASC') {
-      formatted.sort((a: any, b: any) => a.property_name.localeCompare(b.property_name));
-    } else if (sortBy === 'ORG_ASC') {
-      formatted.sort((a: any, b: any) => a.organization_name.localeCompare(b.organization_name));
-    } else if (sortBy === 'STATUS') {
-      const statusOrder: Record<string, number> = {
-        DRAFT: 0, SUBMITTED: 1, IN_PROGRESS: 2, PENDING: 3,
-        FOC_RECEIVED: 4, COMPLETED: 5, REJECTED: 6, CANCELLED: 7,
-      };
-      formatted.sort((a: any, b: any) => (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99));
-    } else if (sortBy === 'TARGET_DATE') {
-      formatted.sort((a: any, b: any) => {
-        if (!a.target_date && !b.target_date) return 0;
-        if (!a.target_date) return 1;
-        if (!b.target_date) return -1;
-        return new Date(a.target_date).getTime() - new Date(b.target_date).getTime();
-      });
-    } else {
-      // NEWEST (default)
-      formatted.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
+    formatted.sort((a: any, b: any) => {
+      if (sortBy === 'OLDEST') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sortBy === 'PROPERTY_ASC') return a.property_name.localeCompare(b.property_name);
+      if (sortBy === 'ORG_ASC') return a.organization_name.localeCompare(b.organization_name);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
-    const filteredTotal = formatted.length;
-    const paginatedData = formatted.slice((page - 1) * limit, page * limit);
+    const totalCountFiltered = formatted.length;
+    const paginated = formatted.slice((page - 1) * limit, page * limit);
 
     return NextResponse.json({
       success: true,
-      data: paginatedData,
+      data: paginated,
       pagination: {
-        totalCount: filteredTotal,
-        totalPages: Math.ceil(filteredTotal / limit) || 1,
+        totalCount: totalCountFiltered,
+        totalPages: Math.ceil(totalCountFiltered / limit) || 1,
         currentPage: page,
         pageSize: limit,
       },
       metrics: {
-        totalRequests: totalCount || filteredTotal,
+        totalRequests: totalCount || totalCountFiltered,
         inProgressCount: inProgressCount || 0,
         focReceivedCount: focReceivedCount || 0,
         completedCount: completedCount || 0,
@@ -221,173 +195,82 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
     const adminClient = createAdminClient();
     const db = adminClient || supabase;
+
     const body = await request.json();
-
-    const { organization_property_id, target_date, notes, service_ids } = body;
-
-    if (!organization_property_id) {
-      return NextResponse.json(
-        { success: false, error: 'Organization property is required.' },
-        { status: 400 }
-      );
-    }
-
-    // Create the porting request
-    const { data: portRequest, error: portErr } = await db
-      .from('porting_requests')
-      .insert({
-        organization_property_id,
-        status: 'SUBMITTED',
-        target_date: target_date || null,
-        notes: notes?.trim() || null,
-      })
-      .select()
-      .single();
-
-    if (portErr || !portRequest) {
-      return NextResponse.json(
-        { success: false, error: portErr?.message || 'Failed to create porting request' },
-        { status: 400 }
-      );
-    }
-
-    // Attach services if provided
-    if (Array.isArray(service_ids) && service_ids.length > 0) {
-      const inserts = service_ids.map((sid: string) => ({
-        porting_request_id: portRequest.id,
-        service_id: sid,
-      }));
-
-      await db.from('porting_request_services').insert(inserts);
-
-      // Mark services as PENDING_PORT
-      await db
-        .from('services')
-        .update({ status: 'PENDING_PORT', updated_at: new Date().toISOString() })
-        .in('id', service_ids);
-    }
-
-    // Get property name for audit log
-    const { data: orgProp } = await db
-      .from('organization_properties')
-      .select('property:properties(name)')
-      .eq('id', organization_property_id)
-      .maybeSingle();
-
-    const propName = Array.isArray((orgProp as any)?.property)
-      ? (orgProp as any)?.property[0]?.name
-      : (orgProp as any)?.property?.name;
-
-    await logAuditEvent({
-      action: 'PORTING_REQUEST_CREATED',
-      entity_type: 'PORTING',
-      entity_id: portRequest.id,
-      entity_name: propName || 'Property',
-      changes: {
-        organization_property_id,
-        target_date,
-        services_attached: service_ids?.length || 0,
-        initial_status: 'SUBMITTED',
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: portRequest,
-      message: 'Porting request created successfully.',
-    });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const adminClient = createAdminClient();
-    const db = adminClient || supabase;
-    const body = await request.json();
-
-    const { id, status, target_date, notes } = body;
+    const { id, status, foc_date, target_date, rejection_reason, notes } = body;
 
     if (!id) {
-      return NextResponse.json({ success: false, error: 'Porting request ID is required.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Porting Request ID is required.' }, { status: 400 });
     }
 
-    const updates: any = {};
-    if (status !== undefined) {
-      updates.status = status;
-      const now = new Date().toISOString();
-      if (status === 'SUBMITTED') updates.submitted_at = now;
-      if (status === 'IN_PROGRESS') updates.in_progress_at = now;
-      if (status === 'FOC_RECEIVED') updates.foc_received_at = now;
-      if (status === 'COMPLETED') updates.completed_at = now;
-    }
-    if (target_date !== undefined) updates.target_date = target_date;
-    if (notes !== undefined) updates.notes = notes?.trim() || null;
-    updates.updated_at = new Date().toISOString();
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (status !== undefined) updatePayload.status = status;
+    if (foc_date !== undefined) updatePayload.foc_date = foc_date;
+    if (target_date !== undefined) updatePayload.target_date = target_date;
+    if (rejection_reason !== undefined) updatePayload.rejection_reason = rejection_reason;
+    if (notes !== undefined) updatePayload.notes = notes;
+    if (status === 'COMPLETED') updatePayload.completed_at = new Date().toISOString();
 
     const { data: updated, error } = await db
       .from('porting_requests')
-      .update(updates)
+      .update(updatePayload)
       .eq('id', id)
-      .select(`
-        *,
-        organization_property:organization_properties(
-          id,
-          property_id,
-          property:properties(id, name, status)
-        )
-      `)
+      .select()
       .single();
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    // If completed, update services status to ACTIVE
-    if (status === 'COMPLETED') {
-      const { data: portServices } = await db
-        .from('porting_request_services')
-        .select('service_id')
-        .eq('porting_request_id', id);
+    await logAuditEvent({
+      action: 'PORTING_STATUS_CHANGED',
+      entity_type: 'PORTING_REQUEST',
+      entity_id: id,
+      entity_name: updated.property_name || 'Porting Request',
+      changes: updatePayload,
+    });
 
-      if (portServices && portServices.length > 0) {
-        const serviceIds = portServices.map((ps: any) => ps.service_id);
-        await db
-          .from('services')
-          .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
-          .in('id', serviceIds);
-      }
+    return NextResponse.json({ success: true, data: updated });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Porting Request ID is required.' }, { status: 400 });
     }
 
-    // Audit log
-    const prop = Array.isArray(updated.organization_property?.property)
-      ? updated.organization_property?.property[0]
-      : updated.organization_property?.property;
-    const propName = prop?.name || 'Property';
+    const { error } = await db.from('porting_requests').delete().eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
 
     await logAuditEvent({
-      action: status === 'COMPLETED' ? 'PORTING_COMPLETED' : 'PORTING_STATUS_UPDATED',
-      entity_type: 'PORTING',
+      action: 'PORTING_REQUEST_DELETED',
+      entity_type: 'PORTING_REQUEST',
       entity_id: id,
-      entity_name: propName,
-      changes: {
-        status,
-        target_date: target_date !== undefined ? target_date : undefined,
-        notes: notes !== undefined ? notes : undefined,
-      },
+      entity_name: `Porting Request ${id}`,
+      changes: { id },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: updated,
-    });
+    return NextResponse.json({ success: true, message: 'Porting request deleted successfully.' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

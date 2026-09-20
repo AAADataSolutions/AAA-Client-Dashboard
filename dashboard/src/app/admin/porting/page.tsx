@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   XCircle,
   Send,
+  Trash2,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -195,8 +196,9 @@ export default function AdminPortingPage() {
   // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'DETAILS' | 'WORKFLOW'>('DETAILS');
+  const [activeTab, setActiveTab] = useState<'DETAILS' | 'ATTACHMENTS' | 'WORKFLOW'>('DETAILS');
   const [selectedRecord, setSelectedRecord] = useState<PortingItem | null>(null);
+  const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
 
   // Workflow Edit State
   const [editStatus, setEditStatus] = useState<PortingStatus>('DRAFT');
@@ -204,15 +206,17 @@ export default function AdminPortingPage() {
   const [editNotes, setEditNotes] = useState<string>('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  // 3-Dots Action Menu Position
+  // 3-Dots Action Menu Position (strictly opens ABOVE)
   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
+    bottom: number;
     left: number;
     record: PortingItem;
   } | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [activating, setActivating] = useState(false);
+
   const showToast = useCallback(
     (title: string, message?: string, type: 'success' | 'error' | 'info' = 'success') => {
       const id = Math.random().toString(36).substring(2, 9);
@@ -223,6 +227,44 @@ export default function AdminPortingPage() {
     },
     []
   );
+
+  const handleActivateProperty = async (portingId: string) => {
+    try {
+      setActivating(true);
+      const res = await fetch(`/api/admin/porting/${portingId}/activate`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Activation failed');
+      }
+      showToast('Property Activated', 'Property activated successfully! Onboarding initiated at Draft stage.', 'success');
+      loadData();
+      if (showUnifiedModal) setShowUnifiedModal(false);
+    } catch (err: any) {
+      showToast('Activation Failed', err.message, 'error');
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleDeletePorting = async (portingId: string) => {
+    if (!confirm('Are you sure you want to delete this porting request? This action cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/admin/porting?id=${portingId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to delete porting request');
+      }
+      showToast('Deleted', 'Porting request deleted successfully.', 'success');
+      loadData();
+      setMenuPosition(null);
+    } catch (err: any) {
+      showToast('Delete Failed', err.message, 'error');
+    }
+  };
 
   // Create form state
   const [orgPropertyOptions, setOrgPropertyOptions] = useState<OrgPropertyOption[]>([]);
@@ -315,7 +357,7 @@ export default function AdminPortingPage() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  // Open 3-Dots Menu
+  // Open 3-Dots Menu strictly ABOVE the line (Rule 8)
   const handleOpenMenu = (
     e: React.MouseEvent<HTMLButtonElement>,
     record: PortingItem
@@ -324,14 +366,14 @@ export default function AdminPortingPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 200;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, record });
+    const bottom = window.innerHeight - rect.top + 6;
+    setMenuPosition({ bottom, left, record });
   };
 
   // Open Unified Modal
   const openUnifiedModal = (
     record: PortingItem,
-    defaultTab: 'DETAILS' | 'WORKFLOW' = 'DETAILS'
+    defaultTab: 'DETAILS' | 'ATTACHMENTS' | 'WORKFLOW' = 'DETAILS'
   ) => {
     setSelectedRecord(record);
     setActiveTab(defaultTab);
@@ -998,13 +1040,31 @@ export default function AdminPortingPage() {
                         className="py-3.5 px-4 text-right whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <button
-                          onClick={(e) => handleOpenMenu(e, rec)}
-                          className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
-                          title="Actions"
-                        >
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {rec.status === 'COMPLETED' && !rec.is_activated && (
+                            <button
+                              onClick={() => handleActivateProperty(rec.id)}
+                              disabled={activating}
+                              className="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer disabled:opacity-50"
+                              title="Activate Property into Onboarding"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Activate Property</span>
+                            </button>
+                          )}
+                          {rec.is_activated && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+                              <Check className="w-3 h-3" /> Activated
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => handleOpenMenu(e, rec)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                            title="Actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1086,7 +1146,7 @@ export default function AdminPortingPage() {
           />
           <div
             style={{
-              top: `${menuPosition.top}px`,
+              bottom: `${menuPosition.bottom}px`,
               left: `${menuPosition.left}px`,
             }}
             className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
@@ -1130,6 +1190,32 @@ export default function AdminPortingPage() {
               <GitBranch className="w-3.5 h-3.5 text-emerald-500" />
               <span>View Pipeline</span>
             </button>
+
+            {menuPosition.record.status === 'COMPLETED' && !menuPosition.record.is_activated && (
+              <button
+                onClick={() => {
+                  const recId = menuPosition.record.id;
+                  setMenuPosition(null);
+                  handleActivateProperty(recId);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center gap-2 cursor-pointer font-semibold border-t border-slate-100 dark:border-[#222430]"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Activate Property</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                const recId = menuPosition.record.id;
+                setMenuPosition(null);
+                handleDeletePorting(recId);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center gap-2 cursor-pointer font-medium border-t border-slate-100 dark:border-[#222430]"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Request</span>
+            </button>
           </div>
         </>
       )}
@@ -1167,7 +1253,23 @@ export default function AdminPortingPage() {
                           : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                     >
-                      Details
+                      Property Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('ATTACHMENTS')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                        activeTab === 'ATTACHMENTS'
+                          ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      <span>Attachments</span>
+                      {selectedRecord.attachments && selectedRecord.attachments.length > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                          {selectedRecord.attachments.length}
+                        </span>
+                      )}
                     </button>
                     <button
                       type="button"
@@ -1219,6 +1321,7 @@ export default function AdminPortingPage() {
                           {selectedRecord.property_phone && (
                             <div className="flex items-center gap-2 text-xs">
                               <Phone className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="text-slate-500 font-medium">Phone:</span>
                               <span className="text-slate-600 dark:text-slate-300">
                                 {selectedRecord.property_phone}
                               </span>
@@ -1239,9 +1342,34 @@ export default function AdminPortingPage() {
                               </button>
                             </div>
                           )}
+                          {selectedRecord.fax && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <PhoneCall className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="text-slate-500 font-medium">Fax:</span>
+                              <span className="text-slate-600 dark:text-slate-300 font-mono">
+                                {selectedRecord.fax}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  handleCopy(
+                                    selectedRecord.fax || '',
+                                    'detail-fax'
+                                  )
+                                }
+                                className="text-slate-400 hover:text-blue-600 cursor-pointer"
+                              >
+                                {copiedField === 'detail-fax' ? (
+                                  <Check className="w-3 h-3 text-emerald-500" />
+                                ) : (
+                                  <Copy className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 text-xs">
                             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="text-slate-600 dark:text-slate-300">
+                            <span className="text-slate-500 font-medium">Org:</span>
+                            <span className="text-slate-600 dark:text-slate-300 font-semibold">
                               {selectedRecord.organization_name}
                             </span>
                           </div>
@@ -1364,6 +1492,49 @@ export default function AdminPortingPage() {
                       )}
                     </div>
 
+                    {/* Carrier Details & Account Info */}
+                    {selectedRecord.carrier_details && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Carrier Details &amp; Account Info
+                        </h4>
+                        <div className="p-3.5 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                          {selectedRecord.carrier_details}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Activate Property Banner */}
+                    {selectedRecord.status === 'COMPLETED' && !selectedRecord.is_activated && (
+                      <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            Ready to Activate Property
+                          </h4>
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                            This porting request is complete. Activate to create the property and start the onboarding pipeline.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleActivateProperty(selectedRecord.id)}
+                          disabled={activating}
+                          className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer shrink-0 disabled:opacity-50"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          {activating ? 'Activating...' : 'Activate Property'}
+                        </button>
+                      </div>
+                    )}
+
+                    {selectedRecord.is_activated && (
+                      <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <span>This property has already been activated and enrolled into the onboarding tracker.</span>
+                      </div>
+                    )}
+
                     {/* Current Status Badge */}
                     <div className="flex items-center gap-3 pt-2">
                       <span className="text-xs text-slate-400">Current Status:</span>
@@ -1382,6 +1553,120 @@ export default function AdminPortingPage() {
                       })()}
                     </div>
                   </>
+                ) : activeTab === 'ATTACHMENTS' ? (
+                  /* TAB 2: ATTACHMENTS (Download & Inline Preview) */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                          Porting Documents &amp; Authorizations
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Carrier LOA, invoices, and customer CSR attachments
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40">
+                        {selectedRecord.attachments?.length || 0} Files
+                      </span>
+                    </div>
+
+                    {selectedRecord.attachments && selectedRecord.attachments.length > 0 ? (
+                      <div className="space-y-4">
+                        {selectedRecord.attachments.map((att: any, idx: number) => {
+                          const isImg =
+                            att.mime_type?.startsWith('image/') ||
+                            /\.(jpg|jpeg|png|webp|gif)$/i.test(att.file_name);
+                          const isPdf =
+                            att.mime_type === 'application/pdf' ||
+                            /\.pdf$/i.test(att.file_name);
+                          const isExpanded = previewAttachmentId === (att.id || String(idx));
+                          const fileUrl = `/api/client/porting/attachment?path=${encodeURIComponent(att.storage_path)}`;
+
+                          return (
+                            <div
+                              key={att.id || idx}
+                              className="rounded-xl border border-slate-200/80 dark:border-[#222430] bg-slate-50 dark:bg-[#111217] overflow-hidden"
+                            >
+                              <div className="p-3 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-lg bg-blue-100/70 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 shrink-0">
+                                    <FileText className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-slate-900 dark:text-white text-xs truncate">
+                                      {att.file_name}
+                                    </p>
+                                    <p className="text-[11px] text-slate-400">
+                                      {(att.file_size / 1024 / 1024).toFixed(2)} MB &bull; {att.mime_type || 'Document'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {(isImg || isPdf) && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setPreviewAttachmentId(
+                                          isExpanded ? null : (att.id || String(idx))
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1f212c] text-slate-700 dark:text-slate-300 font-semibold text-xs transition flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Eye className="w-3.5 h-3.5 text-blue-500" />
+                                      <span>{isExpanded ? 'Hide Preview' : 'Inline Preview'}</span>
+                                    </button>
+                                  )}
+                                  <a
+                                    href={fileUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    download={att.file_name}
+                                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>Download</span>
+                                  </a>
+                                </div>
+                              </div>
+
+                              {/* Inline Preview Container */}
+                              {isExpanded && (
+                                <div className="border-t border-slate-200 dark:border-[#222430] p-4 bg-white dark:bg-[#15161c]">
+                                  {isImg && (
+                                    <div className="flex justify-center bg-slate-900/5 dark:bg-black/40 rounded-lg p-2 max-h-96 overflow-auto">
+                                      <img
+                                        src={fileUrl}
+                                        alt={att.file_name}
+                                        className="max-h-80 object-contain rounded"
+                                      />
+                                    </div>
+                                  )}
+                                  {isPdf && (
+                                    <iframe
+                                      src={fileUrl}
+                                      title={att.file_name}
+                                      className="w-full h-96 rounded-lg border border-slate-200 dark:border-[#222430]"
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] space-y-2">
+                        <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                        <p className="font-semibold text-slate-700 dark:text-slate-300">
+                          No attachments uploaded
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          This porting request does not contain any attached documents or files.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   /* WORKFLOW TAB */
                   <form onSubmit={handleUpdateStatusSubmit} className="space-y-6">

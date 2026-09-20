@@ -107,26 +107,39 @@ export async function DELETE(
       .eq('id', id)
       .maybeSingle();
 
-    const { error } = await supabase
-      .from('services')
-      .update({ status: 'DISCONNECTED', updated_at: new Date().toISOString() })
-      .eq('id', id);
+    if (!existingSvc) {
+      return NextResponse.json({ success: false, error: 'Service not found' }, { status: 404 });
+    }
+
+    // Unlink any property assignments
+    await supabase.from('organization_property_services').delete().eq('service_id', id);
+
+    // Delete service
+    const { error } = await supabase.from('services').delete().eq('id', id);
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      // Fallback: If foreign key prevents hard deletion, set to DISCONNECTED
+      const { error: updateErr } = await supabase
+        .from('services')
+        .update({ status: 'DISCONNECTED', updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (updateErr) {
+        return NextResponse.json({ success: false, error: updateErr.message }, { status: 400 });
+      }
     }
 
     // Audit Log
     await logAdminAction({
-      action: 'SERVICE_DISCONNECTED',
+      action: 'SERVICE_DELETED',
       entity_type: 'SERVICE',
       entity_id: id,
-      entity_name: existingSvc?.phone_number || `Service ${id}`,
-      description: `Disconnected service line '${existingSvc?.phone_number || id}'`,
-      changes: { status: 'DISCONNECTED' },
+      entity_name: existingSvc.phone_number || `Service ${id}`,
+      description: `Deleted service line '${existingSvc.phone_number || id}'`,
+      changes: { deleted: true },
     });
 
-    return NextResponse.json({ success: true, message: 'Service disconnected successfully' });
+    return NextResponse.json({ success: true, message: 'Service deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

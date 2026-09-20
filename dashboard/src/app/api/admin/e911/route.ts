@@ -104,6 +104,7 @@ export async function GET(request: NextRequest) {
         correction_notes: item.correction_notes || null,
         verified_at: item.verified_at,
         ray_baum_compliant: prop?.ray_baud_and_logs_enabled ?? true,
+        karys_law_direct_dial: true,
         karis_law_direct_dial: true,
         created_at: item.created_at,
         updated_at: item.updated_at,

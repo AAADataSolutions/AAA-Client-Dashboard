@@ -108,7 +108,7 @@ export const BrandPanel: React.FC = () => {
           <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
             <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-slate-200">Kari’s Law &amp; RAY BAUM’S</p>
+              <p className="text-[13px] font-semibold text-slate-200">Kary’s Law &amp; RAY BAUM’S</p>
               <p className="text-[11px] text-slate-400">Automated E911 compliance</p>
             </div>
           </div>

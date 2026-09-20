@@ -24,6 +24,7 @@ import {
   Layers,
   Link as LinkIcon,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -114,8 +115,20 @@ export default function AdminServicesPage() {
   const [statusSliderValue, setStatusSliderValue] = useState<'ACTIVE' | 'INACTIVE' | 'SUSPENDED'>('ACTIVE');
   const [statusSliderLoading, setStatusSliderLoading] = useState(false);
 
-  // 3-Dots Action Menu Position
-  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; service: ServiceItem } | null>(null);
+  // Delete State
+  const [serviceToDelete, setServiceToDelete] = useState<ServiceItem | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // 3-Dots Action Menu Position (strictly opens ABOVE)
+  const [menuPosition, setMenuPosition] = useState<{ bottom: number; left: number; service: ServiceItem } | null>(null);
+
+  // Dynamic Service Types
+  const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string; description?: string }[]>([]);
+  const [showManageTypesModal, setShowManageTypesModal] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeDescription, setNewTypeDescription] = useState('');
+  const [typeActionLoading, setTypeActionLoading] = useState(false);
+  const [editingType, setEditingType] = useState<{ id: string; name: string; description?: string } | null>(null);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -184,20 +197,37 @@ export default function AdminServicesPage() {
     loadData();
   }, [loadData]);
 
+  // Load Dynamic Service Types
+  const loadServiceTypes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/service-types');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setServiceTypes(data.data);
+      }
+    } catch (err) {
+      console.warn('Could not load service types:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadServiceTypes();
+  }, [loadServiceTypes]);
+
   // Search input handler (char-by-char)
   const handleSearchChange = (val: string) => {
     setSearchInput(val);
     dispatch(setSearchQuery(val));
   };
 
-  // Open 3-Dots Menu
+  // Open 3-Dots Menu strictly ABOVE the line (Rule 8)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, svc: ServiceItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 200;
     const left = Math.max(16, rect.right - menuWidth);
-    const top = rect.bottom + 4;
-    setMenuPosition({ top, left, service: svc });
+    const bottom = window.innerHeight - rect.top + 6;
+    setMenuPosition({ bottom, left, service: svc });
   };
 
   // Open Status Slider Modal
@@ -271,6 +301,110 @@ export default function AdminServicesPage() {
       showToast('Error', err.message, 'error');
     } finally {
       setAssignLoading(false);
+    }
+  };
+
+  // Handle Delete Service
+  const handleConfirmDelete = async () => {
+    if (!serviceToDelete) return;
+    try {
+      setDeleteLoading(true);
+      const res = await fetch(`/api/admin/services/${serviceToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete service');
+      showToast('Deleted', `Service ${serviceToDelete.phone_number} removed.`, 'success');
+      setServiceToDelete(null);
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Handle Unassign from Property
+  const handleUnassignProperty = async (svc: ServiceItem) => {
+    if (!confirm(`Are you sure you want to unassign ${svc.phone_number} from its property?`)) return;
+    try {
+      const res = await fetch(`/api/admin/services/${svc.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: null }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to unassign property.');
+      showToast('Unassigned', `${svc.phone_number} is now unassigned.`, 'success');
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    }
+  };
+
+  // Handle Create Service Type
+  const handleCreateServiceType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    try {
+      setTypeActionLoading(true);
+      const res = await fetch('/api/admin/service-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTypeName.trim(), description: newTypeDescription.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to add service type');
+      showToast('Service Type Added', `"${newTypeName}" is now available.`, 'success');
+      setNewTypeName('');
+      setNewTypeDescription('');
+      loadServiceTypes();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setTypeActionLoading(false);
+    }
+  };
+
+  // Handle Update Service Type
+  const handleUpdateServiceType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingType || !editingType.name.trim()) return;
+    try {
+      setTypeActionLoading(true);
+      const res = await fetch('/api/admin/service-types', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingType.id, name: editingType.name.trim(), description: editingType.description?.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update service type');
+      showToast('Updated', 'Service type updated.', 'success');
+      setEditingType(null);
+      loadServiceTypes();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setTypeActionLoading(false);
+    }
+  };
+
+  // Handle Delete Service Type
+  const handleDeleteServiceType = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete service type "${name}"?`)) return;
+    try {
+      setTypeActionLoading(true);
+      const res = await fetch(`/api/admin/service-types?id=${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to delete service type');
+      showToast('Deleted', `Service type "${name}" removed.`, 'success');
+      loadServiceTypes();
+    } catch (err: any) {
+      showToast('Cannot Delete', err.message, 'error');
+    } finally {
+      setTypeActionLoading(false);
     }
   };
 
@@ -488,12 +622,20 @@ export default function AdminServicesPage() {
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
+            onClick={() => setShowManageTypesModal(true)}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
+          >
+            <Layers className="w-3.5 h-3.5 text-blue-500" /> Manage Types
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => {
               setFormData({
                 custom_service_id: '',
                 service_name: '',
                 phone_number: '',
-                service_type_name: 'Direct Inward Dial (DID)',
+                service_type_name: serviceTypes.length > 0 ? serviceTypes[0].name : 'Direct Inward Dial (DID)',
                 custom_type_input: '',
                 is_custom_type: false,
                 property_id: '',
@@ -659,7 +801,7 @@ export default function AdminServicesPage() {
               className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">Type: All Service Types</option>
-              {SERVICE_TYPES_LIST.map((t) => (
+              {(serviceTypes.length > 0 ? serviceTypes.map((t) => t.name) : SERVICE_TYPES_LIST).map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -944,7 +1086,7 @@ export default function AdminServicesPage() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
           <div
-            style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+            style={{ bottom: `${menuPosition.bottom}px`, left: `${menuPosition.left}px` }}
             className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
@@ -984,6 +1126,31 @@ export default function AdminServicesPage() {
             >
               <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
               <span>Assign to Property</span>
+            </button>
+
+            {menuPosition.service.property_id && (
+              <button
+                onClick={() => {
+                  const svc = menuPosition.service;
+                  setMenuPosition(null);
+                  handleUnassignProperty(svc);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium text-amber-600 dark:text-amber-400"
+              >
+                <X className="w-3.5 h-3.5 text-amber-500" />
+                <span>Unassign Property</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                setServiceToDelete(menuPosition.service);
+                setMenuPosition(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 cursor-pointer font-medium text-rose-600 dark:text-rose-400"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>Delete Service</span>
             </button>
           </div>
         </>
@@ -1336,7 +1503,7 @@ export default function AdminServicesPage() {
                       onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      {SERVICE_TYPES_LIST.map((t) => (
+                      {(serviceTypes.length > 0 ? serviceTypes.map((t) => t.name) : SERVICE_TYPES_LIST).map((t) => (
                         <option key={t} value={t}>
                           {t}
                         </option>
@@ -1463,7 +1630,7 @@ export default function AdminServicesPage() {
                     onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
-                    {SERVICE_TYPES_LIST.map((t) => (
+                    {(serviceTypes.length > 0 ? serviceTypes.map((t) => t.name) : SERVICE_TYPES_LIST).map((t) => (
                       <option key={t} value={t}>
                         {t}
                       </option>
@@ -1514,6 +1681,214 @@ export default function AdminServicesPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 5. DELETE CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {serviceToDelete && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+              <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">Delete Service</h3>
+                  <p className="text-xs text-slate-400 font-mono">{serviceToDelete.phone_number}</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
+                Are you sure you want to permanently delete service <span className="font-semibold text-slate-900 dark:text-white">{serviceToDelete.phone_number}</span> ({serviceToDelete.service_name})? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setServiceToDelete(null)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-[#1a1c24]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={deleteLoading}
+                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {deleteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Delete Service'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>  
+      {/* 6. MANAGE SERVICE TYPES MODAL */}
+      <AnimatePresence>
+        {showManageTypesModal && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">Manage Service Types</h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Configure telecom service categories</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowManageTypesModal(false);
+                    setEditingType(null);
+                  }}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto space-y-5 text-xs">
+                {/* Form to add or edit a type */}
+                <div className="p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] bg-slate-50 dark:bg-[#111217]">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-xs mb-2.5">
+                    {editingType ? 'Edit Service Type' : 'Add New Service Type'}
+                  </h4>
+                  {editingType ? (
+                    <form onSubmit={handleUpdateServiceType} className="space-y-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={editingType.name}
+                          onChange={(e) => setEditingType({ ...editingType, name: e.target.value })}
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">Description (optional)</label>
+                        <input
+                          type="text"
+                          value={editingType.description || ''}
+                          onChange={(e) => setEditingType({ ...editingType, description: e.target.value })}
+                          placeholder="e.g. Dedicated emergency phone line"
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingType(null)}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={typeActionLoading}
+                          className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1"
+                        >
+                          {typeActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Changes'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleCreateServiceType} className="space-y-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">Service Type Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={newTypeName}
+                          onChange={(e) => setNewTypeName(e.target.value)}
+                          placeholder="e.g. Dedicated Fiber Link"
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block mb-1">Description (optional)</label>
+                        <input
+                          type="text"
+                          value={newTypeDescription}
+                          onChange={(e) => setNewTypeDescription(e.target.value)}
+                          placeholder="e.g. High throughput commercial fiber line"
+                          className="w-full px-3 py-1.5 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="submit"
+                          disabled={typeActionLoading || !newTypeName.trim()}
+                          className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1 shadow-xs"
+                        >
+                          {typeActionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Plus className="w-3.5 h-3.5" /> Add Type</>}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* List of existing types */}
+                <div>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-xs mb-2 flex items-center justify-between">
+                    <span>Available Types ({serviceTypes.length})</span>
+                    <button
+                      type="button"
+                      onClick={loadServiceTypes}
+                      className="text-[11px] text-blue-500 hover:underline flex items-center gap-1 cursor-pointer font-normal"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Refresh
+                    </button>
+                  </h4>
+
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                    {serviceTypes.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-2.5 rounded-lg border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] flex items-center justify-between hover:border-slate-300 dark:hover:border-slate-700 transition"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">{t.name}</p>
+                          {t.description && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{t.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setEditingType({ id: t.id, name: t.name, description: t.description })}
+                            className="p-1 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                            title="Edit Type"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteServiceType(t.id, t.name)}
+                            className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                            title="Delete Type"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowManageTypesModal(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-[#1f212c] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer hover:bg-slate-200"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
         )}

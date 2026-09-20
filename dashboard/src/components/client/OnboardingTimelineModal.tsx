@@ -19,39 +19,35 @@ export type OnboardingStatus =
   | 'DRAFT'
   | 'CONTRACT_SENT'
   | 'SIGNED'
-  | 'PORTING_WAITING'
   | 'PORTING_SUBMITTED'
   | 'SOF_WAITING'
   | 'FOC_RECEIVED'
   | 'COMPLETED';
 
-export const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: string }[] = [
-  { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status' },
-  { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM' },
-  { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified' },
-  { key: 'PORTING_WAITING', label: 'Waiting for LOA', step: 4, desc: 'Awaiting LOA documentation and bill copy' },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5, desc: 'LSR submitted to winning carrier' },
-  { key: 'SOF_WAITING', label: 'SOF Review', step: 6, desc: 'Service Order Form technical review' },
-  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 7, desc: 'Firm Order Confirmation date locked' },
-  { key: 'COMPLETED', label: 'Live Cutover', step: 8, desc: 'Traffic migrated & property activated' },
+export const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: string; dateField: string }[] = [
+  { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status', dateField: 'draft_date' },
+  { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM', dateField: 'contract_sent_date' },
+  { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified', dateField: 'signed_date' },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4, desc: 'LSR submitted to winning carrier', dateField: 'porting_submitted_date' },
+  { key: 'SOF_WAITING', label: 'SOF Review', step: 5, desc: 'Service Order Form technical review', dateField: 'sof_review_date' },
+  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6, desc: 'Firm Order Confirmation date locked', dateField: 'foc_confirmed_date' },
+  { key: 'COMPLETED', label: 'Live Cutover', step: 7, desc: 'Traffic migrated & property activated', dateField: 'live_cutover_date' },
 ];
 
 export function getStageBadge(status: string): { label: string; bg: string; text: string; border: string; pct: number } {
   switch (status) {
     case 'DRAFT':
-      return { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]', pct: 12.5 };
+      return { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]', pct: 14 };
     case 'CONTRACT_SENT':
-      return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 25 };
+      return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 28 };
     case 'SIGNED':
-      return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 37.5 };
-    case 'PORTING_WAITING':
-      return { label: 'Waiting for LOA', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 50 };
+      return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 42 };
     case 'PORTING_SUBMITTED':
-      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 62.5 };
+      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 57 };
     case 'SOF_WAITING':
-      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 75 };
+      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 71 };
     case 'FOC_RECEIVED':
-      return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 87.5 };
+      return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 85 };
     case 'COMPLETED':
       return { label: 'Live Cutover', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50', pct: 100 };
     default:
@@ -74,6 +70,14 @@ interface OnboardingTimelineModalProps {
     general_manager_name?: string | null;
     general_manager_phone?: string | null;
     general_manager_email?: string | null;
+    draft_date?: string | null;
+    contract_sent_date?: string | null;
+    signed_date?: string | null;
+    porting_submitted_date?: string | null;
+    sof_review_date?: string | null;
+    foc_confirmed_date?: string | null;
+    live_cutover_date?: string | null;
+    [key: string]: any;
   } | null;
 }
 
@@ -99,7 +103,7 @@ export const OnboardingTimelineModal: React.FC<OnboardingTimelineModalProps> = (
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.18 }}
-          className="relative w-full max-w-3xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[92vh]"
+          className="relative w-full max-w-4xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 overflow-hidden flex flex-col max-h-[92vh]"
         >
           {/* Header */}
           <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between bg-slate-50/50 dark:bg-[#111217]/50 shrink-0">
@@ -138,7 +142,7 @@ export const OnboardingTimelineModal: React.FC<OnboardingTimelineModalProps> = (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
-                  Onboarding Progress Roadmap
+                  Onboarding Progress Roadmap (7 Stages)
                 </h4>
                 <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                   {Math.round(currentBadge.pct)}% Complete
@@ -155,11 +159,12 @@ export const OnboardingTimelineModal: React.FC<OnboardingTimelineModalProps> = (
                 />
               </div>
 
-              {/* 8 Milestone Road Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+              {/* 7 Milestone Road Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 pt-3">
                 {STAGES_ROAD.map((st, idx) => {
                   const isDone = currentStepIndex !== -1 && idx < currentStepIndex;
                   const isCurrent = currentStepIndex !== -1 ? idx === currentStepIndex : idx === 0;
+                  const stageDate = record[st.dateField];
 
                   return (
                     <motion.div
@@ -175,29 +180,44 @@ export const OnboardingTimelineModal: React.FC<OnboardingTimelineModalProps> = (
                           : 'border-slate-200 dark:border-[#222430] opacity-50 bg-slate-50/30 dark:bg-[#181920]/50'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                            isDone
-                              ? 'bg-emerald-500 text-white'
-                              : isCurrent
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-200 dark:bg-[#222430] text-slate-600 dark:text-slate-400'
-                          }`}
-                        >
-                          {isDone ? <Check className="w-3 h-3" /> : st.step}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-semibold">
-                          Stage {st.step}
-                        </span>
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                              isDone
+                                ? 'bg-emerald-500 text-white'
+                                : isCurrent
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-200 dark:bg-[#222430] text-slate-600 dark:text-slate-400'
+                            }`}
+                          >
+                            {isDone ? <Check className="w-3 h-3" /> : st.step}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold">
+                            Stage {st.step}
+                          </span>
+                        </div>
+
+                        <p className="font-bold text-slate-900 dark:text-white text-xs leading-snug">
+                          {st.label}
+                        </p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
+                          {st.desc}
+                        </p>
                       </div>
 
-                      <p className="font-bold text-slate-900 dark:text-white text-xs leading-snug">
-                        {st.label}
-                      </p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-tight">
-                        {st.desc}
-                      </p>
+                      {/* Display milestone date ONLY if entered by admin */}
+                      {stageDate && (
+                        <div className="mt-2 pt-1.5 border-t border-slate-200/60 dark:border-[#222430] flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                          <Calendar className="w-2.5 h-2.5 shrink-0" />
+                          <span>
+                            {new Date(stageDate).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                      )}
                     </motion.div>
                   );
                 })}

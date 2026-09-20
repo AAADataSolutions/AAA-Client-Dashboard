@@ -133,11 +133,14 @@ export default function ClientPropertiesPage() {
 
   // 3-Dots Fixed Action Menu state
   const [menuPosition, setMenuPosition] = useState<{
-    top?: number;
     bottom?: number;
+    top?: number;
     left: number;
     prop: PropertyRecord;
   } | null>(null);
+
+  // Filter for Ray Baum
+  const [rayBaumFilter, setRayBaumFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
   // Copy state
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -155,6 +158,9 @@ export default function ClientPropertiesPage() {
         state: stateFilter,
         sortBy: sortBy,
       });
+      if (rayBaumFilter !== 'ALL') {
+        params.set('rayBaum', rayBaumFilter);
+      }
 
       const res = await fetch(`/api/client/properties?${params.toString()}`);
       const json = await res.json();
@@ -173,7 +179,7 @@ export default function ClientPropertiesPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, statusFilter, onboardingFilter, stateFilter, sortBy]);
+  }, [currentPage, searchQuery, statusFilter, onboardingFilter, stateFilter, sortBy, rayBaumFilter]);
 
   useEffect(() => {
     fetchProperties();
@@ -184,12 +190,8 @@ export default function ClientPropertiesPage() {
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 240;
     const left = Math.max(16, rect.right - menuWidth);
-    const isNearBottom = rect.bottom + 270 > window.innerHeight;
-    if (isNearBottom) {
-      setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, prop });
-    } else {
-      setMenuPosition({ top: rect.bottom + 4, left, prop });
-    }
+    const bottom = window.innerHeight - rect.top + 6;
+    setMenuPosition({ bottom, left, prop });
   };
 
   const handleOpenTicketModalForProp = (propId: string) => {
@@ -225,7 +227,7 @@ export default function ClientPropertiesPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || onboardingFilter !== 'ALL' || stateFilter !== 'ALL' || sortBy !== 'NEWEST';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || onboardingFilter !== 'ALL' || stateFilter !== 'ALL' || rayBaumFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
 
   return (
@@ -413,6 +415,21 @@ export default function ClientPropertiesPage() {
             <option value="COMPLETED">Completed</option>
           </select>
 
+          {/* Ray Baum and Kary's Law Filter */}
+          <select
+            value={rayBaumFilter}
+            onChange={(e) => {
+              setRayBaumFilter(e.target.value as any);
+              setCurrentPage(1);
+            }}
+            aria-label="Filter properties by Ray Baum and Kary's Law"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+          >
+            <option value="ALL">Ray Baum: All</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+          </select>
+
           {/* Sort By Filter */}
           <select
             value={sortBy}
@@ -535,7 +552,7 @@ export default function ClientPropertiesPage() {
                     E911 STATUS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    RAY BAUM STATUS
+                    RAY BAUM AND KARY'S LAW
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     GM NAME
@@ -620,17 +637,27 @@ export default function ClientPropertiesPage() {
                         </span>
                       </td>
 
-                      {/* Column 5: RAY BAUM STATUS */}
+                      {/* Column 5: RAY BAUM AND KARY'S LAW */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
-                            prop.ray_baud_and_logs_enabled
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
-                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          }`}
-                        >
-                          {prop.ray_baud_and_logs_enabled ? 'COMPLIANT' : 'DISABLED'}
-                        </span>
+                        {((prop as any).ray_baum_status === 'Active' || prop.ray_baud_and_logs_enabled) ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`/dashboard/ray-baum/${prop.id}`, '_blank');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                            title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Active</span>
+                            <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span>Inactive</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* Column 6: GM NAME */}

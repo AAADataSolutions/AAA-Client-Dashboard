@@ -159,17 +159,13 @@ export default function ClientOnboardingPage() {
     fetchOnboardings();
   }, [fetchOnboardings]);
 
+  // Open 3-Dots Menu strictly ABOVE the line (Rule 8)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, record: OnboardingRecordItem) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const menuWidth = 220;
     const left = Math.max(16, rect.right - menuWidth);
-    const isNearBottom = rect.bottom + 180 > window.innerHeight;
-    if (isNearBottom) {
-      setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, record });
-    } else {
-      setMenuPosition({ top: rect.bottom + 4, left, record });
-    }
+    setMenuPosition({ bottom: window.innerHeight - rect.top + 6, left, record });
   };
 
   const handleOpenTimeline = (record: OnboardingRecordItem) => {

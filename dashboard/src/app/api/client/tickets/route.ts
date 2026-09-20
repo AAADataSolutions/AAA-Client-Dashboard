@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { sendTicketEmail } from '@/lib/email/mailer';
 
 // Generate a deterministic 8-digit ticket number from UUID
 function generateTicketNumber(uuid: string): string {
@@ -180,6 +182,71 @@ export async function GET(request: NextRequest) {
   }
 }
 
+async function sendTicketNotifications({
+  ticket,
+  member,
+  propertyName,
+  category,
+  attachmentFileNames = [],
+  userId,
+}: {
+  ticket: any;
+  member: any;
+  propertyName: string;
+  category?: string | null;
+  attachmentFileNames?: string[];
+  userId: string;
+}) {
+  const dbClient = createAdminClient();
+  const orgName = (member.organization as any)?.name || 'Client Organization';
+  const profile = (member.profile as any) || { full_name: 'Client User', email: '' };
+
+  // 1. Send Email via SMTP to support@aaadatasolutions.com
+  try {
+    await sendTicketEmail({
+      ticketId: ticket.id,
+      subject: ticket.subject,
+      description: ticket.description,
+      priority: ticket.priority,
+      category: category || undefined,
+      organizationName: orgName,
+      propertyName,
+      raisedByName: profile.full_name || 'Client User',
+      raisedByEmail: profile.email || '',
+      attachmentUrls: attachmentFileNames,
+    });
+  } catch (emailErr) {
+    console.error('Failed to send ticket email:', emailErr);
+  }
+
+  // 2. Realtime Notifications to Super Admins
+  if (dbClient) {
+    try {
+      const { data: admins } = await dbClient
+        .from('profiles')
+        .select('id')
+        .in('role', ['SUPER_ADMIN', 'SUB_SUPER_ADMIN'])
+        .eq('status', 'ACTIVE');
+
+      if (admins && admins.length > 0) {
+        const notifs = admins.map((a: any) => ({
+          recipient_id: a.id,
+          sender_id: userId,
+          type: 'NEW_TICKET',
+          title: `New Support Ticket: ${ticket.subject}`,
+          message: `${profile.full_name || 'A client'} from ${orgName} submitted a ticket (${ticket.priority}): ${ticket.subject}`,
+          entity_type: 'ticket',
+          entity_id: ticket.id,
+          organization_id: member.organization_id,
+        }));
+        await dbClient.from('notifications').insert(notifs);
+      }
+    } catch (notifErr) {
+      console.error('Failed to insert ticket notification:', notifErr);
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -194,7 +261,7 @@ export async function POST(request: NextRequest) {
 
     const { data: member } = await supabase
       .from('organization_members')
-      .select('organization_id')
+      .select('organization_id, organization:organizations(name), profile:profiles(full_name, email)')
       .eq('profile_id', user.id)
       .maybeSingle();
 
@@ -253,6 +320,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Fetch property name for alerts
+      let propertyName = 'General Property';
+      const { data: opData } = await supabase
+        .from('organization_properties')
+        .select('property:properties(name)')
+        .eq('id', organization_property_id)
+        .maybeSingle();
+      if ((opData as any)?.property?.name) {
+        propertyName = (opData as any).property.name;
+      }
+
       // Update phone number on profile if provided
       if (phone_number && phone_number.trim()) {
         await supabase
@@ -286,10 +364,12 @@ export async function POST(request: NextRequest) {
 
       // Handle file attachments (max 3)
       const files: File[] = [];
+      const fileNames: string[] = [];
       for (let i = 0; i < 3; i++) {
         const file = formData.get(`attachment_${i}`) as File | null;
         if (file && file.size > 0) {
           files.push(file);
+          fileNames.push(file.name);
         }
       }
 
@@ -327,6 +407,16 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      // Trigger email and in-app notifications
+      await sendTicketNotifications({
+        ticket: newTicket,
+        member,
+        propertyName,
+        category,
+        attachmentFileNames: fileNames,
+        userId: user.id,
+      });
 
       return NextResponse.json({
         success: true,
@@ -377,6 +467,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch property name for alerts
+    let propertyName = 'General Property';
+    const { data: opData } = await supabase
+      .from('organization_properties')
+      .select('property:properties(name)')
+      .eq('id', organization_property_id)
+      .maybeSingle();
+    if ((opData as any)?.property?.name) {
+      propertyName = (opData as any).property.name;
+    }
+
     // Update phone number on profile if provided
     if (phone_number && phone_number.trim()) {
       await supabase
@@ -407,6 +508,16 @@ export async function POST(request: NextRequest) {
       throw insertErr || new Error('Failed to create ticket');
     }
 
+    // Trigger email and in-app notifications
+    await sendTicketNotifications({
+      ticket: newTicket,
+      member,
+      propertyName,
+      category,
+      attachmentFileNames: [],
+      userId: user.id,
+    });
+
     return NextResponse.json({
       success: true,
       data: newTicket,
@@ -420,3 +531,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

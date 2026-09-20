@@ -842,7 +842,7 @@ export default function AdminOverviewPage() {
           </Link>
         </div>
         <p className="text-[11px] text-slate-500 dark:text-slate-400 -mt-2">
-          KARI&apos;S Law and RAY BAUM&apos;S Act location dispatch verification status across all properties.
+          KARY&apos;S Law and RAY BAUM&apos;S Act location dispatch verification status across all properties.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">

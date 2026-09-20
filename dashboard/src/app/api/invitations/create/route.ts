@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { logAdminAction } from '@/lib/audit/logger';
+import { sendInviteEmail } from '@/lib/email/mailer';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
@@ -17,13 +18,14 @@ export async function POST(request: Request) {
 
     const { data: callerProfile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, full_name')
       .eq('id', user.id)
       .maybeSingle();
 
     const body = await request.json();
     let {
       email,
+      role, // optional generic role passed from forms
       invite_type, // 'INTERNAL_TEAM' | 'CLIENT_MEMBER'
       target_app_role, // 'SUB_SUPER_ADMIN'
       target_org_role, // 'ADMIN' | 'USER'
@@ -40,6 +42,15 @@ export async function POST(request: Request) {
     // If invite_type is not provided, deduce from caller role
     if (!invite_type) {
       invite_type = isInternal ? 'INTERNAL_TEAM' : 'CLIENT_MEMBER';
+    }
+
+    // Role mapping fallback
+    if (role) {
+      if (invite_type === 'INTERNAL_TEAM' && !target_app_role) {
+        target_app_role = 'SUB_SUPER_ADMIN';
+      } else if (invite_type === 'CLIENT_MEMBER' && !target_org_role) {
+        target_org_role = role === 'ADMIN' ? 'ADMIN' : 'USER';
+      }
     }
 
     // Permission validations
@@ -124,6 +135,31 @@ export async function POST(request: Request) {
 
     const inviteUrl = `${new URL(request.url).origin}/invite/${rawToken}`;
 
+    // Look up organization name if this is a client member invite
+    let orgName: string | undefined;
+    if (organization_id) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', organization_id)
+        .maybeSingle();
+      if (orgData?.name) {
+        orgName = orgData.name;
+      }
+    }
+
+    // Dispatch automated invitation email
+    const emailResult = await sendInviteEmail({
+      recipientEmail: email.trim().toLowerCase(),
+      inviteUrl,
+      roleName:
+        invite_type === 'INTERNAL_TEAM'
+          ? (target_app_role === 'SUB_SUPER_ADMIN' ? 'Sub-Super Administrator' : 'Administrator')
+          : (target_org_role === 'ADMIN' ? 'Organization Administrator' : 'Organization Member'),
+      organizationName: orgName,
+      invitedByName: callerProfile?.full_name || user.email || 'An administrator',
+    });
+
     await logAdminAction({
       action: invite_type === 'INTERNAL_TEAM' ? 'ADMIN_INVITATION_SENT' : 'INVITATION_SENT',
       entity_type: 'INVITATION',
@@ -137,6 +173,7 @@ export async function POST(request: Request) {
         target_org_role,
         organization_id,
         email: email.trim().toLowerCase(),
+        email_sent: emailResult.success,
       },
     });
 
@@ -144,7 +181,11 @@ export async function POST(request: Request) {
       success: true,
       invitation: invite,
       inviteUrl,
-      message: 'Invitation generated successfully.',
+      emailSent: emailResult.success,
+      emailSkipped: emailResult.skipped,
+      message: emailResult.success
+        ? 'Invitation email dispatched and link generated successfully.'
+        : 'Invitation link generated successfully.',
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error';

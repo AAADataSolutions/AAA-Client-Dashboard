@@ -28,6 +28,7 @@ export interface Organization {
   state?: string | null;
   zip_code?: string | null;
   country: string;
+  logo_url?: string | null;
   status: OrgStatus;
   created_at: string;
   updated_at: string;

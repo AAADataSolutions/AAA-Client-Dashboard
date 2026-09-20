@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function POST(
@@ -27,7 +28,7 @@ export async function POST(
     // Verify ticket exists before inserting comment
     const { data: ticket, error: ticketErr } = await supabase
       .from('tickets')
-      .select('id, subject, status')
+      .select('id, subject, status, created_by')
       .eq('id', id)
       .single();
 
@@ -76,6 +77,24 @@ export async function POST(
       .from('tickets')
       .update(updateData)
       .eq('id', id);
+
+    // If public reply, notify the ticket creator
+    if (!isInternal && ticket.created_by && ticket.created_by !== user.id) {
+      try {
+        const adminClient = createAdminClient() || supabase;
+        await adminClient.from('notifications').insert({
+          recipient_id: ticket.created_by,
+          sender_id: user.id,
+          type: 'TICKET_REPLY',
+          title: `Update on Ticket: ${ticket.subject}`,
+          message: `Support team has posted a reply on your ticket.`,
+          entity_type: 'ticket',
+          entity_id: ticket.id,
+        });
+      } catch (notifErr) {
+        console.error('Failed to notify client of reply:', notifErr);
+      }
+    }
 
     // Audit Log
     await logAuditEvent({

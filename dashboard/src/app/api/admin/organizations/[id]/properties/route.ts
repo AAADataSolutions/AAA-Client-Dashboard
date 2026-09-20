@@ -84,7 +84,7 @@ export async function GET(
     const properties = (links || []).map((link: any) => {
       const p = link.property;
       const fullAddress = p?.address ? `${p.address}, ${p.city || ''}, ${p.state || ''} ${p.zip_code || ''}`.trim() : 'Address not specified';
-      const isRayBaumVerified = p?.ray_baum_status === 'VERIFIED' || !!p?.ray_baud_and_logs_enabled;
+      const isRayBaumActive = p?.ray_baum_status === 'ACTIVE' || p?.ray_baum_status === 'VERIFIED' || !!p?.ray_baud_and_logs_enabled;
       const rawE911 = e911Map[link.id];
       const e911Status = rawE911 === 'VERIFIED' ? 'Verified' : rawE911 === 'CORRECTION_REQUIRED' ? 'Correction Required' : 'Pending Validation';
 
@@ -105,7 +105,7 @@ export async function GET(
         general_manager_name: p?.general_manager_name || p?.contact_person_name || '—',
         general_manager_phone: p?.general_manager_phone || p?.main_phone || '—',
         general_manager_email: p?.general_manager_email || p?.contact_person_email || '—',
-        ray_baum_status: isRayBaumVerified ? 'Verified' : 'Not-Verified',
+        ray_baum_status: isRayBaumActive ? 'Active' : 'Inactive',
         e911_status: e911Status,
         created_at: p?.created_at,
       };
@@ -150,7 +150,7 @@ export async function POST(
       .insert({
         organization_id: organizationId,
         property_id,
-        status: status || 'ACTIVE',
+        status: status || 'ONBOARDING',
       })
       .select(`
         id,
@@ -160,6 +160,20 @@ export async function POST(
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Rule 3: Auto-create onboarding record at DRAFT stage
+    const { data: existingOnb } = await dbClient
+      .from('onboardings')
+      .select('id')
+      .eq('organization_property_id', newLink.id)
+      .maybeSingle();
+
+    if (!existingOnb) {
+      await dbClient.from('onboardings').insert({
+        organization_property_id: newLink.id,
+        status: 'DRAFT',
+      });
     }
 
     const propObj: any = (newLink as any)?.property;

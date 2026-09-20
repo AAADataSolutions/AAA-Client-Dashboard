@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const orgId = searchParams.get('orgId') || 'ALL';
     const status = searchParams.get('status') || 'ALL';
     const e911Filter = searchParams.get('e911') || 'ALL';
+    const rayBaumFilter = searchParams.get('rayBaum') || 'ALL';
     const sortBy = searchParams.get('sortBy') || 'NAME_ASC';
 
     // 1. Fetch Global DB Metrics
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
         services_count: 0,
         onboarding_stage: 'Draft Initialized',
         e911_status: p.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        ray_baum_status: p.ray_baud_and_logs_enabled ? 'Verified' : 'Not-Verified',
+        ray_baum_status: (p.ray_baum_status === 'ACTIVE' || p.ray_baud_and_logs_enabled) ? 'Active' : 'Inactive',
       }));
 
       return NextResponse.json({
@@ -160,13 +161,20 @@ export async function GET(request: NextRequest) {
         services_count: dynamicServiceCount,
         onboarding_stage: stage,
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        ray_baum_status: isE911Verified ? 'Verified' : 'Not-Verified',
+        ray_baum_status: (prop.ray_baum_status === 'ACTIVE' || isE911Verified) ? 'Active' : 'Inactive',
         created_at: prop.created_at,
         updated_at: prop.updated_at || prop.created_at,
       };
     });
 
-    // 4. Filter by Organization if requested
+    // 4. Filter by Ray Baum status if requested
+    if (rayBaumFilter === 'ACTIVE') {
+      processed = processed.filter((p: any) => p.ray_baum_status === 'Active');
+    } else if (rayBaumFilter === 'INACTIVE') {
+      processed = processed.filter((p: any) => p.ray_baum_status === 'Inactive');
+    }
+
+    // 5. Filter by Organization if requested
     if (orgId !== 'ALL') {
       processed = processed.filter((p: any) =>
         p.organizations.some((o: any) => o.id === orgId)

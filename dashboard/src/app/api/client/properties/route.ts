@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get('status') || 'ALL';
     const onboardingFilter = searchParams.get('onboarding') || 'ALL';
     const stateFilter = searchParams.get('state') || 'ALL';
+    const rayBaumFilter = searchParams.get('rayBaum') || 'ALL';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '10', 10);
 
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
           general_manager_name,
           general_manager_phone,
           general_manager_email,
+          ray_baum_status,
           ray_baud_and_logs_enabled,
           status,
           created_at
@@ -135,6 +137,7 @@ export async function GET(request: NextRequest) {
           general_manager_phone: gmPhone,
           general_manager_email: gmEmail,
           ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
+          ray_baum_status: (prop.ray_baum_status === 'ACTIVE' || prop.ray_baud_and_logs_enabled) ? 'Active' : 'Inactive',
           status: propStatus,
           stage: onboardingRecord?.status || (propStatus === 'ACTIVE' ? 'COMPLETED' : 'DRAFT'),
           services_count: servicesList.length,
@@ -192,6 +195,12 @@ export async function GET(request: NextRequest) {
 
     if (stateFilter !== 'ALL') {
       filtered = filtered.filter((p) => p.state === stateFilter);
+    }
+
+    if (rayBaumFilter === 'ACTIVE') {
+      filtered = filtered.filter((p) => p.ray_baum_status === 'Active');
+    } else if (rayBaumFilter === 'INACTIVE') {
+      filtered = filtered.filter((p) => p.ray_baum_status === 'Inactive');
     }
 
     // Sorting

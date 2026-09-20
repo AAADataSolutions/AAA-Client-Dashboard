@@ -225,3 +225,58 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: ticket } = await supabase
+      .from('tickets')
+      .select('id, subject')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!ticket) {
+      return NextResponse.json({ success: false, error: 'Ticket not found' }, { status: 404 });
+    }
+
+    // Unlink / clean up comments and attachments
+    await supabase.from('ticket_comments').delete().eq('ticket_id', id);
+    await supabase.from('ticket_attachments').delete().eq('ticket_id', id);
+
+    // Delete ticket
+    const { error: deleteErr } = await supabase.from('tickets').delete().eq('id', id);
+
+    if (deleteErr) {
+      return NextResponse.json({ success: false, error: deleteErr.message }, { status: 400 });
+    }
+
+    // Log audit event
+    await logAuditEvent({
+      action: 'TICKET_DELETED',
+      entity_type: 'TICKET',
+      entity_id: id,
+      entity_name: ticket.subject,
+      changes: { deleted: true },
+    });
+
+    return NextResponse.json({ success: true, message: 'Ticket deleted successfully' });
+  } catch (err: any) {
+    console.error('Admin delete ticket error:', err);
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+

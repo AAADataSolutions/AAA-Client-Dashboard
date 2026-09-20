@@ -19,6 +19,7 @@ import {
   ArrowLeftRight,
   Flame,
   ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -50,9 +51,10 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Services and Lines', href: '/dashboard/services', icon: PhoneCall },
       { label: 'Firelines', href: '/dashboard/firelines', icon: Flame },
+      { label: 'Elevator Lines', href: '/dashboard/elevator-lines', icon: ArrowUpDown },
     ],
   },
-  { label: 'E911 Compliance', href: '/dashboard/e911', icon: ShieldCheck },
+  { label: "E911 Compliance", href: '/dashboard/e911', icon: ShieldCheck },
   { label: 'Onboarding Tracker', href: '/dashboard/onboarding', icon: GitBranch },
   { label: 'Porting Tracker', href: '/dashboard/porting', icon: ArrowLeftRight },
   { label: 'Support Tickets', href: '/dashboard/tickets', icon: LifeBuoy },
@@ -86,6 +88,17 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
       >
         {/* Top Header & Navigation */}
         <div className="flex flex-col flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {/* Organization Logo (above brand header, if uploaded) */}
+          {orgMembership?.organization?.logo_url && (
+            <div className={`px-4 pt-3 pb-2 border-b border-[#27272a] flex items-center ${isOpen ? 'justify-start' : 'justify-center'} bg-[#161619]`}>
+              <img
+                src={orgMembership.organization.logo_url}
+                alt={orgName}
+                className="max-h-9 max-w-full object-contain rounded"
+              />
+            </div>
+          )}
+
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
             <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">

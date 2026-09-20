@@ -168,10 +168,17 @@ export async function GET(
           status,
           current_stage,
           target_completion_date,
+          draft_date,
+          contract_sent_date,
+          signed_date,
+          porting_submitted_date,
+          sof_review_date,
+          foc_confirmed_date,
+          live_cutover_date,
           created_at,
           organization_property:organization_properties(
             id,
-            property:properties(id, name, city, state)
+            property:properties(id, name, address, city, state, general_manager_name, general_manager_phone, general_manager_email)
           )
         `)
         .in('organization_property_id', orgPropIds)
@@ -183,10 +190,21 @@ export async function GET(
           id: o.id,
           property_id: prop?.id,
           property_name: prop?.name || 'Property',
+          property_address: prop?.address || (prop ? `${prop.city}, ${prop.state}` : '—'),
           property_location: prop ? `${prop.city}, ${prop.state}` : '',
+          general_manager_name: prop?.general_manager_name || '—',
+          general_manager_phone: prop?.general_manager_phone || '—',
+          general_manager_email: prop?.general_manager_email || '—',
           stage: o.current_stage || o.status || 'DRAFT',
           status: o.status,
           target_date: o.target_completion_date,
+          draft_date: o.draft_date,
+          contract_sent_date: o.contract_sent_date,
+          signed_date: o.signed_date,
+          porting_submitted_date: o.porting_submitted_date,
+          sof_review_date: o.sof_review_date,
+          foc_confirmed_date: o.foc_confirmed_date,
+          live_cutover_date: o.live_cutover_date,
           created_at: o.created_at,
         };
       });
@@ -388,6 +406,7 @@ export async function PATCH(
     if (body.state !== undefined) updatePayload.state = body.state ? body.state.trim() : null;
     if (body.zip_code !== undefined) updatePayload.zip_code = body.zip_code ? body.zip_code.trim() : null;
     if (body.country !== undefined) updatePayload.country = body.country ? body.country.trim() : 'USA';
+    if (body.logo_url !== undefined) updatePayload.logo_url = body.logo_url ? body.logo_url.trim() : null;
     if (body.status !== undefined) updatePayload.status = body.status;
 
     const { data: updatedOrg, error } = await dbClient
@@ -436,28 +455,44 @@ export async function DELETE(
       .eq('id', id)
       .maybeSingle();
 
-    const { error } = await dbClient
-      .from('organizations')
-      .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
-      .eq('id', id);
+    if (!orgData) {
+      return NextResponse.json({ success: false, error: 'Organization not found' }, { status: 404 });
+    }
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    // Try hard deletion by unlinking dependencies first
+    try {
+      await dbClient.from('organization_members').delete().eq('organization_id', id);
+      await dbClient.from('invitations').delete().eq('organization_id', id);
+      await dbClient.from('organization_properties').delete().eq('organization_id', id);
+      const { error: delErr } = await dbClient.from('organizations').delete().eq('id', id);
+      if (delErr) {
+        // Fallback to ARCHIVED if constraint still prevents hard delete
+        await dbClient
+          .from('organizations')
+          .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
+          .eq('id', id);
+      }
+    } catch {
+      await dbClient
+        .from('organizations')
+        .update({ status: 'ARCHIVED', updated_at: new Date().toISOString() })
+        .eq('id', id);
     }
 
     // Log Audit Event
     await logAdminAction({
-      action: 'ORGANIZATION_ARCHIVED',
+      action: 'ORGANIZATION_DELETED',
       entity_type: 'ORGANIZATION',
       entity_id: id,
-      entity_name: orgData?.name || `Organization ${id}`,
+      entity_name: orgData.name || `Organization ${id}`,
       organization_id: id,
-      description: `Archived organization '${orgData?.name || id}'`,
-      changes: { status: 'ARCHIVED' },
+      description: `Deleted organization '${orgData.name || id}'`,
+      changes: { deleted: true },
     });
 
-    return NextResponse.json({ success: true, message: 'Organization archived successfully' });
+    return NextResponse.json({ success: true, message: 'Organization deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+

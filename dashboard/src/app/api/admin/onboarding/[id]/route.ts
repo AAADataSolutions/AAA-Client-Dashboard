@@ -48,6 +48,14 @@ export async function PATCH(
     };
 
     if (body.target_date !== undefined) updatePayload.target_date = body.target_date;
+    if (body.target_completion_date !== undefined) updatePayload.target_completion_date = body.target_completion_date;
+    if (body.draft_date !== undefined) updatePayload.draft_date = body.draft_date || null;
+    if (body.contract_sent_date !== undefined) updatePayload.contract_sent_date = body.contract_sent_date || null;
+    if (body.signed_date !== undefined) updatePayload.signed_date = body.signed_date || null;
+    if (body.porting_submitted_date !== undefined) updatePayload.porting_submitted_date = body.porting_submitted_date || null;
+    if (body.sof_review_date !== undefined) updatePayload.sof_review_date = body.sof_review_date || null;
+    if (body.foc_confirmed_date !== undefined) updatePayload.foc_confirmed_date = body.foc_confirmed_date || null;
+    if (body.live_cutover_date !== undefined) updatePayload.live_cutover_date = body.live_cutover_date || null;
 
     if (body.status !== undefined) {
       updatePayload.status = body.status;

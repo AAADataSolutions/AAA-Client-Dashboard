@@ -192,7 +192,7 @@ export const E911DetailDrawer: React.FC<E911DetailDrawerProps> = ({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Kari\'s Law Notification:</span>
+                <span className="text-slate-400">Kary's Law Notification:</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                   Compliant (Direct 911 Dialing)
                 </span>

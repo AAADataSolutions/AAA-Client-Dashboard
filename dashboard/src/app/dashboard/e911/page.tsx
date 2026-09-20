@@ -154,7 +154,7 @@ export default function ClientE911Page() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              E911 &amp; Ray Baum Compliance
+              Ray Baum and Kary's Law Compliance
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Emergency dispatch routing validation for <strong className="text-slate-700 dark:text-slate-200">{orgName}</strong>
@@ -399,7 +399,7 @@ export default function ClientE911Page() {
                     STATUS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    RAY BAUM ACT
+                    RAY BAUM AND KARY'S LAW
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     ACTIONS

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendPortingEmail } from '@/lib/email/mailer';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     const { data: member } = await supabase
       .from('organization_members')
-      .select('organization_id, role')
+      .select('organization_id, role, organization:organizations(name)')
       .eq('profile_id', user.id)
       .maybeSingle();
 
@@ -33,30 +34,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('q')?.toLowerCase() || '';
     const statusFilter = searchParams.get('status') || 'ALL';
-    const propertyFilter = searchParams.get('property_id') || 'ALL';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '10', 10);
 
     const dbClient = createAdminClient() || supabase;
 
-    // Get organization_properties for tenant
-    const { data: orgProps } = await dbClient
-      .from('organization_properties')
-      .select('id, property:properties(id, name, address, city, state, zip_code, main_phone)')
-      .eq('organization_id', member.organization_id);
-
-    const orgPropIds = (orgProps || []).map((op) => op.id);
-
-    if (orgPropIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        total: 0,
-        metrics: { total: 0, inProgress: 0, focReceived: 0, completed: 0, actionRequired: 0 },
-        filters: { properties: [] },
-      });
-    }
-
+    // Fetch porting requests matching this organization
     const { data: portRecords, error } = await dbClient
       .from('porting_requests')
       .select(`
@@ -65,143 +48,91 @@ export async function GET(request: NextRequest) {
           id,
           property:properties(id, name, address, city, state, zip_code, main_phone)
         ),
-        porting_request_services(
-          id,
-          service:services(id, phone_number, status, description, service_type:service_types(name))
+        attachments:porting_attachments(
+          id, file_name, file_size, mime_type, storage_path, created_at
         )
       `)
-      .in('organization_property_id', orgPropIds)
+      .or(`organization_id.eq.${member.organization_id},organization_property.organization_id.eq.${member.organization_id}`)
       .order('created_at', { ascending: false });
 
     if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+      // Fallback simple query
+      const { data: simpleRecords } = await dbClient
+        .from('porting_requests')
+        .select('*')
+        .eq('organization_id', member.organization_id)
+        .order('created_at', { ascending: false });
+
+      return NextResponse.json({
+        success: true,
+        data: simpleRecords || [],
+        total: simpleRecords?.length || 0,
+        metrics: { total: simpleRecords?.length || 0, inProgress: 0, focReceived: 0, completed: 0, actionRequired: 0 },
+        filters: { properties: [] },
+      });
     }
 
     const allPortings = (portRecords || []).map((item: any) => {
       const prop = item.organization_property?.property;
-      const services = (item.porting_request_services || [])
-        .map((prs: any) => {
-          const s = prs.service;
-          if (!s) return null;
-          return {
-            id: s.id,
-            phone_number: s.phone_number,
-            status: s.status,
-            description: s.description,
-            service_type: s.service_type?.name || 'Voice Line',
-          };
-        })
-        .filter(Boolean);
-
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
         property_id: prop?.id || null,
-        property_name: prop?.name || 'Property Location',
-        property_address: prop?.address ? `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code || ''}`.trim() : '',
-        property_location: prop ? `${prop.city}, ${prop.state}` : '',
-        property_phone: prop?.main_phone || '',
+        property_name: item.property_name || prop?.name || 'New Property',
+        property_address: item.property_address || prop?.address || '—',
+        property_phone: item.property_phone || prop?.main_phone || '—',
+        fax: item.fax || '—',
+        carrier_details: item.carrier_details || '',
         status: item.status,
-        target_date: item.target_date,
-        completed_at: item.completed_at,
-        notes: item.notes,
-        services_count: services.length,
-        services,
+        foc_date: item.foc_date || null,
+        target_date: item.target_date || null,
+        rejection_reason: item.rejection_reason || null,
+        notes: item.notes || '',
+        is_activated: item.is_activated || false,
         created_at: item.created_at,
-        updated_at: item.updated_at || item.created_at,
+        updated_at: item.updated_at,
+        attachments: item.attachments || [],
       };
     });
 
-    // KPI Cards per Task.md:
-    // Total Porting Requests, In Progress, FOC Received, Completed, Action Required (Rejected/Cancelled/Pending)
-    const total = allPortings.length;
-    const completed = allPortings.filter((p) => p.status === 'COMPLETED').length;
-    const focReceived = allPortings.filter((p) => p.status === 'FOC_RECEIVED').length;
-    const inProgress = allPortings.filter(
-      (p) => p.status === 'IN_PROGRESS' || p.status === 'SUBMITTED' || p.status === 'DRAFT'
-    ).length;
-    const actionRequired = allPortings.filter(
-      (p) => p.status === 'REJECTED' || p.status === 'CANCELLED' || p.status === 'PENDING'
-    ).length;
-
     let filtered = allPortings;
-    if (search) {
-      filtered = filtered.filter(
-        (p) =>
-          p.property_name.toLowerCase().includes(search) ||
-          (p.notes && p.notes.toLowerCase().includes(search)) ||
-          p.services.some((s: any) => s.phone_number?.toLowerCase().includes(search))
-      );
-    }
-
     if (statusFilter !== 'ALL') {
       if (statusFilter === 'ACTION_REQUIRED') {
-        filtered = filtered.filter((p) => p.status === 'REJECTED' || p.status === 'CANCELLED' || p.status === 'PENDING');
+        filtered = filtered.filter((p) => ['REJECTED', 'CANCELLED', 'PENDING'].includes(p.status));
       } else if (statusFilter === 'IN_PROGRESS_ALL') {
-        filtered = filtered.filter((p) => p.status === 'IN_PROGRESS' || p.status === 'SUBMITTED' || p.status === 'DRAFT');
+        filtered = filtered.filter((p) => ['IN_PROGRESS', 'SUBMITTED', 'DRAFT'].includes(p.status));
       } else {
         filtered = filtered.filter((p) => p.status === statusFilter);
       }
     }
 
-    if (propertyFilter !== 'ALL') {
-      filtered = filtered.filter((p) => p.property_id === propertyFilter);
+    if (search) {
+      filtered = filtered.filter(
+        (p) =>
+          p.property_name.toLowerCase().includes(search) ||
+          p.property_phone.toLowerCase().includes(search) ||
+          p.property_address.toLowerCase().includes(search) ||
+          p.id.toLowerCase().includes(search)
+      );
     }
 
-    // Sorting
-    const sortBy = searchParams.get('sortBy') || 'NEWEST';
-    if (sortBy === 'PROP_ASC') {
-      filtered.sort((a, b) => a.property_name.localeCompare(b.property_name));
-    } else if (sortBy === 'TARGET_DATE') {
-      filtered.sort((a, b) => {
-        if (!a.target_date && !b.target_date) return 0;
-        if (!a.target_date) return 1;
-        if (!b.target_date) return -1;
-        return new Date(a.target_date).getTime() - new Date(b.target_date).getTime();
-      });
-    } else if (sortBy === 'STATUS') {
-      filtered.sort((a, b) => a.status.localeCompare(b.status));
-    } else {
-      // NEWEST
-      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-
-    // Unique properties for filter dropdown
-    const propertyOptions = Array.from(
-      new Map(
-        allPortings
-          .filter((p) => p.property_id)
-          .map((p) => [p.property_id, { id: p.property_id, name: p.property_name }])
-      ).values()
-    );
-
-    const totalFiltered = filtered.length;
-    const startIndex = (page - 1) * limit;
-    const paginated = filtered.slice(startIndex, startIndex + limit);
+    const total = filtered.length;
+    const paginated = filtered.slice((page - 1) * limit, page * limit);
 
     return NextResponse.json({
       success: true,
       data: paginated,
-      total: totalFiltered,
-      page,
-      limit,
+      total,
       metrics: {
-        total,
-        inProgress,
-        focReceived,
-        completed,
-        actionRequired,
-      },
-      filters: {
-        properties: propertyOptions,
+        total: allPortings.length,
+        inProgress: allPortings.filter((p) => ['IN_PROGRESS', 'SUBMITTED'].includes(p.status)).length,
+        focReceived: allPortings.filter((p) => p.status === 'FOC_RECEIVED').length,
+        completed: allPortings.filter((p) => p.status === 'COMPLETED').length,
+        actionRequired: allPortings.filter((p) => ['REJECTED', 'CANCELLED', 'PENDING'].includes(p.status)).length,
       },
     });
   } catch (err: any) {
-    console.error('Client Porting API error:', err);
-    return NextResponse.json(
-      { success: false, error: err.message || 'Failed to fetch porting records' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -217,74 +148,105 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Role check: Only Client Admin can submit porting requests
+    // Get member org
     const { data: member } = await supabase
       .from('organization_members')
-      .select('organization_id, role')
+      .select('organization_id, organization:organizations(name), profile:profiles(full_name, email)')
       .eq('profile_id', user.id)
       .maybeSingle();
 
-    if (!member || member.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: 'Only Organization Admins can submit porting requests.' },
-        { status: 403 }
-      );
+    if (!member?.organization_id) {
+      return NextResponse.json({ success: false, error: 'User is not associated with an organization.' }, { status: 403 });
     }
 
     const body = await request.json();
-    const { organization_property_id, target_date, notes, service_ids } = body;
+    const { property_name, property_address, property_phone, fax, carrier_details, attachments } = body;
 
-    if (!organization_property_id) {
+    if (!property_name?.trim() || !property_phone?.trim()) {
       return NextResponse.json(
-        { success: false, error: 'Please select a destination property location.' },
+        { success: false, error: 'Property Name and Phone Number to port are required.' },
         { status: 400 }
       );
     }
 
     const dbClient = createAdminClient() || supabase;
 
-    // Insert porting request in SUBMITTED state
-    const { data: portRequest, error: portErr } = await dbClient
+    // Insert porting request
+    const { data: newPorting, error: insertErr } = await dbClient
       .from('porting_requests')
       .insert({
-        organization_property_id,
+        organization_id: member.organization_id,
+        created_by: user.id,
+        property_name: property_name.trim(),
+        property_address: property_address ? property_address.trim() : null,
+        property_phone: property_phone.trim(),
+        fax: fax ? fax.trim() : null,
+        carrier_details: carrier_details ? carrier_details.trim() : null,
         status: 'SUBMITTED',
-        target_date: target_date || null,
-        notes: notes?.trim() || null,
+        is_activated: false,
       })
       .select()
       .single();
 
-    if (portErr || !portRequest) {
-      throw portErr || new Error('Failed to create porting request');
+    if (insertErr) {
+      return NextResponse.json({ success: false, error: insertErr.message }, { status: 400 });
     }
 
-    // Attach services if provided
-    if (Array.isArray(service_ids) && service_ids.length > 0) {
-      const inserts = service_ids.map((sid: string) => ({
-        porting_request_id: portRequest.id,
-        service_id: sid,
+    // Insert attachments if provided
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const attRows = attachments.map((att: any) => ({
+        porting_request_id: newPorting.id,
+        uploaded_by: user.id,
+        file_name: att.file_name,
+        file_size: att.file_size || 0,
+        mime_type: att.mime_type || 'application/pdf',
+        storage_path: att.storage_path,
       }));
 
-      await dbClient.from('porting_request_services').insert(inserts);
-
-      // Update service status to PENDING_PORT
-      await dbClient
-        .from('services')
-        .update({ status: 'PENDING_PORT', updated_at: new Date().toISOString() })
-        .in('id', service_ids);
+      await dbClient.from('porting_attachments').insert(attRows);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: portRequest,
-      message: 'Porting order submitted successfully to AAA Carrier Operations.',
+    // Send email alert via SMTP
+    const orgName = (member.organization as any)?.name || 'Client Organization';
+    const profile = (member.profile as any) || { full_name: 'User', email: user.email };
+
+    await sendPortingEmail({
+      portingRequestId: newPorting.id,
+      propertyName: newPorting.property_name,
+      propertyAddress: newPorting.property_address || 'Address pending',
+      propertyPhone: newPorting.property_phone,
+      fax: newPorting.fax || '',
+      carrierDetails: newPorting.carrier_details || '',
+      organizationName: orgName,
+      submittedByName: profile.full_name || 'Client Member',
+      submittedByEmail: profile.email || user.email || '',
+      attachmentCount: attachments?.length || 0,
     });
+
+    // Notify all admins via in-app notifications
+    const { data: admins } = await dbClient
+      .from('profiles')
+      .select('id')
+      .in('role', ['SUPER_ADMIN', 'SUB_SUPER_ADMIN'])
+      .eq('status', 'ACTIVE');
+
+    if (admins && admins.length > 0) {
+      const notifs = admins.map((a: any) => ({
+        recipient_id: a.id,
+        sender_id: user.id,
+        type: 'NEW_PORTING_REQUEST',
+        title: `New Porting Request: ${newPorting.property_name}`,
+        message: `${profile.full_name || 'A client'} from ${orgName} submitted a porting request for ${newPorting.property_phone}.`,
+        entity_type: 'porting_request',
+        entity_id: newPorting.id,
+        organization_id: member.organization_id,
+      }));
+
+      await dbClient.from('notifications').insert(notifs);
+    }
+
+    return NextResponse.json({ success: true, data: newPorting });
   } catch (err: any) {
-    console.error('Client Porting Creation error:', err);
-    return NextResponse.json(
-      { success: false, error: err.message || 'Failed to submit porting order' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

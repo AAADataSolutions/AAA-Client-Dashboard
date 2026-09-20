@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, ShieldCheck, MapPin, Phone, Mail, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Building2, ShieldCheck, MapPin, Phone, Mail, ArrowRight, Loader2, AlertCircle, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 
 function OnboardingContent() {
@@ -17,6 +17,8 @@ function OnboardingContent() {
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [country, setCountry] = useState('USA');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,20 @@ function OnboardingContent() {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to complete setup.');
+      }
+
+      // If user selected a logo, upload it
+      if (logoFile) {
+        try {
+          const logoForm = new FormData();
+          logoForm.append('logo', logoFile);
+          await fetch('/api/client/organization/logo', {
+            method: 'POST',
+            body: logoForm,
+          });
+        } catch (logoErr) {
+          console.warn('Failed to upload logo during onboarding:', logoErr);
+        }
       }
 
       await refreshProfile();
@@ -192,6 +208,61 @@ function OnboardingContent() {
                 className="w-full bg-[#f8f9fa] border border-[#e2e8f0] focus:border-[#1275e2] focus:bg-white rounded-lg px-3.5 py-2 text-xs text-[#181c22] outline-none"
               />
             </div>
+          </div>
+
+          {/* Organization Logo (Optional) */}
+          <div className="space-y-1.5 pt-1">
+            <label className="block text-xs font-semibold text-[#181c22] flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-[#1275e2]" />
+                Organization Logo (Optional)
+              </span>
+              <span className="text-[11px] text-[#64748b] font-normal">Max 2MB (PNG, JPG, SVG, WebP)</span>
+            </label>
+
+            {logoPreview ? (
+              <div className="flex items-center gap-3 p-3 rounded-lg border border-[#e2e8f0] bg-[#f8f9fa]">
+                <div className="w-16 h-12 rounded bg-white border border-[#e2e8f0] p-1 flex items-center justify-center overflow-hidden">
+                  <img src={logoPreview} alt="Logo preview" className="max-h-full max-w-full object-contain" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-[#181c22] truncate">{logoFile?.name}</p>
+                  <p className="text-[10px] text-[#64748b]">Ready to upload with organization</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogoFile(null);
+                    setLogoPreview(null);
+                  }}
+                  className="p-1 rounded text-[#64748b] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                  title="Remove logo"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="border border-dashed border-[#cbd5e1] hover:border-[#1275e2] rounded-lg p-3.5 flex items-center justify-center gap-2 cursor-pointer transition bg-[#f8f9fa] hover:bg-blue-50/20">
+                <Upload className="w-4 h-4 text-[#1275e2]" />
+                <span className="text-xs font-medium text-[#475569]">Click to choose organization logo</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 2 * 1024 * 1024) {
+                        setError('Logo file size exceeds 2MB limit.');
+                        return;
+                      }
+                      setLogoFile(file);
+                      setLogoPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+            )}
           </div>
 
           <div className="pt-4 flex items-center justify-between border-t border-[#e2e8f0]">

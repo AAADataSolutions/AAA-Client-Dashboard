@@ -444,7 +444,7 @@ export default function AdminE911Page() {
           <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0">
             <ShieldCheck size={256} className="text-black dark:text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">E911 &amp; Ray Baum Compliance</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Ray Baum and Kary's Law Compliance</h1>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -757,7 +757,7 @@ export default function AdminE911Page() {
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">EMERGENCY DISPATCH ADDRESS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM ACT</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY'S LAW</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>

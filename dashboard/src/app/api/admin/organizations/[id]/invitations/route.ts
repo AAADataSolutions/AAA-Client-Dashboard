@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
+import { sendInviteEmail } from '@/lib/email/mailer';
 import crypto from 'crypto';
 
 export async function GET(
@@ -136,6 +137,15 @@ export async function POST(
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     const inviteUrl = `${protocol}://${host}/invite/${rawToken}`;
 
+    // Dispatch automated invitation email
+    const emailResult = await sendInviteEmail({
+      recipientEmail: inviteEmail,
+      inviteUrl,
+      roleName: role === 'ADMIN' ? 'Organization Administrator' : 'Organization Member',
+      organizationName: org.name,
+      invitedByName: user.email || 'An administrator',
+    });
+
     // Audit Log
     await logAdminAction({
       action: 'INVITATION_SENT',
@@ -149,6 +159,7 @@ export async function POST(
         email: inviteEmail,
         role: role,
         organization_name: org.name,
+        email_sent: emailResult.success,
       },
     });
 
@@ -163,8 +174,12 @@ export async function POST(
         expires_at: expiresAt,
         role: invite.target_org_role,
         organization_name: org.name,
+        emailSent: emailResult.success,
+        emailSkipped: emailResult.skipped,
       },
-      message: 'Invitation generated successfully.',
+      message: emailResult.success
+        ? 'Invitation email sent and link generated successfully.'
+        : 'Invitation generated successfully.',
     });
   } catch (err: any) {
     console.error('Generate invite error:', err);

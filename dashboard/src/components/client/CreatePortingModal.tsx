@@ -1,13 +1,33 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, ArrowLeftRight, Loader2, AlertCircle, Phone, Check, CheckSquare, Square } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import {
+  X,
+  ArrowLeftRight,
+  Loader2,
+  AlertCircle,
+  Upload,
+  FileText,
+  Trash2,
+  Building2,
+  Phone,
+  ShieldCheck,
+} from 'lucide-react';
 import { useToast } from './ClientToast';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth/auth-context';
 
 interface CreatePortingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+}
+
+interface AttachedFile {
+  file: File;
+  name: string;
+  size: number;
+  type: string;
 }
 
 export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
@@ -16,90 +36,134 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
   onSuccess,
 }) => {
   const toast = useToast();
-  const [properties, setProperties] = useState<any[]>([]);
-  const [selectedOrgPropId, setSelectedOrgPropId] = useState<string>('');
-  const [allServices, setAllServices] = useState<any[]>([]);
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
-  const [targetDate, setTargetDate] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
-  const [loadingData, setLoadingData] = useState<boolean>(false);
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const { user } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [propertyName, setPropertyName] = useState('');
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const [propertyPhone, setPropertyPhone] = useState('');
+  const [fax, setFax] = useState('');
+  const [carrierDetails, setCarrierDetails] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setLoadingData(true);
-    setError(null);
-    setSelectedServiceIds([]);
-    setTargetDate('');
-    setNotes('');
-
-    Promise.all([
-      fetch('/api/client/properties?limit=100').then((r) => r.json()),
-      fetch('/api/client/services?limit=200').then((r) => r.json()),
-    ])
-      .then(([propsRes, servicesRes]) => {
-        if (propsRes.success && propsRes.data) {
-          setProperties(propsRes.data);
-          if (propsRes.data.length > 0) {
-            setSelectedOrgPropId(propsRes.data[0].org_property_id);
-          }
-        }
-        if (servicesRes.success && servicesRes.data) {
-          setAllServices(servicesRes.data);
-        }
-      })
-      .catch((err) => {
-        console.error('Error loading porting form data:', err);
-        setError('Failed to load properties or voice lines for porting.');
-      })
-      .finally(() => setLoadingData(false));
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Selected property object
-  const selectedProperty = properties.find((p) => p.org_property_id === selectedOrgPropId);
+  const pdfCount = attachedFiles.filter(
+    (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+  ).length;
+  const imgCount = attachedFiles.filter(
+    (f) => f.type.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(f.name)
+  ).length;
 
-  // Filter services that belong to the selected property
-  const eligibleServices = allServices.filter(
-    (s) => s.property_id === selectedProperty?.id || s.property_name === selectedProperty?.name
-  );
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
 
-  const toggleService = (id: string) => {
-    setSelectedServiceIds((prev) =>
-      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
-    );
+    let curPdfs = pdfCount;
+    let curImgs = imgCount;
+
+    const accepted: AttachedFile[] = [];
+    for (const f of files) {
+      if (f.size > 10 * 1024 * 1024) {
+        toast.error(`File "${f.name}" exceeds the 10MB limit.`);
+        continue;
+      }
+      const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      const isImg = f.type.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(f.name);
+
+      if (!isPdf && !isImg) {
+        toast.error(`File "${f.name}" is not supported. Only PDF and image files are allowed.`);
+        continue;
+      }
+
+      if (isPdf) {
+        if (curPdfs >= 2) {
+          toast.error('Maximum 2 PDF documents allowed.');
+          continue;
+        }
+        curPdfs++;
+      } else if (isImg) {
+        if (curImgs >= 2) {
+          toast.error('Maximum 2 image files allowed.');
+          continue;
+        }
+        curImgs++;
+      }
+
+      accepted.push({
+        file: f,
+        name: f.name,
+        size: f.size,
+        type: f.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+      });
+    }
+
+    setAttachedFiles((prev) => [...prev, ...accepted]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSelectAllServices = () => {
-    if (selectedServiceIds.length === eligibleServices.length) {
-      setSelectedServiceIds([]);
-    } else {
-      setSelectedServiceIds(eligibleServices.map((s) => s.id));
-    }
+  const removeFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrgPropId) {
-      setError('Please select a destination property location.');
+    if (!propertyName.trim() || !propertyPhone.trim()) {
+      setError('Property Name and Main Phone to Port are required.');
       return;
     }
 
     setSubmitting(true);
     setError(null);
+    const supabase = createClient();
 
     try {
+      // 1. Upload attachments to 'porting-attachments' bucket if any
+      const uploadedAttachments: { file_name: string; file_size: number; mime_type: string; storage_path: string }[] = [];
+
+      for (let i = 0; i < attachedFiles.length; i++) {
+        const item = attachedFiles[i];
+        setUploadProgress(`Uploading ${i + 1} of ${attachedFiles.length}: ${item.name}...`);
+
+        const cleanName = item.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const storagePath = `${user?.id || 'anon'}/${Date.now()}_${cleanName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('porting-attachments')
+          .upload(storagePath, item.file, {
+            contentType: item.type,
+            upsert: false,
+          });
+
+        if (uploadErr) {
+          console.error('Failed to upload file to storage:', uploadErr);
+          throw new Error(`Failed to upload ${item.name}: ${uploadErr.message}`);
+        }
+
+        uploadedAttachments.push({
+          file_name: item.name,
+          file_size: item.size,
+          mime_type: item.type,
+          storage_path: storagePath,
+        });
+      }
+
+      setUploadProgress('Finalizing porting request...');
+
+      // 2. Submit porting request
       const res = await fetch('/api/client/porting', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_property_id: selectedOrgPropId,
-          target_date: targetDate || null,
-          notes: notes.trim() || null,
-          service_ids: selectedServiceIds,
+          property_name: propertyName.trim(),
+          property_address: propertyAddress.trim() || null,
+          property_phone: propertyPhone.trim(),
+          fax: fax.trim() || null,
+          carrier_details: carrierDetails.trim() || null,
+          attachments: uploadedAttachments,
         }),
       });
 
@@ -108,24 +172,25 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
         throw new Error(data.error || 'Failed to submit porting request.');
       }
 
-      toast.success('Porting order submitted successfully to AAA Carrier Operations.');
+      toast.success('Porting request submitted! An email alert has been sent to support@aaadatasolutions.com.');
       onSuccess();
       onClose();
     } catch (err: any) {
       setError(err.message || 'Submission failed');
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-        {/* Modal Header */}
+      <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
+            <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/40">
               <ArrowLeftRight className="w-4 h-4" />
             </div>
             <div>
@@ -133,7 +198,7 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
                 Start New Porting Request
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Initiate carrier DID or toll-free transfer for your property numbers.
+                Submit phone numbers and carrier documentation for property migration.
               </p>
             </div>
           </div>
@@ -153,144 +218,170 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Property Selector */}
-          <div className="space-y-1.5">
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          {/* Property Name */}
+          <div className="space-y-1">
             <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-              Target Property Location <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={selectedOrgPropId}
-              onChange={(e) => {
-                setSelectedOrgPropId(e.target.value);
-                setSelectedServiceIds([]);
-              }}
-              disabled={loadingData || submitting}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs cursor-pointer"
-            >
-              {properties.map((p) => (
-                <option key={p.org_property_id} value={p.org_property_id}>
-                  {p.name} ({p.city}, {p.state})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Desired Target FOC Date */}
-          <div className="space-y-1.5">
-            <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-              Desired Cutover / Target FOC Date
+              Property Name <span className="text-rose-500">*</span>
             </label>
             <input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
+              type="text"
+              required
+              placeholder="e.g. Austin Grand Hotel & Conference Center"
+              value={propertyName}
+              onChange={(e) => setPropertyName(e.target.value)}
               disabled={submitting}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs"
             />
-            <p className="text-[10.5px] text-slate-400">
-              Standard carrier cutovers require 5 to 10 business days for FOC confirmation.
-            </p>
           </div>
 
-          {/* Eligible Lines Checklist */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
+          {/* Property Address */}
+          <div className="space-y-1">
+            <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+              Property Street Address
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. 100 Congress Ave, Austin, TX 78701"
+              value={propertyAddress}
+              onChange={(e) => setPropertyAddress(e.target.value)}
+              disabled={submitting}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs"
+            />
+          </div>
+
+          {/* Phone & Fax Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
               <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                Select Numbers to Port ({selectedServiceIds.length} Selected)
+                Main Phone to Port <span className="text-rose-500">*</span>
               </label>
-              {eligibleServices.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSelectAllServices}
-                  className="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold cursor-pointer"
-                >
-                  {selectedServiceIds.length === eligibleServices.length ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
+              <input
+                type="text"
+                required
+                placeholder="e.g. +1 512-555-0100"
+                value={propertyPhone}
+                onChange={(e) => setPropertyPhone(e.target.value)}
+                disabled={submitting}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                Fax Number (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. +1 512-555-0199"
+                value={fax}
+                onChange={(e) => setFax(e.target.value)}
+                disabled={submitting}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Carrier Details */}
+          <div className="space-y-1">
+            <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+              Current Carrier Details &amp; Account Info
+            </label>
+            <textarea
+              rows={2}
+              placeholder="Current Carrier (e.g. AT&T / Spectrum), Billing Account Number, PIN / Passcode, Authorized Contact Name..."
+              value={carrierDetails}
+              onChange={(e) => setCarrierDetails(e.target.value)}
+              disabled={submitting}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 text-xs resize-none"
+            />
+          </div>
+
+          {/* Attachments Upload (LOA, Phone Bills) */}
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-slate-800 dark:text-slate-200">
+                Porting Attachments (LOA &amp; Phone Bills)
+              </label>
+              <span className="text-[10px] text-slate-400">
+                PDFs ({pdfCount}/2) &bull; Images ({imgCount}/2) &bull; Max 10MB
+              </span>
             </div>
 
-            {loadingData ? (
-              <div className="p-4 bg-slate-50 dark:bg-[#111217] rounded-lg text-center text-slate-400 text-xs">
-                Loading property lines...
-              </div>
-            ) : eligibleServices.length === 0 ? (
-              <div className="p-3 bg-slate-50 dark:bg-[#111217] rounded-lg border border-slate-200 dark:border-[#222430] text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">
-                No existing voice services found for this property. You can still submit manual phone numbers in the carrier notes below.
-              </div>
-            ) : (
-              <div className="max-h-40 overflow-y-auto p-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg space-y-1.5 [scrollbar-width:thin]">
-                {eligibleServices.map((s) => {
-                  const isChecked = selectedServiceIds.includes(s.id);
-                  return (
-                    <div
-                      key={s.id}
-                      onClick={() => toggleService(s.id)}
-                      className={`p-2 rounded-md flex items-center justify-between cursor-pointer transition ${
-                        isChecked
-                          ? 'bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-blue-900 dark:text-blue-200'
-                          : 'hover:bg-white dark:hover:bg-[#181920] text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-4 h-4 rounded border flex items-center justify-center ${
-                            isChecked
-                              ? 'bg-blue-600 border-blue-600 text-white'
-                              : 'border-slate-300 dark:border-slate-600'
-                          }`}
-                        >
-                          {isChecked && <Check className="w-3 h-3" />}
-                        </div>
-                        <span className="font-bold text-xs">{s.phone_number}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-medium">
-                        {s.service_type || 'Voice Line'}
+            <input
+              type="file"
+              ref={fileInputRef}
+              multiple
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={submitting}
+              className="w-full py-3 px-4 border border-dashed border-slate-300 dark:border-[#282a36] hover:border-purple-500 dark:hover:border-purple-500 rounded-xl bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="font-semibold text-xs">Choose Files (LOA, Recent Carrier Invoice)</span>
+            </button>
+
+            {/* Attached files list */}
+            {attachedFiles.length > 0 && (
+              <div className="space-y-1.5 mt-2">
+                {attachedFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded-lg bg-slate-100 dark:bg-[#181a24] border border-slate-200/80 dark:border-[#242634] text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                      <span className="truncate text-slate-800 dark:text-slate-200 font-medium">
+                        {file.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
                       </span>
                     </div>
-                  );
-                })}
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="p-1 text-slate-400 hover:text-red-500 transition cursor-pointer"
+                      title="Remove file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Carrier Notes & LOA Details */}
-          <div className="space-y-1.5">
-            <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-              Carrier Details, Account # &amp; PIN <span className="text-slate-400 font-normal">(Optional)</span>
-            </label>
-            <textarea
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Enter losing carrier name (e.g., AT&T, Verizon), Account #, BTN (Billing Telephone Number), Authorization PIN, or manual numbers to port..."
-              disabled={submitting}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 resize-none text-xs"
-            />
-          </div>
-
-          {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1c1e27] font-semibold transition cursor-pointer"
+              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#282a36] hover:bg-slate-100 dark:hover:bg-[#181a24] text-slate-600 dark:text-slate-300 font-semibold cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Submitting Order...</span>
+                  <span>{uploadProgress || 'Submitting...'}</span>
                 </>
               ) : (
-                <span>Submit Porting Request</span>
+                <>
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                  <span>Submit Porting Request</span>
+                </>
               )}
             </button>
           </div>
