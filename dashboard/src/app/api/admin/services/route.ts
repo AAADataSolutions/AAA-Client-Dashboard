@@ -255,26 +255,11 @@ export async function POST(request: NextRequest) {
     // 2. Attach to Property if specified (Rule 2: One service can only be assigned to one property)
     let assignedPropName = 'Unassigned';
     if (property_id) {
-      let { data: orgProp } = await supabase
+      const { data: orgProp } = await supabase
         .from('organization_properties')
         .select('id, property:properties(name)')
         .eq('property_id', property_id)
         .maybeSingle();
-
-      if (!orgProp) {
-        // Check if property exists
-        const { data: propData } = await supabase.from('properties').select('name').eq('id', property_id).maybeSingle();
-        // Check for first organization
-        const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
-        if (defaultOrg && propData) {
-          const { data: newOp } = await supabase.from('organization_properties').insert({
-            organization_id: defaultOrg.id,
-            property_id: property_id,
-            status: 'ACTIVE',
-          }).select('id, property:properties(name)').single();
-          orgProp = newOp;
-        }
-      }
 
       if (orgProp) {
         const pName = Array.isArray((orgProp as any)?.property)
@@ -285,6 +270,10 @@ export async function POST(request: NextRequest) {
           organization_property_id: orgProp.id,
           service_id: newService.id,
         });
+      } else {
+        // Fetch property name for audit log if unassigned
+        const { data: propData } = await supabase.from('properties').select('name').eq('id', property_id).maybeSingle();
+        if (propData) assignedPropName = propData.name;
       }
     }
 

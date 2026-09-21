@@ -123,10 +123,10 @@ export default function AdminTicketsPage() {
   // 3-Dots Action Menu Position
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; ticket: TicketItem } | null>(null);
 
-  // Create Form State with Attachments (Max 3)
+  // Create Form State: subject, phone_number, description, attachments, priority, property
   const [createForm, setCreateForm] = useState({
     subject: '',
-    category: 'Properties',
+    phone_number: '',
     property_id: '',
     priority: 'MEDIUM' as TicketPriority,
     description: '',
@@ -302,9 +302,12 @@ export default function AdminTicketsPage() {
     try {
       const formData = new FormData();
       formData.append('subject', createForm.subject.trim());
-      formData.append('description', `[Category: ${createForm.category}]\n\n${createForm.description.trim()}`);
+      formData.append('description', createForm.description.trim());
       formData.append('priority', createForm.priority);
       formData.append('status', 'OPEN');
+      if (createForm.phone_number.trim()) {
+        formData.append('phone_number', createForm.phone_number.trim());
+      }
       if (createForm.property_id) {
         formData.append('property_id', createForm.property_id);
       }
@@ -327,7 +330,7 @@ export default function AdminTicketsPage() {
       setShowCreateModal(false);
       setCreateForm({
         subject: '',
-        category: 'Properties',
+        phone_number: '',
         property_id: '',
         priority: 'MEDIUM',
         description: '',
@@ -1122,6 +1125,7 @@ export default function AdminTicketsPage() {
               )}
 
               <form onSubmit={handleCreateSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
+                {/* 1. Subject */}
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">
                     Subject <span className="text-rose-500">*</span>
@@ -1136,20 +1140,17 @@ export default function AdminTicketsPage() {
                   />
                 </div>
 
+                {/* 2-column row: Your Phone No. & Property */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-black dark:text-white block mb-1">Category</label>
-                    <select
-                      value={createForm.category}
-                      onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                    >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="font-bold text-black dark:text-white block mb-1">Your Phone No.</label>
+                    <input
+                      type="tel"
+                      value={createForm.phone_number}
+                      onChange={(e) => setCreateForm({ ...createForm, phone_number: e.target.value })}
+                      placeholder="+1 98765 43210"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
                   </div>
 
                   <div>
@@ -1159,16 +1160,17 @@ export default function AdminTicketsPage() {
                       onChange={(e) => setCreateForm({ ...createForm, property_id: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="">General Support (No Property)</option>
+                      <option value="">Select Property</option>
                       {propertyList.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} ({p.organization_name})
+                          {p.name} {p.organization_name ? `(${p.organization_name})` : ''}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
 
+                {/* 3. Priority */}
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">Priority</label>
                   <div className="grid grid-cols-4 gap-2">
@@ -1195,6 +1197,7 @@ export default function AdminTicketsPage() {
                   </div>
                 </div>
 
+                {/* 4. Description */}
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">
                     Description <span className="text-rose-500">*</span>
@@ -1207,6 +1210,64 @@ export default function AdminTicketsPage() {
                     placeholder="Provide details of the issue, affected numbers, error messages..."
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
                   />
+                </div>
+
+                {/* 5. Attachments */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-black dark:text-white block text-xs">
+                    Attachments <span className="text-slate-400 font-normal">(Max 3 images)</span>
+                  </label>
+
+                  {attachments.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={createLoading}
+                      className="w-full py-2.5 px-4 border-2 border-dashed border-slate-200 dark:border-[#2a2c3a] rounded-xl text-slate-500 dark:text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-600 dark:hover:text-blue-400 transition flex items-center justify-center gap-2 cursor-pointer bg-slate-50/50 dark:bg-[#111217]/50"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-semibold">
+                        Attach Image ({3 - attachments.length} remaining)
+                      </span>
+                    </button>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  {/* Preview attached images */}
+                  {attachments.length > 0 && (
+                    <div className="flex gap-2 flex-wrap mt-1">
+                      {attachments.map((file, idx) => (
+                        <div
+                          key={idx}
+                          className="relative group w-16 h-16 rounded-lg border border-slate-200 dark:border-[#2a2c3a] overflow-hidden bg-slate-100 dark:bg-[#111217]"
+                        >
+                          <img
+                            src={attachmentPreviews[idx]}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(idx)}
+                            className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer shadow-lg"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-0.5 py-px">
+                            <p className="text-[7px] text-white truncate">{file.name}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">

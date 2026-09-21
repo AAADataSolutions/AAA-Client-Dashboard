@@ -43,104 +43,121 @@ export async function GET(
           zip_code,
           country,
           main_phone,
+          fax,
+          general_manager_name,
+          general_manager_phone,
+          general_manager_email,
+          contact_person_name,
+          contact_person_email,
           status,
-          ray_baud_and_logs_enabled
+          ray_baud_and_logs_enabled,
+          ray_baum_status,
+          created_at
+        ),
+        onboardings(
+          id,
+          status,
+          target_date,
+          contract_sent_at,
+          signed_at,
+          porting_waiting_at,
+          porting_submitted_at,
+          sof_waiting_at,
+          foc_received_at,
+          completed_at,
+          created_at
         )
       `)
       .eq('organization_id', id);
 
     const orgPropIds = (orgProps || []).map((op) => op.id);
-    const properties = (orgProps || []).map((op: any) => ({
-      org_property_id: op.id,
-      id: op.property?.id,
-      name: op.property?.name || 'Property',
-      address: op.property?.address ? `${op.property.address}, ${op.property.city}, ${op.property.state} ${op.property.zip_code || ''}`.trim() : 'Address not specified',
-      city: op.property?.city,
-      state: op.property?.state,
-      main_phone: op.property?.main_phone || '—',
-      status: op.status || op.property?.status || 'ACTIVE',
-      e911_status: op.property?.ray_baud_and_logs_enabled ? 'VERIFIED' : 'PENDING',
-      services_count: 6,
-      created_at: op.created_at,
-    }));
 
-    // 3. Fetch Contacts / Members & Invitations
-    const { data: members } = await dbClient
-      .from('organization_members')
-      .select(`
-        id,
-        role,
-        status,
-        created_at,
-        profile:profiles(
-          id,
-          full_name,
-          email,
-          phone_number,
-          avatar_url,
-          status
-        )
-      `)
-      .eq('organization_id', id)
-      .order('created_at', { ascending: false });
+    // Fetch actual service counts per organization property
+    let serviceCountMap: Record<string, number> = {};
+    if (orgPropIds.length > 0) {
+      const { data: opsData } = await dbClient
+        .from('organization_property_services')
+        .select('organization_property_id')
+        .in('organization_property_id', orgPropIds);
 
-    const { data: rawInvites } = await dbClient
-      .from('invitations')
-      .select('*')
-      .eq('organization_id', id)
-      .order('created_at', { ascending: false });
-
-    const contacts: any[] = [];
-    const seenEmails = new Set<string>();
-
-    for (const m of (members || []) as any[]) {
-      const prof: any = Array.isArray(m.profile) ? m.profile[0] : m.profile;
-      const email = prof?.email || org.email || '—';
-      seenEmails.add(email.toLowerCase());
-      contacts.push({
-        id: m.id,
-        profile_id: prof?.id,
-        name: prof?.full_name || (m.role === 'ADMIN' ? `${org.name} Admin` : 'Contact Member'),
-        email: email,
-        phone: prof?.phone_number || org.phone || '—',
-        role: m.role || 'USER',
-        is_primary: m.role === 'ADMIN',
-        status: m.status || prof?.status || 'ACTIVE',
-        avatar_url: prof?.avatar_url,
-        created_at: m.created_at,
+      (opsData || []).forEach((ops: any) => {
+        serviceCountMap[ops.organization_property_id] = (serviceCountMap[ops.organization_property_id] || 0) + 1;
       });
     }
 
-    for (const inv of rawInvites || []) {
-      const cleanEmail = inv.email?.toLowerCase() || '';
-      if (cleanEmail && !seenEmails.has(cleanEmail) && inv.status !== 'REVOKED') {
-        seenEmails.add(cleanEmail);
-        const isExpired = new Date(inv.expires_at) < new Date();
-        contacts.push({
-          id: `invite-${inv.id}`,
-          invitation_id: inv.id,
-          profile_id: null,
-          name: inv.email.split('@')[0],
-          email: inv.email,
-          phone: org.phone || '—',
-          role: inv.target_org_role || 'USER',
-          is_primary: inv.target_org_role === 'ADMIN',
-          status: isExpired && inv.status === 'PENDING' ? 'EXPIRED' : (inv.status === 'PENDING' ? 'INVITED' : inv.status),
-          invite_url: `${baseUrl}/invite/${inv.token_hash}`,
-          created_at: inv.created_at,
-        });
-      }
+    // Fetch actual E911 status per organization property
+    let e911Map: Record<string, string> = {};
+    if (orgPropIds.length > 0) {
+      const { data: e911Data } = await dbClient
+        .from('e911_records')
+        .select('organization_property_id, status')
+        .in('organization_property_id', orgPropIds);
+
+      (e911Data || []).forEach((e: any) => {
+        e911Map[e.organization_property_id] = e.status;
+      });
     }
+
+    const properties = (orgProps || []).map((op: any) => {
+      const p = op.property;
+      const fullAddress = p?.address ? `${p.address}, ${p.city || ''}, ${p.state || ''} ${p.zip_code || ''}`.trim() : 'Address not specified';
+      const isRayBaumActive = p?.ray_baum_status === 'ACTIVE' || p?.ray_baum_status === 'VERIFIED' || !!p?.ray_baud_and_logs_enabled;
+      const rawE911 = e911Map[op.id];
+      const e911Status = rawE911 === 'VERIFIED' ? 'Verified' : rawE911 === 'CORRECTION_REQUIRED' ? 'Correction Required' : 'Pending Validation';
+      const onb = Array.isArray(op.onboardings) && op.onboardings.length > 0 ? op.onboardings[0] : null;
+
+      return {
+        org_property_id: op.id,
+        link_id: op.id,
+        id: p?.id,
+        name: p?.name || 'Property',
+        address: fullAddress,
+        street_address: p?.address || '',
+        city: p?.city || '',
+        state: p?.state || '',
+        zip_code: p?.zip_code || '',
+        country: p?.country || 'USA',
+        main_phone: p?.main_phone || '—',
+        status: p?.status || op.status || 'ACTIVE',
+        onboarding_stage: onb?.status || 'DRAFT',
+        stage: onb?.status || 'DRAFT',
+        services_count: serviceCountMap[op.id] || 0,
+        general_manager_name: p?.general_manager_name || p?.contact_person_name || '—',
+        general_manager_phone: p?.general_manager_phone || p?.main_phone || '—',
+        general_manager_email: p?.general_manager_email || p?.contact_person_email || '—',
+        ray_baum_status: isRayBaumActive ? 'Active' : 'Inactive',
+        e911_status: e911Status,
+        created_at: p?.created_at || op.created_at,
+      };
+    });
+
+    // 3. Fetch Organization Contacts (Directory / Address Book for Admin)
+    const { data: rawOrgContacts } = await dbClient
+      .from('organization_contacts')
+      .select('*')
+      .eq('organization_id', id)
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    const contacts: any[] = (rawOrgContacts || []).map((oc: any) => ({
+      id: oc.id,
+      name: oc.name,
+      email: oc.email,
+      phone: oc.phone || '—',
+      role: oc.role || 'Contact',
+      is_primary: Boolean(oc.is_primary),
+      status: 'ACTIVE',
+      created_at: oc.created_at,
+    }));
 
     // Fallback if no contacts yet
     if (contacts.length === 0 && org.email) {
       contacts.push({
-        id: `org-admin-${org.id}`,
-        profile_id: null,
-        name: org.contact_name || `${org.name} Admin`,
+        id: `org-contact-default-${org.id}`,
+        name: org.contact_name || `${org.name} Contact`,
         email: org.email,
         phone: org.phone || '—',
-        role: 'ADMIN',
+        role: 'Primary Contact',
         is_primary: true,
         status: 'ACTIVE',
         created_at: org.created_at,
@@ -150,10 +167,10 @@ export async function GET(
     contacts.sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
 
     const primaryContact = contacts.find((c) => c.is_primary) || contacts[0] || {
-      name: org.contact_name || `${org.name} Admin`,
+      name: org.contact_name || `${org.name} Contact`,
       email: org.email || '—',
       phone: org.phone || '—',
-      role: 'ADMIN',
+      role: 'Primary Contact',
       is_primary: true,
       status: 'ACTIVE',
     };
@@ -162,19 +179,18 @@ export async function GET(
     let onboardings: any[] = [];
     if (orgPropIds.length > 0) {
       const { data: onbData } = await dbClient
-        .from('property_onboardings')
+        .from('onboardings')
         .select(`
           id,
           status,
-          current_stage,
-          target_completion_date,
-          draft_date,
-          contract_sent_date,
-          signed_date,
-          porting_submitted_date,
-          sof_review_date,
-          foc_confirmed_date,
-          live_cutover_date,
+          target_date,
+          contract_sent_at,
+          signed_at,
+          porting_waiting_at,
+          porting_submitted_at,
+          sof_waiting_at,
+          foc_received_at,
+          completed_at,
           created_at,
           organization_property:organization_properties(
             id,
@@ -195,16 +211,15 @@ export async function GET(
           general_manager_name: prop?.general_manager_name || '—',
           general_manager_phone: prop?.general_manager_phone || '—',
           general_manager_email: prop?.general_manager_email || '—',
-          stage: o.current_stage || o.status || 'DRAFT',
-          status: o.status,
-          target_date: o.target_completion_date,
-          draft_date: o.draft_date,
-          contract_sent_date: o.contract_sent_date,
-          signed_date: o.signed_date,
-          porting_submitted_date: o.porting_submitted_date,
-          sof_review_date: o.sof_review_date,
-          foc_confirmed_date: o.foc_confirmed_date,
-          live_cutover_date: o.live_cutover_date,
+          stage: o.status || 'DRAFT',
+          status: o.status || 'DRAFT',
+          target_date: o.target_date,
+          contract_sent_date: o.contract_sent_at,
+          signed_date: o.signed_at,
+          porting_submitted_date: o.porting_submitted_at,
+          sof_review_date: o.sof_waiting_at,
+          foc_confirmed_date: o.foc_received_at,
+          live_cutover_date: o.completed_at,
           created_at: o.created_at,
         };
       });
@@ -236,6 +251,7 @@ export async function GET(
         const prop = ops.organization_property?.property;
         return {
           id: s?.id || ops.id,
+          property_id: prop?.id || null,
           property_name: prop?.name || 'Property',
           service_type: s?.service_type?.name || 'Voice Line',
           phone_number: s?.phone_number || '—',

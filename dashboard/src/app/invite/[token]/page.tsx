@@ -126,11 +126,14 @@ function InviteAcceptContent({ token }: { token: string }) {
         }
       }
 
+      const isInternal = json.type === 'INTERNAL_TEAM' || json.role === 'SUB_SUPER_ADMIN' || json.role === 'SUPER_ADMIN' || inviteData?.invite_type === 'INTERNAL_TEAM';
+      const targetDestination = json.redirectTo || (isInternal ? '/admin' : '/dashboard');
+
       setTimeout(() => {
-        router.push('/dashboard');
-      }, 1800);
+        window.location.href = targetDestination;
+      }, 1500);
     } catch (err: any) {
-      setSubmitError(err.message || 'Error activating organization access');
+      setSubmitError(err.message || 'Error activating account access');
       setSubmitting(false);
     }
   };
@@ -180,7 +183,11 @@ function InviteAcceptContent({ token }: { token: string }) {
     );
   }
 
-  const orgName = inviteData.organization?.name || 'AAA Data Solutions Client';
+  const isInternal = inviteData.invite_type === 'INTERNAL_TEAM' || inviteData.target_app_role === 'SUB_SUPER_ADMIN' || inviteData.target_app_role === 'SUPER_ADMIN';
+  const orgName = isInternal ? 'AAA Solutions Platform' : (inviteData.organization?.name || 'AAA Data Solutions Client');
+  const displayRole = isInternal
+    ? (inviteData.target_app_role === 'SUPER_ADMIN' ? 'Super Admin' : 'Sub-Super Admin')
+    : (inviteData.target_org_role || 'ORGANIZATION ADMIN');
 
   return (
     <div className="min-h-screen bg-[#0d0e12] text-slate-900 dark:text-white flex flex-col justify-center items-center p-4 sm:p-8 font-sans relative overflow-hidden">
@@ -191,14 +198,18 @@ function InviteAcceptContent({ token }: { token: string }) {
         {/* Header */}
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-[#222834]">
           <div className="w-10 h-10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-            <Building2 size={36} className="w-full h-full object-contain" />
+            {isInternal ? (
+              <ShieldCheck size={36} className="w-full h-full object-contain text-blue-500" />
+            ) : (
+              <Building2 size={36} className="w-full h-full object-contain" />
+            )}
           </div>
           <div>
             <span className="text-[10.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              Client Organization Onboarding
+              {isInternal ? 'System Administrator Invitation' : 'Client Organization Onboarding'}
             </span>
             <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white mt-1">
-              Join {orgName}
+              {isInternal ? 'Join AAA Solutions Admin Team' : `Join ${orgName}`}
             </h1>
           </div>
         </div>
@@ -211,7 +222,15 @@ function InviteAcceptContent({ token }: { token: string }) {
             <div className="space-y-1.5">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Account Created Successfully!</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-                You are now registered as the administrator for <strong className="text-slate-900 dark:text-white">{orgName}</strong>. Entering your organization workspace...
+                {isInternal ? (
+                  <>
+                    You are now registered as a <strong className="text-slate-900 dark:text-white">{displayRole}</strong>. Entering Admin Portal...
+                  </>
+                ) : (
+                  <>
+                    You are now registered as the administrator for <strong className="text-slate-900 dark:text-white">{orgName}</strong>. Entering your organization workspace...
+                  </>
+                )}
               </p>
             </div>
             <div className="pt-2">
@@ -230,13 +249,13 @@ function InviteAcceptContent({ token }: { token: string }) {
             {/* Invited Organization & Role Info */}
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181c26] border border-slate-200/80 dark:border-[#222834] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Organization:</span>
+                <span className="text-slate-500 dark:text-slate-400">{isInternal ? 'Scope:' : 'Organization:'}</span>
                 <span className="font-bold text-slate-900 dark:text-white text-xs">{orgName}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 dark:text-slate-400">Assigned Role:</span>
                 <span className="font-semibold text-blue-600 dark:text-blue-400 uppercase text-[11px]">
-                  {inviteData.target_org_role || 'ORGANIZATION ADMIN'}
+                  {displayRole}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -248,7 +267,7 @@ function InviteAcceptContent({ token }: { token: string }) {
             {user ? (
               <div className="space-y-4 pt-2">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  You are currently logged in as <strong className="text-slate-900 dark:text-white">{user.email}</strong>. Click below to accept the invitation and link your account.
+                  You are currently logged in as <strong className="text-slate-900 dark:text-white">{user.email}</strong>. Click below to accept the invitation and activate your {displayRole} access.
                 </p>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -264,7 +283,7 @@ function InviteAcceptContent({ token }: { token: string }) {
                     </>
                   ) : (
                     <>
-                      <span>Accept &amp; Access Dashboard</span>
+                      <span>{isInternal ? 'Accept & Enter Admin Portal' : 'Accept & Access Dashboard'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -352,7 +371,9 @@ function InviteAcceptContent({ token }: { token: string }) {
                 </div>
 
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-                  By clicking below, your organization admin account will be created and you will be logged into your workspace.
+                  {isInternal
+                    ? 'By clicking below, your Sub-Super Administrator account will be registered and you will be redirected to the Admin Portal.'
+                    : 'By clicking below, your organization admin account will be created and you will be logged into your workspace.'}
                 </p>
 
                 <motion.button
@@ -365,11 +386,11 @@ function InviteAcceptContent({ token }: { token: string }) {
                   {submitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Creating Account &amp; Entering Workspace...</span>
+                      <span>{isInternal ? 'Creating Admin Account...' : 'Creating Account & Entering Workspace...'}</span>
                     </>
                   ) : (
                     <>
-                      <span>Accept Invite &amp; Enter Workspace</span>
+                      <span>{isInternal ? 'Accept Invite & Enter Admin Portal' : 'Accept Invite & Enter Workspace'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

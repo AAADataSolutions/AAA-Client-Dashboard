@@ -185,8 +185,8 @@ export default function AdminE911Page() {
         if (data.success && Array.isArray(data.data)) {
           const props: PropertyOption[] = data.data.map((p: any) => {
             const orgLinks = Array.isArray(p.org_links) ? p.org_links : (p.org_links ? [p.org_links] : []);
-            const firstOrg = orgLinks[0]?.organization?.name || p.primary_organization?.name || 'Unassigned';
-            const firstOrgPropId = orgLinks[0]?.id || '';
+            const firstOrg = orgLinks[0]?.organization?.name || p.primary_organization?.name || p.organization_name || 'Unassigned';
+            const firstOrgPropId = p.org_property_id || orgLinks[0]?.id || '';
 
             return {
               id: p.id,
@@ -289,6 +289,7 @@ export default function AdminE911Page() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          property_id: createForm.property_id,
           organization_property_id: chosenProp?.org_property_id || null,
           emergency_address: createForm.emergency_address.trim(),
           status: createForm.status,

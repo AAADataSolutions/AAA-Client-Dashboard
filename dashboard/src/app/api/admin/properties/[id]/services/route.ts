@@ -120,31 +120,17 @@ export async function POST(
     }
 
     // 1. Find or verify organization_property link for this property
-    let { data: orgProp } = await supabase
+    const { data: orgProp } = await supabase
       .from('organization_properties')
       .select('id, organization_id, property:properties(name)')
       .eq('property_id', propertyId)
       .maybeSingle();
 
     if (!orgProp) {
-      // If property has no org yet, associate with first organization
-      const { data: firstOrg } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
-      if (firstOrg) {
-        const { data: newOp } = await supabase
-          .from('organization_properties')
-          .insert({
-            organization_id: firstOrg.id,
-            property_id: propertyId,
-            status: 'ACTIVE',
-          })
-          .select('id, organization_id, property:properties(name)')
-          .single();
-        orgProp = newOp;
-      }
-    }
-
-    if (!orgProp) {
-      return NextResponse.json({ success: false, error: 'Property is not linked to an organization.' }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        error: 'Property is not assigned to any organization yet. Please assign the property to an organization before assigning services.',
+      }, { status: 400 });
     }
 
     // 2. Enforce Rule 2: One service can only be assigned to one property. Remove any prior assignments!

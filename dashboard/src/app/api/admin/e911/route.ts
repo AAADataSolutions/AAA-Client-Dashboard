@@ -179,6 +179,7 @@ export async function POST(request: NextRequest) {
 
     const {
       organization_property_id,
+      property_id,
       emergency_address,
       status,
       correction_notes,
@@ -189,39 +190,131 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Emergency dispatch address is required.' }, { status: 400 });
     }
 
-    const { data: newRecord, error } = await supabase
-      .from('e911_records')
-      .insert({
-        organization_property_id,
-        emergency_address: emergency_address.trim(),
-        psap_id: psap_id?.trim() || null,
-        status: status || 'PENDING',
-        correction_notes: correction_notes?.trim() || null,
-        verified_at: status === 'VERIFIED' ? new Date().toISOString() : null,
-      })
-      .select()
-      .single();
+    let targetOrgPropId = organization_property_id;
+    let targetPropId = property_id;
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    // 1. If organization_property_id is not directly given, look it up by property_id
+    if (!targetOrgPropId && targetPropId) {
+      const { data: opData } = await supabase
+        .from('organization_properties')
+        .select('id, property_id')
+        .eq('property_id', targetPropId)
+        .limit(1)
+        .maybeSingle();
+
+      if (opData?.id) {
+        targetOrgPropId = opData.id;
+      }
     }
 
-    // Audit Log
+    // 2. If targetOrgPropId is present but targetPropId is not, find the property_id
+    if (targetOrgPropId && !targetPropId) {
+      const { data: opData } = await supabase
+        .from('organization_properties')
+        .select('property_id')
+        .eq('id', targetOrgPropId)
+        .maybeSingle();
+      if (opData?.property_id) {
+        targetPropId = opData.property_id;
+      }
+    }
+
+    if (!targetOrgPropId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Could not associate this record with a property organization link. Please ensure a valid property is selected.',
+        },
+        { status: 400 }
+      );
+    }
+
+    const isTargetVerified = status === 'VERIFIED' || status === 'ACTIVE';
+    const validStatus = isTargetVerified
+      ? 'VERIFIED'
+      : ['PENDING', 'CORRECTION_REQUIRED', 'FAILED'].includes(status)
+      ? status
+      : 'PENDING';
+
+    // 3. Check if an E911 record already exists for this organization_property
+    const { data: existingRec } = await supabase
+      .from('e911_records')
+      .select('id')
+      .eq('organization_property_id', targetOrgPropId)
+      .limit(1)
+      .maybeSingle();
+
+    let savedRecord: any = null;
+
+    if (existingRec) {
+      const { data: updated, error: updateErr } = await supabase
+        .from('e911_records')
+        .update({
+          emergency_address: emergency_address.trim(),
+          psap_id: psap_id?.trim() || null,
+          status: validStatus,
+          correction_notes: correction_notes?.trim() || null,
+          verified_at: isTargetVerified ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingRec.id)
+        .select()
+        .single();
+
+      if (updateErr) {
+        return NextResponse.json({ success: false, error: updateErr.message }, { status: 400 });
+      }
+      savedRecord = updated;
+    } else {
+      const { data: newRecord, error: insertErr } = await supabase
+        .from('e911_records')
+        .insert({
+          organization_property_id: targetOrgPropId,
+          emergency_address: emergency_address.trim(),
+          psap_id: psap_id?.trim() || null,
+          status: validStatus,
+          correction_notes: correction_notes?.trim() || null,
+          verified_at: isTargetVerified ? new Date().toISOString() : null,
+        })
+        .select()
+        .single();
+
+      if (insertErr) {
+        return NextResponse.json({ success: false, error: insertErr.message }, { status: 400 });
+      }
+      savedRecord = newRecord;
+    }
+
+    // 4. Keep the associated property's ray_baud_and_logs_enabled and ray_baum_status in sync
+    if (targetPropId) {
+      await supabase
+        .from('properties')
+        .update({
+          ray_baud_and_logs_enabled: isTargetVerified,
+          ray_baum_status: isTargetVerified ? 'ACTIVE' : 'INACTIVE',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetPropId);
+    }
+
+    // 5. Centralized Audit Log
     await logAdminAction({
-      action: 'E911_RECORD_CREATED',
+      action: isTargetVerified ? 'E911_VERIFIED' : 'E911_RECORD_CREATED',
       entity_type: 'E911',
-      entity_id: newRecord.id,
+      entity_id: savedRecord.id,
       entity_name: emergency_address,
-      description: `Registered new E911 emergency dispatch address '${emergency_address}' with status ${status || 'PENDING'}`,
+      description: `Registered E911 emergency dispatch address '${emergency_address}' with status ${validStatus}`,
       changes: {
-        e911_id: newRecord.id,
+        e911_id: savedRecord.id,
         emergency_address,
-        status: newRecord.status,
+        status: savedRecord.status,
         psap_id,
+        organization_property_id: targetOrgPropId,
+        property_id: targetPropId,
       },
     });
 
-    return NextResponse.json({ success: true, data: newRecord });
+    return NextResponse.json({ success: true, data: savedRecord });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

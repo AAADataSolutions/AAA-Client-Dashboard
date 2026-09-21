@@ -37,7 +37,9 @@ import {
   XCircle,
   Send,
   Trash2,
+  Upload,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   fetchPortingRequests,
@@ -266,65 +268,100 @@ export default function AdminPortingPage() {
     }
   };
 
-  // Create form state
-  const [orgPropertyOptions, setOrgPropertyOptions] = useState<OrgPropertyOption[]>([]);
-  const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>([]);
+  // Organizations state for create modal
+  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [createForm, setCreateForm] = useState({
-    organization_property_id: '',
-    target_date: '',
-    notes: '',
-    service_ids: [] as string[],
+    organization_id: '',
+    property_name: '',
+    property_address: '',
+    property_phone: '',
+    fax: '',
+    carrier_details: '',
   });
+  const [createAttachedFiles, setCreateAttachedFiles] = useState<{
+    file: File;
+    name: string;
+    size: number;
+    type: string;
+  }[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const createFileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Load org properties for dropdown
+  // Load organizations for dropdown
   useEffect(() => {
-    async function loadOrgProps() {
+    async function loadOrgs() {
       try {
-        const res = await fetch('/api/admin/properties?limit=200');
+        const res = await fetch('/api/admin/organizations?limit=200');
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
-          const mapped: OrgPropertyOption[] = data.data
-            .filter((p: any) => p.organization_property_id)
-            .map((p: any) => ({
-              id: p.organization_property_id,
-              property_name: p.name,
-              organization_name:
-                p.primary_organization?.name || p.organizations?.[0]?.name || 'Organization',
-              property_id: p.id,
-            }));
-          setOrgPropertyOptions(mapped);
+          setOrganizations(data.data.map((o: any) => ({ id: o.id, name: o.name })));
         }
       } catch (err) {
-        console.warn('Could not load org property options:', err);
+        console.warn('Could not load organizations:', err);
       }
     }
-    loadOrgProps();
+    loadOrgs();
   }, []);
 
-  // Load services for selection
-  useEffect(() => {
-    async function loadServices() {
-      try {
-        const res = await fetch('/api/admin/services?limit=200');
-        const data = await res.json();
-        if (data.success && Array.isArray(data.data)) {
-          setServiceOptions(
-            data.data.map((s: any) => ({
-              id: s.id,
-              phone_number: s.phone_number,
-              service_type: s.service_type || 'Voice Line',
-              status: s.status,
-            }))
-          );
-        }
-      } catch (err) {
-        console.warn('Could not load services:', err);
+  const pdfCount = createAttachedFiles.filter(
+    (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+  ).length;
+  const imgCount = createAttachedFiles.filter(
+    (f) => f.type.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(f.name)
+  ).length;
+
+  const handleCreateFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+
+    let curPdfs = pdfCount;
+    let curImgs = imgCount;
+
+    const accepted: typeof createAttachedFiles = [];
+    for (const f of files) {
+      if (f.size > 10 * 1024 * 1024) {
+        showToast('File too large', `File "${f.name}" exceeds 10MB limit.`, 'error');
+        continue;
       }
+      const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      const isImg = f.type.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(f.name);
+
+      if (!isPdf && !isImg) {
+        showToast('Invalid file type', `File "${f.name}" is not supported. Only PDFs and images allowed.`, 'error');
+        continue;
+      }
+
+      if (isPdf) {
+        if (curPdfs >= 2) {
+          showToast('Limit reached', 'Maximum 2 PDF documents allowed.', 'error');
+          continue;
+        }
+        curPdfs++;
+      } else if (isImg) {
+        if (curImgs >= 2) {
+          showToast('Limit reached', 'Maximum 2 image files allowed.', 'error');
+          continue;
+        }
+        curImgs++;
+      }
+
+      accepted.push({
+        file: f,
+        name: f.name,
+        size: f.size,
+        type: f.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+      });
     }
-    loadServices();
-  }, []);
+
+    setCreateAttachedFiles((prev) => [...prev, ...accepted]);
+    if (createFileInputRef.current) createFileInputRef.current.value = '';
+  };
+
+  const removeCreateFile = (index: number) => {
+    setCreateAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Fetch Porting Requests
   const loadData = useCallback(() => {
@@ -386,8 +423,12 @@ export default function AdminPortingPage() {
   // Handle Create Submit
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.organization_property_id) {
-      setCreateError('Please select a destination property.');
+    if (!createForm.organization_id) {
+      setCreateError('Please select an organization.');
+      return;
+    }
+    if (!createForm.property_name.trim() || !createForm.property_phone.trim()) {
+      setCreateError('Property Name and Phone Number are required.');
       return;
     }
 
@@ -395,38 +436,82 @@ export default function AdminPortingPage() {
       setCreateLoading(true);
       setCreateError(null);
 
+      const uploadedAttachments: {
+        file_name: string;
+        file_size: number;
+        mime_type: string;
+        storage_path: string;
+      }[] = [];
+
+      if (createAttachedFiles.length > 0) {
+        const supabase = createClient();
+        for (let i = 0; i < createAttachedFiles.length; i++) {
+          const item = createAttachedFiles[i];
+          setUploadProgress(`Uploading ${i + 1} of ${createAttachedFiles.length}: ${item.name}...`);
+          const cleanName = item.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const storagePath = `admin/${Date.now()}_${cleanName}`;
+          const { error: uploadErr } = await supabase.storage
+            .from('porting-attachments')
+            .upload(storagePath, item.file, {
+              contentType: item.type,
+              upsert: false,
+            });
+          if (uploadErr) {
+            console.error('Storage upload error:', uploadErr);
+          } else {
+            uploadedAttachments.push({
+              file_name: item.name,
+              file_size: item.size,
+              mime_type: item.type,
+              storage_path: storagePath,
+            });
+          }
+        }
+      }
+
+      setUploadProgress('Saving porting request...');
+
       const res = await fetch('/api/admin/porting', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify({
+          organization_id: createForm.organization_id,
+          property_name: createForm.property_name.trim(),
+          property_address: createForm.property_address.trim() || null,
+          property_phone: createForm.property_phone.trim(),
+          fax: createForm.fax.trim() || null,
+          carrier_details: createForm.carrier_details.trim() || null,
+          status: 'SUBMITTED',
+          attachments: uploadedAttachments,
+        }),
       });
 
       const result = await res.json();
       if (!res.ok || !result.success)
         throw new Error(result.error || 'Failed to create porting request.');
 
-      const propName =
-        orgPropertyOptions.find((o) => o.id === createForm.organization_property_id)
-          ?.property_name || 'Property';
-
       showToast(
         'Porting Request Created',
-        `Port request for ${propName} submitted successfully.`,
+        `Port request for ${createForm.property_name} submitted successfully.`,
         'success'
       );
       setShowCreateModal(false);
       setCreateForm({
-        organization_property_id: '',
-        target_date: '',
-        notes: '',
-        service_ids: [],
+        organization_id: '',
+        property_name: '',
+        property_address: '',
+        property_phone: '',
+        fax: '',
+        carrier_details: '',
       });
+      setCreateAttachedFiles([]);
       loadData();
     } catch (err: any) {
       setCreateError(err.message || 'Creation failed.');
       showToast('Error', err.message, 'error');
     } finally {
       setCreateLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -608,11 +693,14 @@ export default function AdminPortingPage() {
             whileTap={{ scale: 0.97 }}
             onClick={() => {
               setCreateForm({
-                organization_property_id: '',
-                target_date: '',
-                notes: '',
-                service_ids: [],
+                organization_id: '',
+                property_name: '',
+                property_address: '',
+                property_phone: '',
+                fax: '',
+                carrier_details: '',
               });
+              setCreateAttachedFiles([]);
               setCreateError(null);
               setShowCreateModal(true);
             }}
@@ -883,11 +971,15 @@ export default function AdminPortingPage() {
             <button
               onClick={() => {
                 setCreateForm({
-                  organization_property_id: '',
-                  target_date: '',
-                  notes: '',
-                  service_ids: [],
+                  organization_id: '',
+                  property_name: '',
+                  property_address: '',
+                  property_phone: '',
+                  fax: '',
+                  carrier_details: '',
                 });
+                setCreateAttachedFiles([]);
+                setCreateError(null);
                 setShowCreateModal(true);
               }}
               className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
@@ -903,22 +995,25 @@ export default function AdminPortingPage() {
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
-                    PROPERTY
+                    PROPERTY NAME
                   </th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
-                    ORGANIZATION
+                    ADDRESS
+                  </th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
+                    PHONE
+                  </th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
+                    ORGANIZATION NAME
+                  </th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
+                    FAX
+                  </th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
+                    ATTACHMENTS
                   </th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
                     STATUS
-                  </th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
-                    PHONE NUMBERS
-                  </th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
-                    TARGET DATE
-                  </th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">
-                    CREATED
                   </th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">
                     ACTIONS
@@ -928,10 +1023,6 @@ export default function AdminPortingPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
                 {portings.map((rec: PortingRecord) => {
                   const badge = getStatusBadge(rec.status as PortingStatus);
-                  const overdue =
-                    rec.status !== 'COMPLETED' &&
-                    rec.status !== 'CANCELLED' &&
-                    isOverdue(rec.target_date);
 
                   return (
                     <tr
@@ -939,26 +1030,68 @@ export default function AdminPortingPage() {
                       onClick={() => openUnifiedModal(rec, 'DETAILS')}
                       className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition cursor-pointer"
                     >
-                      {/* Property */}
+                      {/* 1. Property Name */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-bold text-black dark:text-white text-sm block">
                           {rec.property_name}
                         </span>
-                        {rec.property_location && (
-                          <span className="text-[10px] text-slate-400 block mt-0.5">
-                            {rec.property_location}
-                          </span>
-                        )}
                       </td>
 
-                      {/* Organization */}
+                      {/* 2. Address */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-semibold text-slate-800 dark:text-white">
-                          {rec.organization_name}
+                        <span className="text-slate-600 dark:text-slate-300 text-xs">
+                          {rec.property_address || '—'}
                         </span>
                       </td>
 
-                      {/* Status */}
+                      {/* 3. Phone */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-800 dark:text-slate-200 font-mono text-xs">
+                            {rec.property_phone || '—'}
+                          </span>
+                          {rec.property_phone && rec.property_phone !== '—' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopy(rec.property_phone, `phone-${rec.id}`);
+                              }}
+                              className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                              title="Copy Phone"
+                            >
+                              {copiedField === `phone-${rec.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 4. Organization Name */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-slate-800 dark:text-white text-xs">
+                          {rec.organization_name || '—'}
+                        </span>
+                      </td>
+
+                      {/* 5. Fax */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="text-slate-600 dark:text-slate-400 font-mono text-xs">
+                          {rec.fax || '—'}
+                        </span>
+                      </td>
+
+                      {/* 6. Attachments */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40">
+                          <FileText className="w-3 h-3" />
+                          <span>{rec.attachments?.length || 0}</span>
+                        </span>
+                      </td>
+
+                      {/* 7. Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
@@ -968,79 +1101,19 @@ export default function AdminPortingPage() {
                         </span>
                       </td>
 
-                      {/* Phone Numbers */}
-                      <td
-                        className="py-3.5 px-4 whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {rec.services_count > 0 ? (
-                          <div className="flex items-center gap-1.5">
-                            <PhoneCall className="w-3 h-3 text-slate-400" />
-                            <span className="text-slate-700 dark:text-slate-300 font-medium">
-                              {rec.services_count}{' '}
-                              {rec.services_count === 1 ? 'line' : 'lines'}
-                            </span>
-                            {rec.services[0]?.phone_number && (
-                              <button
-                                onClick={() =>
-                                  handleCopy(
-                                    rec.services
-                                      .map((s) => s.phone_number)
-                                      .join(', '),
-                                    `phones-${rec.id}`
-                                  )
-                                }
-                                className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
-                                title="Copy Numbers"
-                              >
-                                {copiedField === `phones-${rec.id}` ? (
-                                  <Check className="w-3 h-3 text-emerald-500" />
-                                ) : (
-                                  <Copy className="w-3 h-3" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">No lines</span>
-                        )}
-                      </td>
-
-                      {/* Target Date */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {rec.target_date ? (
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`font-medium ${
-                                overdue
-                                  ? 'text-rose-600 dark:text-rose-400'
-                                  : 'text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              {formatDate(rec.target_date)}
-                            </span>
-                            {overdue && (
-                              <AlertTriangle className="w-3 h-3 text-rose-500" />
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">TBD</span>
-                        )}
-                      </td>
-
-                      {/* Created */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {formatDate(rec.created_at)}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
+                      {/* 8. Actions */}
                       <td
                         className="py-3.5 px-4 text-right whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openUnifiedModal(rec, 'DETAILS')}
+                            className="px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-semibold text-[11px] flex items-center gap-1 border border-blue-200 dark:border-blue-800/50 transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Details</span>
+                          </button>
                           {rec.status === 'COMPLETED' && !rec.is_activated && (
                             <button
                               onClick={() => handleActivateProperty(rec.id)}
@@ -1253,7 +1326,7 @@ export default function AdminPortingPage() {
                           : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                     >
-                      Property Details
+                      Details
                     </button>
                     <button
                       type="button"
@@ -1264,23 +1337,12 @@ export default function AdminPortingPage() {
                           : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                     >
-                      <span>Attachments</span>
+                      <span>PDFs &amp; Images</span>
                       {selectedRecord.attachments && selectedRecord.attachments.length > 0 && (
                         <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                           {selectedRecord.attachments.length}
                         </span>
                       )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('WORKFLOW')}
-                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
-                        activeTab === 'WORKFLOW'
-                          ? 'bg-white dark:bg-[#1f212c] text-blue-600 dark:text-blue-400 shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      Workflow
                     </button>
                   </div>
 
@@ -1322,7 +1384,7 @@ export default function AdminPortingPage() {
                             <div className="flex items-center gap-2 text-xs">
                               <Phone className="w-3.5 h-3.5 text-slate-400" />
                               <span className="text-slate-500 font-medium">Phone:</span>
-                              <span className="text-slate-600 dark:text-slate-300">
+                              <span className="text-slate-600 dark:text-slate-300 font-mono">
                                 {selectedRecord.property_phone}
                               </span>
                               <button
@@ -1368,7 +1430,7 @@ export default function AdminPortingPage() {
                           )}
                           <div className="flex items-center gap-2 text-xs">
                             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="text-slate-500 font-medium">Org:</span>
+                            <span className="text-slate-500 font-medium">Organization:</span>
                             <span className="text-slate-600 dark:text-slate-300 font-semibold">
                               {selectedRecord.organization_name}
                             </span>
@@ -1388,30 +1450,15 @@ export default function AdminPortingPage() {
                               {formatDate(selectedRecord.created_at)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="text-slate-500">Target:</span>
-                            {selectedRecord.target_date ? (
-                              <span
-                                className={`font-semibold ${
-                                  isOverdue(selectedRecord.target_date) &&
-                                  selectedRecord.status !== 'COMPLETED'
-                                    ? 'text-rose-600 dark:text-rose-400'
-                                    : 'text-slate-800 dark:text-white'
-                                }`}
-                              >
+                          {selectedRecord.target_date && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <Clock className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="text-slate-500">Target:</span>
+                              <span className="font-semibold text-slate-800 dark:text-white">
                                 {formatDate(selectedRecord.target_date)}
-                                {isOverdue(selectedRecord.target_date) &&
-                                  selectedRecord.status !== 'COMPLETED' && (
-                                    <span className="ml-1 text-rose-500 text-[10px]">
-                                      (Overdue)
-                                    </span>
-                                  )}
                               </span>
-                            ) : (
-                              <span className="text-slate-400">Not set</span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                           {selectedRecord.completed_at && (
                             <div className="flex items-center gap-2 text-xs">
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
@@ -1424,6 +1471,18 @@ export default function AdminPortingPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Carrier Details & Account Info */}
+                    {selectedRecord.carrier_details && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Carrier Details &amp; Account Info
+                        </h4>
+                        <div className="p-3.5 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                          {selectedRecord.carrier_details}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Notes */}
                     {selectedRecord.notes && (
@@ -1440,9 +1499,9 @@ export default function AdminPortingPage() {
                     {/* Attached Services */}
                     <div className="space-y-2">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Attached Services ({selectedRecord.services_count})
+                        Attached Services ({selectedRecord.services_count || selectedRecord.services?.length || 0})
                       </h4>
-                      {selectedRecord.services.length > 0 ? (
+                      {(selectedRecord.services || []).length > 0 ? (
                         <div className="border border-slate-200 dark:border-[#222430] rounded-lg overflow-hidden">
                           <table className="w-full text-xs">
                             <thead className="bg-slate-50 dark:bg-[#111217]">
@@ -1459,7 +1518,7 @@ export default function AdminPortingPage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
-                              {selectedRecord.services.map((svc, idx) => (
+                              {(selectedRecord.services || []).map((svc, idx) => (
                                 <tr key={idx}>
                                   <td className="py-2 px-3 font-medium text-slate-800 dark:text-white">
                                     {svc.phone_number}
@@ -1492,17 +1551,54 @@ export default function AdminPortingPage() {
                       )}
                     </div>
 
-                    {/* Carrier Details & Account Info */}
-                    {selectedRecord.carrier_details && (
-                      <div className="space-y-2">
+                    {/* Uploaded Attachments (LOA, Bills, Documents) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                          Carrier Details &amp; Account Info
+                          Attachments ({selectedRecord.attachments?.length || 0})
                         </h4>
-                        <div className="p-3.5 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                          {selectedRecord.carrier_details}
-                        </div>
                       </div>
-                    )}
+                      {selectedRecord.attachments && selectedRecord.attachments.length > 0 ? (
+                        <div className="space-y-2">
+                          {selectedRecord.attachments.map((att: any, idx: number) => {
+                            const fileUrl = `/api/admin/porting/attachment?path=${encodeURIComponent(att.storage_path)}`;
+                            return (
+                              <div
+                                key={att.id || idx}
+                                className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-slate-900 dark:text-white truncate">
+                                      {att.file_name}
+                                    </p>
+                                    <p className="text-[10.5px] text-slate-400">
+                                      {att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(2)} MB • ` : ''}
+                                      {att.mime_type || 'Document'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  download={att.file_name}
+                                  className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-semibold text-xs transition flex items-center gap-1 shrink-0 cursor-pointer"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download</span>
+                                </a>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-slate-400 text-xs bg-slate-50 dark:bg-[#111217] rounded-lg border border-slate-200 dark:border-[#222430]">
+                          No attachments uploaded for this porting request.
+                        </div>
+                      )}
+                    </div>
 
                     {/* Activate Property Banner */}
                     {selectedRecord.status === 'COMPLETED' && !selectedRecord.is_activated && (
@@ -1535,34 +1631,97 @@ export default function AdminPortingPage() {
                       </div>
                     )}
 
-                    {/* Current Status Badge */}
-                    <div className="flex items-center gap-3 pt-2">
-                      <span className="text-xs text-slate-400">Current Status:</span>
-                      {(() => {
-                        const b = getStatusBadge(
-                          selectedRecord.status as PortingStatus
-                        );
-                        return (
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${b.bg} ${b.text} ${b.border}`}
-                          >
-                            <span className="w-2 h-2 rounded-full bg-current" />
-                            {b.label}
-                          </span>
-                        );
-                      })()}
-                    </div>
+                    {/* Status & Workflow Updater */}
+                    <form onSubmit={handleUpdateStatusSubmit} className="pt-4 border-t border-slate-100 dark:border-[#222430] space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          Update Porting Status
+                        </h4>
+                        {(() => {
+                          const b = getStatusBadge(selectedRecord.status as PortingStatus);
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${b.bg} ${b.text} ${b.border}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              Current: {b.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {(['SUBMITTED', 'IN_PROGRESS', 'FOC_RECEIVED', 'COMPLETED', 'REJECTED', 'CANCELLED'] as PortingStatus[]).map((st) => {
+                          const isSel = editStatus === st;
+                          return (
+                            <button
+                              key={st}
+                              type="button"
+                              onClick={() => setEditStatus(st)}
+                              className={`px-3 py-2 rounded-lg text-xs font-semibold border transition text-center cursor-pointer ${
+                                isSel
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                  : 'bg-white dark:bg-[#111217] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#222430] hover:bg-slate-50 dark:hover:bg-[#181a24]'
+                              }`}
+                            >
+                              {getStatusBadge(st).label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            Target / FOC Date
+                          </label>
+                          <input
+                            type="date"
+                            value={editTargetDate}
+                            onChange={(e) => setEditTargetDate(e.target.value)}
+                            className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            Add / Update Notes
+                          </label>
+                          <input
+                            type="text"
+                            value={editNotes}
+                            onChange={(e) => setEditNotes(e.target.value)}
+                            placeholder="Carrier reference, notes..."
+                            className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="submit"
+                          disabled={updatingStatus}
+                          className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          {updatingStatus ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          {updatingStatus ? 'Saving...' : 'Save Status'}
+                        </button>
+                      </div>
+                    </form>
                   </>
-                ) : activeTab === 'ATTACHMENTS' ? (
+                ) : (
                   /* TAB 2: ATTACHMENTS (Download & Inline Preview) */
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                          Porting Documents &amp; Authorizations
+                          Porting Documents &amp; Attachments
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          Carrier LOA, invoices, and customer CSR attachments
+                          Carrier LOA documents and customer invoices
                         </p>
                       </div>
                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40">
@@ -1656,169 +1815,12 @@ export default function AdminPortingPage() {
                         })}
                       </div>
                     ) : (
-                      <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] space-y-2">
-                        <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-                        <p className="font-semibold text-slate-700 dark:text-slate-300">
-                          No attachments uploaded
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          This porting request does not contain any attached documents or files.
-                        </p>
+                      <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430]">
+                        <FileText className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                        <p>No documents or attachments uploaded for this porting request.</p>
                       </div>
                     )}
                   </div>
-                ) : (
-                  /* WORKFLOW TAB */
-                  <form onSubmit={handleUpdateStatusSubmit} className="space-y-6">
-                    {/* Visual Pipeline */}
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Porting Pipeline
-                      </h4>
-                      <div className="space-y-0">
-                        {PORTING_STAGES.map((stage, idx) => {
-                          const currentIdx = getStepIndex(editStatus);
-                          const isCompleted = idx < currentIdx;
-                          const isCurrent = idx === currentIdx;
-                          const isFuture = idx > currentIdx;
-
-                          return (
-                            <div key={stage.key} className="flex items-start gap-3">
-                              {/* Step Indicator */}
-                              <div className="flex flex-col items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setEditStatus(stage.key)}
-                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all cursor-pointer ${
-                                    isCompleted
-                                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                                      : isCurrent
-                                      ? 'bg-blue-600 border-blue-600 text-white ring-4 ring-blue-600/20'
-                                      : 'bg-slate-100 dark:bg-[#1a1c24] border-slate-200 dark:border-[#2a2c3a] text-slate-400'
-                                  }`}
-                                >
-                                  {isCompleted ? (
-                                    <Check className="w-4 h-4" />
-                                  ) : (
-                                    stage.step
-                                  )}
-                                </button>
-                                {idx < PORTING_STAGES.length - 1 && (
-                                  <div
-                                    className={`w-0.5 h-8 ${
-                                      isCompleted
-                                        ? 'bg-emerald-500'
-                                        : 'bg-slate-200 dark:bg-[#222430]'
-                                    }`}
-                                  />
-                                )}
-                              </div>
-
-                              {/* Step Content */}
-                              <div
-                                className={`pt-1 pb-4 ${
-                                  isFuture ? 'opacity-50' : ''
-                                }`}
-                              >
-                                <p
-                                  className={`text-xs font-bold ${
-                                    isCurrent
-                                      ? 'text-blue-600 dark:text-blue-400'
-                                      : isCompleted
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : 'text-slate-500'
-                                  }`}
-                                >
-                                  {stage.label}
-                                </p>
-                                <p className="text-[10px] text-slate-400 mt-0.5">
-                                  {stage.desc}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Rejected / Cancelled statuses */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditStatus('REJECTED')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
-                          editStatus === 'REJECTED'
-                            ? 'bg-rose-500 text-white border-rose-500'
-                            : 'bg-white dark:bg-[#111217] text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/50 hover:bg-rose-50 dark:hover:bg-rose-950/30'
-                        }`}
-                      >
-                        <XCircle className="w-3 h-3 inline mr-1" />
-                        Rejected
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditStatus('CANCELLED')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
-                          editStatus === 'CANCELLED'
-                            ? 'bg-slate-600 text-white border-slate-600'
-                            : 'bg-white dark:bg-[#111217] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <X className="w-3 h-3 inline mr-1" />
-                        Cancelled
-                      </button>
-                    </div>
-
-                    {/* Target Date */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        Target Completion Date
-                      </label>
-                      <input
-                        type="date"
-                        value={editTargetDate}
-                        onChange={(e) => setEditTargetDate(e.target.value)}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Notes */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        Notes
-                      </label>
-                      <textarea
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        placeholder="Add carrier notes, LOA details, CSR info..."
-                        rows={3}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 resize-none"
-                      />
-                    </div>
-
-                    {/* Submit */}
-                    <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
-                      <button
-                        type="button"
-                        onClick={() => setShowUnifiedModal(false)}
-                        className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c] cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={updatingStatus}
-                        className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {updatingStatus ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
-                        {updatingStatus ? 'Saving...' : 'Save Changes'}
-                      </button>
-                    </div>
-                  </form>
                 )}
               </div>
             </div>
@@ -1826,7 +1828,7 @@ export default function AdminPortingPage() {
         )}
       </AnimatePresence>
 
-      {/* CREATE PORTING REQUEST MODAL */}
+      {/* CREATE PORTING REQUEST MODAL (FOR NEW NON-EXISTING PROPERTY) */}
       <AnimatePresence>
         {showCreateModal && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1842,7 +1844,7 @@ export default function AdminPortingPage() {
                       Create Porting Request
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Submit a new number porting order
+                      Submit a new property porting request
                     </p>
                   </div>
                 </div>
@@ -1866,112 +1868,171 @@ export default function AdminPortingPage() {
                   </div>
                 )}
 
-                {/* Destination Property */}
+                {/* Organization Name */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    Destination Property <span className="text-rose-500">*</span>
+                    Organization Name <span className="text-rose-500">*</span>
                   </label>
                   <select
-                    value={createForm.organization_property_id}
+                    required
+                    value={createForm.organization_id}
                     onChange={(e) =>
                       setCreateForm((p) => ({
                         ...p,
-                        organization_property_id: e.target.value,
+                        organization_id: e.target.value,
                       }))
                     }
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    <option value="">Select property...</option>
-                    {orgPropertyOptions.map((op) => (
-                      <option key={op.id} value={op.id}>
-                        {op.property_name} — {op.organization_name}
+                    <option value="">Select organization...</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Target Date */}
+                {/* Property Name */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    Target Completion Date
+                    Property Name <span className="text-rose-500">*</span>
                   </label>
                   <input
-                    type="date"
-                    value={createForm.target_date}
+                    type="text"
+                    required
+                    placeholder="e.g. Austin Grand Resort"
+                    value={createForm.property_name}
                     onChange={(e) =>
-                      setCreateForm((p) => ({ ...p, target_date: e.target.value }))
+                      setCreateForm((p) => ({ ...p, property_name: e.target.value }))
                     }
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                {/* Notes */}
+                {/* Property Address */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    Notes
+                    Property Address
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 100 Congress Ave, Austin, TX 78701"
+                    value={createForm.property_address}
+                    onChange={(e) =>
+                      setCreateForm((p) => ({ ...p, property_address: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Phone & Fax Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Property Phone No. <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. +1 512-555-0100"
+                      value={createForm.property_phone}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({ ...p, property_phone: e.target.value }))
+                      }
+                      className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Fax (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. +1 512-555-0199"
+                      value={createForm.fax}
+                      onChange={(e) =>
+                        setCreateForm((p) => ({ ...p, fax: e.target.value }))
+                      }
+                      className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Carrier Details */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    Carrier Details (Optional)
                   </label>
                   <textarea
-                    value={createForm.notes}
+                    rows={2}
+                    placeholder="Losing carrier, account number, PIN / passcode, billing name..."
+                    value={createForm.carrier_details}
                     onChange={(e) =>
-                      setCreateForm((p) => ({ ...p, notes: e.target.value }))
+                      setCreateForm((p) => ({ ...p, carrier_details: e.target.value }))
                     }
-                    placeholder="LOA details, carrier info, special instructions..."
-                    rows={3}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 resize-none"
                   />
                 </div>
 
-                {/* Attach Services */}
+                {/* Attachments (Max 2 PDFs and Max 2 Images) */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    Attach Services / Phone Numbers
-                  </label>
-                  <div className="max-h-32 overflow-y-auto border border-slate-200 dark:border-[#222430] rounded-lg divide-y divide-slate-100 dark:divide-[#1f212c]">
-                    {serviceOptions.length > 0 ? (
-                      serviceOptions.map((svc) => (
-                        <label
-                          key={svc.id}
-                          className="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#111217] cursor-pointer text-xs"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={createForm.service_ids.includes(svc.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setCreateForm((p) => ({
-                                  ...p,
-                                  service_ids: [...p.service_ids, svc.id],
-                                }));
-                              } else {
-                                setCreateForm((p) => ({
-                                  ...p,
-                                  service_ids: p.service_ids.filter(
-                                    (id) => id !== svc.id
-                                  ),
-                                }));
-                              }
-                            }}
-                            className="rounded border-slate-300 dark:border-slate-600"
-                          />
-                          <span className="font-medium text-slate-800 dark:text-white">
-                            {svc.phone_number}
-                          </span>
-                          <span className="text-slate-400 text-[10px]">
-                            {svc.service_type} &bull; {svc.status}
-                          </span>
-                        </label>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-slate-400 text-xs">
-                        No services available
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Add Attachments (LOA &amp; Bills)
+                    </label>
+                    <span className="text-[10px] text-slate-400">
+                      PDFs ({pdfCount}/2) &bull; Images ({imgCount}/2)
+                    </span>
                   </div>
-                  {createForm.service_ids.length > 0 && (
-                    <p className="text-[10px] text-blue-500 font-medium">
-                      {createForm.service_ids.length} service
-                      {createForm.service_ids.length !== 1 ? 's' : ''} selected
-                    </p>
+
+                  <input
+                    type="file"
+                    ref={createFileInputRef}
+                    multiple
+                    accept="application/pdf,image/png,image/jpeg,image/webp"
+                    onChange={handleCreateFileChange}
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => createFileInputRef.current?.click()}
+                    disabled={createLoading}
+                    className="w-full py-3 px-4 border border-dashed border-slate-300 dark:border-[#282a36] hover:border-blue-500 rounded-xl bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="font-semibold text-xs">Choose Files (LOA, Carrier Invoices)</span>
+                  </button>
+
+                  {/* Attached Files List */}
+                  {createAttachedFiles.length > 0 && (
+                    <div className="space-y-1.5 mt-2">
+                      {createAttachedFiles.map((f, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-slate-100 dark:bg-[#181a24] border border-slate-200/80 dark:border-[#242634] text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate text-slate-800 dark:text-slate-200 font-medium">
+                              {f.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 shrink-0">
+                              ({(f.size / 1024 / 1024).toFixed(2)} MB)
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeCreateFile(idx)}
+                            className="p-1 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+                            title="Remove file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -1987,14 +2048,19 @@ export default function AdminPortingPage() {
                   <button
                     type="submit"
                     disabled={createLoading}
-                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     {createLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>{uploadProgress || 'Submitting...'}</span>
+                      </>
                     ) : (
-                      <Send className="w-3.5 h-3.5" />
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Submit Porting Request</span>
+                      </>
                     )}
-                    {createLoading ? 'Submitting...' : 'Submit Porting Request'}
                   </button>
                 </div>
               </form>

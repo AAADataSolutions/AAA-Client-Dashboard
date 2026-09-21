@@ -78,6 +78,11 @@ export async function POST(request: Request) {
 
     let targetUserId = currentUser?.id;
 
+    const isInternal = invite.invite_type === 'INTERNAL_TEAM';
+    const determinedRole = isInternal
+      ? (invite.target_app_role || 'SUB_SUPER_ADMIN')
+      : 'CLIENT_USER';
+
     // If not logged in and password provided, create/signup user
     if (!targetUserId && password) {
       if (adminClient) {
@@ -88,6 +93,7 @@ export async function POST(request: Request) {
           email_confirm: true,
           user_metadata: {
             full_name: fullName || targetEmail.split('@')[0],
+            role: determinedRole,
             initial_org_id: invite.organization_id,
             initial_org_role: invite.target_org_role || 'ADMIN',
           },
@@ -103,6 +109,10 @@ export async function POST(request: Request) {
               await adminClient.auth.admin.updateUserById(foundUser.id, {
                 password: password,
                 email_confirm: true,
+                user_metadata: {
+                  full_name: fullName || targetEmail.split('@')[0],
+                  role: determinedRole,
+                },
               });
               targetUserId = foundUser.id;
             } else {
@@ -122,6 +132,7 @@ export async function POST(request: Request) {
           options: {
             data: {
               full_name: fullName || targetEmail.split('@')[0],
+              role: determinedRole,
               initial_org_id: invite.organization_id,
               initial_org_role: invite.target_org_role || 'ADMIN',
             },
@@ -161,52 +172,68 @@ export async function POST(request: Request) {
     // Fallback or adminClient completion: Ensure profile, member, and invitation updated
     const db = adminClient || supabase;
 
-    if (!rpcCompleted) {
-      // Ensure Profile exists and is active
-      await db.from('profiles').upsert({
-        id: targetUserId,
-        email: targetEmail,
-        full_name: fullName || targetEmail.split('@')[0],
-        role: invite.invite_type === 'INTERNAL_TEAM' ? invite.target_app_role || 'SUB_SUPER_ADMIN' : 'CLIENT_USER',
-        status: 'ACTIVE',
-        updated_at: new Date().toISOString(),
-      });
+    // ALWAYS ensure Profile exists and has the exact determinedRole (SUB_SUPER_ADMIN for admin team)
+    await db.from('profiles').upsert({
+      id: targetUserId,
+      email: targetEmail,
+      full_name: fullName || targetEmail.split('@')[0],
+      role: determinedRole,
+      status: 'ACTIVE',
+      updated_at: new Date().toISOString(),
+    });
 
-      // CLIENT MEMBER / ADMIN INVITATION FLOW
-      if (invite.invite_type === 'CLIENT_MEMBER' && invite.organization_id) {
-        const orgRole = invite.target_org_role || 'ADMIN';
-
-        await db.from('organization_members').upsert(
-          {
-            organization_id: invite.organization_id,
-            profile_id: targetUserId,
-            role: orgRole,
-            status: 'ACTIVE',
-            updated_at: new Date().toISOString(),
+    // Also ensure user_metadata in auth.users is synced with determinedRole
+    if (adminClient) {
+      try {
+        await adminClient.auth.admin.updateUserById(targetUserId, {
+          user_metadata: {
+            full_name: fullName || targetEmail.split('@')[0],
+            role: determinedRole,
           },
-          { onConflict: 'organization_id,profile_id' }
-        );
-
-        await db
-          .from('organizations')
-          .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
-          .eq('id', invite.organization_id);
+        });
+      } catch (authMetaErr) {
+        console.warn('Could not sync user_metadata in auth.users:', authMetaErr);
       }
-
-      // Mark invite as ACCEPTED
-      await db
-        .from('invitations')
-        .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
-        .eq('id', invite.id);
     }
+
+    // CLIENT MEMBER / ADMIN INVITATION FLOW
+    if (!isInternal && invite.organization_id) {
+      const orgRole = invite.target_org_role || 'ADMIN';
+
+      await db.from('organization_members').upsert(
+        {
+          organization_id: invite.organization_id,
+          profile_id: targetUserId,
+          role: orgRole,
+          status: 'ACTIVE',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'organization_id,profile_id' }
+      );
+
+      await db
+        .from('organizations')
+        .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
+        .eq('id', invite.organization_id);
+    }
+
+    // Mark invite as ACCEPTED
+    await db
+      .from('invitations')
+      .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
+      .eq('id', invite.id);
 
     return NextResponse.json({
       success: true,
       type: invite.invite_type,
-      requiresApproval: invite.invite_type === 'INTERNAL_TEAM',
+      role: determinedRole,
+      requiresApproval: false,
       organizationId: invite.organization_id,
       email: targetEmail,
-      message: 'Account activated successfully! You now have access to your organization dashboard.',
+      redirectTo: isInternal ? '/admin' : '/dashboard',
+      message: isInternal
+        ? 'Admin account activated successfully! Navigating to Admin Management Console...'
+        : 'Account activated successfully! You now have access to your organization dashboard.',
     });
   } catch (err: unknown) {
     console.error('Accept invitation error:', err);

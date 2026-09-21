@@ -239,36 +239,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Associate with Organization (Rule 1: One property can only be assigned to one organization)
-    let targetOrgId = organization_id;
-    let orgName = 'Unassigned';
-
+    const targetOrgId = organization_id;
     if (!targetOrgId) {
-      const { data: firstOrg } = await supabase
-        .from('organizations')
-        .select('id, name')
-        .limit(1)
-        .maybeSingle();
-
-      targetOrgId = firstOrg?.id;
-      if (firstOrg) orgName = firstOrg.name;
-    } else {
-      const { data: chosenOrg } = await supabase.from('organizations').select('name').eq('id', targetOrgId).maybeSingle();
-      if (chosenOrg) orgName = chosenOrg.name;
+      return NextResponse.json({
+        success: false,
+        error: 'An organization must be selected to initialize an onboarding pipeline.',
+      }, { status: 400 });
     }
 
-    if (!targetOrgId) {
-      const { data: defaultOrg } = await supabase
-        .from('organizations')
-        .insert({
-          name: 'Primary Portfolio',
-          primary_email: 'admin@aaasolutions.com',
-          status: 'ACTIVE',
-        })
-        .select('id, name')
-        .single();
-      targetOrgId = defaultOrg?.id;
-      if (defaultOrg) orgName = defaultOrg.name;
-    }
+    let orgName = 'Organization';
+    const { data: chosenOrg } = await supabase.from('organizations').select('name').eq('id', targetOrgId).maybeSingle();
+    if (chosenOrg) orgName = chosenOrg.name;
 
     // 3. Link this new property in organization_properties
     const { data: newLink, error: linkErr } = await supabase

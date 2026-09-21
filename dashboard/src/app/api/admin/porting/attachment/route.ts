@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
       .createSignedUrl(path, 300); // 5 minutes validity
 
     if (error || !data?.signedUrl) {
-      // If signed URL fails, try downloading file directly
       const { data: fileBlob, error: downloadErr } = await dbClient.storage
         .from('porting-attachments')
         .download(path);
@@ -54,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(data.signedUrl);
   } catch (err: any) {
-    console.error('Download porting attachment error:', err);
+    console.error('Download admin porting attachment error:', err);
     return NextResponse.json(
       { success: false, error: err.message || 'Internal server error' },
       { status: 500 }

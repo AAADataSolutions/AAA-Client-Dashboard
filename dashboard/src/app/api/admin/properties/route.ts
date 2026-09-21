@@ -105,12 +105,22 @@ export async function GET(request: NextRequest) {
       ).length;
 
       // Calculate onboarding stage
+      const STAGE_MAP: Record<string, string> = {
+        DRAFT: 'Draft Initialized',
+        CONTRACT_SENT: 'Contract Sent',
+        SIGNED: 'Contract Signed & Waiting for LOA',
+        PORTING_WAITING: 'Contract Signed & Waiting for LOA',
+        PORTING_SUBMITTED: 'Porting Submitted',
+        SOF_WAITING: 'SOF Review',
+        FOC_RECEIVED: 'FOC Confirmed',
+        COMPLETED: 'Live Cutover',
+      };
       let stage = 'Draft Initialized';
       for (const op of matchingOps) {
         if (Array.isArray(op.onboardings) && op.onboardings.length > 0) {
           const onb = op.onboardings[0];
           if (onb?.status) {
-            stage = onb.status.replace(/_/g, ' ');
+            stage = STAGE_MAP[onb.status] || onb.status.replace(/_/g, ' ');
             break;
           }
         }
@@ -146,6 +156,8 @@ export async function GET(request: NextRequest) {
         organizations: orgs,
         primary_organization: primaryOrg,
         organization_name: primaryOrg?.name || 'Unassigned',
+        org_property_id: matchingOps[0]?.id || null,
+        org_links: matchingOps,
         services_count: dynamicServiceCount,
         onboarding_stage: stage,
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',

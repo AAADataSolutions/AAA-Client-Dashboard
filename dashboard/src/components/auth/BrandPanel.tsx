@@ -71,7 +71,7 @@ export const BrandPanel: React.FC = () => {
               <PhoneCall className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-white">voice, cloud and on premise pbx</p>
+              <p className="text-[13px] font-semibold text-white">Voice, Cloud and on Premise PBX</p>
               <p className="text-[11px] text-slate-400">Carrier SIP trunking &amp; DIDs</p>
             </div>
           </div>

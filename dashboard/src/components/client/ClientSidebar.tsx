@@ -102,16 +102,14 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
             <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                <Radio className="w-4 h-4 text-white" />
-              </div>
+                            <img src="/logo.png" alt="" className='h-8' />
               {isOpen && (
                 <div className="truncate">
                   <span className="font-semibold text-[13px] text-[#f4f4f5] tracking-tight block leading-tight truncate">
                     AAA Data Solutions
                   </span>
-                  <span className="text-[9px] uppercase font-bold tracking-widest text-blue-400 block leading-none mt-0.5">
-                    Client Portal
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-[#71717a] block leading-none mt-0.5">
+                    Telecommunications
                   </span>
                 </div>
               )}

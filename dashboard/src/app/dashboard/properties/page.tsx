@@ -567,7 +567,7 @@ export default function ClientPropertiesPage() {
                     PROPERTY STATUS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    STAGE
+                    ONBOARDING STAGE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     ACTIONS

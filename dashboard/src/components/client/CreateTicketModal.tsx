@@ -25,28 +25,17 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form fields
+  // Form fields: subject, phone number, description, attachments, priority, property
   const [subject, setSubject] = useState('');
-  const [description, setDescription] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('MEDIUM');
-  const [category, setCategory] = useState('');
-
-  // Dropdown selections
   const [selectedPropId, setSelectedPropId] = useState<string>(preselectedPropertyId || '');
-  const [selectedE911, setSelectedE911] = useState('');
-  const [selectedOnboarding, setSelectedOnboarding] = useState('');
-  const [selectedService, setSelectedService] = useState('');
-  const [selectedPorting, setSelectedPorting] = useState('');
 
-  // Dropdown data
+  // Properties dropdown data
   const [properties, setProperties] = useState<SelectOption[]>([]);
-  const [e911Records, setE911Records] = useState<SelectOption[]>([]);
-  const [onboardings, setOnboardings] = useState<SelectOption[]>([]);
-  const [services, setServices] = useState<SelectOption[]>([]);
-  const [portingRequests, setPortingRequests] = useState<SelectOption[]>([]);
 
-  // Attachments
+  // Attachments (Max 3)
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState<string[]>([]);
 
@@ -55,98 +44,39 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const CATEGORIES = [
-    { value: 'PROPS', label: 'Properties' },
-    { value: 'E911', label: 'E911' },
-    { value: 'ONBOARDING', label: 'Onboarding' },
-    { value: 'SERVICES', label: 'Services' },
-    { value: 'PORTING', label: 'Porting' },
-    { value: 'OTHER', label: 'Other' },
-  ];
-
   useEffect(() => {
     if (preselectedPropertyId) {
       setSelectedPropId(preselectedPropertyId);
     }
   }, [preselectedPropertyId]);
 
-  // Fetch all dropdown data when modal opens
+  // Fetch properties when modal opens
   useEffect(() => {
     if (!isOpen) return;
     setLoadingData(true);
 
-    const fetchAll = async () => {
+    const fetchProperties = async () => {
       try {
-        // Fetch properties
         const propsRes = await fetch('/api/client/properties?limit=100');
         const propsJson = await propsRes.json();
         if (propsJson.success && propsJson.data) {
-          setProperties(
-            propsJson.data.map((p: any) => ({
-              id: p.id,
-              label: `${p.name}${p.city ? ` (${p.city})` : ''}`,
-            }))
-          );
-          if (!selectedPropId && propsJson.data.length > 0) {
-            setSelectedPropId(propsJson.data[0].id);
+          const list = propsJson.data.map((p: any) => ({
+            id: p.id,
+            label: `${p.name}${p.city ? ` (${p.city})` : ''}`,
+          }));
+          setProperties(list);
+          if (!selectedPropId && list.length > 0) {
+            setSelectedPropId(list[0].id);
           }
         }
-
-        // Fetch E911 records
-        const e911Res = await fetch('/api/client/e911?limit=100');
-        const e911Json = await e911Res.json();
-        if (e911Json.success && e911Json.data) {
-          setE911Records(
-            e911Json.data.map((r: any) => ({
-              id: r.id,
-              label: `${r.emergency_address || r.property_name || 'E911 Record'} — ${r.status}`,
-            }))
-          );
-        }
-
-        // Fetch onboarding records
-        const onbRes = await fetch('/api/client/onboarding?limit=100');
-        const onbJson = await onbRes.json();
-        if (onbJson.success && onbJson.data) {
-          setOnboardings(
-            onbJson.data.map((o: any) => ({
-              id: o.id,
-              label: `${o.property_name || 'Onboarding'} — ${o.status?.replace(/_/g, ' ')}`,
-            }))
-          );
-        }
-
-        // Fetch services
-        const svcRes = await fetch('/api/client/services?limit=100');
-        const svcJson = await svcRes.json();
-        if (svcJson.success && svcJson.data) {
-          setServices(
-            svcJson.data.map((s: any) => ({
-              id: s.id,
-              label: `${s.phone_number || s.service_type_name || 'Service'} — ${s.status}`,
-            }))
-          );
-        }
-
-        // Fetch porting requests
-        const portRes = await fetch('/api/client/porting?limit=100');
-        const portJson = await portRes.json();
-        if (portJson.success && portJson.data) {
-          setPortingRequests(
-            portJson.data.map((p: any) => ({
-              id: p.id,
-              label: `${p.property_name || 'Porting Request'} — ${p.status?.replace(/_/g, ' ')}`,
-            }))
-          );
-        }
       } catch (err) {
-        console.error('Error loading dropdown data:', err);
+        console.error('Error loading properties dropdown:', err);
       } finally {
         setLoadingData(false);
       }
     };
 
-    fetchAll();
+    fetchProperties();
   }, [isOpen]);
 
   // Cleanup previews on unmount
@@ -207,36 +137,18 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       setError('Please provide a detailed description.');
       return;
     }
-    if (!category) {
-      setError('Please select a category.');
-      return;
-    }
 
     setSubmitting(true);
     setError(null);
 
     try {
-      // Build category context with related selections
-      const relatedSelections: string[] = [];
-      if (selectedPropId) relatedSelections.push(`Property: ${properties.find(p => p.id === selectedPropId)?.label || selectedPropId}`);
-      if (selectedE911) relatedSelections.push(`E911: ${e911Records.find(r => r.id === selectedE911)?.label || selectedE911}`);
-      if (selectedOnboarding) relatedSelections.push(`Onboarding: ${onboardings.find(o => o.id === selectedOnboarding)?.label || selectedOnboarding}`);
-      if (selectedService) relatedSelections.push(`Service: ${services.find(s => s.id === selectedService)?.label || selectedService}`);
-      if (selectedPorting) relatedSelections.push(`Porting: ${portingRequests.find(p => p.id === selectedPorting)?.label || selectedPorting}`);
-
       const formData = new FormData();
       formData.append('property_id', selectedPropId || '');
       formData.append('subject', subject.trim());
       formData.append('description', description.trim());
       formData.append('priority', priority);
-      formData.append('category', CATEGORIES.find(c => c.value === category)?.label || category);
       if (phoneNumber.trim()) {
         formData.append('phone_number', phoneNumber.trim());
-      }
-
-      // Append related selections as metadata in the description
-      if (relatedSelections.length > 0) {
-        formData.set('description', `${description.trim()}\n\n--- Related Items ---\n${relatedSelections.join('\n')}`);
       }
 
       attachments.forEach((file, i) => {
@@ -257,13 +169,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       // Reset form
       setSubject('');
       setDescription('');
-      setCategory('');
       setPhoneNumber('');
       setPriority('MEDIUM');
-      setSelectedE911('');
-      setSelectedOnboarding('');
-      setSelectedService('');
-      setSelectedPorting('');
       setAttachments([]);
       setAttachmentPreviews([]);
       onSuccess();
@@ -275,7 +182,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     }
   };
 
-  const selectClasses = "w-full px-3 py-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs cursor-pointer";
+  const selectClasses = "w-full px-3 py-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-xs";
   const labelClasses = "font-semibold text-slate-800 dark:text-slate-200 block text-xs";
 
   return (
@@ -316,7 +223,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-            {/* Subject */}
+            {/* 1. Subject */}
             <div className="space-y-1">
               <label className={labelClasses}>
                 Subject <span className="text-rose-500">*</span>
@@ -331,109 +238,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               />
             </div>
 
-            {/* Category */}
-            <div className="space-y-1">
-              <label className={labelClasses}>
-                Category <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                disabled={submitting}
-                className={selectClasses}
-              >
-                <option value="">Select Category</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* All separate dropdowns in 2-column grid */}
+            {/* 2-column row: Your Phone No. & Property Dropdown */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Properties Dropdown */}
-              <div className="space-y-1">
-                <label className={labelClasses}>Property</label>
-                <select
-                  value={selectedPropId}
-                  onChange={(e) => setSelectedPropId(e.target.value)}
-                  disabled={loadingData || submitting}
-                  className={selectClasses}
-                >
-                  <option value="">Select Property</option>
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* E911 Dropdown */}
-              <div className="space-y-1">
-                <label className={labelClasses}>E911</label>
-                <select
-                  value={selectedE911}
-                  onChange={(e) => setSelectedE911(e.target.value)}
-                  disabled={loadingData || submitting}
-                  className={selectClasses}
-                >
-                  <option value="">Select E911 Record</option>
-                  {e911Records.map((r) => (
-                    <option key={r.id} value={r.id}>{r.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Onboarding Dropdown */}
-              <div className="space-y-1">
-                <label className={labelClasses}>Onboarding</label>
-                <select
-                  value={selectedOnboarding}
-                  onChange={(e) => setSelectedOnboarding(e.target.value)}
-                  disabled={loadingData || submitting}
-                  className={selectClasses}
-                >
-                  <option value="">Select Onboarding</option>
-                  {onboardings.map((o) => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Services Dropdown */}
-              <div className="space-y-1">
-                <label className={labelClasses}>Services</label>
-                <select
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  disabled={loadingData || submitting}
-                  className={selectClasses}
-                >
-                  <option value="">Select Service</option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Porting Dropdown */}
-              <div className="space-y-1">
-                <label className={labelClasses}>Porting</label>
-                <select
-                  value={selectedPorting}
-                  onChange={(e) => setSelectedPorting(e.target.value)}
-                  disabled={loadingData || submitting}
-                  className={selectClasses}
-                >
-                  <option value="">Select Porting Request</option>
-                  {portingRequests.map((p) => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Phone Number */}
+              {/* 2. Your Phone No. */}
               <div className="space-y-1">
                 <label className={labelClasses}>Your Phone No.</label>
                 <input
@@ -445,9 +252,25 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                   className={selectClasses}
                 />
               </div>
+
+              {/* 3. Property Dropdown */}
+              <div className="space-y-1">
+                <label className={labelClasses}>Property</label>
+                <select
+                  value={selectedPropId}
+                  onChange={(e) => setSelectedPropId(e.target.value)}
+                  disabled={loadingData || submitting}
+                  className={`${selectClasses} cursor-pointer`}
+                >
+                  <option value="">Select Property</option>
+                  {properties.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Priority */}
+            {/* 4. Priority */}
             <div className="space-y-1">
               <label className={labelClasses}>Priority</label>
               <div className="grid grid-cols-4 gap-2">
@@ -474,7 +297,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               </div>
             </div>
 
-            {/* Description */}
+            {/* 5. Description */}
             <div className="space-y-1">
               <label className={labelClasses}>
                 Description <span className="text-rose-500">*</span>
@@ -489,7 +312,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               />
             </div>
 
-            {/* Attachments */}
+            {/* 6. Attachments */}
             <div className="space-y-1.5">
               <label className={labelClasses}>
                 Attachments <span className="text-slate-400 font-normal">(Max 3 images)</span>

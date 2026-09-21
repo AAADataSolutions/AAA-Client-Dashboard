@@ -39,8 +39,16 @@ export async function GET(request: NextRequest) {
 
     const dbClient = createAdminClient() || supabase;
 
-    // Fetch porting requests matching this organization
-    const { data: portRecords, error } = await dbClient
+    // 1. Fetch organization property IDs for this organization
+    const { data: orgProps } = await dbClient
+      .from('organization_properties')
+      .select('id')
+      .eq('organization_id', member.organization_id);
+
+    const orgPropIds = (orgProps || []).map((op: any) => op.id);
+
+    // 2. Fetch porting requests matching this organization
+    let portQuery = dbClient
       .from('porting_requests')
       .select(`
         *,
@@ -50,22 +58,45 @@ export async function GET(request: NextRequest) {
         ),
         attachments:porting_attachments(
           id, file_name, file_size, mime_type, storage_path, created_at
+        ),
+        services:porting_request_services(
+          id,
+          service:services(id, phone_number, status, description, service_type:service_types(name))
         )
       `)
-      .or(`organization_id.eq.${member.organization_id},organization_property.organization_id.eq.${member.organization_id}`)
       .order('created_at', { ascending: false });
 
+    if (orgPropIds.length > 0) {
+      portQuery = portQuery.or(`organization_id.eq.${member.organization_id},organization_property_id.in.(${orgPropIds.join(',')})`);
+    } else {
+      portQuery = portQuery.eq('organization_id', member.organization_id);
+    }
+
+    const { data: portRecords, error } = await portQuery;
+
     if (error) {
-      // Fallback simple query
+      console.error('Client porting query error:', error);
+      // Fallback simple query with attachments
       const { data: simpleRecords } = await dbClient
         .from('porting_requests')
-        .select('*')
+        .select(`
+          *,
+          attachments:porting_attachments(id, file_name, file_size, mime_type, storage_path, created_at)
+        `)
         .eq('organization_id', member.organization_id)
         .order('created_at', { ascending: false });
 
       return NextResponse.json({
         success: true,
-        data: simpleRecords || [],
+        data: (simpleRecords || []).map((item: any) => ({
+          ...item,
+          property_name: item.property_name || 'Property',
+          property_address: item.property_address || '',
+          property_phone: item.property_phone || '',
+          attachments: item.attachments || [],
+          services: [],
+          services_count: 0,
+        })),
         total: simpleRecords?.length || 0,
         metrics: { total: simpleRecords?.length || 0, inProgress: 0, focReceived: 0, completed: 0, actionRequired: 0 },
         filters: { properties: [] },
@@ -74,6 +105,17 @@ export async function GET(request: NextRequest) {
 
     const allPortings = (portRecords || []).map((item: any) => {
       const prop = item.organization_property?.property;
+      const services = (item.services || []).map((s: any) => {
+        const svc = s.service || s;
+        return {
+          id: svc?.id || s.id,
+          phone_number: svc?.phone_number || '—',
+          status: svc?.status || 'ACTIVE',
+          description: svc?.description || '',
+          service_type: svc?.service_type?.name || svc?.service_type || 'Voice Line',
+        };
+      });
+
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
@@ -92,6 +134,8 @@ export async function GET(request: NextRequest) {
         created_at: item.created_at,
         updated_at: item.updated_at,
         attachments: item.attachments || [],
+        services: services,
+        services_count: services.length,
       };
     });
 

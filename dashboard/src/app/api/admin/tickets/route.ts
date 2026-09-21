@@ -212,6 +212,7 @@ export async function POST(request: NextRequest) {
     let property_id: string | null = null;
     let organization_property_id: string | null = null;
     let assigned_to: string | null = null;
+    let phone_number = '';
     const files: File[] = [];
 
     if (contentType.includes('multipart/form-data')) {
@@ -223,6 +224,7 @@ export async function POST(request: NextRequest) {
       property_id = formData.get('property_id') as string | null;
       organization_property_id = formData.get('organization_property_id') as string | null;
       assigned_to = formData.get('assigned_to') as string | null;
+      phone_number = (formData.get('phone_number') as string) || '';
 
       for (let i = 0; i < 3; i++) {
         const file = formData.get(`attachment_${i}`) as File | null;
@@ -239,6 +241,7 @@ export async function POST(request: NextRequest) {
       property_id = body.property_id || null;
       organization_property_id = body.organization_property_id || null;
       assigned_to = body.assigned_to || null;
+      phone_number = body.phone_number || '';
     }
 
     if (!subject || !subject.trim()) {
@@ -259,6 +262,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const fullDescription = phone_number.trim()
+      ? `[Contact Phone: ${phone_number.trim()}]\n\n${description?.trim() || ''}`
+      : (description?.trim() || '');
+
     const { data: newTicket, error } = await supabase
       .from('tickets')
       .insert({
@@ -266,7 +273,7 @@ export async function POST(request: NextRequest) {
         created_by: user?.id || null,
         assigned_to: assigned_to || null,
         subject: subject.trim(),
-        description: description?.trim() || '',
+        description: fullDescription,
         priority: priority || 'MEDIUM',
         status: status || 'OPEN',
       })

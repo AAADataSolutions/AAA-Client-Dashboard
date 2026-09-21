@@ -216,7 +216,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-[#222430]">
-                    <a
+                    {/* <a
                       href={createdInvite.inviteUrl}
                       target="_blank"
                       rel="noreferrer"
@@ -224,7 +224,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                     >
                       <span>Open Invite in New Window</span>
                       <ExternalLink className="w-3 h-3" />
-                    </a>
+                    </a> */}
 
                     <motion.button
                       type="button"

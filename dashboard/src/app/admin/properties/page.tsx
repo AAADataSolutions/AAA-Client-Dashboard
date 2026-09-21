@@ -371,6 +371,14 @@ export default function AdminPropertiesPage() {
 
       showToast('Contact Saved', `${contactFormData.full_name} saved successfully.`, 'success');
       setShowAddContactModal(false);
+
+      if (result.data) {
+        setContactsList((prev) => [
+          result.data,
+          ...prev.filter((c) => c.id !== result.data.id && (!result.data.is_primary || !c.is_primary)),
+        ]);
+      }
+
       setContactFormData({
         full_name: '',
         email: '',
@@ -1111,7 +1119,7 @@ export default function AdminPropertiesPage() {
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM PHONE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM EMAIL</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STAGE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ONBOARDING STAGE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
@@ -1287,7 +1295,7 @@ export default function AdminPropertiesPage() {
                       {/* 10. Onboarding Stage */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-[#1a1c24] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#222430]">
-                          {(prop as any).onboarding_stage || 'Draft Initialized'}
+                          {(prop as any).onboarding_stage === 'DRAFT' || !(prop as any).onboarding_stage ? 'Draft Initialized' : (prop as any).onboarding_stage}
                         </span>
                       </td>
 

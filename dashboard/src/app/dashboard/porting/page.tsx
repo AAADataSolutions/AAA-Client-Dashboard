@@ -22,6 +22,7 @@ import {
   ChevronRight,
   AlertTriangle,
   GitBranch,
+  FileText,
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -62,6 +63,9 @@ interface PortingRecordItem {
   property_address: string;
   property_location: string;
   property_phone: string;
+  fax?: string;
+  carrier_details?: string;
+  attachments?: any[];
   status: string;
   target_date: string | null;
   completed_at: string | null;
@@ -505,22 +509,22 @@ export default function ClientPortingPage() {
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Property
+                    Property Name
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Numbers
+                    Address
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Current Status
+                    Phone
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Target / FOC Date
+                    Fax
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Created
+                    Attachments
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Last Updated
+                    Status
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     Action
@@ -534,54 +538,67 @@ export default function ClientPortingPage() {
                     onClick={() => setSelectedPortingForDrawer(item)}
                     className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
                   >
-                    {/* Column 1: Property */}
+                    {/* Column 1: Property Name */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
                           <Hotel className="w-4 h-4" />
                         </div>
-                        <div>
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {item.property_name}
-                          </span>
-                          <span className="block text-[10.5px] text-slate-400">
-                            {item.property_location}
-                          </span>
-                        </div>
+                        <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {item.property_name}
+                        </span>
                       </div>
                     </td>
 
-                    {/* Column 2: Numbers */}
+                    {/* Column 2: Address */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60">
-                            <Phone className="w-3 h-3" />
-                            <span>{item.services_count || item.services?.length || 0} Line(s)</span>
-                          </span>
-                          {item.services?.length > 0 && (
-                            <button
-                              onClick={(e) => handleCopyNumbers(item, e)}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                              title="Copy numbers"
-                            >
-                              {copiedId === item.id ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                        {item.services?.length > 0 && (
-                          <span className="text-[10.5px] text-slate-400 block">
-                            {item.services.map((s) => s.phone_number).join(', ')}
-                          </span>
+                      <span className="text-slate-600 dark:text-slate-300 text-xs">
+                        {item.property_address || '—'}
+                      </span>
+                    </td>
+
+                    {/* Column 3: Phone */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 font-mono text-xs text-slate-800 dark:text-slate-200">
+                        <span>{item.property_phone || '—'}</span>
+                        {item.property_phone && item.property_phone !== '—' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(item.property_phone);
+                              setCopiedId(item.id);
+                              toast.success('Phone number copied');
+                              setTimeout(() => setCopiedId(null), 2000);
+                            }}
+                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                            title="Copy phone"
+                          >
+                            {copiedId === item.id ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
                         )}
                       </div>
                     </td>
 
-                    {/* Column 3: Current Status */}
+                    {/* Column 4: Fax */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className="text-slate-600 dark:text-slate-400 font-mono text-xs">
+                        {item.fax || '—'}
+                      </span>
+                    </td>
+
+                    {/* Column 5: Attachments (no. of attachments) */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40">
+                        <FileText className="w-3 h-3" />
+                        <span>{item.attachments?.length || 0}</span>
+                      </span>
+                    </td>
+
+                    {/* Column 6: Status */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
@@ -609,40 +626,6 @@ export default function ClientPortingPage() {
                       </span>
                     </td>
 
-                    {/* Column 4: Target / FOC Date */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {item.target_date ? (
-                            new Date(item.target_date).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })
-                          ) : (
-                            <span className="text-slate-400 font-normal">Pending FOC</span>
-                          )}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Column 5: Created */}
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
-                      {new Date(item.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </td>
-
-                    {/* Column 6: Last Updated */}
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
-                      {new Date(item.updated_at || item.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </td>
-
                     {/* Column 7: Action */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -651,7 +634,7 @@ export default function ClientPortingPage() {
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>View</span>
+                          <span>View Details</span>
                         </button>
                         <button
                           onClick={(e) => handleOpenMenu(e, item)}
@@ -659,7 +642,7 @@ export default function ClientPortingPage() {
                           aria-label="More porting actions"
                         >
                           <MoreVertical className="w-4 h-4" />
-                        </button>
+                          </button>
                       </div>
                     </td>
                   </tr>

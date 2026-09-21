@@ -52,6 +52,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const propId = property_id && property_id !== 'UNASSIGNED' ? property_id : null;
+    let linkedServiceId = service_id && service_id !== 'UNASSIGNED' ? service_id : null;
+
+    // If no service_id was provided, automatically mirror/create this as a service in services table
+    if (!linkedServiceId) {
+      // 1. Resolve or create 'Fire Lines' service type
+      let typeId: string | null = null;
+      const { data: stData } = await supabase
+        .from('service_types')
+        .select('id')
+        .or('name.ilike.Fire Lines,name.ilike.Fire Line')
+        .limit(1)
+        .maybeSingle();
+
+      if (stData) {
+        typeId = stData.id;
+      } else {
+        const { data: newType } = await supabase
+          .from('service_types')
+          .insert({ name: 'Fire Lines', description: 'Life Safety & Fire Alarm Dedicated Lines' })
+          .select('id')
+          .single();
+        if (newType) typeId = newType.id;
+      }
+
+      // 2. Insert into services
+      const customServiceId = `FL-${Date.now().toString().slice(-6)}`;
+      const serviceName = `Fire Line - ${device_type.trim()}`;
+      const serviceDesc = description
+        ? description.trim()
+        : `Fire Line device: ${device_type.trim()}${serial_number ? ` (S/N: ${serial_number.trim()})` : ''}`;
+
+      const { data: createdSvc } = await supabase
+        .from('services')
+        .insert({
+          custom_service_id: customServiceId,
+          service_name: serviceName,
+          phone_number: phone_number.trim(),
+          service_type_id: typeId,
+          description: serviceDesc,
+          status: 'ACTIVE',
+        })
+        .select('id')
+        .single();
+
+      if (createdSvc) {
+        linkedServiceId = createdSvc.id;
+
+        // 3. Link to property if property_id was provided and property has an organization link
+        if (propId) {
+          const { data: orgProp } = await supabase
+            .from('organization_properties')
+            .select('id')
+            .eq('property_id', propId)
+            .maybeSingle();
+
+          if (orgProp) {
+            await supabase.from('organization_property_services').insert({
+              organization_property_id: orgProp.id,
+              service_id: linkedServiceId,
+            });
+          }
+        }
+      }
+    }
+
     const { data: newFireLine, error } = await supabase
       .from('fire_lines')
       .insert({
@@ -59,8 +125,8 @@ export async function POST(request: NextRequest) {
         phone_number: phone_number.trim(),
         serial_number: serial_number ? serial_number.trim() : null,
         description: description ? description.trim() : null,
-        property_id: property_id && property_id !== 'UNASSIGNED' ? property_id : null,
-        service_id: service_id && service_id !== 'UNASSIGNED' ? service_id : null,
+        property_id: propId,
+        service_id: linkedServiceId,
       })
       .select(`
         *,
@@ -97,6 +163,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Fire Line ID is required.' }, { status: 400 });
     }
 
+    // Fetch existing fireline
+    const { data: existingLine } = await supabase
+      .from('fire_lines')
+      .select('id, service_id, property_id, phone_number, device_type')
+      .eq('id', id)
+      .maybeSingle();
+
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
     };
@@ -106,6 +179,34 @@ export async function PATCH(request: NextRequest) {
     if (description !== undefined) updatePayload.description = description ? description.trim() : null;
     if (property_id !== undefined) updatePayload.property_id = property_id && property_id !== 'UNASSIGNED' ? property_id : null;
     if (service_id !== undefined) updatePayload.service_id = service_id && service_id !== 'UNASSIGNED' ? service_id : null;
+
+    const currentServiceId = existingLine?.service_id || updatePayload.service_id;
+    const targetPropId = updatePayload.property_id !== undefined ? updatePayload.property_id : existingLine?.property_id;
+
+    // If linked to a service, update service info as well
+    if (currentServiceId) {
+      const srvUpdate: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (phone_number !== undefined) srvUpdate.phone_number = phone_number.trim();
+      if (device_type !== undefined) srvUpdate.service_name = `Fire Line - ${device_type.trim()}`;
+      if (description !== undefined) srvUpdate.description = description ? description.trim() : null;
+
+      await supabase.from('services').update(srvUpdate).eq('id', currentServiceId);
+
+      // If property was updated, re-link in organization_property_services
+      if (property_id !== undefined) {
+        await supabase.from('organization_property_services').delete().eq('service_id', currentServiceId);
+
+        if (targetPropId) {
+          const { data: op } = await supabase.from('organization_properties').select('id').eq('property_id', targetPropId).maybeSingle();
+          if (op) {
+            await supabase.from('organization_property_services').insert({
+              organization_property_id: op.id,
+              service_id: currentServiceId,
+            });
+          }
+        }
+      }
+    }
 
     const { data: updatedFireLine, error } = await supabase
       .from('fire_lines')
@@ -146,6 +247,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Fire Line ID is required.' }, { status: 400 });
     }
 
+    // Fetch fireline to check linked service
+    const { data: existingLine } = await supabase
+      .from('fire_lines')
+      .select('id, service_id, device_type, phone_number')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existingLine?.service_id) {
+      // Remove service property link & service
+      await supabase.from('organization_property_services').delete().eq('service_id', existingLine.service_id);
+      await supabase.from('services').delete().eq('id', existingLine.service_id);
+    }
+
     const { error } = await supabase.from('fire_lines').delete().eq('id', id);
 
     if (error) {
@@ -156,7 +270,7 @@ export async function DELETE(request: NextRequest) {
       action: 'FIRE_LINE_DELETED',
       entity_type: 'FIRE_LINE',
       entity_id: id,
-      entity_name: `Fire Line ${id}`,
+      entity_name: `Fire Line ${existingLine?.device_type || ''} - ${existingLine?.phone_number || id}`,
       changes: { id },
     });
 

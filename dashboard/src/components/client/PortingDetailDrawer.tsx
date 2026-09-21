@@ -15,6 +15,8 @@ import {
   LifeBuoy,
   FileText,
   ShieldAlert,
+  Download,
+  Eye,
 } from 'lucide-react';
 import { useToast } from './ClientToast';
 
@@ -184,9 +186,9 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
           {/* Property Section */}
           <div className="space-y-2">
             <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">
-              Associated Property Location
+              Property Information
             </span>
-            <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-1.5">
+            <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Hotel className="w-4 h-4 text-purple-500" />
@@ -208,6 +210,34 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                 <p className="text-slate-500 dark:text-slate-400 text-[11px]">
                   {porting.property_address}
                 </p>
+              )}
+              {porting.property_phone && (
+                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-[#222430]">
+                  <span className="text-slate-400">Phone:</span>
+                  <div className="flex items-center gap-1 font-mono text-slate-800 dark:text-slate-200">
+                    <span>{porting.property_phone}</span>
+                    <button
+                      onClick={() => handleCopy(porting.property_phone, 'Phone number')}
+                      className="p-0.5 text-slate-400 hover:text-purple-600 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {porting.fax && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Fax:</span>
+                  <div className="flex items-center gap-1 font-mono text-slate-800 dark:text-slate-200">
+                    <span>{porting.fax}</span>
+                    <button
+                      onClick={() => handleCopy(porting.fax, 'Fax number')}
+                      className="p-0.5 text-slate-400 hover:text-purple-600 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -311,10 +341,72 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
               Carrier Notes &amp; LOA Instructions
             </span>
             <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
-              <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-xs">
                 {porting.notes || 'No specific carrier account or authorization instructions attached.'}
               </p>
             </div>
+          </div>
+
+          {/* Carrier Details & Account Info */}
+          {porting.carrier_details && (
+            <div className="space-y-2">
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">
+                Carrier Details &amp; Account Info
+              </span>
+              <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-xs whitespace-pre-wrap">
+                  {porting.carrier_details}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Attachments Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">
+                Attachments ({porting.attachments?.length || 0})
+              </span>
+            </div>
+            {porting.attachments && porting.attachments.length > 0 ? (
+              <div className="space-y-2">
+                {porting.attachments.map((att: any, idx: number) => {
+                  const fileUrl = `/api/client/porting/attachment?path=${encodeURIComponent(att.storage_path)}`;
+                  return (
+                    <div
+                      key={att.id || idx}
+                      className="p-3 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileText className="w-4 h-4 text-purple-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-white truncate">
+                            {att.file_name}
+                          </p>
+                          <p className="text-[10.5px] text-slate-400">
+                            {(att.file_size / 1024 / 1024).toFixed(2)} MB &bull; {att.mime_type || 'Document'}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={att.file_name}
+                        className="px-2.5 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-600 dark:text-purple-400 font-semibold text-xs transition flex items-center gap-1 shrink-0"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download</span>
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] text-slate-400 text-center text-xs">
+                No attachments uploaded for this porting request.
+              </div>
+            )}
           </div>
         </div>
 

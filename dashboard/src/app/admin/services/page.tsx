@@ -25,6 +25,8 @@ import {
   Link as LinkIcon,
   Loader2,
   Trash2,
+  Flame,
+  ArrowUpDown,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -73,12 +75,24 @@ interface Toast {
 
 const SERVICE_TYPES_LIST = [
   'Direct Inward Dial (DID)',
+  'Fire Lines',
+  'Elevator Lines',
   'SIP Trunk - 100 Channels',
   'Toll-Free 800 Route',
   'Analog Emergency FXS',
   'Cloud PBX Extension',
   'Ray Baum Dedicated E911',
 ];
+
+const isFireLineType = (type: string) => {
+  const t = (type || '').toLowerCase().replace(/[\s_-]+/g, '');
+  return t === 'firelines' || t === 'fireline' || t.includes('fireline');
+};
+
+const isElevatorLineType = (type: string) => {
+  const t = (type || '').toLowerCase().replace(/[\s_-]+/g, '');
+  return t === 'elevatorlines' || t === 'elevatorline' || t.includes('elevatorline');
+};
 
 export default function AdminServicesPage() {
   const dispatch = useAppDispatch();
@@ -151,7 +165,13 @@ export default function AdminServicesPage() {
     property_id: '',
     description: '',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED',
+    // Fire Lines specific fields
+    device_type: '',
+    serial_number: '',
+    // Elevator Lines specific fields
+    extension: '',
   });
+  const [showCustomServiceId, setShowCustomServiceId] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -213,6 +233,26 @@ export default function AdminServicesPage() {
   useEffect(() => {
     loadServiceTypes();
   }, [loadServiceTypes]);
+
+  const availableServiceTypes = React.useMemo(() => {
+    const dynamicNames = serviceTypes.map((t) => t.name);
+    const defaults = [
+      'Direct Inward Dial (DID)',
+      'Fire Lines',
+      'Elevator Lines',
+      'SIP Trunk - 100 Channels',
+      'Toll-Free 800 Route',
+      'Analog Emergency FXS',
+      'Cloud PBX Extension',
+      'Ray Baum Dedicated E911',
+    ];
+    const set = new Set<string>();
+    defaults.forEach((d) => set.add(d));
+    dynamicNames.forEach((d) => {
+      if (d && d.trim()) set.add(d.trim());
+    });
+    return Array.from(set);
+  }, [serviceTypes]);
 
   // Search input handler (char-by-char)
   const handleSearchChange = (val: string) => {
@@ -411,15 +451,40 @@ export default function AdminServicesPage() {
   // Handle Create Service Submit
   const handleSaveCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const serviceId = formData.custom_service_id.trim();
 
-    if (!serviceId || serviceId.length < 6) {
-      setFormError('Service ID is mandatory and must be at least 6 characters.');
-      return;
+    const activeType = formData.is_custom_type
+      ? formData.custom_type_input.trim()
+      : formData.service_type_name;
+
+    const isFire = isFireLineType(activeType);
+    const isElevator = isElevatorLineType(activeType);
+
+    // Auto-generate service ID if needed for Fire/Elevator lines, or validate for general services
+    let serviceId = formData.custom_service_id.trim();
+    if (!serviceId) {
+      if (isFire) {
+        serviceId = `FL-${Math.floor(100000 + Math.random() * 900000)}`;
+      } else if (isElevator) {
+        serviceId = `EL-${Math.floor(100000 + Math.random() * 900000)}`;
+      } else {
+        serviceId = `SVC-${Math.floor(100000 + Math.random() * 900000)}`;
+      }
+    } else if (serviceId.length < 6) {
+      if (isFire || isElevator) {
+        serviceId = `${isFire ? 'FL' : 'EL'}-${Math.floor(100000 + Math.random() * 900000)}`;
+      } else {
+        setFormError('Service ID is mandatory and must be at least 6 characters.');
+        return;
+      }
     }
 
     if (!formData.phone_number.trim()) {
-      setFormError('Service phone number / DID identifier is required.');
+      setFormError('Phone number is required.');
+      return;
+    }
+
+    if (isFire && !formData.device_type.trim()) {
+      setFormError('Device Type is required for Fire Lines.');
       return;
     }
 
@@ -427,18 +492,28 @@ export default function AdminServicesPage() {
       setFormLoading(true);
       setFormError(null);
 
-      const typeName = formData.is_custom_type
-        ? formData.custom_type_input.trim()
-        : formData.service_type_name;
+      let serviceName = formData.service_name.trim();
+      if (!serviceName) {
+        if (isFire) {
+          serviceName = formData.device_type.trim() || `Fire Line ${formData.phone_number.trim()}`;
+        } else if (isElevator) {
+          serviceName = formData.extension.trim()
+            ? `Elevator - ${formData.extension.trim()}`
+            : `Elevator Line ${formData.phone_number.trim()}`;
+        } else {
+          serviceName = `Service ${formData.phone_number.trim()}`;
+        }
+      }
 
+      // 1. Provision standard service
       const res = await fetch('/api/admin/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           custom_service_id: serviceId,
-          service_name: formData.service_name.trim() || `Service ${formData.phone_number.trim()}`,
+          service_name: serviceName,
           phone_number: formData.phone_number.trim(),
-          service_type_name: typeName,
+          service_type_name: isFire ? 'Fire Lines' : isElevator ? 'Elevator Lines' : activeType,
           property_id: formData.property_id || null,
           description: formData.description.trim() || null,
           status: formData.status,
@@ -448,7 +523,68 @@ export default function AdminServicesPage() {
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create service.');
 
-      showToast('Service Provisioned', `${serviceId} (${formData.phone_number}) created successfully.`, 'success');
+      const createdService = result.data;
+
+      // 2. If Fire Line, also create in fire_lines section (/api/admin/fire-lines)
+      if (isFire) {
+        try {
+          const fireRes = await fetch('/api/admin/fire-lines', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              device_type: formData.device_type.trim(),
+              phone_number: formData.phone_number.trim(),
+              serial_number: formData.serial_number.trim() || null,
+              description: formData.description.trim() || null,
+              property_id: formData.property_id || null,
+              service_id: createdService?.id || null,
+            }),
+          });
+          const fireJson = await fireRes.json();
+          if (!fireRes.ok || !fireJson.success) {
+            console.warn('Fire line creation warning:', fireJson.error);
+          }
+        } catch (fErr) {
+          console.warn('Could not mirror to fire_lines:', fErr);
+        }
+      }
+
+      // 3. If Elevator Line, also create in elevator_lines section (/api/admin/elevator-lines)
+      if (isElevator) {
+        try {
+          const eleRes = await fetch('/api/admin/elevator-lines', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone_number: formData.phone_number.trim(),
+              extension: formData.extension.trim() || null,
+              description: formData.description.trim() || null,
+              status: 'ACTIVE',
+              property_id: formData.property_id || null,
+              service_id: createdService?.id || null,
+            }),
+          });
+          const eleJson = await eleRes.json();
+          if (!eleRes.ok || !eleJson.success) {
+            console.warn('Elevator line creation warning:', eleJson.error);
+          }
+        } catch (eErr) {
+          console.warn('Could not mirror to elevator_lines:', eErr);
+        }
+      }
+
+      const successTitle = isFire
+        ? 'Fire Line Created'
+        : isElevator
+        ? 'Elevator Line Created'
+        : 'Service Provisioned';
+      const successMsg = isFire
+        ? `Fire line ${formData.phone_number} created in Services & Fire Lines.`
+        : isElevator
+        ? `Elevator line ${formData.phone_number} created in Services & Elevator Lines.`
+        : `${serviceId} (${formData.phone_number}) created successfully.`;
+
+      showToast(successTitle, successMsg, 'success');
       setShowCreateModal(false);
       setFormData({
         custom_service_id: '',
@@ -460,7 +596,11 @@ export default function AdminServicesPage() {
         property_id: '',
         description: '',
         status: 'ACTIVE',
+        device_type: '',
+        serial_number: '',
+        extension: '',
       });
+      setShowCustomServiceId(false);
       loadData();
     } catch (err: any) {
       setFormError(err.message || 'Creation failed.');
@@ -483,6 +623,9 @@ export default function AdminServicesPage() {
       property_id: svc.property_id || '',
       description: svc.description || '',
       status: (svc.status as any) || 'ACTIVE',
+      device_type: '',
+      serial_number: '',
+      extension: '',
     });
     setFormError(null);
     setShowEditModal(true);
@@ -635,13 +778,17 @@ export default function AdminServicesPage() {
                 custom_service_id: '',
                 service_name: '',
                 phone_number: '',
-                service_type_name: serviceTypes.length > 0 ? serviceTypes[0].name : 'Direct Inward Dial (DID)',
+                service_type_name: 'Direct Inward Dial (DID)',
                 custom_type_input: '',
                 is_custom_type: false,
                 property_id: '',
                 description: '',
                 status: 'ACTIVE',
+                device_type: '',
+                serial_number: '',
+                extension: '',
               });
+              setShowCustomServiceId(false);
               setFormError(null);
               setShowCreateModal(true);
             }}
@@ -801,7 +948,7 @@ export default function AdminServicesPage() {
               className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">Type: All Service Types</option>
-              {(serviceTypes.length > 0 ? serviceTypes.map((t) => t.name) : SERVICE_TYPES_LIST).map((t) => (
+              {availableServiceTypes.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -910,7 +1057,11 @@ export default function AdminServicesPage() {
                   property_id: '',
                   description: '',
                   status: 'ACTIVE',
+                  device_type: '',
+                  serial_number: '',
+                  extension: '',
                 });
+                setShowCustomServiceId(false);
                 setShowCreateModal(true);
               }}
               className="px-3.5 py-1.5 bg-[#4f46e5] text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
@@ -1411,154 +1562,468 @@ export default function AdminServicesPage() {
 
       {/* 4. PROVISION NEW SERVICE MODAL */}
       <AnimatePresence>
-        {showCreateModal && (
-          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-blue-600" />
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Provision New Service</h3>
-                </div>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+        {showCreateModal && (() => {
+          const currentType = formData.is_custom_type
+            ? formData.custom_type_input.trim()
+            : formData.service_type_name;
+          const isFire = isFireLineType(currentType);
+          const isElevator = isElevatorLineType(currentType);
 
-              {formError && (
-                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
-                  {formError}
-                </div>
-              )}
+          const handleTypeSelect = (newType: string) => {
+            const isFL = isFireLineType(newType);
+            const isEL = isElevatorLineType(newType);
+            let newId = formData.custom_service_id;
+            if (!newId || newId.startsWith('SVC-') || newId.startsWith('FL-') || newId.startsWith('EL-')) {
+              if (isFL) newId = `FL-${Math.floor(100000 + Math.random() * 900000)}`;
+              else if (isEL) newId = `EL-${Math.floor(100000 + Math.random() * 900000)}`;
+              else newId = `SVC-${Math.floor(100000 + Math.random() * 900000)}`;
+            }
+            setFormData((prev) => ({
+              ...prev,
+              service_type_name: newType,
+              custom_service_id: newId,
+            }));
+          };
 
-              <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto space-y-4 text-xs">
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">
-                    Service ID <span className="text-rose-500">* (Min 6 chars)</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    minLength={6}
-                    value={formData.custom_service_id}
-                    onChange={(e) => setFormData({ ...formData, custom_service_id: e.target.value })}
-                    placeholder="e.g. SVC-MIA-001"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-black dark:text-white block mb-1">Service Name</label>
-                    <input
-                      type="text"
-                      value={formData.service_name}
-                      onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-                      placeholder="e.g. Main Lobby Line"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
+          return (
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isFire ? (
+                      <Flame className="w-5 h-5 text-orange-500" />
+                    ) : isElevator ? (
+                      <ArrowUpDown className="w-5 h-5 text-purple-600" />
+                    ) : (
+                      <Plus className="w-4 h-4 text-blue-600" />
+                    )}
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                      {isFire
+                        ? 'Add Fire Line'
+                        : isElevator
+                        ? 'Add Elevator Line'
+                        : 'Provision New Service'}
+                    </h3>
                   </div>
-
-                  <div>
-                    <label className="font-bold text-black dark:text-white block mb-1">
-                      Phone Number / DID <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.phone_number}
-                      onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                      placeholder="+1 (555) 019-2834"
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="font-bold text-black dark:text-white block">Service Type</label>
+                {formError && (
+                  <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                    {formError}
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto space-y-4 text-xs">
+                  {/* Service Type selector when in Fire Lines mode */}
+                  {isFire ? (
+                    <>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-black dark:text-white block">Service Type</label>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, is_custom_type: !formData.is_custom_type })}
+                            className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {formData.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                          </button>
+                        </div>
+
+                        {formData.is_custom_type ? (
+                          <input
+                            type="text"
+                            required
+                            value={formData.custom_type_input}
+                            onChange={(e) => setFormData({ ...formData, custom_type_input: e.target.value })}
+                            placeholder="Enter new custom service type..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        ) : (
+                          <select
+                            value={formData.service_type_name}
+                            onChange={(e) => handleTypeSelect(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500 font-medium"
+                          >
+                            {availableServiceTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Device Type * */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Device Type <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.device_type}
+                          onChange={(e) => setFormData({ ...formData, device_type: e.target.value })}
+                          placeholder="e.g. Fire Communicator DACT, Fire Alarm Panel"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Phone Number * */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Phone Number <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.phone_number}
+                          onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                          placeholder="e.g. +1 555-019-2831"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Serial Number */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Serial Number</label>
+                        <input
+                          type="text"
+                          value={formData.serial_number}
+                          onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                          placeholder="e.g. SN-9812-FL-01"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Description (Shown in Table UI) */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Description (Shown in Table UI)
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          placeholder="e.g. Primary life-safety monitoring dialer line for Main Building Fire Riser Room"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Assigned Property */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Assigned Property</label>
+                        <select
+                          value={formData.property_id}
+                          onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {propertyOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} {p.organization_name ? `(${p.organization_name})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Subtle Service ID display / customize */}
+                      <div className="pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            Service ID:{' '}
+                            <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
+                              {formData.custom_service_id || 'Auto-generated (FL-XXXXXX)'}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomServiceId(!showCustomServiceId)}
+                            className="text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {showCustomServiceId ? 'Hide Custom ID' : 'Customize ID'}
+                          </button>
+                        </div>
+                        {showCustomServiceId && (
+                          <input
+                            type="text"
+                            value={formData.custom_service_id}
+                            onChange={(e) => setFormData({ ...formData, custom_service_id: e.target.value })}
+                            placeholder="e.g. FL-MIA-001"
+                            className="mt-1.5 w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : isElevator ? (
+                    /* Service Type selector when in Elevator Lines mode */
+                    <>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-black dark:text-white block">Service Type</label>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, is_custom_type: !formData.is_custom_type })}
+                            className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {formData.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                          </button>
+                        </div>
+
+                        {formData.is_custom_type ? (
+                          <input
+                            type="text"
+                            required
+                            value={formData.custom_type_input}
+                            onChange={(e) => setFormData({ ...formData, custom_type_input: e.target.value })}
+                            placeholder="Enter new custom service type..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        ) : (
+                          <select
+                            value={formData.service_type_name}
+                            onChange={(e) => handleTypeSelect(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500 font-medium"
+                          >
+                            {availableServiceTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      {/* Phone Number * */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Phone Number <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.phone_number}
+                          onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                          placeholder="e.g. +1 555-019-2844"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Extension / Cab ID */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Extension / Cab ID</label>
+                        <input
+                          type="text"
+                          value={formData.extension}
+                          onChange={(e) => setFormData({ ...formData, extension: e.target.value })}
+                          placeholder="e.g. Cab #1 - North Tower"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Description (Shown in Table UI) */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Description (Shown in Table UI)
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          placeholder="e.g. Freight elevator cab emergency auto-dialer direct to security desk"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* Assigned Property */}
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Assigned Property</label>
+                        <select
+                          value={formData.property_id}
+                          onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {propertyOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} {p.organization_name ? `(${p.organization_name})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Subtle Service ID display / customize */}
+                      <div className="pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            Service ID:{' '}
+                            <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
+                              {formData.custom_service_id || 'Auto-generated (EL-XXXXXX)'}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomServiceId(!showCustomServiceId)}
+                            className="text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {showCustomServiceId ? 'Hide Custom ID' : 'Customize ID'}
+                          </button>
+                        </div>
+                        {showCustomServiceId && (
+                          <input
+                            type="text"
+                            value={formData.custom_service_id}
+                            onChange={(e) => setFormData({ ...formData, custom_service_id: e.target.value })}
+                            placeholder="e.g. EL-MIA-001"
+                            className="mt-1.5 w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Standard Provision New Service */
+                    <>
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Service ID <span className="text-rose-500">* (Min 6 chars)</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          minLength={6}
+                          value={formData.custom_service_id}
+                          onChange={(e) => setFormData({ ...formData, custom_service_id: e.target.value })}
+                          placeholder="e.g. SVC-MIA-001"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Service Name</label>
+                          <input
+                            type="text"
+                            value={formData.service_name}
+                            onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
+                            placeholder="e.g. Main Lobby Line"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">
+                            Phone Number / DID <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={formData.phone_number}
+                            onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                            placeholder="+1 (555) 019-2834"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-black dark:text-white block">Service Type</label>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({ ...formData, is_custom_type: !formData.is_custom_type })}
+                            className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {formData.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                          </button>
+                        </div>
+
+                        {formData.is_custom_type ? (
+                          <input
+                            type="text"
+                            required
+                            value={formData.custom_type_input}
+                            onChange={(e) => setFormData({ ...formData, custom_type_input: e.target.value })}
+                            placeholder="Enter new custom service type..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        ) : (
+                          <select
+                            value={formData.service_type_name}
+                            onChange={(e) => handleTypeSelect(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                          >
+                            {availableServiceTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
+                        <select
+                          value={formData.property_id}
+                          onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {propertyOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} {p.organization_name ? `(${p.organization_name})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Description</label>
+                        <textarea
+                          rows={2}
+                          value={formData.description}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          placeholder="e.g. Primary inbound DID for front desk operations"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, is_custom_type: !formData.is_custom_type })}
-                      className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                      onClick={() => setShowCreateModal(false)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
                     >
-                      {formData.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={formLoading}
+                      className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      {formLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : isFire ? (
+                        'Save Fire Line'
+                      ) : isElevator ? (
+                        'Save Elevator Line'
+                      ) : (
+                        'Provision Service'
+                      )}
                     </button>
                   </div>
-
-                  {formData.is_custom_type ? (
-                    <input
-                      type="text"
-                      required
-                      value={formData.custom_type_input}
-                      onChange={(e) => setFormData({ ...formData, custom_type_input: e.target.value })}
-                      placeholder="Enter new custom service type..."
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  ) : (
-                    <select
-                      value={formData.service_type_name}
-                      onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                    >
-                      {(serviceTypes.length > 0 ? serviceTypes.map((t) => t.name) : SERVICE_TYPES_LIST).map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
-                  <select
-                    value={formData.property_id}
-                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">Unassigned</option>
-                    {propertyOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.organization_name})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Description</label>
-                  <textarea
-                    rows={2}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="e.g. Primary inbound DID for front desk operations"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                    className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
-                  >
-                    {formLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Provision Service'}
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* 5. EDIT SERVICE MODAL */}
@@ -1630,7 +2095,7 @@ export default function AdminServicesPage() {
                     onChange={(e) => setFormData({ ...formData, service_type_name: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
-                    {(serviceTypes.length > 0 ? serviceTypes.map((t) => t.name) : SERVICE_TYPES_LIST).map((t) => (
+                    {availableServiceTypes.map((t) => (
                       <option key={t} value={t}>
                         {t}
                       </option>

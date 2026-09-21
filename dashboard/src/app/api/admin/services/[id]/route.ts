@@ -51,7 +51,18 @@ export async function PATCH(
     };
 
     if (body.phone_number !== undefined) updatePayload.phone_number = body.phone_number.trim();
-    if (body.service_type_id !== undefined) updatePayload.service_type_id = body.service_type_id;
+    if (body.service_type_id !== undefined) {
+      updatePayload.service_type_id = body.service_type_id;
+    } else if (body.service_type !== undefined) {
+      const { data: stRow } = await supabase
+        .from('service_types')
+        .select('id')
+        .ilike('name', body.service_type.trim())
+        .maybeSingle();
+      if (stRow) {
+        updatePayload.service_type_id = stRow.id;
+      }
+    }
     if (body.description !== undefined) updatePayload.description = body.description ? body.description.trim() : null;
     if (body.status !== undefined) updatePayload.status = body.status;
 
@@ -80,17 +91,6 @@ export async function PATCH(
 
       if (op) {
         targetOrgPropId = op.id;
-      } else {
-        // If property has no organization yet, find or assign default
-        const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
-        if (defaultOrg) {
-          const { data: newOp } = await supabase.from('organization_properties').insert({
-            organization_id: defaultOrg.id,
-            property_id: targetPropertyId,
-            status: 'ACTIVE',
-          }).select('id').single();
-          if (newOp) targetOrgPropId = newOp.id;
-        }
       }
     }
 

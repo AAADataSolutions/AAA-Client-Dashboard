@@ -59,6 +59,10 @@ export async function GET(request: NextRequest) {
         ),
         attachments:porting_attachments(
           id, file_name, file_size, mime_type, storage_path, created_at
+        ),
+        services:porting_request_services(
+          id,
+          service:services(id, phone_number, status, description, service_type:service_types(name))
         )
       `, { count: 'exact' });
 
@@ -98,6 +102,8 @@ export async function GET(request: NextRequest) {
           organization_name: 'Organization',
           is_activated: item.is_activated || false,
           attachments: [],
+          services: [],
+          services_count: 0,
         })),
         pagination: {
           totalCount: totalSimple,
@@ -123,6 +129,17 @@ export async function GET(request: NextRequest) {
       const directOrg = Array.isArray(item.organization) ? item.organization[0] : item.organization;
       const org = directOrg || (Array.isArray(orgProp?.organization) ? orgProp?.organization[0] : orgProp?.organization);
 
+      const services = (item.services || []).map((s: any) => {
+        const svc = s.service || s;
+        return {
+          id: svc?.id || s.id,
+          phone_number: svc?.phone_number || '—',
+          status: svc?.status || 'ACTIVE',
+          description: svc?.description || '',
+          service_type: svc?.service_type?.name || svc?.service_type || 'Voice Line',
+        };
+      });
+
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
@@ -144,6 +161,8 @@ export async function GET(request: NextRequest) {
         notes: item.notes,
         is_activated: item.is_activated || false,
         attachments: item.attachments || [],
+        services_count: services.length,
+        services: services,
         created_at: item.created_at,
         updated_at: item.updated_at || item.created_at,
       };
@@ -190,6 +209,88 @@ export async function GET(request: NextRequest) {
         submittedCount: submittedCount || 0,
       },
     });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const body = await request.json();
+    const {
+      organization_id,
+      property_name,
+      property_address,
+      property_phone,
+      fax,
+      carrier_details,
+      status,
+      attachments,
+    } = body;
+
+    if (!organization_id) {
+      return NextResponse.json({ success: false, error: 'Please select an organization.' }, { status: 400 });
+    }
+
+    if (!property_name?.trim() || !property_phone?.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Property Name and Phone Number are required.' },
+        { status: 400 }
+      );
+    }
+
+    // Insert porting request
+    const { data: newPorting, error: insertErr } = await db
+      .from('porting_requests')
+      .insert({
+        organization_id,
+        created_by: user?.id || null,
+        property_name: property_name.trim(),
+        property_address: property_address ? property_address.trim() : null,
+        property_phone: property_phone.trim(),
+        fax: fax ? fax.trim() : null,
+        carrier_details: carrier_details ? carrier_details.trim() : null,
+        status: status || 'SUBMITTED',
+        is_activated: false,
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
+      return NextResponse.json({ success: false, error: insertErr.message }, { status: 400 });
+    }
+
+    // Insert attachments if provided
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const attRows = attachments.map((att: any) => ({
+        porting_request_id: newPorting.id,
+        uploaded_by: user?.id || null,
+        file_name: att.file_name,
+        file_size: att.file_size || 0,
+        mime_type: att.mime_type || 'application/pdf',
+        storage_path: att.storage_path,
+      }));
+
+      await db.from('porting_attachments').insert(attRows);
+    }
+
+    await logAuditEvent({
+      action: 'PORTING_REQUEST_CREATED',
+      entity_type: 'PORTING_REQUEST',
+      entity_id: newPorting.id,
+      entity_name: newPorting.property_name,
+      changes: body,
+    });
+
+    return NextResponse.json({ success: true, data: newPorting });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
