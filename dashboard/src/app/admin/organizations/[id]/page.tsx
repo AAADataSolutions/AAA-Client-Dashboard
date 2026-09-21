@@ -1299,12 +1299,12 @@ export default function OrganizationDetailPage({
                 <Plus className="w-3.5 h-3.5" />
                 <span>Assign Service</span>
               </motion.button>
-              <Link
+              {/* <Link
                 href="/admin/services"
                 className="text-blue-600 dark:text-blue-400 text-xs font-semibold hover:underline cursor-pointer"
               >
                 Open Services Catalog
-              </Link>
+              </Link> */}
             </div>
           </div>
 
