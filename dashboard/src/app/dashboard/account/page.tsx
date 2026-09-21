@@ -731,12 +731,12 @@ export default function ClientAccountPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <button
+                          {/* <button
                             onClick={() => setInvitationToRevoke(inv)}
                             className="px-2.5 py-1 rounded border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-[11px] font-semibold transition cursor-pointer"
                           >
                             Revoke
-                          </button>
+                          </button> */}
                         </div>
                       </div>
                     ))}

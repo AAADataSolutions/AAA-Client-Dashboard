@@ -305,7 +305,7 @@ export default function AdminInvitationsPage() {
                             </button>
                           </>
                         )}
-                        {isPending && (
+                        {/* {isPending && (
                           <button
                             onClick={() => handleReview(inv.id, 'REVOKE')}
                             disabled={actionLoading === inv.id}
@@ -313,7 +313,7 @@ export default function AdminInvitationsPage() {
                           >
                             Revoke
                           </button>
-                        )}
+                        )} */}
                       </td>
                     </tr>
                   );
