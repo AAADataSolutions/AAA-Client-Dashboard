@@ -71,7 +71,12 @@ export async function PATCH(
     if (body.general_manager_name !== undefined) updatePayload.general_manager_name = body.general_manager_name ? body.general_manager_name.trim() : null;
     if (body.general_manager_phone !== undefined) updatePayload.general_manager_phone = body.general_manager_phone ? body.general_manager_phone.trim() : null;
     if (body.general_manager_email !== undefined) updatePayload.general_manager_email = body.general_manager_email ? body.general_manager_email.trim() : null;
-    if (body.ray_baud_and_logs_enabled !== undefined) updatePayload.ray_baud_and_logs_enabled = body.ray_baud_and_logs_enabled;
+    if (body.ray_baud_and_logs_enabled !== undefined) {
+      updatePayload.ray_baud_and_logs_enabled = Boolean(body.ray_baud_and_logs_enabled);
+    } else if (body.e911_status !== undefined) {
+      updatePayload.ray_baud_and_logs_enabled = body.e911_status === 'VERIFIED' || body.e911_status === 'ACTIVE';
+    }
+    if (body.ray_baum_status !== undefined) updatePayload.ray_baum_status = body.ray_baum_status;
     if (body.status !== undefined) updatePayload.status = body.status;
 
     const { data: updatedProp, error: propErr } = await supabase
@@ -87,15 +92,70 @@ export async function PATCH(
 
     // Reassign organization if specified (Rule 1: One property can only belong to one organization)
     if (body.organization_id !== undefined) {
-      // Remove old link
-      await supabase.from('organization_properties').delete().eq('property_id', id);
-      // Add new link if not null/empty
-      if (body.organization_id && body.organization_id !== 'UNASSIGNED') {
-        await supabase.from('organization_properties').insert({
-          organization_id: body.organization_id,
-          property_id: id,
-          status: body.status || 'ACTIVE',
-        });
+      // Find existing organization_properties link
+      const { data: existingOp } = await supabase
+        .from('organization_properties')
+        .select('id, organization_id')
+        .eq('property_id', id)
+        .maybeSingle();
+
+      if (!body.organization_id || body.organization_id === 'UNASSIGNED') {
+        // Unassign property from organization
+        await supabase.from('organization_properties').delete().eq('property_id', id);
+      } else if (!existingOp) {
+        // Insert new assignment
+        const { data: newOp } = await supabase
+          .from('organization_properties')
+          .insert({
+            organization_id: body.organization_id,
+            property_id: id,
+            status: body.status || 'ACTIVE',
+          })
+          .select('id')
+          .single();
+
+        if (newOp) {
+          // Auto create onboarding record (Rule 3)
+          await supabase.from('onboardings').insert({
+            organization_property_id: newOp.id,
+            status: 'DRAFT',
+          });
+
+          // Auto create e911 record
+          await supabase.from('e911_records').insert({
+            organization_property_id: newOp.id,
+            emergency_address: `${updatedProp.address}, ${updatedProp.city}, ${updatedProp.state} ${updatedProp.zip_code}`,
+            status: updatedProp.ray_baud_and_logs_enabled ? 'VERIFIED' : 'PENDING',
+            verified_at: updatedProp.ray_baud_and_logs_enabled ? new Date().toISOString() : null,
+          });
+        }
+      } else if (existingOp.organization_id !== body.organization_id) {
+        // Update existing link to new org
+        await supabase
+          .from('organization_properties')
+          .update({ organization_id: body.organization_id, status: body.status || 'ACTIVE' })
+          .eq('id', existingOp.id);
+      }
+    }
+
+    // Keep e911_records in sync with property e911 status
+    if (updatePayload.ray_baud_and_logs_enabled !== undefined) {
+      const { data: op } = await supabase
+        .from('organization_properties')
+        .select('id')
+        .eq('property_id', id)
+        .maybeSingle();
+
+      if (op) {
+        const isVer = updatePayload.ray_baud_and_logs_enabled;
+        await supabase
+          .from('e911_records')
+          .update({
+            status: isVer ? 'VERIFIED' : 'PENDING',
+            verified_at: isVer ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('organization_property_id', op.id);
       }
     }
 

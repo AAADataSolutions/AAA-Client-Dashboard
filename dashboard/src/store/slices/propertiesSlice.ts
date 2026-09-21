@@ -35,6 +35,7 @@ export interface PropertyRecord {
   organization_id?: string | null;
   organization_name?: string | null;
   organization_property_id?: string | null;
+  is_assigned?: boolean;
   primary_organization?: any;
   organizations?: any;
   created_at: string;

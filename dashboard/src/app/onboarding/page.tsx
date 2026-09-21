@@ -273,7 +273,7 @@ function OnboardingContent() {
             <button
               type="submit"
               disabled={submitting}
-              className="h-10 px-5 rounded-lg bg-[#1275e2] hover:bg-[#005cb8] text-white font-semibold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-60 shadow-xs"
+              className="h-10 px-5 rounded-lg bg-[#1275e2] hover:bg-[#005cb8] text-white font-semibold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-60 shadow-xs cursor-pointer disabled:cursor-not-allowed"
             >
               {submitting ? (
                 <>

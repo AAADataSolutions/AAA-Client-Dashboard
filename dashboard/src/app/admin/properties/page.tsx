@@ -214,6 +214,8 @@ export default function AdminPropertiesPage() {
     general_manager_phone: '',
     general_manager_email: '',
     ray_baud_and_logs_enabled: true,
+    ray_baum_status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
+    e911_status: 'VERIFIED' as 'VERIFIED' | 'AUDIT_REQUIRED',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED',
   });
   const [formLoading, setFormLoading] = useState(false);
@@ -560,9 +562,12 @@ export default function AdminPropertiesPage() {
   // --- Handlers: Edit Property ---
   const handleOpenEdit = (prop: PropertyItem) => {
     setSelectedPropForEdit(prop);
+    const isE911 = prop.ray_baud_and_logs_enabled ?? true;
+    const isRayBaumActive = (prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' || isE911;
+
     setFormData({
       name: prop.name || '',
-      organization_id: prop.primary_organization?.id || prop.organizations?.[0]?.id || '',
+      organization_id: prop.primary_organization?.id || prop.organizations?.[0]?.id || prop.organization_id || '',
       address: prop.address || '',
       city: prop.city || '',
       state: prop.state || '',
@@ -573,7 +578,9 @@ export default function AdminPropertiesPage() {
       general_manager_name: prop.general_manager_name || '',
       general_manager_phone: prop.general_manager_phone || '',
       general_manager_email: prop.general_manager_email || '',
-      ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
+      ray_baud_and_logs_enabled: isE911,
+      ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
+      e911_status: isE911 ? 'VERIFIED' : 'AUDIT_REQUIRED',
       status: (prop.status as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED') || 'ACTIVE',
     });
     setFormError(null);
@@ -762,6 +769,8 @@ export default function AdminPropertiesPage() {
                 general_manager_phone: '',
                 general_manager_email: '',
                 ray_baud_and_logs_enabled: true,
+                ray_baum_status: 'ACTIVE',
+                e911_status: 'VERIFIED',
                 status: 'ACTIVE',
               });
               setFormError(null);
@@ -1074,6 +1083,8 @@ export default function AdminPropertiesPage() {
                   general_manager_phone: '',
                   general_manager_email: '',
                   ray_baud_and_logs_enabled: true,
+                  ray_baum_status: 'ACTIVE',
+                  e911_status: 'VERIFIED',
                   status: 'ACTIVE',
                 });
                 setShowCreateModal(true);
@@ -1124,15 +1135,15 @@ export default function AdminPropertiesPage() {
 
                       {/* 3. Organization */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {prop.primary_organization || (prop.organizations && prop.organizations.length > 0) ? (
+                        {(prop.organization_name && prop.organization_name !== 'Unassigned') || prop.primary_organization || (prop.organizations && prop.organizations.length > 0) ? (
                           <a
-                            href={`/admin/organizations/${prop.primary_organization?.id || prop.organizations[0]?.id}`}
+                            href={`/admin/organizations/${prop.primary_organization?.id || prop.organizations?.[0]?.id || ''}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
                           >
-                            <span>{prop.primary_organization?.name || prop.organizations[0]?.name}</span>
+                            <span>{prop.organization_name && prop.organization_name !== 'Unassigned' ? prop.organization_name : (prop.primary_organization?.name || prop.organizations?.[0]?.name)}</span>
                             <ExternalLink className="w-3 h-3 opacity-60" />
                           </a>
                         ) : (
@@ -1243,7 +1254,7 @@ export default function AdminPropertiesPage() {
 
                       {/* 10. Property Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {!prop.primary_organization && (!prop.organizations || prop.organizations.length === 0) ? (
+                        {!prop.is_assigned && !prop.primary_organization && (!prop.organizations || prop.organizations.length === 0) && (!prop.organization_name || prop.organization_name === 'Unassigned') ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-dashed border-slate-300 dark:border-slate-700">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                             Unassigned
@@ -1256,7 +1267,7 @@ export default function AdminPropertiesPage() {
                                 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
                                 : prop.status === 'ARCHIVED'
                                 ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
-                                : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40'
+                                : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40'
                             }`}
                           >
                             <span
@@ -1265,10 +1276,10 @@ export default function AdminPropertiesPage() {
                                   ? 'bg-emerald-500'
                                   : prop.status === 'ARCHIVED'
                                   ? 'bg-rose-500'
-                                  : 'bg-amber-500'
+                                  : 'bg-blue-500'
                               }`}
                             />
-                            {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' ? 'Archived' : 'Inactive'}
+                            {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' ? 'Archived' : 'Assigned'}
                           </button>
                         )}
                       </td>
@@ -2159,6 +2170,43 @@ export default function AdminPropertiesPage() {
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">E911 Compliance Status</label>
+                    <select
+                      value={formData.e911_status}
+                      onChange={(e) => {
+                        const val = e.target.value as 'VERIFIED' | 'AUDIT_REQUIRED';
+                        setFormData({
+                          ...formData,
+                          e911_status: val,
+                          ray_baud_and_logs_enabled: val === 'VERIFIED',
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="VERIFIED">PSAP Verified (Active)</option>
+                      <option value="AUDIT_REQUIRED">Audit Required (Pending)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Ray Baum and Kari&apos;s Law</label>
+                    <select
+                      value={formData.ray_baum_status}
+                      onChange={(e) => {
+                        const val = e.target.value as 'ACTIVE' | 'INACTIVE';
+                        setFormData({
+                          ...formData,
+                          ray_baum_status: val,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="ACTIVE">Active (Compliant)</option>
+                      <option value="INACTIVE">Inactive (Non-Compliant)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430]">
@@ -2314,6 +2362,56 @@ export default function AdminPropertiesPage() {
                       onChange={(e) => setFormData({ ...formData, general_manager_email: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">E911 Compliance Status</label>
+                    <select
+                      value={formData.e911_status}
+                      onChange={(e) => {
+                        const val = e.target.value as 'VERIFIED' | 'AUDIT_REQUIRED';
+                        setFormData({
+                          ...formData,
+                          e911_status: val,
+                          ray_baud_and_logs_enabled: val === 'VERIFIED',
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="VERIFIED">PSAP Verified (Active)</option>
+                      <option value="AUDIT_REQUIRED">Audit Required (Pending)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Ray Baum and Kari&apos;s Law</label>
+                    <select
+                      value={formData.ray_baum_status}
+                      onChange={(e) => {
+                        const val = e.target.value as 'ACTIVE' | 'INACTIVE';
+                        setFormData({
+                          ...formData,
+                          ray_baum_status: val,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="ACTIVE">Active (Compliant)</option>
+                      <option value="INACTIVE">Inactive (Non-Compliant)</option>
+                    </select>
+                  </div>
+
+                  <div className="col-span-2 space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Property Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                      <option value="ARCHIVED">Archived</option>
+                    </select>
                   </div>
                 </div>
 

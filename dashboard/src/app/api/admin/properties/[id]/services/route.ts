@@ -31,11 +31,14 @@ export async function GET(
       .from('organization_property_services')
       .select(`
         id,
+        service_id,
         service:services(
           id,
           phone_number,
           description,
           status,
+          service_name,
+          custom_service_id,
           service_type:service_types(id, name),
           created_at
         )
@@ -46,17 +49,52 @@ export async function GET(
       return NextResponse.json({ success: false, error: lsErr.message }, { status: 400 });
     }
 
-    const services = (linkedServices || [])
+    let services = (linkedServices || [])
       .map((item: any) => item.service)
       .filter(Boolean)
       .map((s: any) => ({
         id: s.id,
         phone_number: s.phone_number,
+        service_name: s.service_name || '',
+        custom_service_id: s.custom_service_id || '',
         service_type: s.service_type?.name || 'Voice Trunk / DID',
         description: s.description || '',
         status: s.status || 'ACTIVE',
         created_at: s.created_at,
       }));
+
+    // If nested join returned empty but links exist, fetch directly
+    if (services.length === 0 && (linkedServices || []).length > 0) {
+      const sIds = (linkedServices || []).map((ls: any) => ls.service_id).filter(Boolean);
+      if (sIds.length > 0) {
+        const { data: directSvcs } = await supabase
+          .from('services')
+          .select(`
+            id,
+            phone_number,
+            description,
+            status,
+            service_name,
+            custom_service_id,
+            service_type:service_types(id, name),
+            created_at
+          `)
+          .in('id', sIds);
+
+        if (directSvcs && directSvcs.length > 0) {
+          services = directSvcs.map((s: any) => ({
+            id: s.id,
+            phone_number: s.phone_number,
+            service_name: s.service_name || '',
+            custom_service_id: s.custom_service_id || '',
+            service_type: s.service_type?.name || 'Voice Trunk / DID',
+            description: s.description || '',
+            status: s.status || 'ACTIVE',
+            created_at: s.created_at,
+          }));
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, data: services });
   } catch (err: any) {

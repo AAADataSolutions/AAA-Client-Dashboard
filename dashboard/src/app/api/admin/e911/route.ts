@@ -248,9 +248,15 @@ export async function PUT(request: NextRequest) {
     const updates: any = {};
     if (emergency_address !== undefined) updates.emergency_address = emergency_address.trim();
     if (psap_id !== undefined) updates.psap_id = psap_id.trim();
+
+    const isTargetVerified = status === 'VERIFIED' || status === 'ACTIVE';
     if (status !== undefined) {
-      updates.status = status;
-      if (status === 'VERIFIED') updates.verified_at = new Date().toISOString();
+      updates.status = isTargetVerified ? 'VERIFIED' : status;
+      if (isTargetVerified) {
+        updates.verified_at = new Date().toISOString();
+      } else if (status === 'PENDING') {
+        updates.verified_at = null;
+      }
     }
 
     if (append_correction_note) {
@@ -274,11 +280,24 @@ export async function PUT(request: NextRequest) {
       .from('e911_records')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('*, org_property:organization_properties(property_id)')
       .single();
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Keep the associated property's ray_baud_and_logs_enabled and ray_baum_status in 100% sync
+    if (status !== undefined && updated?.org_property?.property_id) {
+      const propId = updated.org_property.property_id;
+      await supabase
+        .from('properties')
+        .update({
+          ray_baud_and_logs_enabled: isTargetVerified,
+          ray_baum_status: isTargetVerified ? 'ACTIVE' : 'INACTIVE',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', propId);
     }
 
     // Audit Log

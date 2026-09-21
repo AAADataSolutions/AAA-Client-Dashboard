@@ -58,20 +58,53 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { full_name, phone_number } = body;
 
-    const updates: any = { updated_at: new Date().toISOString() };
-    if (full_name !== undefined) updates.full_name = full_name ? full_name.trim() : null;
-    if (phone_number !== undefined) updates.phone_number = phone_number ? phone_number.trim() : null;
+    const trimmedName = full_name !== undefined ? (full_name ? full_name.trim() : null) : undefined;
+    const trimmedPhone = phone_number !== undefined ? (phone_number ? phone_number.trim() : null) : undefined;
 
-    const dbClient = createAdminClient() || supabase;
+    // 1. Try calling the dedicated RPC function which runs with SECURITY DEFINER to bypass any RLS recursion
+    let updatedProfile: any = null;
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('update_own_profile', {
+        p_full_name: trimmedName ?? null,
+        p_phone_number: trimmedPhone ?? null,
+      });
 
-    const { data: updatedProfile, error } = await dbClient
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
+      if (!rpcError && rpcData) {
+        updatedProfile = rpcData;
+      }
+    } catch (rpcErr) {
+      console.warn('update_own_profile RPC not available, falling back to direct table update:', rpcErr);
+    }
 
-    if (error) throw error;
+    // 2. If RPC was not used or failed, fallback to direct table update with adminClient or authenticated supabase
+    if (!updatedProfile) {
+      const updates: any = { updated_at: new Date().toISOString() };
+      if (trimmedName !== undefined) updates.full_name = trimmedName;
+      if (trimmedPhone !== undefined) updates.phone_number = trimmedPhone;
+
+      const dbClient = createAdminClient() || supabase;
+
+      const { data, error } = await dbClient
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      updatedProfile = data;
+    }
+
+    // 3. Keep Supabase Auth user_metadata in sync so JWT reflects the new full_name
+    if (trimmedName) {
+      try {
+        await supabase.auth.updateUser({
+          data: { full_name: trimmedName, name: trimmedName },
+        });
+      } catch (authUpdateErr) {
+        console.warn('Could not sync user_metadata:', authUpdateErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,

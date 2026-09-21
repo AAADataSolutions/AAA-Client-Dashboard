@@ -35,26 +35,19 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true })
       .neq('status', 'ACTIVE');
 
-    // 2. Fetch Properties with Org Links, Onboardings & Services
-    let query = supabase
-      .from('properties')
-      .select(`
-        *,
-        org_links:organization_properties(
-          id,
-          status,
-          organization:organizations(id, name, email, phone),
-          onboardings(id, status, target_date),
-          services_links:organization_property_services(id, service_id)
-        )
-      `, { count: 'exact' });
+    // 2. Fetch Properties
+    let query = supabase.from('properties').select('*', { count: 'exact' });
 
     if (search) {
       query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%,address.ilike.%${search}%,general_manager_name.ilike.%${search}%,contact_person_name.ilike.%${search}%,general_manager_email.ilike.%${search}%`);
     }
 
     if (status !== 'ALL') {
-      query = query.eq('status', status);
+      if (status === 'UNASSIGNED') {
+        // Will be filtered in memory
+      } else {
+        query = query.eq('status', status);
+      }
     }
 
     if (e911Filter === 'VERIFIED') {
@@ -66,76 +59,69 @@ export async function GET(request: NextRequest) {
     const { data: rawProps, error } = await query;
 
     if (error) {
-      // Fallback
-      const { data: fallbackProps, error: fbErr } = await supabase
-        .from('properties')
-        .select('*');
-
-      if (fbErr) {
-        return NextResponse.json({ success: false, error: fbErr.message }, { status: 400 });
-      }
-
-      const processedFallback = (fallbackProps || []).map((p: any) => ({
-        ...p,
-        general_manager_name: p.general_manager_name || p.contact_person_name || 'N/A',
-        general_manager_phone: p.general_manager_phone || p.main_phone || 'N/A',
-        general_manager_email: p.general_manager_email || p.contact_person_email || 'N/A',
-        organizations_count: 0,
-        organizations: [],
-        services_count: 0,
-        onboarding_stage: 'Draft Initialized',
-        e911_status: p.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        ray_baum_status: (p.ray_baum_status === 'ACTIVE' || p.ray_baud_and_logs_enabled) ? 'Active' : 'Inactive',
-      }));
-
-      return NextResponse.json({
-        success: true,
-        data: processedFallback.slice((page - 1) * limit, page * limit),
-        pagination: {
-          totalCount: processedFallback.length,
-          totalPages: Math.ceil(processedFallback.length / limit) || 1,
-          currentPage: page,
-          limit,
-        },
-        metrics: {
-          totalProperties: totalPropertiesCount || processedFallback.length,
-          e911VerifiedCount: verifiedE911Count || 0,
-          totalServicesCount: totalServicesCount || 0,
-          pendingOrInactiveCount: pendingOrInactiveCount || 0,
-        },
-      });
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    // 3. Process & Map Records
-    let processed = (rawProps || []).map((prop: any, idx: number) => {
-      const orgLinks = Array.isArray(prop.org_links) ? prop.org_links : [];
-      const orgs = orgLinks.map((ol: any) => ol.organization).filter(Boolean);
+    const propList = rawProps || [];
+    const propIds = propList.map((p: any) => p.id);
+
+    // 3. Fetch Organization Properties links
+    let allOrgProps: any[] = [];
+    if (propIds.length > 0) {
+      const { data: opData } = await supabase
+        .from('organization_properties')
+        .select(`
+          id,
+          property_id,
+          status,
+          organization:organizations(id, name, email, phone),
+          onboardings(id, status, target_date)
+        `)
+        .in('property_id', propIds);
+      allOrgProps = opData || [];
+    }
+
+    // 4. Fetch Services linked via organization_property_services
+    const opIds = allOrgProps.map((op: any) => op.id);
+    let allServicesLinks: any[] = [];
+    if (opIds.length > 0) {
+      const { data: opsData } = await supabase
+        .from('organization_property_services')
+        .select('id, organization_property_id, service_id')
+        .in('organization_property_id', opIds);
+      allServicesLinks = opsData || [];
+    }
+
+    // 5. Map and combine
+    let processed = propList.map((prop: any, idx: number) => {
+      const matchingOps = allOrgProps.filter((op: any) => op.property_id === prop.id);
+      const matchingOpIds = matchingOps.map((op: any) => op.id);
+      const orgs = matchingOps.map((op: any) => op.organization).filter(Boolean);
       const primaryOrg = orgs[0] || null;
 
-      // Calculate dynamic count of services
-      let dynamicServiceCount = 0;
-      orgLinks.forEach((ol: any) => {
-        if (Array.isArray(ol.services_links)) {
-          dynamicServiceCount += ol.services_links.length;
-        }
-      });
+      // Count actual services linked to this property
+      const dynamicServiceCount = allServicesLinks.filter((sl: any) =>
+        matchingOpIds.includes(sl.organization_property_id)
+      ).length;
 
       // Calculate onboarding stage
       let stage = 'Draft Initialized';
-      orgLinks.forEach((ol: any) => {
-        if (Array.isArray(ol.onboardings) && ol.onboardings.length > 0) {
-          const onb = ol.onboardings[0];
-          if (onb.status) {
+      for (const op of matchingOps) {
+        if (Array.isArray(op.onboardings) && op.onboardings.length > 0) {
+          const onb = op.onboardings[0];
+          if (onb?.status) {
             stage = onb.status.replace(/_/g, ' ');
+            break;
           }
         }
-      });
+      }
 
       const gmName = prop.general_manager_name || prop.contact_person_name || 'N/A';
       const gmPhone = prop.general_manager_phone || prop.main_phone || 'N/A';
       const gmEmail = prop.general_manager_email || prop.contact_person_email || 'N/A';
 
       const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
+      const isAssigned = Boolean(primaryOrg || orgs.length > 0);
 
       return {
         id: prop.id,
@@ -154,10 +140,12 @@ export async function GET(request: NextRequest) {
         general_manager_phone: gmPhone,
         general_manager_email: gmEmail,
         ray_baud_and_logs_enabled: isE911Verified,
-        status: prop.status || 'ACTIVE',
+        status: isAssigned ? (prop.status || 'ACTIVE') : 'UNASSIGNED',
+        is_assigned: isAssigned,
         organizations_count: orgs.length,
         organizations: orgs,
         primary_organization: primaryOrg,
+        organization_name: primaryOrg?.name || 'Unassigned',
         services_count: dynamicServiceCount,
         onboarding_stage: stage,
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
@@ -167,21 +155,25 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 4. Filter by Ray Baum status if requested
+    // Filter by Ray Baum status if requested
     if (rayBaumFilter === 'ACTIVE') {
       processed = processed.filter((p: any) => p.ray_baum_status === 'Active');
     } else if (rayBaumFilter === 'INACTIVE') {
       processed = processed.filter((p: any) => p.ray_baum_status === 'Inactive');
     }
 
-    // 5. Filter by Organization if requested
+    // Filter by Organization if requested
     if (orgId !== 'ALL') {
       processed = processed.filter((p: any) =>
         p.organizations.some((o: any) => o.id === orgId)
       );
     }
 
-    // 5. Sorting
+    if (status === 'UNASSIGNED') {
+      processed = processed.filter((p: any) => !p.is_assigned);
+    }
+
+    // Sorting
     processed.sort((a: any, b: any) => {
       switch (sortBy) {
         case 'NAME_ASC':
@@ -249,6 +241,8 @@ export async function POST(request: NextRequest) {
       general_manager_phone,
       general_manager_email,
       ray_baud_and_logs_enabled,
+      ray_baum_status,
+      e911_status,
       status,
     } = body;
 
@@ -262,6 +256,15 @@ export async function POST(request: NextRequest) {
         error: 'Complete street address, city, state, and zip code are required for E911 dispatch.',
       }, { status: 400 });
     }
+
+    // Determine E911 and Ray Baum status
+    const isE911Verified =
+      ray_baud_and_logs_enabled !== undefined
+        ? Boolean(ray_baud_and_logs_enabled)
+        : (e911_status === 'VERIFIED' || e911_status === 'ACTIVE');
+
+    const resolvedRayBaum = ray_baum_status || (isE911Verified ? 'ACTIVE' : 'INACTIVE');
+    const resolvedStatus = status || (organization_id ? 'ACTIVE' : 'INACTIVE');
 
     const { data: newProp, error: propErr } = await supabase
       .from('properties')
@@ -279,8 +282,9 @@ export async function POST(request: NextRequest) {
         general_manager_name: general_manager_name?.trim() || null,
         general_manager_phone: general_manager_phone?.trim() || null,
         general_manager_email: general_manager_email?.trim() || null,
-        ray_baud_and_logs_enabled: ray_baud_and_logs_enabled ?? true,
-        status: status || 'ACTIVE',
+        ray_baud_and_logs_enabled: isE911Verified,
+        ray_baum_status: resolvedRayBaum,
+        status: resolvedStatus,
       })
       .select()
       .single();
@@ -295,11 +299,31 @@ export async function POST(request: NextRequest) {
       const { data: org } = await supabase.from('organizations').select('name').eq('id', organization_id).maybeSingle();
       if (org) orgName = org.name;
 
-      await supabase.from('organization_properties').insert({
-        organization_id,
-        property_id: newProp.id,
-        status: status || 'ACTIVE',
-      });
+      const { data: newOp } = await supabase
+        .from('organization_properties')
+        .insert({
+          organization_id,
+          property_id: newProp.id,
+          status: resolvedStatus,
+        })
+        .select('id')
+        .single();
+
+      if (newOp) {
+        // Auto-create onboarding record (Rule 3)
+        await supabase.from('onboardings').insert({
+          organization_property_id: newOp.id,
+          status: 'DRAFT',
+        });
+
+        // Auto-create e911 record
+        await supabase.from('e911_records').insert({
+          organization_property_id: newOp.id,
+          emergency_address: `${address.trim()}, ${city.trim()}, ${state.trim()} ${zip_code.trim()}`,
+          status: isE911Verified ? 'VERIFIED' : 'PENDING',
+          verified_at: isE911Verified ? new Date().toISOString() : null,
+        });
+      }
     }
 
     // Central Audit Log
@@ -317,6 +341,8 @@ export async function POST(request: NextRequest) {
         organization_id,
         organization_name: orgName,
         status: newProp.status,
+        e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
+        ray_baum_status: resolvedRayBaum,
       },
     });
 

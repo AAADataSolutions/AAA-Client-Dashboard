@@ -66,13 +66,44 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    // Reassign organization_property if provided
-    if (body.organization_property_id) {
+    // Reassign organization_property / property if provided
+    const targetPropertyId = body.property_id;
+    let targetOrgPropId = body.organization_property_id;
+
+    if (targetPropertyId && !targetOrgPropId) {
+      // Look up organization_property record for this property
+      const { data: op } = await supabase
+        .from('organization_properties')
+        .select('id')
+        .eq('property_id', targetPropertyId)
+        .maybeSingle();
+
+      if (op) {
+        targetOrgPropId = op.id;
+      } else {
+        // If property has no organization yet, find or assign default
+        const { data: defaultOrg } = await supabase.from('organizations').select('id').limit(1).maybeSingle();
+        if (defaultOrg) {
+          const { data: newOp } = await supabase.from('organization_properties').insert({
+            organization_id: defaultOrg.id,
+            property_id: targetPropertyId,
+            status: 'ACTIVE',
+          }).select('id').single();
+          if (newOp) targetOrgPropId = newOp.id;
+        }
+      }
+    }
+
+    if (targetOrgPropId) {
+      // Enforce Rule 2: One service can only be assigned to one property
       await supabase.from('organization_property_services').delete().eq('service_id', id);
       await supabase.from('organization_property_services').insert({
-        organization_property_id: body.organization_property_id,
+        organization_property_id: targetOrgPropId,
         service_id: id,
       });
+    } else if (targetPropertyId === '' || targetPropertyId === null || body.unassign === true) {
+      // Explicitly unassigned from property
+      await supabase.from('organization_property_services').delete().eq('service_id', id);
     }
 
     // Audit Log

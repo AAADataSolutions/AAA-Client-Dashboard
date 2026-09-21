@@ -130,29 +130,27 @@ export default function ClientDashboardOverviewPage() {
             <span>Raise Support Ticket</span>
           </motion.button>
 
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowPortingModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] font-semibold text-xs transition shadow-sm cursor-pointer"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Submit Porting</span>
+          </motion.button>
+
           {/* Admin shortcuts */}
           {isClientAdmin && (
-            <>
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setShowPortingModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] font-semibold text-xs transition shadow-sm cursor-pointer"
-              >
-                <ArrowLeftRight className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Submit Porting</span>
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setShowInviteModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] font-semibold text-xs transition shadow-sm cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Invite Member</span>
-              </motion.button>
-            </>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setShowInviteModal(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] font-semibold text-xs transition shadow-sm cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Invite Member</span>
+            </motion.button>
           )}
         </div>
       </motion.div>

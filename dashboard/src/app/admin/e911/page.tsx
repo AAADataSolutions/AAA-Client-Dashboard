@@ -60,13 +60,14 @@ const itemVariants: Variants = {
   },
 };
 
-export type E911Status = 'VERIFIED' | 'PENDING' | 'CORRECTION_REQUIRED' | 'FAILED';
+export type E911Status = 'VERIFIED' | 'PENDING' | 'CORRECTION_REQUIRED' | 'FAILED' | 'ACTIVE';
 
-function getStatusBadge(status: E911Status): { label: string; bg: string; text: string; border: string } {
+function getStatusBadge(status: E911Status | string): { label: string; bg: string; text: string; border: string } {
   switch (status) {
     case 'VERIFIED':
+    case 'ACTIVE':
       return {
-        label: 'PSAP Verified',
+        label: 'Active / PSAP Verified',
         bg: 'bg-emerald-50 dark:bg-emerald-950/50',
         text: 'text-emerald-700 dark:text-emerald-300',
         border: 'border-emerald-200 dark:border-emerald-800/50',
@@ -1154,8 +1155,8 @@ export default function AdminE911Page() {
                     onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as E911Status })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
-                    <option value="PENDING">Validation Pending</option>
-                    <option value="VERIFIED">PSAP Verified</option>
+                    <option value="VERIFIED">Active / PSAP Verified</option>
+                    <option value="PENDING">Pending Validation</option>
                     <option value="CORRECTION_REQUIRED">Correction Required</option>
                   </select>
                 </div>
@@ -1234,8 +1235,8 @@ export default function AdminE911Page() {
                     onChange={(e) => setEditForm({ ...editForm, status: e.target.value as E911Status })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                   >
-                    <option value="PENDING">Validation Pending</option>
-                    <option value="VERIFIED">PSAP Verified</option>
+                    <option value="VERIFIED">Active / PSAP Verified</option>
+                    <option value="PENDING">Pending Validation</option>
                     <option value="CORRECTION_REQUIRED">Correction Required</option>
                     <option value="FAILED">Routing Failed</option>
                   </select>

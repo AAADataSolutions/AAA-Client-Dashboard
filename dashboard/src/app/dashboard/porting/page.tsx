@@ -229,17 +229,15 @@ export default function ClientPortingPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          {isClientAdmin && (
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => setShowPortingModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Start Porting Request</span>
-            </motion.button>
-          )}
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowPortingModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Start Porting Request</span>
+          </motion.button>
         </div>
       </motion.div>
 
@@ -491,7 +489,7 @@ export default function ClientPortingPage() {
               ? 'No porting requests matched your search and filter criteria.'
               : 'There are currently no active phone number porting orders for your organization.'}
           </p>
-          {isClientAdmin && !hasActiveFilters && (
+          {!hasActiveFilters && (
             <button
               onClick={() => setShowPortingModal(true)}
               className="mt-4 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
