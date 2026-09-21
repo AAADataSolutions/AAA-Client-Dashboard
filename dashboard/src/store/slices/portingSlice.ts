@@ -127,7 +127,21 @@ export const fetchPortingRequests = createAsyncThunk(
     if (p.sortBy) q.set('sortBy', p.sortBy);
 
     const res = await fetch(`/api/admin/porting?${q.toString()}`);
-    const json = await res.json();
+    const responseText = await res.text();
+    let json: {
+      success?: boolean;
+      error?: string;
+      data?: PortingRecord[];
+      pagination?: { totalCount: number; totalPages: number; currentPage: number };
+      metrics?: Partial<PortingMetrics>;
+    } = {};
+    if (responseText) {
+      try {
+        json = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Failed to fetch porting requests (${res.status}).`);
+      }
+    }
     if (!res.ok || !json.success) {
       throw new Error(json.error || 'Failed to fetch porting requests');
     }

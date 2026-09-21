@@ -528,7 +528,7 @@ export default function AdminPortingPage() {
     try {
       setUpdatingStatus(true);
       const res = await fetch('/api/admin/porting', {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: selectedRecord.id,
@@ -538,7 +538,15 @@ export default function AdminPortingPage() {
         }),
       });
 
-      const result = await res.json();
+      const responseText = await res.text();
+      let result: { success?: boolean; error?: string } = {};
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          throw new Error(`Porting update failed (${res.status}).`);
+        }
+      }
       if (!res.ok || !result.success)
         throw new Error(result.error || 'Failed to update porting request.');
 

@@ -89,7 +89,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
         {/* Top Header & Navigation */}
         <div className="flex flex-col flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Organization Logo (above brand header, if uploaded) */}
-          {orgMembership?.organization?.logo_url && (
+          {/* {orgMembership?.organization?.logo_url && (
             <div className={`px-4 pt-3 pb-2 border-b border-[#27272a] flex items-center ${isOpen ? 'justify-start' : 'justify-center'} bg-[#161619]`}>
               <img
                 src={orgMembership.organization.logo_url}
@@ -97,7 +97,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                 className="max-h-9 max-w-full object-contain rounded"
               />
             </div>
-          )}
+          )} */}
 
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">

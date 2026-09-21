@@ -759,7 +759,7 @@ export default function AdminE911Page() {
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">EMERGENCY DISPATCH ADDRESS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY'S LAW</th>
+                  {/* <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY'S LAW</th> */}
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
@@ -812,7 +812,7 @@ export default function AdminE911Page() {
                       </td>
 
                       {/* 6. Ray Baum Act (Single Line) */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      {/* <td className="py-3.5 px-4 whitespace-nowrap">
                         {rec.ray_baum_compliant ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
                             <ShieldCheck className="w-3 h-3" /> Verified
@@ -822,7 +822,7 @@ export default function AdminE911Page() {
                             <AlertCircle className="w-3 h-3" /> Non-Verified
                           </span>
                         )}
-                      </td>
+                      </td> */}
 
                       {/* 7. Actions (Edit Pencil and Three Dots) */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>

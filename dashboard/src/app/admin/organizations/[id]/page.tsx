@@ -3080,7 +3080,7 @@ export default function OrganizationDetailPage({
                   >
                     Assign Existing Service
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => setAssignServiceTab('NEW')}
                     className={`pb-2 transition cursor-pointer border-b-2 ${
                       assignServiceTab === 'NEW'
@@ -3089,7 +3089,7 @@ export default function OrganizationDetailPage({
                     }`}
                   >
                     Create New Service
-                  </button>
+                  </button> */}
                 </div>
 
                 {/* Tab 1: Existing Service */}
@@ -3105,7 +3105,7 @@ export default function OrganizationDetailPage({
                         </div>
                       ) : availableUnassignedServices.length === 0 ? (
                         <p className="text-amber-600 dark:text-amber-400 text-xs py-2">
-                          No unassigned services available. Switch to 'Create New Service' tab to create one.
+                          No unassigned services available. Go to Services & Lines section to create new service.
                         </p>
                       ) : (
                         <select
