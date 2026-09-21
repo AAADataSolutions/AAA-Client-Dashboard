@@ -101,9 +101,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
             <Link href="/admin" className="flex items-center gap-3 overflow-hidden cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Radio className="w-4 h-4 text-white" />
-              </div>
+              
+              <img src="/logo.png" alt="" className='h-8' />
+              
               {isOpen && (
                 <div className="truncate">
                   <span className="font-semibold text-[13px] text-[#f4f4f5] tracking-tight block leading-tight truncate">
