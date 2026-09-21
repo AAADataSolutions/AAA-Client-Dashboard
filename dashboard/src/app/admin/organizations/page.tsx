@@ -827,6 +827,9 @@ export default function AdminOrganizationsPage() {
             <table className="w-full text-left border-collapse min-w-[1320px]">
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap w-16">
+                    Logo
+                  </th>
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[200px]">
                     Organization Name
                   </th>
@@ -868,6 +871,24 @@ export default function AdminOrganizationsPage() {
                       key={org.id}
                       className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors group"
                     >
+                      {/* Column 1: Organization Logo */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap w-16">
+                        {org.logo_url ? (
+                          <img
+                            src={org.logo_url}
+                            alt={`${org.name} logo`}
+                            className="w-9 h-9 rounded-lg object-cover border border-slate-200 dark:border-[#2a2d39]"
+                          />
+                        ) : (
+                          <div
+                            aria-label={`${org.name} logo placeholder`}
+                            className="w-9 h-9 rounded-lg bg-blue-600/10 dark:bg-blue-500/15 border border-blue-200 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center font-bold"
+                          >
+                            {org.name?.trim().charAt(0).toUpperCase() || '?'}
+                          </div>
+                        )}
+                      </td>
+
                       {/* Column 1: Organization Name */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[200px]">
                         <div className="flex items-center gap-2">

@@ -95,9 +95,8 @@ export default function ClientDashboardOverviewPage() {
     waitingOnClient: 0,
     resolved: 0,
     closed: 0,
-    resolutionRate: '100%',
+    resolutionRate: '0%',
   };
-  const recentActivities = data?.recentActivity || [];
 
   return (
     <motion.div
@@ -432,8 +431,8 @@ export default function ClientDashboardOverviewPage() {
         </div>
       </motion.div>
 
-      {/* 4. Row: Ticket Analytics & Recent Activity */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      {/* 4. Row: Ticket Analytics */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 gap-5">
         {/* Ticket Analytics (6 cols) */}
         <div className="lg:col-span-6 p-5 rounded-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
@@ -494,47 +493,6 @@ export default function ClientDashboardOverviewPage() {
           </div>
         </div>
 
-        {/* Recent Activity Log (6 cols) */}
-        <div className="lg:col-span-6 p-5 rounded-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Recent Organization Activity</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Audit event updates across your telecommunication services.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-400">Live feed</span>
-          </div>
-
-          <div className="space-y-3">
-            {recentActivities.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                <p>No recent activity records logged for this billing period.</p>
-              </div>
-            ) : (
-              recentActivities.map((act: any) => (
-                <div key={act.id} className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-[#20222a] flex items-center justify-center shrink-0 mt-0.5 text-slate-600 dark:text-slate-300">
-                      <Clock className="w-3 h-3" />
-                    </div>
-                    <div>
-                      <span className="font-semibold text-slate-900 dark:text-white block capitalize">
-                        {act.action?.replace(/_/g, ' ')}
-                      </span>
-                      <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                        Target: {act.entity_type} {act.actor_email ? `• ${act.actor_email}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">
-                    {new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </motion.div>
 
       {/* Modals */}

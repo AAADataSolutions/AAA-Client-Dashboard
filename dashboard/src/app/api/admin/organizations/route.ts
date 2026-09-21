@@ -104,6 +104,7 @@ export async function GET(request: NextRequest) {
       return {
         id: org.id,
         name: org.name,
+        logo_url: org.logo_url || null,
         type: org.type || 'Client Organization',
         address: formattedAddress,
         street_address: org.address || '',

@@ -15,6 +15,7 @@ export interface OrgContact {
 export interface OrgRecord {
   id: string;
   name: string;
+  logo_url?: string | null;
   contact_name: string;
   email: string;
   phone: string;

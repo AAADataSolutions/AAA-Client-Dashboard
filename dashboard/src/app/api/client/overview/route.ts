@@ -245,7 +245,7 @@ export async function GET() {
                 ticketsList.length) *
                 100
             )}%`
-          : '100%',
+          : '0%',
     };
 
     // Fetch Recent Activity Audit Logs

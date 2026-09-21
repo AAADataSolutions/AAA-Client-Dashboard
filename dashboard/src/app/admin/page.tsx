@@ -98,8 +98,6 @@ export default function AdminOverviewPage() {
     urgentTicketsCount: 0,
   };
 
-  const attentionRequired = data?.attentionRequired || [];
-  const upcomingDeadlines = data?.upcomingDeadlines || [];
   const onboardingPipeline = data?.onboardingPipeline || {
     totalActive: 0,
     stageCounts: { waitingSignature: 0, waitingPorting: 0, portingSubmitted: 0, sofReview: 0, completed: 0 },
@@ -357,165 +355,7 @@ export default function AdminOverviewPage() {
         </Link>
       </motion.div>
 
-      {/* 3. Row 1: Attention Required & Upcoming Deadlines */}
-      <motion.div
-        variants={sectionVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.1 }}
-        className="grid grid-cols-1 lg:grid-cols-12 gap-5"
-      >
-        {/* Left: Attention Required (7 cols) */}
-        <motion.div
-          variants={itemVariants}
-          className="lg:col-span-7 p-5 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm space-y-4 flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Attention Required</h3>
-                <span className="text-[10.5px] font-semibold px-2 py-0.2 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40">
-                  {attentionRequired.length} Items
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-400">High priority operational triggers</span>
-            </div>
-
-            <div className="divide-y divide-slate-100 dark:divide-[#1f212a] mt-1">
-              {attentionRequired.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 space-y-1">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
-                  <p className="font-semibold text-slate-800 dark:text-slate-200">No Critical Operational Triggers</p>
-                  <p className="text-[11px]">All emergency routes, onboardings, and porting queues are in order.</p>
-                </div>
-              ) : (
-                attentionRequired.map((item: any, idx: number) => (
-                  <motion.div
-                    key={item.id || idx}
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.35, delay: idx * 0.08 }}
-                    className="py-2.5 flex items-start justify-between gap-3 text-xs group"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span
-                        className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded uppercase mt-0.5 ${
-                          item.severity === 'Critical'
-                            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40'
-                            : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40'
-                        }`}
-                      >
-                        {item.severity}
-                      </span>
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">
-                          {item.title}
-                        </h4>
-                        <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      href={item.actionHref || '/admin'}
-                      className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0 cursor-pointer"
-                    >
-                      {item.actionText || 'Fix Now →'}
-                    </Link>
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 dark:border-[#222430]">
-            <Link
-              href="/admin/e911"
-              className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
-            >
-              <span>View all attention items &amp; action queue</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </motion.div>
-
-        {/* Right: Upcoming Deadlines (5 cols) */}
-        <motion.div
-          variants={itemVariants}
-          className="lg:col-span-5 p-5 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm space-y-4 flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-800 dark:text-slate-200" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Upcoming Deadlines</h3>
-              </div>
-              <span className="text-[11px] text-slate-400">Target milestones</span>
-            </div>
-
-            <div className="divide-y divide-slate-100 dark:divide-[#1f212a] mt-1">
-              {upcomingDeadlines.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
-                  <p>No upcoming target deadlines recorded for active orders.</p>
-                </div>
-              ) : (
-                upcomingDeadlines.map((dl: any, idx: number) => (
-                  <motion.div
-                    key={dl.id || idx}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.35, delay: idx * 0.08 }}
-                    className="py-3 flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-[#1f212a] border border-slate-200 dark:border-[#2a2d39] flex flex-col items-center justify-center leading-none group-hover:border-blue-500/50 transition-colors">
-                        <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                          {dl.month}
-                        </span>
-                        <span className="text-sm font-bold text-slate-900 dark:text-white">
-                          {dl.day}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-semibold text-slate-900 dark:text-white group-hover:text-blue-400 transition-colors">
-                          {dl.propertyName}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {dl.stage}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded ${
-                        dl.type === 'Onboarding'
-                          ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40'
-                          : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40'
-                      }`}
-                    >
-                      {dl.type}
-                    </span>
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 dark:border-[#222430]">
-            <Link
-              href="/admin/onboarding-porting"
-              className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
-            >
-              <span>View calendar &amp; schedule</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </motion.div>
-      </motion.div>
-
-      {/* 4. Row 2: Onboarding Overview with Donut Chart & Progress Bars */}
+      {/* 3. Row 1: Onboarding Overview with Donut Chart & Progress Bars */}
       <motion.div
         variants={sectionVariants}
         initial="hidden"
@@ -570,6 +410,13 @@ export default function AdminOverviewPage() {
                   viewport={{ once: true }}
                   transition={{ duration: 1.2, delay: 0.3, ease: 'easeOut' }}
                   cx="18" cy="18" r="14" fill="transparent" stroke="#10b981" strokeWidth="4" strokeDashoffset={`-${onbSofPct + onbPortWaitPct}`}
+                />
+                <motion.circle
+                  initial={{ strokeDasharray: '0 100' }}
+                  whileInView={{ strokeDasharray: `${onbReviewPct} ${100 - onbReviewPct}` }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1.2, delay: 0.4, ease: 'easeOut' }}
+                  cx="18" cy="18" r="14" fill="transparent" stroke="#a855f7" strokeWidth="4" strokeDashoffset={`-${onbSofPct + onbPortWaitPct + onbPortSubPct}`}
                 />
               </svg>
               <div className="absolute text-center leading-none">
@@ -626,7 +473,7 @@ export default function AdminOverviewPage() {
                 <div key={item.id} className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-semibold">
                     <span className="text-slate-900 dark:text-white">{item.propertyName}</span>
-                    <span className={`text-[11px] ${item.colorClass}`}>{item.stageLabel}</span>
+                    <span className={`text-[11px] ${item.colorClass.split(' ').find((className: string) => className.startsWith('text-')) || 'text-slate-500'}`}>{item.stageLabel}</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-[#20222a] overflow-hidden">
                     <motion.div
