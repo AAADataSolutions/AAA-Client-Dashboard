@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         property:properties(
           id,
           name,
+          monthly_price,
           address,
           city,
           state,
@@ -123,6 +124,7 @@ export async function GET(request: NextRequest) {
           id: prop.id,
           org_property_id: op.id,
           name: prop.name,
+          monthly_price: prop.monthly_price ?? null,
           address: prop.address,
           city: prop.city,
           state: prop.state,

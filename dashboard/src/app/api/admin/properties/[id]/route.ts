@@ -71,6 +71,9 @@ export async function PATCH(
     if (body.general_manager_name !== undefined) updatePayload.general_manager_name = body.general_manager_name ? body.general_manager_name.trim() : null;
     if (body.general_manager_phone !== undefined) updatePayload.general_manager_phone = body.general_manager_phone ? body.general_manager_phone.trim() : null;
     if (body.general_manager_email !== undefined) updatePayload.general_manager_email = body.general_manager_email ? body.general_manager_email.trim() : null;
+    if (body.monthly_price !== undefined) {
+      updatePayload.monthly_price = body.monthly_price === null || body.monthly_price === '' ? null : Number(body.monthly_price);
+    }
     if (body.ray_baud_and_logs_enabled !== undefined) {
       updatePayload.ray_baud_and_logs_enabled = Boolean(body.ray_baud_and_logs_enabled);
     } else if (body.e911_status !== undefined) {

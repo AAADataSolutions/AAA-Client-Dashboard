@@ -217,6 +217,7 @@ export default function OrganizationDetailPage({
     general_manager_name: '',
     general_manager_phone: '',
     general_manager_email: '',
+    monthly_price: '' as string | number,
     ray_baum_status: 'Active',
     status: 'ACTIVE',
   });
@@ -796,6 +797,7 @@ export default function OrganizationDetailPage({
       general_manager_name: prop.general_manager_name && prop.general_manager_name !== '—' ? prop.general_manager_name : '',
       general_manager_phone: prop.general_manager_phone && prop.general_manager_phone !== '—' ? prop.general_manager_phone : '',
       general_manager_email: prop.general_manager_email && prop.general_manager_email !== '—' ? prop.general_manager_email : '',
+      monthly_price: prop.monthly_price ?? '',
       ray_baum_status: prop.ray_baum_status === 'Active' ? 'Active' : 'Inactive',
       status: prop.status || 'ACTIVE',
     });
@@ -1553,6 +1555,7 @@ export default function OrganizationDetailPage({
               <thead className="bg-slate-50 dark:bg-[#111217] text-slate-500 dark:text-slate-400 uppercase text-[11px]">
                 <tr>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">Property</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[120px]">Monthly Price</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[160px]">Location</th>
                   <th className="py-3 px-3.5 font-bold text-center whitespace-nowrap min-w-[100px]">No. of Services</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">E911 Status</th>
@@ -1568,7 +1571,7 @@ export default function OrganizationDetailPage({
               <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
                 {org.properties?.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
+                    <td colSpan={12} className="py-12 text-center text-slate-400 text-xs">
                       No properties assigned to this organization yet.
                     </td>
                   </tr>
@@ -1583,6 +1586,13 @@ export default function OrganizationDetailPage({
                         >
                           {prop.name}
                         </Link>
+                      </td>
+
+                      {/* Monthly Price */}
+                      <td className="py-3.5 px-3.5 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                        {prop.monthly_price !== null && prop.monthly_price !== undefined
+                          ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '—'}
                       </td>
 
                       {/* Location */}
@@ -3500,6 +3510,18 @@ export default function OrganizationDetailPage({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-900 dark:text-slate-100 block">Monthly Price</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editPropSettingsForm.monthly_price}
+                        onChange={(e) => setEditPropSettingsForm({ ...editPropSettingsForm, monthly_price: e.target.value })}
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                      />
+                    </div>
                     <div className="space-y-1">
                       <label className="font-bold text-slate-900 dark:text-slate-100 block">Main Phone</label>
                       <input

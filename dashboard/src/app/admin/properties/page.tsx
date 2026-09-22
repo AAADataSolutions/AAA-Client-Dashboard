@@ -213,6 +213,7 @@ export default function AdminPropertiesPage() {
     general_manager_name: '',
     general_manager_phone: '',
     general_manager_email: '',
+    monthly_price: '' as string | number,
     ray_baud_and_logs_enabled: true,
     ray_baum_status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     e911_status: 'VERIFIED' as 'VERIFIED' | 'AUDIT_REQUIRED',
@@ -586,6 +587,7 @@ export default function AdminPropertiesPage() {
       general_manager_name: prop.general_manager_name || '',
       general_manager_phone: prop.general_manager_phone || '',
       general_manager_email: prop.general_manager_email || '',
+      monthly_price: prop.monthly_price ?? '',
       ray_baud_and_logs_enabled: isE911,
       ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
       e911_status: isE911 ? 'VERIFIED' : 'AUDIT_REQUIRED',
@@ -776,6 +778,7 @@ export default function AdminPropertiesPage() {
                 general_manager_name: '',
                 general_manager_phone: '',
                 general_manager_email: '',
+                monthly_price: '',
                 ray_baud_and_logs_enabled: true,
                 ray_baum_status: 'ACTIVE',
                 e911_status: 'VERIFIED',
@@ -1090,6 +1093,7 @@ export default function AdminPropertiesPage() {
                   general_manager_name: '',
                   general_manager_phone: '',
                   general_manager_email: '',
+                  monthly_price: '',
                   ray_baud_and_logs_enabled: true,
                   ray_baum_status: 'ACTIVE',
                   e911_status: 'VERIFIED',
@@ -1110,6 +1114,7 @@ export default function AdminPropertiesPage() {
               <thead className="bg-slate-50/80 dark:bg-[#111217] border-b border-slate-200/80 dark:border-[#222430] text-black dark:text-white font-bold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MONTHLY PRICE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">LOCATION</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">NO. OF SERVICES</th>
@@ -1134,7 +1139,14 @@ export default function AdminPropertiesPage() {
                         </span>
                       </td>
 
-                      {/* 2. Location */}
+                      {/* 2. Monthly Price */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-200">
+                        {prop.monthly_price !== null && prop.monthly_price !== undefined
+                          ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '—'}
+                      </td>
+
+                      {/* 3. Location */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="text-slate-700 dark:text-slate-300">
                           {prop.city ? `${prop.city}, ${prop.state || prop.country} ${prop.zip_code || ''}` : prop.address}
@@ -1526,6 +1538,14 @@ export default function AdminPropertiesPage() {
                     <label className="font-bold text-black dark:text-white block text-xs">Property Name</label>
                     <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
                       {selectedPropForDetails.name}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block text-xs">Monthly Price</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                      {selectedPropForDetails.monthly_price !== null && selectedPropForDetails.monthly_price !== undefined
+                        ? `$${Number(selectedPropForDetails.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : 'Not set'}
                     </p>
                   </div>
                   <div className="space-y-1">
@@ -2094,6 +2114,19 @@ export default function AdminPropertiesPage() {
                     </select>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Monthly Price</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.monthly_price}
+                      onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
                   <div className="col-span-2 space-y-1">
                     <label className="font-bold text-black dark:text-white block">
                       Street Address <span className="text-rose-500">*</span>
@@ -2292,6 +2325,19 @@ export default function AdminPropertiesPage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Monthly Price</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.monthly_price}
+                      onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
                   </div>
 
                   <div className="col-span-2 space-y-1">

@@ -22,6 +22,7 @@ export async function GET(
         property:properties(
           id,
           name,
+          monthly_price,
           address,
           city,
           state,
@@ -92,6 +93,7 @@ export async function GET(
         link_id: link.id,
         id: p?.id,
         name: p?.name || 'Property',
+        monthly_price: p?.monthly_price ?? null,
         address: fullAddress,
         street_address: p?.address || '',
         city: p?.city || '',

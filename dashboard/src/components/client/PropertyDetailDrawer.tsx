@@ -151,6 +151,14 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                       </span>
                     </div>
                   </div>
+                  <div className="pt-2 border-t border-slate-100 dark:border-[#222430]">
+                    <span className="text-[10px] text-slate-400 block">Monthly Price</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                      {property.monthly_price !== null && property.monthly_price !== undefined
+                        ? `$${Number(property.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : 'Not set'}
+                    </span>
+                  </div>
                 </div>
               </div>
 

@@ -59,6 +59,7 @@ interface PropertyRecord {
   id: string;
   org_property_id: string;
   name: string;
+  monthly_price: number | null;
   address: string;
   city: string;
   state: string;
@@ -543,6 +544,9 @@ export default function ClientPropertiesPage() {
                     PROPERTY
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    MONTHLY PRICE
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     LOCATION
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -605,7 +609,14 @@ export default function ClientPropertiesPage() {
                         </div>
                       </td>
 
-                      {/* Column 2: LOCATION */}
+                      {/* Column 2: MONTHLY PRICE */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-200">
+                        {prop.monthly_price !== null && prop.monthly_price !== undefined
+                          ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '—'}
+                      </td>
+
+                      {/* Column 3: LOCATION */}
                       <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -824,6 +835,14 @@ export default function ClientPropertiesPage() {
                     <span className="text-slate-400 text-[11px]">Active Services:</span>
                     <span className="font-semibold text-blue-600 dark:text-blue-400">
                       {prop.services_count} Lines
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">Monthly Price:</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">
+                      {prop.monthly_price !== null && prop.monthly_price !== undefined
+                        ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : 'Not set'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
