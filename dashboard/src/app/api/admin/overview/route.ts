@@ -50,10 +50,10 @@ export async function GET() {
         .select('id, name, city, state, status, created_at')
         .order('created_at', { ascending: false }),
 
-      // 3. Organization Property Services
+      // 3. Total provisioned services
       db
-        .from('organization_property_services')
-        .select('id, service_type, status, did_count, created_at'),
+        .from('services')
+        .select('id', { count: 'exact', head: true }),
 
       // 4. Onboardings with property & org
       db
@@ -123,7 +123,6 @@ export async function GET() {
 
     const orgs = orgsRes.data || [];
     const props = propsRes.data || [];
-    const services = servicesRes.data || [];
     const onboardings = onboardingsRes.data || [];
     const portings = portingsRes.data || [];
     const tickets = ticketsRes.data || [];
@@ -133,7 +132,7 @@ export async function GET() {
     // 1. KPI Counts
     const orgsCount = orgs.length;
     const propsCount = props.length;
-    const servicesCount = services.length;
+    const servicesCount = servicesRes.count ?? 0;
 
     const activeOnboardings = onboardings.filter((o) => o.status !== 'COMPLETED');
     const activePortings = portings.filter(

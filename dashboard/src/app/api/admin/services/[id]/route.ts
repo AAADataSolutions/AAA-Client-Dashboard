@@ -50,14 +50,21 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     };
 
+    if (body.custom_service_id !== undefined) {
+      updatePayload.custom_service_id = body.custom_service_id.trim();
+    }
+    if (body.service_name !== undefined) {
+      updatePayload.service_name = body.service_name ? body.service_name.trim() : null;
+    }
     if (body.phone_number !== undefined) updatePayload.phone_number = body.phone_number.trim();
     if (body.service_type_id !== undefined) {
       updatePayload.service_type_id = body.service_type_id;
-    } else if (body.service_type !== undefined) {
+    } else if (body.service_type !== undefined || body.service_type_name !== undefined) {
+      const serviceTypeName = body.service_type ?? body.service_type_name;
       const { data: stRow } = await supabase
         .from('service_types')
         .select('id')
-        .ilike('name', body.service_type.trim())
+        .ilike('name', serviceTypeName.trim())
         .maybeSingle();
       if (stRow) {
         updatePayload.service_type_id = stRow.id;
