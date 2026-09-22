@@ -194,7 +194,7 @@ function formatLogRecord(item: any) {
       narrative = narrative || `${actorName} updated onboarding stage for '${entityName}' to ${item.changes?.stage || 'updated stage'} at ${dateStr}.`;
       break;
     case 'ONBOARDING_COMPLETED_PROPERTY_ACTIVATED':
-      actionTitle = 'Live Cutover Completed (Property Activated)';
+      actionTitle = 'Onboarded (Property Activated)';
       narrative = narrative || `${actorName} marked cutover completed for '${entityName}', automatically setting property status to ACTIVE at ${dateStr}.`;
       break;
     case 'TICKET_CREATED':

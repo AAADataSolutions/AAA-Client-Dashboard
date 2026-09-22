@@ -57,6 +57,8 @@ export default function AuthPage() {
         </section>
       </div>
 
+
+
       {/* Password Reset Modal */}
       <ForgotPasswordModal
         isOpen={isForgotModalOpen}

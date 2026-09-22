@@ -110,16 +110,38 @@ export const BrandPanel: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Footer info line */}
+        {/* Footer info line & Contact details */}
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.4, ease: 'easeOut' }}
-          className="pt-4 border-t border-white/15 flex items-center justify-between text-xs text-slate-400 max-w-[580px]"
+          className="pt-4 border-t border-white/15 flex flex-col gap-3 text-xs max-w-[580px]"
         >
-          <span>An Active Telephones Company</span>
-          <span className="text-slate-500">•</span>
-          <span>Decades of Trust. Built for Hospitality.</span>
+          <div className="flex items-center justify-between text-slate-400">
+            <span>An Active Telephones Company</span>
+            <span className="text-slate-500">•</span>
+            <span>Decades of Trust. Built for Hospitality.</span>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center sm:justify-start gap-2 sm:gap-4 text-[11px] leading-5 text-white/75 sm:text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/50">Support:</span>
+              <a href="tel:2035990500" className="font-medium text-white hover:text-blue-300 transition-colors">
+                203-599-0500
+              </a>
+              <span className="text-white/30 px-0.5">•</span>
+              <a href="mailto:support@activetelephones.com" className="font-medium text-white hover:text-blue-300 transition-colors">
+                support@activetelephones.com
+              </a>
+            </div>
+            <div className="hidden sm:block text-white/30">|</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-white/50">Billing:</span>
+              <a href="mailto:support@aaadatasolutions.com" className="font-medium text-white hover:text-blue-300 transition-colors">
+                support@aaadatasolutions.com
+              </a>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>

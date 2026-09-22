@@ -119,7 +119,7 @@ const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: s
   { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4, desc: 'LSR submitted to winning carrier', dateField: 'porting_submitted_date' },
   { key: 'SOF_WAITING', label: 'SOF Review', step: 5, desc: 'Service Order Form technical review', dateField: 'sof_review_date' },
   { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6, desc: 'Firm Order Confirmation date locked', dateField: 'foc_confirmed_date' },
-  { key: 'COMPLETED', label: 'Live Cutover', step: 7, desc: 'Traffic migrated & property activated', dateField: 'live_cutover_date' },
+  { key: 'COMPLETED', label: 'Onboarded', step: 7, desc: 'Traffic migrated & property activated', dateField: 'live_cutover_date' },
 ];
 
 function getStageBadge(status: string): { label: string; bg: string; text: string; border: string; pct: number } {
@@ -137,7 +137,7 @@ function getStageBadge(status: string): { label: string; bg: string; text: strin
     case 'FOC_RECEIVED':
       return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 85 };
     case 'COMPLETED':
-      return { label: 'Live Cutover', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50', pct: 100 };
+      return { label: 'Onboarded', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50', pct: 100 };
     default:
       return { label: status || 'Draft Initialized', bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-slate-700', pct: 14 };
   }
@@ -4220,7 +4220,7 @@ export default function OrganizationDetailPage({
                       <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
                         <span>
-                          Setting stage to <strong>Live Cutover (COMPLETED)</strong> will automatically activate the property to <strong>ACTIVE</strong> in the database and audit trail.
+                          Setting stage to <strong>Onboarded (COMPLETED)</strong> will automatically activate the property to <strong>ACTIVE</strong> in the database and audit trail.
                         </span>
                       </div>
                     )}

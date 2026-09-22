@@ -571,7 +571,7 @@ export default function AdminPropertiesPage() {
   const handleOpenEdit = (prop: PropertyItem) => {
     setSelectedPropForEdit(prop);
     const isE911 = prop.ray_baud_and_logs_enabled ?? true;
-    const isRayBaumActive = (prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' || isE911;
+    const isRayBaumActive = (prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE';
 
     setFormData({
       name: prop.name || '',

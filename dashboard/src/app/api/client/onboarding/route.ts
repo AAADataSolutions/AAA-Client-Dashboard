@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       PORTING_SUBMITTED: { percent: 62.5, stepIndex: 5, label: 'Porting Submitted', waitingClient: false },
       SOF_WAITING: { percent: 75, stepIndex: 6, label: 'SOF Review', waitingClient: true },
       FOC_RECEIVED: { percent: 87.5, stepIndex: 7, label: 'FOC Confirmed', waitingClient: false },
-      COMPLETED: { percent: 100, stepIndex: 8, label: 'Live Cutover', waitingClient: false },
+      COMPLETED: { percent: 100, stepIndex: 8, label: 'Onboarded', waitingClient: false },
     };
 
     const allOnboardings = (onbRecords || []).map((item: any) => {

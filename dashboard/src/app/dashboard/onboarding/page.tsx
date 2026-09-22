@@ -298,14 +298,14 @@ export default function ClientOnboardingPage() {
           <p className="text-[11px] text-slate-200 mt-2">Contract / SOF Review needed</p>
         </motion.div>
 
-        {/* Card 4: Live Cutover */}
+        {/* Card 4: Onboarded */}
         <motion.div
           whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
           className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Live Cutover
+              Onboarded
             </span>
             <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-white" />

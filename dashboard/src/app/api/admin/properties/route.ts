@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         PORTING_SUBMITTED: 'Porting Submitted',
         SOF_WAITING: 'SOF Review',
         FOC_RECEIVED: 'FOC Confirmed',
-        COMPLETED: 'Live Cutover',
+        COMPLETED: 'Onboarded',
       };
       let stage = 'Draft Initialized';
       for (const op of matchingOps) {
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
         services_count: dynamicServiceCount,
         onboarding_stage: stage,
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        ray_baum_status: (prop.ray_baum_status === 'ACTIVE' || isE911Verified) ? 'Active' : 'Inactive',
+        ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
         created_at: prop.created_at,
         updated_at: prop.updated_at || prop.created_at,
       };
