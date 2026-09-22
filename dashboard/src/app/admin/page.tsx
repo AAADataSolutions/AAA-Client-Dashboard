@@ -248,7 +248,7 @@ export default function AdminOverviewPage() {
           </motion.div>
         </Link>
 
-        {/* Card 3: Voice Lines */}
+        {/* Card 3: Services */}
         <Link href="/admin/services" className="block">
           <motion.div
             variants={itemVariants}
@@ -258,7 +258,7 @@ export default function AdminOverviewPage() {
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-                Voice Lines
+                Services
               </span>
               <div className="w-7 h-7 rounded-lg text-white flex items-center justify-center">
                 <PhoneCall size={18} />
@@ -268,9 +268,9 @@ export default function AdminOverviewPage() {
               <span className="text-2xl font-bold text-slate-100">
                 {stats.servicesCount}
               </span>
-              <span className="text-xs text-slate-200 ml-1.5 font-medium">DIDs</span>
+                <span className="text-xs text-slate-200 ml-1.5 font-medium">Services</span>
             </div>
-            <p className="text-[11px] text-slate-200 mt-2">Provisioned trunks &rarr;</p>
+            <p className="text-[11px] text-slate-200 mt-2">Total services &rarr;</p>
           </motion.div>
         </Link>
 

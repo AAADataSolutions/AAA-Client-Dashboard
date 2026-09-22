@@ -133,8 +133,7 @@ export async function GET() {
     // 1. KPI Counts
     const orgsCount = orgs.length;
     const propsCount = props.length;
-    const totalLines = services.reduce((acc, s) => acc + (Number(s.did_count) || 1), 0);
-    const servicesCount = totalLines > 0 ? totalLines : services.length;
+    const servicesCount = services.length;
 
     const activeOnboardings = onboardings.filter((o) => o.status !== 'COMPLETED');
     const activePortings = portings.filter(
