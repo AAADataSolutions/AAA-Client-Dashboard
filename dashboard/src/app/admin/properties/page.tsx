@@ -1184,7 +1184,7 @@ export default function AdminPropertiesPage() {
 
                       {/* 6. Ray Baum and Kary's Law (Active / Inactive) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {prop.ray_baum_status === 'Active' || prop.ray_baud_and_logs_enabled ? (
+                        {prop.ray_baum_status === 'Active' ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
