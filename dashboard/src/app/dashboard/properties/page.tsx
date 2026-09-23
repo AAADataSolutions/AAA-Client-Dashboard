@@ -650,7 +650,7 @@ export default function ClientPropertiesPage() {
 
                       {/* Column 5: RAY BAUM AND KARY'S LAW */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {((prop as any).ray_baum_status === 'Active' || prop.ray_baud_and_logs_enabled) ? (
+                        {(prop as any).ray_baum_status === 'Active' ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

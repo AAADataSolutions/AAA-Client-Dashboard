@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
           general_manager_phone: gmPhone,
           general_manager_email: gmEmail,
           ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
-          ray_baum_status: (prop.ray_baum_status === 'ACTIVE' || prop.ray_baud_and_logs_enabled) ? 'Active' : 'Inactive',
+          ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
           status: propStatus,
           stage: onboardingRecord?.status || (propStatus === 'ACTIVE' ? 'COMPLETED' : 'DRAFT'),
           services_count: servicesList.length,
