@@ -544,6 +544,9 @@ export default function ClientPropertiesPage() {
                     PROPERTY
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    ADDRESS
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     MONTHLY PRICE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -602,11 +605,18 @@ export default function ClientPropertiesPage() {
                             <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                               {prop.name}
                             </span>
-                            <span className="block text-[10.5px] text-slate-400 truncate max-w-[160px]">
-                              {prop.address}
+                            <span className="block text-[10px] font-mono text-slate-400">
+                              {prop.id.substring(0, 8)}...
                             </span>
                           </div>
                         </div>
+                      </td>
+
+                      {/* Column: ADDRESS */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
+                        <span className="truncate max-w-[240px] block" title={prop.address}>
+                          {prop.address || '—'}
+                        </span>
                       </td>
 
                       {/* Column 2: MONTHLY PRICE */}

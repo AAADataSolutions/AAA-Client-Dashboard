@@ -48,7 +48,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     }
 
     if (selectedRole === 'USER' && !organizationId.trim()) {
-      setError('Please enter the Organization ID to join.');
+      setError('Please enter the Management Group ID to join.');
       return;
     }
 
@@ -174,7 +174,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               }`}
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>Create Organization</span>
+              <span>Create Management Group</span>
             </button>
             <button
               type="button"
@@ -186,7 +186,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Join Organization</span>
+              <span>Join Management Group</span>
             </button>
           </div>
         </div>
@@ -263,7 +263,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         {selectedRole === 'USER' && (
           <div className="space-y-1.5 p-3 rounded-xl bg-blue-950/20 border border-blue-800/40 animate-in fade-in duration-200">
             <label htmlFor="signup-org-id" className="block text-xs font-semibold text-slate-200">
-              Organization ID <span className="text-blue-400">*</span>
+              Management Group ID <span className="text-blue-400">*</span>
             </label>
             <input
               id="signup-org-id"
@@ -275,7 +275,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               className="w-full bg-[#121624]/90 border border-blue-700/50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 outline-none transition-all"
             />
             <p className="text-[11px] text-slate-400 leading-snug mt-1">
-              Ask your team administrator for their Organization ID from their dashboard top navbar.
+              Ask your team administrator for their Management Group ID from their dashboard top navbar.
             </p>
           </div>
         )}
@@ -289,11 +289,11 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{selectedRole === 'USER' ? 'Joining Organization...' : 'Creating account...'}</span>
+              <span>{selectedRole === 'USER' ? 'Joining Management Group...' : 'Creating account...'}</span>
             </>
           ) : (
             <>
-              <span>{selectedRole === 'USER' ? 'Join Organization & Continue' : 'Continue to Organization Setup'}</span>
+              <span>{selectedRole === 'USER' ? 'Join Management Group & Continue' : 'Continue to Setup'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </>
           )}

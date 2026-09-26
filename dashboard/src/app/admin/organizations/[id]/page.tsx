@@ -1068,7 +1068,7 @@ export default function OrganizationDetailPage({
           onClick={() => router.push('/admin/organizations')}
           className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold rounded-lg hover:opacity-90 transition cursor-pointer"
         >
-          Back to Organizations Directory
+          Back to Management Groups Directory
         </button>
       </div>
     );
@@ -1106,7 +1106,7 @@ export default function OrganizationDetailPage({
           className="hover:text-blue-600 dark:hover:text-blue-400 transition flex items-center gap-1 cursor-pointer"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
-          <span>Organizations Directory</span>
+          <span>Management Groups Directory</span>
         </Link>
         <span>/</span>
         <span className="text-slate-900 dark:text-white font-semibold">{org.name}</span>

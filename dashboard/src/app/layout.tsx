@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full dark ${arimo.variable}`}>
+    <html lang="en" className={`h-full ${arimo.variable}`}>
       <body className={`${arimo.className} min-h-full flex flex-col bg-background text-foreground antialiased selection:bg-blue-600/30 selection:text-white font-sans`}>
         <StoreProvider>
           <ThemeProvider>

@@ -19,12 +19,12 @@ export const BrandPanel: React.FC = () => {
             <span className="text-base font-bold tracking-tight text-white block">
               AAA Data Solutions
             </span>
-            <span className="text-[11px] font-medium text-slate-400 block tracking-wide mt-0.5">
+            {/* <span className="text-[11px] font-medium text-slate-400 block tracking-wide mt-0.5">
               An Active Telephones Company
-            </span>
+            </span> */}
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1275e2]/15 border border-[#1275e2]/30 text-sky-400 text-xs font-semibold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1275e4]/15 border border-[#1275e2]/30 text-sky-400 text-xs font-semibold">
             <span>Voice</span>
             <span>•</span>
             <span>Video</span>
@@ -38,10 +38,10 @@ export const BrandPanel: React.FC = () => {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.1, ease: 'easeOut' }}
-            className="text-3xl sm:text-4xl lg:text-[2.75rem] font-bold tracking-[-0.02em] leading-[1.15] text-white"
+            className="text-3xl text-black sm:text-4xl lg:text-[2.75rem] font-bold tracking-[-0.02em] leading-[1.15] text-black"
           >
             Decades of Trust. <br />
-            <span className="text-sky-400">
+            <span className="text-sky-200">
               Built for Hospitality.
             </span>
           </motion.h1>

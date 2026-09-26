@@ -1549,9 +1549,21 @@ export default function AdminPropertiesPage() {
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block text-xs">Parent Organization</label>
+                    <label className="font-bold text-black dark:text-white block text-xs">Parent Management Group</label>
                     <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
                       {selectedPropForDetails.organization_name || (selectedPropForDetails as any).primary_organization?.name || (selectedPropForDetails as any).organizations?.[0]?.name || 'Unassigned'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block text-xs">Main Phone Number</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                      {selectedPropForDetails.main_phone || (selectedPropForDetails as any).phone || 'N/A'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block text-xs">Fax Number</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                      {selectedPropForDetails.fax || (selectedPropForDetails as any).fax_number || 'N/A'}
                     </p>
                   </div>
                   <div className="space-y-1">
@@ -2099,19 +2111,41 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Organization</label>
+                    <label className="font-bold text-black dark:text-white block">Management Group</label>
                     <select
                       value={formData.organization_id}
                       onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="">Select Organization (Optional)</option>
+                      <option value="">Select Management Group (Optional)</option>
                       {orgOptions.map((org) => (
                         <option key={org.id} value={org.id}>
                           {org.name}
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Main Phone No.</label>
+                    <input
+                      type="tel"
+                      value={formData.main_phone}
+                      onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Fax Number</label>
+                    <input
+                      type="tel"
+                      value={formData.fax}
+                      onChange={(e) => setFormData({ ...formData, fax: e.target.value })}
+                      placeholder="+1 (555) 019-2835"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
                   </div>
 
                   <div className="space-y-1">
@@ -2312,19 +2346,41 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Organization</label>
+                    <label className="font-bold text-black dark:text-white block">Management Group</label>
                     <select
                       value={formData.organization_id}
                       onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="">Select Organization (Optional)</option>
+                      <option value="">Select Management Group (Optional)</option>
                       {orgOptions.map((org) => (
                         <option key={org.id} value={org.id}>
                           {org.name}
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Main Phone No.</label>
+                    <input
+                      type="tel"
+                      value={formData.main_phone}
+                      onChange={(e) => setFormData({ ...formData, main_phone: e.target.value })}
+                      placeholder="+1 (555) 019-2834"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Fax Number</label>
+                    <input
+                      type="tel"
+                      value={formData.fax}
+                      onChange={(e) => setFormData({ ...formData, fax: e.target.value })}
+                      placeholder="+1 (555) 019-2835"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    />
                   </div>
 
                   <div className="space-y-1">

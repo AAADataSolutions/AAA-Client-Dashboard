@@ -154,12 +154,12 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                      {createdInvite ? 'Organization & Invitation Created' : 'Create Client Organization'}
+                      {createdInvite ? 'Management Group & Invitation Created' : 'Create Management Group'}
                     </h3>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       {createdInvite
                         ? 'Send the invitation link to the client admin.'
-                        : 'Provision a new client tenant organization and generate admin invitation.'}
+                        : 'Provision a new client tenant management group and generate admin invitation.'}
                     </p>
                   </div>
                 </div>
@@ -216,16 +216,6 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-[#222430]">
-                    {/* <a
-                      href={createdInvite.inviteUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold cursor-pointer"
-                    >
-                      <span>Open Invite in New Window</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a> */}
-
                     <motion.button
                       type="button"
                       whileHover={{ scale: 1.03 }}
@@ -239,15 +229,15 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-                  {/* Organization Info */}
+                  {/* Management Group Info */}
                   <div className="space-y-3">
                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                      Organization Details
+                      Management Group Details
                     </span>
 
                     <div className="space-y-1.5">
                       <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                        Organization Name <span className="text-rose-500">*</span>
+                        Management Group Name <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"

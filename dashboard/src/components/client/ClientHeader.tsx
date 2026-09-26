@@ -110,7 +110,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#161822] border border-slate-200 dark:border-[#232536] text-xs">
             <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
             <div className="flex items-center gap-1 text-[11.5px] font-mono">
-              <span className="hidden md:inline text-slate-500 dark:text-slate-400 font-sans">Org ID:</span>
+              <span className="hidden md:inline text-slate-500 dark:text-slate-400 font-sans">Group ID:</span>
               <span className="text-slate-700 dark:text-slate-200 font-medium">
                 {orgId.length > 8 ? `${orgId.substring(0, 8)}...` : orgId}
               </span>
@@ -122,8 +122,8 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                   ? 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#202330]'
               }`}
-              title="Copy Organization ID to share with team"
-              aria-label="Copy Organization ID"
+              title="Copy Management Group ID to share with team"
+              aria-label="Copy Management Group ID"
             >
               {copiedOrgId ? (
                 <>
@@ -197,7 +197,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                       <button
                         onClick={handleCopyOrgId}
                         className="text-blue-500 hover:text-blue-400 flex items-center gap-0.5 cursor-pointer font-medium"
-                        title="Copy Org ID"
+                        title="Copy Management Group ID"
                       >
                         {copiedOrgId ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                         <span>{copiedOrgId ? 'Copied' : 'Copy'}</span>

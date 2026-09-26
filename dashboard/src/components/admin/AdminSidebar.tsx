@@ -53,7 +53,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
-  { label: 'Organizations', href: '/admin/organizations', icon: Building2 },
+  { label: 'Management Groups', href: '/admin/organizations', icon: Building2 },
   { label: 'Properties', href: '/admin/properties', icon: Hotel },
   {
     label: 'Services',

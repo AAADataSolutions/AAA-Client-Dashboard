@@ -116,9 +116,9 @@ export async function GET(request: NextRequest) {
         totalOpenTicketsCount += openTix.length;
 
         const propStatus = op.status || prop.status || 'ACTIVE';
-        const gmName = prop.general_manager_name || prop.contact_person_name || 'N/A';
-        const gmPhone = prop.general_manager_phone || prop.main_phone || 'N/A';
-        const gmEmail = prop.general_manager_email || prop.contact_person_email || 'N/A';
+        const gmName = prop.general_manager_name || prop.contact_person_name || null;
+        const gmPhone = prop.general_manager_phone || prop.main_phone || null;
+        const gmEmail = prop.general_manager_email || prop.contact_person_email || null;
 
         return {
           id: prop.id,
@@ -133,8 +133,8 @@ export async function GET(request: NextRequest) {
           main_phone: prop.main_phone,
           fax: prop.fax,
           organization_name: op.organization?.name || 'Organization',
-          contact_person_name: prop.contact_person_name || prop.general_manager_name,
-          contact_person_email: prop.contact_person_email,
+          contact_person_name: prop.contact_person_name || prop.general_manager_name || null,
+          contact_person_email: prop.contact_person_email || prop.general_manager_email || null,
           general_manager_name: gmName,
           general_manager_phone: gmPhone,
           general_manager_email: gmEmail,

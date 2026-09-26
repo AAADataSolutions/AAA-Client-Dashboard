@@ -236,10 +236,6 @@ export async function POST(request: NextRequest) {
       attachments,
     } = body;
 
-    if (!organization_id) {
-      return NextResponse.json({ success: false, error: 'Please select an organization.' }, { status: 400 });
-    }
-
     if (!property_name?.trim() || !property_phone?.trim()) {
       return NextResponse.json(
         { success: false, error: 'Property Name and Phone Number are required.' },
@@ -251,7 +247,7 @@ export async function POST(request: NextRequest) {
     const { data: newPorting, error: insertErr } = await db
       .from('porting_requests')
       .insert({
-        organization_id,
+        organization_id: organization_id || null,
         created_by: user?.id || null,
         property_name: property_name.trim(),
         property_address: property_address ? property_address.trim() : null,

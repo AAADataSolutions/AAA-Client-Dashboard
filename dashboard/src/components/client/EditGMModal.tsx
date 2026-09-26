@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Phone, Mail, Loader2, Hotel, Check } from 'lucide-react';
+import { X, User, Phone, Mail, Loader2, Hotel, Check, Printer } from 'lucide-react';
 import { useToast } from '@/components/client/ClientToast';
 
 interface EditGMModalProps {
@@ -17,6 +17,7 @@ interface EditGMModalProps {
     general_manager_email?: string | null;
     contact_person_name?: string | null;
     main_phone?: string | null;
+    fax?: string | null;
     contact_person_email?: string | null;
   } | null;
   onSuccess: () => void;
@@ -32,6 +33,8 @@ export const EditGMModal: React.FC<EditGMModalProps> = ({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [mainPhone, setMainPhone] = useState('');
+  const [fax, setFax] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -53,6 +56,8 @@ export const EditGMModal: React.FC<EditGMModalProps> = ({
           ? property.general_manager_email
           : property.contact_person_email || ''
       );
+      setMainPhone(property.main_phone || '');
+      setFax(property.fax || '');
     }
   }, [property]);
 
@@ -71,20 +76,22 @@ export const EditGMModal: React.FC<EditGMModalProps> = ({
           general_manager_name: name.trim(),
           general_manager_phone: phone.trim(),
           general_manager_email: email.trim(),
+          main_phone: mainPhone.trim(),
+          fax: fax.trim(),
         }),
       });
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Failed to update General Manager details');
+        throw new Error(json.error || 'Failed to update property details');
       }
 
-      toast.success('General Manager details updated successfully.');
+      toast.success('Property & GM details updated successfully.');
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error('Error saving GM details:', err);
-      toast.error(err.message || 'Failed to update GM details');
+      console.error('Error saving details:', err);
+      toast.error(err.message || 'Failed to update details');
     } finally {
       setSaving(false);
     }
@@ -109,7 +116,7 @@ export const EditGMModal: React.FC<EditGMModalProps> = ({
               </div>
               <div className="truncate">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
-                  Edit General Manager Details
+                  Edit Property &amp; GM Details
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
                   <Hotel className="w-3 h-3 text-slate-400 shrink-0" />
@@ -145,37 +152,73 @@ export const EditGMModal: React.FC<EditGMModalProps> = ({
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                General Manager Phone <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="tel"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 000-0000"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                  GM Phone <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                  GM Email <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="gm@hotel.com"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                General Manager Email <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="gm@hotel.com"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+            <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100 dark:border-[#222430]">
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                  Main Phone No.
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="tel"
+                    value={mainPhone}
+                    onChange={(e) => setMainPhone(e.target.value)}
+                    placeholder="+1 (555) 019-2834"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                  Fax Number
+                </label>
+                <div className="relative">
+                  <Printer className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="tel"
+                    value={fax}
+                    onChange={(e) => setFax(e.target.value)}
+                    placeholder="+1 (555) 019-2835"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
 

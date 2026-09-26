@@ -553,7 +553,7 @@ export default function AdminOrganizationsPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Client Organizations
+              Management Groups
             </h1>
           </div>
         </div>
@@ -566,17 +566,17 @@ export default function AdminOrganizationsPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition shadow-2xs cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Create Organization</span>
+            <span>Create Management Group</span>
           </motion.button>
         </div>
       </motion.div>
 
-      {/* 2. Top KPI Cards Row (5 Variant 1 Deep Blue Standardized Cards) */}
+      {/* 2. Top KPI Cards Row (3 Standardized Cards: Total MG, Active MG, Total Properties) */}
       <motion.div
         variants={itemVariants}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"
       >
-        {/* Card 1: Total Organizations */}
+        {/* Card 1: Total Management Groups */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
@@ -585,7 +585,7 @@ export default function AdminOrganizationsPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Total Organizations
+              Total Management Groups
             </span>
             <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <Building2 size={18} />
@@ -595,12 +595,12 @@ export default function AdminOrganizationsPage() {
             <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {metrics.totalOrganizations}
             </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Clients</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Groups</span>
           </div>
           <p className="text-[11px] text-slate-100 mt-2">All provisioned tenant accounts</p>
         </motion.div>
 
-        {/* Card 2: Active Organizations */}
+        {/* Card 2: Active Management Groups */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
@@ -609,7 +609,7 @@ export default function AdminOrganizationsPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Active Organizations
+              Active Management Groups
             </span>
             <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <CheckCircle2 size={18} />
@@ -624,31 +624,7 @@ export default function AdminOrganizationsPage() {
           <p className="text-[11px] text-slate-100 mt-2">Operational active accounts</p>
         </motion.div>
 
-        {/* Card 3: Pending / Invited */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Pending / Invited
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <Clock size={18} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.pendingOrInvited}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Awaiting Setup</span>
-          </div>
-          <p className="text-[11px] text-slate-100 mt-2">Pending invite or onboarding</p>
-        </motion.div>
-
-        {/* Card 4: Total Properties */}
+        {/* Card 3: Total Properties */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
@@ -671,30 +647,6 @@ export default function AdminOrganizationsPage() {
           </div>
           <p className="text-[11px] text-slate-100 mt-2">Assigned across all clients</p>
         </motion.div>
-
-        {/* Card 5: Organizations with No Properties */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              No Properties
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <AlertCircle size={18} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.noPropertiesCount}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Unassigned</span>
-          </div>
-          <p className="text-[11px] text-slate-100 mt-2">Orgs with 0 assigned properties</p>
-        </motion.div>
       </motion.div>
 
       {/* 3. Search & Filters Bar */}
@@ -707,7 +659,7 @@ export default function AdminOrganizationsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => dispatch(setFilters({ searchQuery: e.target.value, currentPage: 1 }))}
-              placeholder="Search by organization, address, contact, email, or phone..."
+              placeholder="Search by management group, address, contact, email, or phone..."
               className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
             />
             {searchQuery && (
@@ -724,7 +676,7 @@ export default function AdminOrganizationsPage() {
           <select
             value={selectedStatus}
             onChange={(e) => dispatch(setFilters({ selectedStatus: e.target.value, currentPage: 1 }))}
-            aria-label="Filter by organization status"
+            aria-label="Filter by management group status"
             className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
@@ -744,14 +696,13 @@ export default function AdminOrganizationsPage() {
           >
             <option value="ALL">All Property Statuses</option>
             <option value="HAS_PROPERTIES">Has Assigned Properties</option>
-            <option value="NO_PROPERTIES">No Assigned Properties (0)</option>
           </select>
 
           {/* Sorting */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            aria-label="Sort organizations"
+            aria-label="Sort management groups"
             className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
           >
             <option value="NEWEST">Sort: Newest First</option>
@@ -803,12 +754,12 @@ export default function AdminOrganizationsPage() {
             <Building2 className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            No client organizations found
+            No management groups found
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
             {hasActiveFilters
-              ? 'No organizations matched your search and filter criteria.'
-              : 'Create your first client organization to begin onboarding and managing telecom services.'}
+              ? 'No management groups matched your search and filter criteria.'
+              : 'Create your first management group to begin onboarding and managing telecom services.'}
           </p>
           {!hasActiveFilters && (
             <motion.button
@@ -817,7 +768,7 @@ export default function AdminOrganizationsPage() {
               onClick={() => setShowCreateModal(true)}
               className="mt-4 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" /> Create Organization
+              <Plus className="w-3.5 h-3.5" /> Create Management Group
             </motion.button>
           )}
         </div>
@@ -831,7 +782,7 @@ export default function AdminOrganizationsPage() {
                     Logo
                   </th>
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[200px]">
-                    Organization Name
+                    Management Group Name
                   </th>
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[240px]">
                     Address

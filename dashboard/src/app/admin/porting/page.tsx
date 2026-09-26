@@ -423,10 +423,6 @@ export default function AdminPortingPage() {
   // Handle Create Submit
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.organization_id) {
-      setCreateError('Please select an organization.');
-      return;
-    }
     if (!createForm.property_name.trim() || !createForm.property_phone.trim()) {
       setCreateError('Property Name and Phone Number are required.');
       return;
@@ -475,7 +471,7 @@ export default function AdminPortingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_id: createForm.organization_id,
+          organization_id: createForm.organization_id || null,
           property_name: createForm.property_name.trim(),
           property_address: createForm.property_address.trim() || null,
           property_phone: createForm.property_phone.trim(),
@@ -1876,13 +1872,12 @@ export default function AdminPortingPage() {
                   </div>
                 )}
 
-                {/* Organization Name */}
+                {/* Organization / Management Group Name (Optional) */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    Organization Name <span className="text-rose-500">*</span>
+                    Management Group (Optional)
                   </label>
                   <select
-                    required
                     value={createForm.organization_id}
                     onChange={(e) =>
                       setCreateForm((p) => ({
@@ -1892,7 +1887,7 @@ export default function AdminPortingPage() {
                     }
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    <option value="">Select organization...</option>
+                    <option value="">None / Unassigned</option>
                     {organizations.map((org) => (
                       <option key={org.id} value={org.id}>
                         {org.name}

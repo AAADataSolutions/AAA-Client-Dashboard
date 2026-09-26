@@ -11,19 +11,19 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => {},
   setTheme: () => {},
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Check saved theme or default to dark (matching user preference in reference)
+    // Check saved theme or default to light
     const saved = localStorage.getItem('aaa_theme') as Theme | null;
-    const initialTheme: Theme = (saved === 'light' || saved === 'dark') ? saved : 'dark';
+    const initialTheme: Theme = (saved === 'light' || saved === 'dark') ? saved : 'light';
     
     setThemeState(initialTheme);
     if (initialTheme === 'dark') {

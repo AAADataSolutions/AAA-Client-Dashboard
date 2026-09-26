@@ -206,7 +206,7 @@ export default function AdminOverviewPage() {
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-                Organizations
+                Management Groups
               </span>
               <div className="w-7 h-7 rounded-lg text-white flex items-center justify-center">
                 <Building2 size={18} />
@@ -216,7 +216,7 @@ export default function AdminOverviewPage() {
               <span className="text-2xl font-bold text-slate-100">
                 {stats.orgsCount}
               </span>
-              <span className="text-xs text-slate-200 ml-1.5 font-medium">Portfolios</span>
+              <span className="text-xs text-slate-200 ml-1.5 font-medium">Groups</span>
             </div>
             <p className="text-[11px] text-slate-200 mt-2">Active client tenants &rarr;</p>
           </motion.div>
@@ -804,11 +804,11 @@ export default function AdminOverviewPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
               <div className="space-y-0.5">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Organizations Overview</h3>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Management Groups Overview</h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">Master enterprise accounts and property volume</p>
               </div>
               <Link href="/admin/organizations" className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-                View All Organizations →
+                View All Management Groups →
               </Link>
             </div>
 
@@ -817,7 +817,7 @@ export default function AdminOverviewPage() {
               <table className="w-full text-left text-xs text-slate-600 dark:text-slate-400">
                 <thead className="text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100 dark:border-[#222430]">
                   <tr>
-                    <th className="pb-2">Organization</th>
+                    <th className="pb-2">Management Group</th>
                     <th className="pb-2">Properties</th>
                     <th className="pb-2">Status</th>
                     <th className="pb-2 text-right">Action</th>
@@ -827,7 +827,7 @@ export default function AdminOverviewPage() {
                   {organizationsOverview.list.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="py-4 text-center text-slate-400 text-xs">
-                        No organizations found in workspace.
+                        No management groups found in workspace.
                       </td>
                     </tr>
                   ) : (

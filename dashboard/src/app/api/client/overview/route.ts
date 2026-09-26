@@ -103,18 +103,33 @@ export async function GET() {
     // 4. Fetch Porting Requests
     let activePortingCount = 0;
     let portingRecords: any[] = [];
-    if (orgPropIds.length > 0) {
-      const { data: ports } = await db
-        .from('porting_requests')
-        .select('*, organization_property:organization_properties(property:properties(name))')
-        .in('organization_property_id', orgPropIds)
-        .order('created_at', { ascending: false });
+    let portingQuery = db
+      .from('porting_requests')
+      .select('*, organization_property:organization_properties(property:properties(name))')
+      .order('created_at', { ascending: false });
 
-      portingRecords = ports || [];
-      activePortingCount = portingRecords.filter(
-        (p) => p.status !== 'COMPLETED' && p.status !== 'CANCELLED' && p.status !== 'REJECTED'
-      ).length;
+    if (orgPropIds.length > 0) {
+      portingQuery = portingQuery.or(`organization_id.eq.${orgId},organization_property_id.in.(${orgPropIds.join(',')})`);
+    } else {
+      portingQuery = portingQuery.eq('organization_id', orgId);
     }
+
+    const { data: ports, error: portErr } = await portingQuery;
+    if (portErr) {
+      console.error('Overview porting query error:', portErr);
+      const { data: fallbackPorts } = await db
+        .from('porting_requests')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+      portingRecords = fallbackPorts || [];
+    } else {
+      portingRecords = ports || [];
+    }
+
+    activePortingCount = portingRecords.filter(
+      (p) => p.status !== 'COMPLETED' && p.status !== 'CANCELLED' && p.status !== 'REJECTED'
+    ).length;
 
     // 5. Fetch Support Tickets
     let openTicketsCount = 0;

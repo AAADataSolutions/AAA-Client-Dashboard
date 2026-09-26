@@ -136,17 +136,34 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     };
 
+    if (body.name !== undefined) updatePayload.name = body.name ? body.name.trim() : null;
+    if (body.address !== undefined) updatePayload.address = body.address ? body.address.trim() : null;
+    if (body.main_phone !== undefined) updatePayload.main_phone = body.main_phone ? body.main_phone.trim() : null;
+    if (body.fax !== undefined) updatePayload.fax = body.fax ? body.fax.trim() : null;
+
     if (body.general_manager_name !== undefined) {
       updatePayload.general_manager_name = body.general_manager_name ? body.general_manager_name.trim() : null;
-      updatePayload.contact_person_name = updatePayload.general_manager_name;
+      if (updatePayload.contact_person_name === undefined) {
+        updatePayload.contact_person_name = updatePayload.general_manager_name;
+      }
     }
     if (body.general_manager_phone !== undefined) {
       updatePayload.general_manager_phone = body.general_manager_phone ? body.general_manager_phone.trim() : null;
-      updatePayload.main_phone = updatePayload.general_manager_phone;
+      if (body.main_phone === undefined && updatePayload.general_manager_phone) {
+        updatePayload.main_phone = updatePayload.general_manager_phone;
+      }
     }
     if (body.general_manager_email !== undefined) {
       updatePayload.general_manager_email = body.general_manager_email ? body.general_manager_email.trim() : null;
-      updatePayload.contact_person_email = updatePayload.general_manager_email;
+      if (updatePayload.contact_person_email === undefined) {
+        updatePayload.contact_person_email = updatePayload.general_manager_email;
+      }
+    }
+    if (body.contact_person_name !== undefined) {
+      updatePayload.contact_person_name = body.contact_person_name ? body.contact_person_name.trim() : null;
+    }
+    if (body.contact_person_email !== undefined) {
+      updatePayload.contact_person_email = body.contact_person_email ? body.contact_person_email.trim() : null;
     }
 
     const { data: updatedProp, error: updateErr } = await supabase

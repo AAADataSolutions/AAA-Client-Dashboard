@@ -163,7 +163,7 @@ export default function ClientDashboardOverviewPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Organization
+              Management Group
             </span>
             <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />

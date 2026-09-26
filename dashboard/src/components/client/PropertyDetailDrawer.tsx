@@ -141,13 +141,13 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                     <div>
                       <span className="text-[10px] text-slate-400 block">Main Phone</span>
                       <span className="text-slate-800 dark:text-slate-200 font-medium">
-                        {property.main_phone || '—'}
+                        {property.main_phone || property.phone || property.general_manager_phone || '—'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 block">Fax</span>
                       <span className="text-slate-800 dark:text-slate-200 font-medium">
-                        {property.fax || '—'}
+                        {property.fax || property.fax_number || '—'}
                       </span>
                     </div>
                   </div>
@@ -168,25 +168,58 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                   Leadership &amp; Contacts
                 </h4>
                 <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <User className="w-4 h-4 text-slate-400 shrink-0" />
-                    <div>
+                  {/* General Manager */}
+                  <div className="flex items-start gap-2.5">
+                    <User className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div className="space-y-0.5">
                       <span className="text-[10px] text-slate-400 block">General Manager</span>
-                      <span className="font-semibold text-slate-900 dark:text-white">
-                        {property.general_manager_name || 'Not Designated'}
+                      <span className="font-semibold text-slate-900 dark:text-white block">
+                        {(property.general_manager_name && property.general_manager_name !== 'N/A' && property.general_manager_name !== '—')
+                          ? property.general_manager_name
+                          : (property.contact_person_name && property.contact_person_name !== 'N/A' && property.contact_person_name !== '—')
+                          ? property.contact_person_name
+                          : 'Not Designated'}
                       </span>
+                      {((property.general_manager_phone && property.general_manager_phone !== 'N/A') || property.main_phone) && (
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1.5 mt-0.5">
+                          <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{property.general_manager_phone && property.general_manager_phone !== 'N/A' ? property.general_manager_phone : property.main_phone}</span>
+                        </p>
+                      )}
+                      {(property.general_manager_email && property.general_manager_email !== 'N/A') && (
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1.5 mt-0.5">
+                          <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{property.general_manager_email}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-[#222430]">
-                    <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Telecom Contact Person</span>
+
+                  {/* Primary Contact Person */}
+                  <div className="flex items-start gap-2.5 pt-2.5 border-t border-slate-100 dark:border-[#222430]">
+                    <Mail className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-slate-400 block">Primary Contact Person</span>
                       <span className="font-semibold text-slate-900 dark:text-white block">
-                        {property.contact_person_name || 'Primary Contact'}
+                        {(property.contact_person_name && property.contact_person_name !== 'N/A' && property.contact_person_name !== '—')
+                          ? property.contact_person_name
+                          : (property.general_manager_name && property.general_manager_name !== 'N/A' && property.general_manager_name !== '—')
+                          ? property.general_manager_name
+                          : 'Primary Contact'}
                       </span>
-                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">
-                        {property.contact_person_email || 'No email provided'}
-                      </span>
+                      {(property.contact_person_email && property.contact_person_email !== 'N/A') ? (
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1.5 mt-0.5">
+                          <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{property.contact_person_email}</span>
+                        </p>
+                      ) : (property.general_manager_email && property.general_manager_email !== 'N/A') ? (
+                        <p className="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1.5 mt-0.5">
+                          <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{property.general_manager_email}</span>
+                        </p>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">No email provided</span>
+                      )}
                     </div>
                   </div>
                 </div>

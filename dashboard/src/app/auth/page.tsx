@@ -17,7 +17,7 @@ export default function AuthPage() {
       style={{ backgroundImage: "url('/authbg.png')" }}
     >
       {/* Dark gradient overlay for contrast and legibility */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/75 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-black/25 to-black/55 pointer-events-none" />
 
       {/* Main Container Grid */}
       <div className="relative z-10 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[56%_44%] gap-8 lg:gap-12 items-center py-6">
