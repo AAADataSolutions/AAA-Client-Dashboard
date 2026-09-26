@@ -31,7 +31,18 @@ import {
   GitBranch,
   ShieldCheck,
   Building2,
+  UserCheck,
+  User,
+  Paperclip,
+  FileText,
+  File,
+  Trash2,
+  UploadCloud,
+  ExternalLink,
+  Lock,
+  UserPlus,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   fetchOnboardings,
@@ -42,6 +53,7 @@ import {
   optimisticUpdateStage,
   OnboardingItem,
   OnboardingRecord,
+  OnboardingAttachment,
 } from '@/store/slices/onboardingSlice';
 
 const containerVariants: Variants = {
@@ -106,11 +118,27 @@ interface OrgOption {
   name: string;
 }
 
+interface Teammate {
+  id: string;
+  full_name: string;
+  email: string;
+  role?: string;
+  avatar_url?: string;
+}
+
 interface Toast {
   id: string;
   title: string;
   message?: string;
   type: 'success' | 'error' | 'info';
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 export default function AdminOnboardingPortingPage() {
@@ -125,6 +153,7 @@ export default function AdminOnboardingPortingPage() {
   } = useAppSelector((state) => state.onboarding);
 
   const [orgOptions, setOrgOptions] = useState<OrgOption[]>([]);
+  const [teammates, setTeammates] = useState<Teammate[]>([]);
   const [searchInput, setSearchInput] = useState(filters.searchQuery);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -146,6 +175,16 @@ export default function AdminOnboardingPortingPage() {
     foc_confirmed_date: '',
     live_cutover_date: '',
   });
+
+  // Internal Assignment, Notes & Attachments (Admin Only)
+  const [assignedTo, setAssignedTo] = useState<string>('');
+  const [assignedToName, setAssignedToName] = useState<string>('');
+  const [assignmentMode, setAssignmentMode] = useState<'TEAMMATE' | 'CUSTOM'>('TEAMMATE');
+  const [internalNotes, setInternalNotes] = useState<string>('');
+  const [existingAttachments, setExistingAttachments] = useState<OnboardingAttachment[]>([]);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [deletingAttId, setDeletingAttId] = useState<string | null>(null);
   const [updatingStage, setUpdatingStage] = useState(false);
 
   // 3-Dots Action Menu Position (strictly opens ABOVE)
@@ -195,6 +234,22 @@ export default function AdminOnboardingPortingPage() {
     loadOrgs();
   }, []);
 
+  // Load admin teammates for assignment
+  useEffect(() => {
+    async function loadTeammates() {
+      try {
+        const res = await fetch('/api/admin/members');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.members)) {
+          setTeammates(data.members);
+        }
+      } catch (err) {
+        console.warn('Could not load teammates:', err);
+      }
+    }
+    loadTeammates();
+  }, []);
+
   // Fetch Onboardings
   const loadData = useCallback(() => {
     dispatch(
@@ -240,7 +295,8 @@ export default function AdminOnboardingPortingPage() {
   const openUnifiedModal = (record: OnboardingItem, defaultTab: 'DETAILS' | 'STAGE' = 'DETAILS') => {
     setSelectedRecord(record);
     setActiveTab(defaultTab);
-    setEditStageStatus(record.status as OnboardingStatus);
+    const currentStatus = (record.status || (record as any).stage || 'DRAFT') as OnboardingStatus;
+    setEditStageStatus(currentStatus);
     setEditTargetDate(record.target_date || '');
     setStageDates({
       draft_date: (record as any).draft_date ? (record as any).draft_date.split('T')[0] : '',
@@ -251,6 +307,22 @@ export default function AdminOnboardingPortingPage() {
       foc_confirmed_date: (record as any).foc_confirmed_date ? (record as any).foc_confirmed_date.split('T')[0] : '',
       live_cutover_date: (record as any).live_cutover_date ? (record as any).live_cutover_date.split('T')[0] : '',
     });
+
+    const rawAssignedTo = record.assigned_to || '';
+    const rawAssignedToName = record.assigned_to_name || '';
+    setAssignedTo(rawAssignedTo);
+    setAssignedToName(rawAssignedToName);
+    if (rawAssignedTo) {
+      setAssignmentMode('TEAMMATE');
+    } else if (rawAssignedToName) {
+      setAssignmentMode('CUSTOM');
+    } else {
+      setAssignmentMode('TEAMMATE');
+    }
+
+    setInternalNotes(record.internal_notes || '');
+    setExistingAttachments(record.attachments || []);
+    setNewFiles([]);
     setShowUnifiedModal(true);
   };
 
@@ -300,7 +372,43 @@ export default function AdminOnboardingPortingPage() {
     }
   };
 
-  // Handle Update Stage
+  // Handle Remove Existing Attachment
+  const handleRemoveExistingAttachment = async (attId?: string, storagePath?: string) => {
+    if (!selectedRecord) return;
+    const targetKey = attId || storagePath;
+    if (!targetKey) return;
+
+    try {
+      setDeletingAttId(targetKey);
+      const res = await fetch('/api/admin/onboarding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedRecord.id,
+          remove_attachment_id: targetKey,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setExistingAttachments((prev) => prev.filter((a) => (a.id || a.storage_path) !== targetKey));
+        showToast('Attachment Removed', 'Internal attachment was removed.', 'info');
+      } else {
+        throw new Error(result.error || 'Failed to remove attachment');
+      }
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to remove attachment', 'error');
+    } finally {
+      setDeletingAttId(null);
+    }
+  };
+
+  // Handle Download / Preview Attachment
+  const handleDownloadAttachment = (att: OnboardingAttachment) => {
+    const url = `/api/admin/onboarding/attachment?path=${encodeURIComponent(att.storage_path)}&name=${encodeURIComponent(att.file_name)}`;
+    window.open(url, '_blank');
+  };
+
+  // Handle Update Stage Submit (includes internal assignment, notes & attachments)
   const handleUpdateStageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRecord) return;
@@ -310,21 +418,77 @@ export default function AdminOnboardingPortingPage() {
 
     try {
       setUpdatingStage(true);
+
+      // Upload new files to Supabase storage if any
+      const newAttachmentsPayload: {
+        file_name: string;
+        file_size: number;
+        mime_type: string;
+        storage_path: string;
+      }[] = [];
+
+      if (newFiles.length > 0) {
+        setUploadingFiles(true);
+        const supabase = createClient();
+        for (const file of newFiles) {
+          const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const storagePath = `onboarding_${selectedRecord.id}/${Date.now()}_${safeName}`;
+
+          // Attempt storage upload in onboarding-attachments bucket, fallback to porting-attachments
+          let uploadRes = await supabase.storage.from('onboarding-attachments').upload(storagePath, file, {
+            upsert: true,
+          });
+
+          if (uploadRes.error) {
+            uploadRes = await supabase.storage.from('porting-attachments').upload(storagePath, file, {
+              upsert: true,
+            });
+          }
+
+          newAttachmentsPayload.push({
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type || 'application/octet-stream',
+            storage_path: storagePath,
+          });
+        }
+        setUploadingFiles(false);
+      }
+
+      // Determine final assignee name
+      let finalAssignedTo = assignmentMode === 'TEAMMATE' ? (assignedTo || null) : null;
+      let finalAssignedToName = assignedToName.trim();
+      if (assignmentMode === 'TEAMMATE' && assignedTo) {
+        const match = teammates.find((t) => t.id === assignedTo);
+        if (match) {
+          finalAssignedToName = match.full_name || match.email;
+        }
+      }
+
+      const payload: any = {
+        id: selectedRecord.id,
+        status: editStageStatus,
+        target_date: editTargetDate || null,
+        draft_date: stageDates.draft_date || null,
+        contract_sent_date: stageDates.contract_sent_date || null,
+        signed_date: stageDates.signed_date || null,
+        porting_submitted_date: stageDates.porting_submitted_date || null,
+        sof_review_date: stageDates.sof_review_date || null,
+        foc_confirmed_date: stageDates.foc_confirmed_date || null,
+        live_cutover_date: stageDates.live_cutover_date || null,
+        assigned_to: finalAssignedTo,
+        assigned_to_name: finalAssignedToName || null,
+        internal_notes: internalNotes || null,
+      };
+
+      if (newAttachmentsPayload.length > 0) {
+        payload.new_attachments = newAttachmentsPayload;
+      }
+
       const res = await fetch('/api/admin/onboarding', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: selectedRecord.id,
-          status: editStageStatus,
-          target_date: editTargetDate || null,
-          draft_date: stageDates.draft_date || null,
-          contract_sent_date: stageDates.contract_sent_date || null,
-          signed_date: stageDates.signed_date || null,
-          porting_submitted_date: stageDates.porting_submitted_date || null,
-          sof_review_date: stageDates.sof_review_date || null,
-          foc_confirmed_date: stageDates.foc_confirmed_date || null,
-          live_cutover_date: stageDates.live_cutover_date || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await res.json();
@@ -337,7 +501,7 @@ export default function AdminOnboardingPortingPage() {
           'success'
         );
       } else {
-        showToast('Stage Updated', `Progress updated to ${getStageBadge(editStageStatus).label}.`, 'success');
+        showToast('Stage & Internal Details Saved', `Pipeline updated to ${getStageBadge(editStageStatus).label}.`, 'success');
       }
 
       setShowUnifiedModal(false);
@@ -347,6 +511,7 @@ export default function AdminOnboardingPortingPage() {
       loadData();
     } finally {
       setUpdatingStage(false);
+      setUploadingFiles(false);
     }
   };
 
@@ -359,6 +524,7 @@ export default function AdminOnboardingPortingPage() {
   };
 
   const hasActiveFilters = filters.searchQuery.trim() !== '' || filters.selectedStage !== 'ALL' || filters.sortBy !== 'NEWEST';
+  const isStage3OrAbove = ['SIGNED', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED', 'COMPLETED'].includes(editStageStatus);
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -410,9 +576,9 @@ export default function AdminOnboardingPortingPage() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              const headers = ['ID,Property,Organization,Stage,Target Date,GM Name,GM Phone,GM Email\n'];
+              const headers = ['ID,Property,Organization,Stage,Assignee,Target Date,GM Name,GM Phone,GM Email\n'];
               const rows = onboardings.map((o: OnboardingRecord) =>
-                `"${o.id}","${o.property_name}","${o.organization_name}","${o.stage || o.status || ''}","${o.target_date || ''}","${o.general_manager_name || ''}","${o.general_manager_phone || ''}","${o.general_manager_email || ''}"`
+                `"${o.id}","${o.property_name}","${o.organization_name}","${o.stage || o.status || ''}","${o.assigned_to_name || 'Unassigned'}","${o.target_date || ''}","${o.general_manager_name || ''}","${o.general_manager_phone || ''}","${o.general_manager_email || ''}"`
               );
               const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
               const url = URL.createObjectURL(blob);
@@ -455,243 +621,138 @@ export default function AdminOnboardingPortingPage() {
               setCreateError(null);
               setShowCreateModal(true);
             }}
-            className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            className="px-4 py-2 bg-[#4f46e5] text-white text-xs font-medium rounded-lg flex items-center gap-2 cursor-pointer shadow-sm hover:bg-[#4338ca] transition"
           >
-            <Plus className="w-3.5 h-3.5" /> Initialize Property Onboarding
+            <Plus className="w-3.5 h-3.5" /> Initialize Pipeline
           </motion.button>
         </div>
       </motion.div>
 
-      {/* Real KPI Cards - ONLY Variant 1 (Deep Blue) */}
+      {/* Stats Cards (4 Key Metrics) */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Pipelines */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Total Pipelines
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <Hotel size={18} />
-            </div>
+        <div className="p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Onboarding</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{metrics.totalOnboardings}</p>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.totalOnboardings}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Properties</span>
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
+            <ArrowLeftRight className="w-5 h-5" />
           </div>
-          <p className="text-[11px] text-slate-100 mt-2">Active &amp; completed lifecycles</p>
-        </motion.div>
+        </div>
 
-        {/* Card 2: Porting In-Flight */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Porting In-Flight
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <ArrowLeftRight size={18} />
-            </div>
+        <div className="p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Live / Activated</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{metrics.completedCount}</p>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.inProgressCount}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Orders</span>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
-          <p className="text-[11px] text-slate-100 mt-2">LOA, SOF &amp; FOC carrier stages</p>
-        </motion.div>
+        </div>
 
-        {/* Card 3: Pending Review */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Draft &amp; Pending
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <Clock size={18} />
-            </div>
+        <div className="p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">In Flight / Porting</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{metrics.inProgressCount}</p>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.pendingReviewCount}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Pending</span>
+          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+            <RefreshCw className="w-5 h-5" />
           </div>
-          <p className="text-[11px] text-slate-100 mt-2">Awaiting contract signing</p>
-        </motion.div>
+        </div>
 
-        {/* Card 4: Cutover Complete */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Cutover Complete
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <CheckCircle2 size={18} />
-            </div>
+        <div className="p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Pending Review / SOF</p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{metrics.pendingReviewCount}</p>
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.completedCount}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Active</span>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
+            <Clock className="w-5 h-5" />
           </div>
-          <p className="text-[11px] text-slate-100 mt-2">100% migrated &amp; operational</p>
-        </motion.div>
+        </div>
       </motion.div>
 
-      {/* Search & Filter Toolbar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-3 shadow-sm space-y-2.5">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-          {/* Search Box (char-by-char) */}
-          <div className="relative flex-1">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by property, address, GM, organization..."
-              value={searchInput}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
-            />
-            {searchInput && (
-              <button
-                onClick={() => handleSearchChange('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Stage Filter */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={filters.selectedStage}
-              onChange={(e) => {
-                dispatch(setStageFilter(e.target.value));
-                dispatch(setPagination({ currentPage: 1 }));
-              }}
-              aria-label="Filter by stage"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="ALL">Stage: All Stages</option>
-              {STAGES_ROAD.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.sortBy}
-              onChange={(e) => {
-                dispatch(setSortBy(e.target.value));
-                dispatch(setPagination({ currentPage: 1 }));
-              }}
-              aria-label="Sort pipelines"
-              className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="NEWEST">Sort: Recently Added</option>
-              <option value="PROP_ASC">Sort: Property (A-Z)</option>
-              <option value="ORG_ASC">Sort: Organization (A-Z)</option>
-              <option value="STATUS">Sort: Stage Progress</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Active Filters Pill Bar */}
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-[#1a1c24] text-xs">
-            <span className="text-slate-400">Active Filters:</span>
-            {filters.searchQuery && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                "{filters.searchQuery}"
-                <button onClick={() => handleSearchChange('')} className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {filters.selectedStage !== 'ALL' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                Stage: {filters.selectedStage}
-                <button onClick={() => dispatch(setStageFilter('ALL'))} className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
+      {/* Filters & Real-time Search */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search property, GM, assignee..."
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
+          />
+          {searchInput && (
             <button
-              onClick={resetAllFilters}
-              className="text-slate-500 hover:text-blue-600 text-xs font-medium underline ml-auto cursor-pointer"
+              onClick={() => handleSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
             >
-              Clear All
+              <X className="w-3.5 h-3.5" />
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* Main Table View */}
-      {error ? (
-        <div className="bg-white dark:bg-[#15161c] border border-rose-500/20 rounded-xl p-8 text-center shadow-sm">
-          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-800 dark:text-white">Could not load onboarding pipelines</p>
-          <p className="text-xs text-slate-400 mt-0.5">{error}</p>
-          <button
-            onClick={loadData}
-            className="mt-3 px-3 py-1.5 bg-[#4f46e5] text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Retry
-          </button>
+          )}
         </div>
-      ) : loading && onboardings.length === 0 ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl overflow-hidden shadow-sm p-4 space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="flex items-center justify-between gap-4 py-2 animate-pulse">
-              <div className="h-3.5 bg-slate-200 dark:bg-[#222430] rounded w-1/4"></div>
-              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-24"></div>
-              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-16"></div>
-              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
-              <div className="h-3 bg-slate-200 dark:bg-[#222430] rounded w-20"></div>
-              <div className="h-5 bg-slate-200 dark:bg-[#222430] rounded-full w-14"></div>
-            </div>
-          ))}
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+          {/* Stage Filter */}
+          <select
+            value={filters.selectedStage}
+            onChange={(e) => {
+              dispatch(setStageFilter(e.target.value));
+              dispatch(setPagination({ currentPage: 1 }));
+            }}
+            className="px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            <option value="ALL">All Lifecycle Stages</option>
+            {STAGES_ROAD.map((s) => (
+              <option key={s.key} value={s.key}>
+                Stage {s.step}: {s.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Sort By */}
+          <select
+            value={filters.sortBy}
+            onChange={(e) => {
+              dispatch(setSortBy(e.target.value as any));
+              dispatch(setPagination({ currentPage: 1 }));
+            }}
+            className="px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            <option value="NEWEST">Sort: Newest First</option>
+            <option value="PROP_ASC">Sort: Property Name (A-Z)</option>
+            <option value="ORG_ASC">Sort: Organization (A-Z)</option>
+            <option value="STATUS">Sort: Progress Percentage</option>
+          </select>
+        </div>
+      </motion.div>
+
+      {/* Main Table / Empty State */}
+      {loading && onboardings.length === 0 ? (
+        <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-3">
+          <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
+          <p className="text-xs font-medium">Loading onboarding pipelines...</p>
         </div>
       ) : onboardings.length === 0 ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-sm">
-          <ArrowLeftRight className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-          <h4 className="text-sm font-bold text-slate-800 dark:text-white">No Onboarding Pipelines Found</h4>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-            {hasActiveFilters
-              ? 'No onboarding records match the selected filters.'
-              : 'Initialize your first hotel property onboarding pipeline.'}
-          </p>
-          <div className="mt-4 flex justify-center gap-2">
+        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center space-y-4 shadow-xs">
+          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-[#1a1c24] flex items-center justify-center mx-auto text-slate-400">
+            <ArrowLeftRight className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">No onboarding records found</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              {hasActiveFilters
+                ? 'Try clearing active search or stage filters to see all pipelines.'
+                : 'Initialize your first onboarding pipeline to start tracking cutover lifecycle stages.'}
+            </p>
+          </div>
+          <div className="pt-2 flex items-center justify-center gap-2.5">
             {hasActiveFilters && (
               <button
                 onClick={resetAllFilters}
-                className="px-3 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-medium rounded-lg cursor-pointer"
+                className="px-3.5 py-1.5 border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-[#1a1c24] cursor-pointer"
               >
-                Clear Filters
+                Reset Filters
               </button>
             )}
             <button
@@ -728,6 +789,7 @@ export default function AdminOnboardingPortingPage() {
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ADDRESS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STAGE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ASSIGNEE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">TARGET CUTOVER DATE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM PHONE</th>
@@ -748,7 +810,7 @@ export default function AdminOnboardingPortingPage() {
                       onClick={() => openUnifiedModal(rec, 'DETAILS')}
                       className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition cursor-pointer"
                     >
-                      {/* 1. Property Name (NO building icon) */}
+                      {/* 1. Property Name */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-bold text-black dark:text-white text-sm block">
                           {rec.property_name}
@@ -792,7 +854,25 @@ export default function AdminOnboardingPortingPage() {
                         </span>
                       </td>
 
-                      {/* 5. Target Cutover Date */}
+                      {/* 5. Assignee (Admin Side Only) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {rec.assigned_to_name ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 text-indigo-700 dark:text-indigo-300 font-medium text-[11px]">
+                            <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold">
+                              {rec.assigned_to_name.charAt(0).toUpperCase()}
+                            </div>
+                            <span>{rec.assigned_to_name}</span>
+                          </div>
+                        ) : ['SIGNED', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED', 'COMPLETED'].includes(rec.stage || rec.status || '') ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md font-medium border border-amber-200/50 dark:border-amber-800/40">
+                            Ready to Assign
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">—</span>
+                        )}
+                      </td>
+
+                      {/* 6. Target Cutover Date */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {rec.target_date ? (
                           <span className="text-slate-700 dark:text-slate-300 font-medium">
@@ -807,14 +887,14 @@ export default function AdminOnboardingPortingPage() {
                         )}
                       </td>
 
-                      {/* 6. GM Name */}
+                      {/* 7. GM Name */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-semibold text-slate-800 dark:text-white">
                           {rec.general_manager_name || 'N/A'}
                         </span>
                       </td>
 
-                      {/* 7. GM Phone (Can Copy) */}
+                      {/* 8. GM Phone (Can Copy) */}
                       <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {rec.general_manager_phone && rec.general_manager_phone !== 'N/A' ? (
                           <div className="flex items-center gap-1.5">
@@ -836,7 +916,7 @@ export default function AdminOnboardingPortingPage() {
                         )}
                       </td>
 
-                      {/* 8. GM Email (Can Copy) */}
+                      {/* 9. GM Email (Can Copy) */}
                       <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {rec.general_manager_email && rec.general_manager_email !== 'N/A' ? (
                           <div className="flex items-center gap-1.5">
@@ -858,7 +938,7 @@ export default function AdminOnboardingPortingPage() {
                         )}
                       </td>
 
-                      {/* 9. Actions (Three Dots Only) */}
+                      {/* 10. Actions (Three Dots Only) */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={(e) => handleOpenMenu(e, rec)}
@@ -923,7 +1003,7 @@ export default function AdminOnboardingPortingPage() {
           <div className="fixed inset-0 z-40" onClick={() => setMenuPosition(null)} />
           <div
             style={{ bottom: `${menuPosition.bottom}px`, left: `${menuPosition.left}px` }}
-            className="fixed z-50 w-48 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
+            className="fixed z-50 w-52 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-xl shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-75"
           >
             <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#222430] mb-0.5">
               <p className="font-semibold text-slate-900 dark:text-white truncate">{menuPosition.record.property_name}</p>
@@ -949,7 +1029,7 @@ export default function AdminOnboardingPortingPage() {
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
             >
               <Edit2 className="w-3.5 h-3.5 text-amber-500" />
-              <span>Edit Stage</span>
+              <span>Edit Stage &amp; Assignment</span>
             </button>
 
             <button
@@ -966,7 +1046,7 @@ export default function AdminOnboardingPortingPage() {
         </>
       )}
 
-      {/* UNIFIED MODAL (DETAILS & STAGE TRACKING TABS WITH CURVED ROAD UI) */}
+      {/* UNIFIED MODAL (DETAILS & STAGE TRACKING TABS WITH STAGE 3 ASSIGNMENT & ATTACHMENTS) */}
       <AnimatePresence>
         {showUnifiedModal && selectedRecord && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1021,7 +1101,7 @@ export default function AdminOnboardingPortingPage() {
 
               {/* Tab 1: Details */}
               {activeTab === 'DETAILS' && (
-                <div className="p-6 overflow-y-auto space-y-4 text-xs">
+                <div className="p-6 overflow-y-auto space-y-5 text-xs">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-black dark:text-white block text-xs">Property Name</label>
@@ -1081,10 +1161,83 @@ export default function AdminOnboardingPortingPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Internal Admin Handoff Summary (Private) */}
+                  <div className="p-4 bg-slate-50 dark:bg-[#111217] border border-indigo-200/50 dark:border-indigo-900/30 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <h4 className="font-bold text-slate-900 dark:text-white text-xs">
+                          Internal Assignment &amp; Operations (Admin Only)
+                        </h4>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('STAGE')}
+                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
+                      >
+                        Edit in Stage Tab &rarr;
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">Assigned Teammate</span>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                          {selectedRecord.assigned_to_name ? (
+                            <span className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                              <UserCheck className="w-3.5 h-3.5" /> {selectedRecord.assigned_to_name}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Not yet assigned</span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">Internal Attachments</span>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                          {selectedRecord.attachments && selectedRecord.attachments.length > 0 ? (
+                            <span>{selectedRecord.attachments.length} file(s) attached</span>
+                          ) : (
+                            <span className="text-slate-400 italic">No attachments uploaded</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {selectedRecord.internal_notes && (
+                        <div className="col-span-2 pt-1 border-t border-slate-200/60 dark:border-[#222430]">
+                          <span className="text-[10px] text-slate-400 font-semibold block uppercase">Internal Notes</span>
+                          <p className="text-xs text-slate-700 dark:text-slate-300 mt-1 whitespace-pre-wrap bg-white dark:bg-[#15161c] p-2.5 rounded-lg border border-slate-200/80 dark:border-[#222430]">
+                            {selectedRecord.internal_notes}
+                          </p>
+                        </div>
+                      )}
+
+                      {selectedRecord.attachments && selectedRecord.attachments.length > 0 && (
+                        <div className="col-span-2 space-y-1.5">
+                          <span className="text-[10px] text-slate-400 font-semibold block uppercase">Attached Files</span>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedRecord.attachments.map((att, i) => (
+                              <button
+                                key={att.id || att.storage_path || i}
+                                onClick={() => handleDownloadAttachment(att)}
+                                className="px-2.5 py-1.5 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-xs text-slate-700 dark:text-slate-200 hover:text-blue-600 flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+                              >
+                                <Paperclip className="w-3 h-3 text-indigo-500" />
+                                <span className="font-medium truncate max-w-[150px]">{att.file_name}</span>
+                                <span className="text-[10px] text-slate-400">({formatFileSize(att.file_size)})</span>
+                                <ExternalLink className="w-3 h-3 text-slate-400 ml-0.5" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Tab 2: Stage Tracking (Curved Road with Animated Fill) */}
+              {/* Tab 2: Stage Tracking (Curved Road with Stage 3+ Task Assignment & Attachments) */}
               {activeTab === 'STAGE' && (
                 <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
                   {/* Stage Road Timeline */}
@@ -1209,6 +1362,260 @@ export default function AdminOnboardingPortingPage() {
                       </div>
                     </div>
 
+                    {/* STAGE 3+: INTERNAL TASK ASSIGNMENT, ATTACHMENTS & NOTES (ADMIN ONLY) */}
+                    {isStage3OrAbove ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/50 dark:from-[#171827] dark:via-[#13141a] dark:to-[#1a1728] border border-indigo-200/80 dark:border-indigo-800/50 rounded-xl space-y-4 shadow-sm"
+                      >
+                        {/* Section Header */}
+                        <div className="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-950/60 pb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                              <UserCheck className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-900 dark:text-white text-xs">
+                                Internal Task Assignment &amp; Operations
+                              </h4>
+                              <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
+                                Active at Stage 3 (Contract Signed) &bull; Visible strictly on Admin Side
+                              </p>
+                            </div>
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold text-[10px] border border-indigo-200 dark:border-indigo-800">
+                            <Lock className="w-3 h-3" /> Admin Only
+                          </span>
+                        </div>
+
+                        {/* 1. Task Assignee Selection */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                              Assign Onboarding Task To:
+                            </label>
+                            <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
+                              <button
+                                type="button"
+                                onClick={() => setAssignmentMode('TEAMMATE')}
+                                className={`px-2 py-0.5 rounded font-medium transition cursor-pointer ${
+                                  assignmentMode === 'TEAMMATE'
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                Admin Teammates
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAssignmentMode('CUSTOM')}
+                                className={`px-2 py-0.5 rounded font-medium transition cursor-pointer ${
+                                  assignmentMode === 'CUSTOM'
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                Custom Name
+                              </button>
+                            </div>
+                          </div>
+
+                          {assignmentMode === 'TEAMMATE' ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <select
+                                value={assignedTo}
+                                onChange={(e) => {
+                                  const selectedId = e.target.value;
+                                  setAssignedTo(selectedId);
+                                  const tm = teammates.find((t) => t.id === selectedId);
+                                  if (tm) {
+                                    setAssignedToName(tm.full_name || tm.email);
+                                  } else {
+                                    setAssignedToName('');
+                                  }
+                                }}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-indigo-500"
+                              >
+                                <option value="">Select an Admin Teammate...</option>
+                                {teammates.map((tm) => (
+                                  <option key={tm.id} value={tm.id}>
+                                    {tm.full_name || tm.email} ({tm.role || 'Admin'})
+                                  </option>
+                                ))}
+                              </select>
+
+                              {assignedToName && (
+                                <div className="flex items-center justify-between px-3 py-2 bg-white dark:bg-[#15161c] border border-indigo-200 dark:border-indigo-900/60 rounded-lg text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
+                                      {assignedToName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="font-semibold text-slate-800 dark:text-white truncate">{assignedToName}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAssignedTo('');
+                                      setAssignedToName('');
+                                    }}
+                                    className="text-[10px] text-rose-500 hover:underline cursor-pointer"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                              <input
+                                type="text"
+                                value={assignedToName}
+                                onChange={(e) => {
+                                  setAssignedToName(e.target.value);
+                                  setAssignedTo('');
+                                }}
+                                placeholder="Enter engineer or teammate full name (e.g., Alex Johnson)"
+                                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Internal Operational Notes */}
+                        <div className="space-y-1.5">
+                          <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                            Internal Operational Notes (LOA Status, PINs, Cutover Rules)
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={internalNotes}
+                            onChange={(e) => setInternalNotes(e.target.value)}
+                            placeholder="Add private engineering notes, carrier account PINs, routing rules, or cutover instructions..."
+                            className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 resize-none"
+                          />
+                        </div>
+
+                        {/* 3. Internal Attachments (Upload & Management) */}
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                              Internal Attachments (LOA, CSR, Signed Agreement, Floorplans)
+                            </label>
+                            <span className="text-[10px] text-slate-400">PDF, DOCX, PNG, JPG (Max 25MB)</span>
+                          </div>
+
+                          {/* File Upload Drop Area */}
+                          <div className="p-3 bg-white dark:bg-[#15161c] border-2 border-dashed border-indigo-200 dark:border-indigo-900/50 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center shrink-0">
+                                <UploadCloud className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  Upload documents or contracts
+                                </p>
+                                <p className="text-[10px] text-slate-400">Files are stored securely in Supabase storage</p>
+                              </div>
+                            </div>
+
+                            <label className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer shrink-0 flex items-center gap-1.5 shadow-xs transition">
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Select Files</span>
+                              <input
+                                type="file"
+                                multiple
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files.length > 0) {
+                                    const selected = Array.from(e.target.files);
+                                    setNewFiles((prev) => [...prev, ...selected]);
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+
+                          {/* Pending New Files Queue */}
+                          {newFiles.length > 0 && (
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                                Ready to Upload ({newFiles.length}):
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {newFiles.map((file, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/40 rounded-lg text-xs flex items-center gap-2 text-indigo-900 dark:text-indigo-200"
+                                  >
+                                    <FileText className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                    <span className="truncate max-w-[140px] font-medium">{file.name}</span>
+                                    <span className="text-[10px] text-indigo-500">({formatFileSize(file.size)})</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewFiles((prev) => prev.filter((_, i) => i !== idx))}
+                                      className="text-indigo-400 hover:text-rose-500 cursor-pointer p-0.5"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Existing Uploaded Attachments List */}
+                          {existingAttachments.length > 0 && (
+                            <div className="space-y-1.5 pt-1">
+                              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                Existing Internal Attachments ({existingAttachments.length}):
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {existingAttachments.map((att) => {
+                                  const attKey = att.id || att.storage_path;
+                                  const isDeleting = deletingAttId === attKey;
+                                  return (
+                                    <div
+                                      key={attKey}
+                                      className="px-2.5 py-1.5 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-xs flex items-center gap-2 text-slate-800 dark:text-slate-200 shadow-xs"
+                                    >
+                                      <Paperclip className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadAttachment(att)}
+                                        className="font-medium hover:text-blue-600 dark:hover:text-blue-400 truncate max-w-[140px] text-left cursor-pointer"
+                                        title="Click to download/preview"
+                                      >
+                                        {att.file_name}
+                                      </button>
+                                      <span className="text-[10px] text-slate-400">({formatFileSize(att.file_size)})</span>
+                                      <button
+                                        type="button"
+                                        disabled={isDeleting}
+                                        onClick={() => handleRemoveExistingAttachment(att.id, att.storage_path)}
+                                        className="text-slate-400 hover:text-rose-500 cursor-pointer p-0.5 disabled:opacity-40"
+                                        title="Delete attachment"
+                                      >
+                                        {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="p-3.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2.5">
+                        <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span>
+                          <strong>Task Assignment &amp; Internal Handoff</strong> unlocks at <strong>Stage 3 (Contract Signed)</strong>. Once contract is signed, you can assign teammates, attach LOA/CSR files, and log private operational notes.
+                        </span>
+                      </div>
+                    )}
+
                     {editStageStatus === 'COMPLETED' && (
                       <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -1228,10 +1635,17 @@ export default function AdminOnboardingPortingPage() {
                       </button>
                       <button
                         type="submit"
-                        disabled={updatingStage}
+                        disabled={updatingStage || uploadingFiles}
                         className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
                       >
-                        {updatingStage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save & Update Stage'}
+                        {updatingStage || uploadingFiles ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving &amp; Uploading...</span>
+                          </>
+                        ) : (
+                          'Save & Update Stage'
+                        )}
                       </button>
                     </div>
                   </form>
@@ -1323,7 +1737,7 @@ export default function AdminOnboardingPortingPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">State & ZIP</label>
+                    <label className="font-bold text-black dark:text-white block">State &amp; ZIP</label>
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"

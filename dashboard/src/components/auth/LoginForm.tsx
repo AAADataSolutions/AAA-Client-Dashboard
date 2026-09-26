@@ -68,12 +68,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   return (
     <div className="w-full">
       {/* 3D Glassmorphic Logo Badge */}
-      <div className="flex justify-center mb-6">          
+      <div className="flex justify-center mb-6">
         <img
-            src="/logo.png"
-            alt="AAA Data Solutions Logo"
-            className="w-70 h-40 rounded-[36px] object-contain relative z-10 drop-shadow-md"
-          />
+          src="/logo.png"
+          alt="AAA Data Solutions Logo"
+          className="w-70 h-40 rounded-[36px] object-contain relative z-10 drop-shadow-md"
+        />
       </div>
 
       <div className="space-y-1 text-center sm:text-left mb-6">
@@ -171,7 +171,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       </form>
 
       {/* Switch to Signup */}
-      <p className="mt-6 text-center text-xs text-slate-400">
+      {/* <p className="mt-6 text-center text-xs text-slate-400">
         Don&apos;t have an account?{' '}
         <button
           type="button"
@@ -180,7 +180,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         >
           Sign up
         </button>
-      </p>
+      </p> */}
     </div>
   );
 };

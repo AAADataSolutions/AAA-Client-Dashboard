@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
     const { searchParams } = new URL(request.url);
 
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
@@ -14,27 +17,27 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'NEWEST';
 
     // 1. Fetch Real KPI Counts directly from DB
-    const { count: totalOnboardingCount } = await supabase
+    const { count: totalOnboardingCount } = await db
       .from('onboardings')
       .select('*', { count: 'exact', head: true });
 
-    const { count: completedCount } = await supabase
+    const { count: completedCount } = await db
       .from('onboardings')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'COMPLETED');
 
-    const { count: inProgressCount } = await supabase
+    const { count: inProgressCount } = await db
       .from('onboardings')
       .select('*', { count: 'exact', head: true })
       .in('status', ['PORTING_WAITING', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED']);
 
-    const { count: pendingReviewCount } = await supabase
+    const { count: pendingReviewCount } = await db
       .from('onboardings')
       .select('*', { count: 'exact', head: true })
       .in('status', ['DRAFT', 'CONTRACT_SENT', 'SIGNED']);
 
     // 2. Query Onboardings with joined Property and Organization
-    let query = supabase
+    let query = db
       .from('onboardings')
       .select(`
         *,
@@ -52,7 +55,7 @@ export async function GET(request: NextRequest) {
     const { data: rawOnboardings, error } = await query;
 
     if (error) {
-      const { data: fallbackList, error: fErr } = await supabase
+      const { data: fallbackList, error: fErr } = await db
         .from('onboardings')
         .select('*')
         .order('created_at', { ascending: false });
@@ -73,6 +76,11 @@ export async function GET(request: NextRequest) {
           property_details: null,
           organization_details: null,
           progress_pct: item.status === 'COMPLETED' ? 100 : 30,
+          assigned_to: item.assigned_to || null,
+          assigned_to_name: item.assigned_to_name || null,
+          assigned_at: item.assigned_at || null,
+          internal_notes: item.internal_notes || null,
+          attachments: item.attachments || [],
         })),
         pagination: {
           totalCount: totalSimple,
@@ -89,6 +97,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Query onboarding_attachments if any
+    const onboardingIds = (rawOnboardings || []).map((o: any) => o.id);
+    const attachmentsByOnboarding: Record<string, any[]> = {};
+    if (onboardingIds.length > 0) {
+      try {
+        const { data: attList } = await db
+          .from('onboarding_attachments')
+          .select('id, onboarding_id, file_name, file_size, mime_type, storage_path, created_at')
+          .in('onboarding_id', onboardingIds);
+        if (attList && Array.isArray(attList)) {
+          attList.forEach((att: any) => {
+            if (!attachmentsByOnboarding[att.onboarding_id]) {
+              attachmentsByOnboarding[att.onboarding_id] = [];
+            }
+            attachmentsByOnboarding[att.onboarding_id].push(att);
+          });
+        }
+      } catch (err) {
+        // Table may not exist yet
+      }
+    }
+
     // 3. Process & Map Records
     let formatted = (rawOnboardings || []).map((item: any) => {
       const orgProp = item.org_property;
@@ -97,19 +127,30 @@ export async function GET(request: NextRequest) {
 
       let pct = 10;
       switch (item.status) {
-        case 'DRAFT': pct = 10; break;
-        case 'CONTRACT_SENT': pct = 25; break;
-        case 'SIGNED': pct = 40; break;
-        case 'PORTING_WAITING': pct = 55; break;
-        case 'PORTING_SUBMITTED': pct = 70; break;
-        case 'SOF_WAITING': pct = 80; break;
-        case 'FOC_RECEIVED': pct = 90; break;
+        case 'DRAFT': pct = 14; break;
+        case 'CONTRACT_SENT': pct = 28; break;
+        case 'SIGNED': pct = 42; break;
+        case 'PORTING_SUBMITTED': pct = 57; break;
+        case 'SOF_WAITING': pct = 71; break;
+        case 'FOC_RECEIVED': pct = 85; break;
         case 'COMPLETED': pct = 100; break;
+        default: pct = 14;
       }
+
+      // Merge relational attachments and JSONB attachments
+      const tableAtts = attachmentsByOnboarding[item.id] || [];
+      const jsonAtts = Array.isArray(item.attachments) ? item.attachments : [];
+      const combinedAtts = [...tableAtts];
+      jsonAtts.forEach((ja: any) => {
+        if (!combinedAtts.some((ta: any) => ta.storage_path === ja.storage_path || (ta.id && ta.id === ja.id))) {
+          combinedAtts.push(ja);
+        }
+      });
 
       return {
         id: item.id,
         status: item.status || 'DRAFT',
+        stage: item.status || 'DRAFT',
         target_date: item.target_date,
         contract_sent_at: item.contract_sent_at,
         signed_at: item.signed_at,
@@ -118,9 +159,21 @@ export async function GET(request: NextRequest) {
         sof_waiting_at: item.sof_waiting_at,
         foc_received_at: item.foc_received_at,
         completed_at: item.completed_at,
+        draft_date: item.draft_date,
+        contract_sent_date: item.contract_sent_date,
+        signed_date: item.signed_date,
+        porting_submitted_date: item.porting_submitted_date,
+        sof_review_date: item.sof_review_date,
+        foc_confirmed_date: item.foc_confirmed_date,
+        live_cutover_date: item.live_cutover_date,
         created_at: item.created_at,
         updated_at: item.updated_at,
         progress_pct: pct,
+        assigned_to: item.assigned_to || null,
+        assigned_to_name: item.assigned_to_name || null,
+        assigned_at: item.assigned_at || null,
+        internal_notes: item.internal_notes || null,
+        attachments: combinedAtts,
         property_id: prop?.id || '',
         property_name: prop?.name || 'New Property',
         property_address: prop?.address || '',
@@ -147,7 +200,9 @@ export async function GET(request: NextRequest) {
           o.property_name.toLowerCase().includes(lowerSearch) ||
           o.organization_name.toLowerCase().includes(lowerSearch) ||
           o.property_address.toLowerCase().includes(lowerSearch) ||
-          o.general_manager_name.toLowerCase().includes(lowerSearch)
+          o.general_manager_name.toLowerCase().includes(lowerSearch) ||
+          (o.assigned_to_name && o.assigned_to_name.toLowerCase().includes(lowerSearch)) ||
+          (o.internal_notes && o.internal_notes.toLowerCase().includes(lowerSearch))
       );
     }
 
@@ -189,6 +244,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
     const body = await request.json();
 
     const {
@@ -213,7 +270,7 @@ export async function POST(request: NextRequest) {
     const isE911Verified = e911_status === 'VERIFIED' || ray_baum_status === 'VERIFIED';
 
     // 1. Create the brand new property with status: 'INACTIVE'
-    const { data: newProp, error: propErr } = await supabase
+    const { data: newProp, error: propErr } = await db
       .from('properties')
       .insert({
         name: property_name.trim(),
@@ -228,7 +285,7 @@ export async function POST(request: NextRequest) {
         general_manager_name: general_manager_name?.trim() || null,
         general_manager_phone: general_manager_phone?.trim() || null,
         general_manager_email: general_manager_email?.trim() || null,
-        status: 'INACTIVE', // Automatically INACTIVE upon creation
+        status: 'INACTIVE',
         ray_baud_and_logs_enabled: isE911Verified,
       })
       .select()
@@ -238,7 +295,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Failed to create property: ${propErr.message}` }, { status: 400 });
     }
 
-    // 2. Associate with Organization (Rule 1: One property can only be assigned to one organization)
+    // 2. Associate with Organization
     const targetOrgId = organization_id;
     if (!targetOrgId) {
       return NextResponse.json({
@@ -248,11 +305,11 @@ export async function POST(request: NextRequest) {
     }
 
     let orgName = 'Organization';
-    const { data: chosenOrg } = await supabase.from('organizations').select('name').eq('id', targetOrgId).maybeSingle();
+    const { data: chosenOrg } = await db.from('organizations').select('name').eq('id', targetOrgId).maybeSingle();
     if (chosenOrg) orgName = chosenOrg.name;
 
     // 3. Link this new property in organization_properties
-    const { data: newLink, error: linkErr } = await supabase
+    const { data: newLink, error: linkErr } = await db
       .from('organization_properties')
       .insert({
         organization_id: targetOrgId,
@@ -267,7 +324,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Create onboarding record with initial stage "DRAFT" ("Draft Initialized")
-    const { data: newOnboarding, error: onbErr } = await supabase
+    const { data: newOnboarding, error: onbErr } = await db
       .from('onboardings')
       .insert({
         organization_property_id: newLink.id,
@@ -312,9 +369,25 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const body = await request.json();
 
-    const { id, status, target_date } = body;
+    const {
+      id,
+      status,
+      target_date,
+      assigned_to,
+      assigned_to_name,
+      internal_notes,
+      new_attachments,
+      remove_attachment_id,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Onboarding ID is required.' }, { status: 400 });
@@ -339,30 +412,116 @@ export async function PUT(request: NextRequest) {
     if (body.sof_review_date !== undefined) updates.sof_review_date = body.sof_review_date || null;
     if (body.foc_confirmed_date !== undefined) updates.foc_confirmed_date = body.foc_confirmed_date || null;
     if (body.live_cutover_date !== undefined) updates.live_cutover_date = body.live_cutover_date || null;
+
+    if (assigned_to !== undefined) updates.assigned_to = assigned_to || null;
+    if (assigned_to_name !== undefined) {
+      updates.assigned_to_name = assigned_to_name ? assigned_to_name.trim() : null;
+      if (updates.assigned_to_name) {
+        updates.assigned_at = new Date().toISOString();
+      }
+    }
+    if (internal_notes !== undefined) {
+      updates.internal_notes = internal_notes ? internal_notes.trim() : null;
+    }
+
     updates.updated_at = new Date().toISOString();
 
-    const { data: updated, error } = await supabase
-      .from('onboardings')
-      .update(updates)
-      .eq('id', id)
-      .select(`
-        *,
-        org_property:organization_properties(
-          id,
-          property_id,
-          property:properties(id, name, status)
-        )
-      `)
-      .single();
+    // Fetch existing onboarding to manage attachments list
+    const { data: existingOnb } = await db.from('onboardings').select('*').eq('id', id).maybeSingle();
+    let currentAttachments: any[] = Array.isArray(existingOnb?.attachments) ? [...existingOnb.attachments] : [];
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    // Handle attachment removal
+    if (remove_attachment_id) {
+      try {
+        await db.from('onboarding_attachments').delete().eq('id', remove_attachment_id);
+      } catch (err) {}
+      currentAttachments = currentAttachments.filter(
+        (a: any) => a.id !== remove_attachment_id && a.storage_path !== remove_attachment_id
+      );
+    }
+
+    // Handle new attachments insertion
+    if (new_attachments && Array.isArray(new_attachments) && new_attachments.length > 0) {
+      const attRows = new_attachments.map((att: any) => ({
+        onboarding_id: id,
+        uploaded_by: user?.id || null,
+        file_name: att.file_name,
+        file_size: att.file_size || 0,
+        mime_type: att.mime_type || 'application/pdf',
+        storage_path: att.storage_path,
+      }));
+
+      try {
+        const { data: insRows } = await db.from('onboarding_attachments').insert(attRows).select();
+        if (insRows && insRows.length > 0) {
+          currentAttachments.push(...insRows);
+        } else {
+          currentAttachments.push(...attRows);
+        }
+      } catch (err) {
+        currentAttachments.push(...attRows);
+      }
+    }
+
+    updates.attachments = currentAttachments;
+
+    let updated = null;
+    try {
+      const { data: resData, error } = await db
+        .from('onboardings')
+        .update(updates)
+        .eq('id', id)
+        .select(`
+          *,
+          org_property:organization_properties(
+            id,
+            property_id,
+            property:properties(id, name, status)
+          )
+        `)
+        .single();
+      if (error) throw error;
+      updated = resData;
+    } catch (updateErr: any) {
+      console.warn('Primary onboarding update failed, retrying standard fields:', updateErr.message);
+      // Fallback: If DB columns for assigned_to/internal_notes/attachments don't exist yet, update core fields
+      const coreUpdates = { ...updates };
+      delete coreUpdates.assigned_to;
+      delete coreUpdates.assigned_to_name;
+      delete coreUpdates.assigned_at;
+      delete coreUpdates.internal_notes;
+      delete coreUpdates.attachments;
+
+      const { data: fallbackData, error: fbErr } = await db
+        .from('onboardings')
+        .update(coreUpdates)
+        .eq('id', id)
+        .select(`
+          *,
+          org_property:organization_properties(
+            id,
+            property_id,
+            property:properties(id, name, status)
+          )
+        `)
+        .single();
+      if (fbErr) {
+        return NextResponse.json({ success: false, error: fbErr.message }, { status: 400 });
+      }
+      updated = {
+        ...fallbackData,
+        assigned_to: updates.assigned_to,
+        assigned_to_name: updates.assigned_to_name,
+        assigned_at: updates.assigned_at,
+        internal_notes: updates.internal_notes,
+        attachments: currentAttachments,
+      };
     }
 
     // Rule: Once stage becomes COMPLETED, automatically activate the property!
     let activatedProperty = false;
     if (status === 'COMPLETED' && updated.org_property?.property_id) {
-      await supabase
+      await db
         .from('properties')
         .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
         .eq('id', updated.org_property.property_id);
@@ -380,6 +539,8 @@ export async function PUT(request: NextRequest) {
         stage: status,
         property_id: updated.org_property?.property_id,
         property_activated: activatedProperty,
+        assigned_to_name: updates.assigned_to_name,
+        internal_notes: updates.internal_notes ? 'Updated internal notes' : undefined,
       },
     });
 

@@ -1,5 +1,14 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 
+export interface OnboardingAttachment {
+  id?: string;
+  file_name: string;
+  file_size?: number;
+  mime_type?: string;
+  storage_path: string;
+  created_at?: string;
+}
+
 export interface OnboardingRecord {
   id: string;
   property_id: string;
@@ -30,6 +39,11 @@ export interface OnboardingRecord {
   sof_waiting_at?: string | null;
   foc_received_at?: string | null;
   completed_at?: string | null;
+  assigned_to?: string | null;
+  assigned_to_name?: string | null;
+  assigned_at?: string | null;
+  internal_notes?: string | null;
+  attachments?: OnboardingAttachment[];
   created_at: string;
   updated_at?: string;
 }
