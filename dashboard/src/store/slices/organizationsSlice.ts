@@ -16,6 +16,7 @@ export interface OrgRecord {
   id: string;
   name: string;
   logo_url?: string | null;
+  type?: 'INDIVIDUAL' | 'GROUP' | string;
   contact_name: string;
   email: string;
   phone: string;
@@ -54,6 +55,7 @@ interface OrganizationsState {
   currentPage: number;
   searchQuery: string;
   selectedStatus: string;
+  selectedTypeFilter: string;
   selectedPropFilter: string;
   loading: boolean;
   error: string | null;
@@ -76,6 +78,7 @@ const initialState: OrganizationsState = {
   currentPage: 1,
   searchQuery: '',
   selectedStatus: 'ALL',
+  selectedTypeFilter: 'ALL',
   selectedPropFilter: 'ALL',
   loading: false,
   error: null,
@@ -233,12 +236,14 @@ export const organizationsSlice = createSlice({
       action: PayloadAction<{
         searchQuery?: string;
         selectedStatus?: string;
+        selectedTypeFilter?: string;
         selectedPropFilter?: string;
         currentPage?: number;
       }>
     ) => {
       if (action.payload.searchQuery !== undefined) state.searchQuery = action.payload.searchQuery;
       if (action.payload.selectedStatus !== undefined) state.selectedStatus = action.payload.selectedStatus;
+      if (action.payload.selectedTypeFilter !== undefined) state.selectedTypeFilter = action.payload.selectedTypeFilter;
       if (action.payload.selectedPropFilter !== undefined) state.selectedPropFilter = action.payload.selectedPropFilter;
       if (action.payload.currentPage !== undefined) state.currentPage = action.payload.currentPage;
     },

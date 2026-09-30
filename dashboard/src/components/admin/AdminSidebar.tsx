@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Users } from 'lucide-react';
 import {
   LayoutDashboard,
   Building2,
@@ -24,6 +25,7 @@ import {
   ArrowLeftRight,
   DollarSign,
   Flame,
+  MapPin,
   ChevronDown,
   ArrowUpDown,
 } from 'lucide-react';
@@ -64,10 +66,10 @@ const navItems: NavItem[] = [
       { label: 'Elevator Lines', href: '/admin/elevator-lines', icon: ArrowUpDown },
     ],
   },
-  { label: 'Onboarding', href: '/admin/onboarding-porting', icon: GitBranch },
   { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
   { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white' },
+  { label: 'Partners', href: '/admin/partners', icon: Users, superAdminOnly: true },
   { label: 'Finances', href: '/admin/finances', icon: DollarSign, superAdminOnly: true },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock },
   { label: 'System Settings', href: '/admin/settings', icon: Settings },

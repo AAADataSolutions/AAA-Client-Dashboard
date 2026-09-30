@@ -78,8 +78,11 @@ export async function POST(request: Request) {
 
     let targetUserId = currentUser?.id;
 
-    const isInternal = invite.invite_type === 'INTERNAL_TEAM';
-    const determinedRole = isInternal
+    const isPartner = invite.invite_type === 'PARTNER' || invite.target_app_role === 'PARTNER';
+    const isInternal = !isPartner && invite.invite_type === 'INTERNAL_TEAM';
+    const determinedRole = isPartner
+      ? 'PARTNER'
+      : isInternal
       ? (invite.target_app_role || 'SUB_SUPER_ADMIN')
       : 'CLIENT_USER';
 
@@ -172,7 +175,7 @@ export async function POST(request: Request) {
     // Fallback or adminClient completion: Ensure profile, member, and invitation updated
     const db = adminClient || supabase;
 
-    // ALWAYS ensure Profile exists and has the exact determinedRole (SUB_SUPER_ADMIN for admin team)
+    // ALWAYS ensure Profile exists and has the exact determinedRole
     await db.from('profiles').upsert({
       id: targetUserId,
       email: targetEmail,
@@ -196,8 +199,20 @@ export async function POST(request: Request) {
       }
     }
 
+    // PARTNER INVITATION FLOW: Link partner record to user profile
+    if (isPartner) {
+      await db
+        .from('partners')
+        .update({
+          user_id: targetUserId,
+          status: 'ACTIVE',
+          updated_at: new Date().toISOString(),
+        })
+        .ilike('email', targetEmail);
+    }
+
     // CLIENT MEMBER / ADMIN INVITATION FLOW
-    if (!isInternal && invite.organization_id) {
+    if (!isInternal && !isPartner && invite.organization_id) {
       const orgRole = invite.target_org_role || 'ADMIN';
 
       await db.from('organization_members').upsert(
@@ -223,6 +238,8 @@ export async function POST(request: Request) {
       .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
       .eq('id', invite.id);
 
+    const redirectDestination = isInternal ? '/admin' : isPartner ? '/partner' : '/dashboard';
+
     return NextResponse.json({
       success: true,
       type: invite.invite_type,
@@ -230,9 +247,11 @@ export async function POST(request: Request) {
       requiresApproval: false,
       organizationId: invite.organization_id,
       email: targetEmail,
-      redirectTo: isInternal ? '/admin' : '/dashboard',
+      redirectTo: redirectDestination,
       message: isInternal
         ? 'Admin account activated successfully! Navigating to Admin Management Console...'
+        : isPartner
+        ? 'Partner account activated successfully! Navigating to Partner Portal...'
         : 'Account activated successfully! You now have access to your organization dashboard.',
     });
   } catch (err: unknown) {

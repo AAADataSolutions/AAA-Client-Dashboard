@@ -363,7 +363,7 @@ export async function GET(
       data: {
         id: org.id,
         name: org.name,
-        type: org.type || 'Client Organization',
+        type: org.type === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GROUP',
         address: formattedAddress,
         street_address: org.address || '',
         city: org.city || '',
@@ -417,6 +417,7 @@ export async function PATCH(
     };
 
     if (body.name !== undefined) updatePayload.name = body.name.trim();
+    if (body.type !== undefined) updatePayload.type = (body.type === 'INDIVIDUAL' || body.type === 'Individual') ? 'INDIVIDUAL' : 'GROUP';
     if (body.email !== undefined) updatePayload.email = body.email ? body.email.trim() : null;
     if (body.phone !== undefined) updatePayload.phone = body.phone ? body.phone.trim() : null;
     if (body.address !== undefined) updatePayload.address = body.address ? body.address.trim() : null;

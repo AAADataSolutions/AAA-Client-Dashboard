@@ -16,6 +16,7 @@ import {
   KeyRound,
   Eye,
   EyeOff,
+  Users,
   RefreshCw,
 } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
@@ -126,8 +127,9 @@ function InviteAcceptContent({ token }: { token: string }) {
         }
       }
 
-      const isInternal = json.type === 'INTERNAL_TEAM' || json.role === 'SUB_SUPER_ADMIN' || json.role === 'SUPER_ADMIN' || inviteData?.invite_type === 'INTERNAL_TEAM';
-      const targetDestination = json.redirectTo || (isInternal ? '/admin' : '/dashboard');
+      const isPartner = json.role === 'PARTNER' || json.type === 'PARTNER' || inviteData?.target_app_role === 'PARTNER' || inviteData?.invite_type === 'PARTNER';
+      const isInternal = !isPartner && (json.type === 'INTERNAL_TEAM' || json.role === 'SUB_SUPER_ADMIN' || json.role === 'SUPER_ADMIN' || inviteData?.invite_type === 'INTERNAL_TEAM');
+      const targetDestination = json.redirectTo || (isPartner ? '/partner' : isInternal ? '/admin' : '/dashboard');
 
       setTimeout(() => {
         window.location.href = targetDestination;
@@ -184,9 +186,12 @@ function InviteAcceptContent({ token }: { token: string }) {
   }
 
   const isInternal = inviteData.invite_type === 'INTERNAL_TEAM' || inviteData.target_app_role === 'SUB_SUPER_ADMIN' || inviteData.target_app_role === 'SUPER_ADMIN';
-  const orgName = isInternal ? 'AAA Solutions Platform' : (inviteData.organization?.name || 'AAA Data Solutions Client');
+  const isPartner = inviteData.invite_type === 'PARTNER' || inviteData.target_app_role === 'PARTNER';
+  const orgName = isInternal ? 'AAA Solutions Platform' : isPartner ? 'AAA Solutions Partner Portal' : (inviteData.organization?.name || 'AAA Data Solutions Client');
   const displayRole = isInternal
     ? (inviteData.target_app_role === 'SUPER_ADMIN' ? 'Super Admin' : 'Sub-Super Admin')
+    : isPartner
+    ? 'Channel Partner'
     : (inviteData.target_org_role || 'ORGANIZATION ADMIN');
 
   return (
@@ -200,16 +205,18 @@ function InviteAcceptContent({ token }: { token: string }) {
           <div className="w-10 h-10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
             {isInternal ? (
               <ShieldCheck size={36} className="w-full h-full object-contain text-blue-500" />
+            ) : isPartner ? (
+              <Users size={36} className="w-full h-full object-contain text-blue-500" />
             ) : (
               <Building2 size={36} className="w-full h-full object-contain" />
             )}
           </div>
           <div>
             <span className="text-[10.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              {isInternal ? 'System Administrator Invitation' : 'Client Organization Onboarding'}
+              {isInternal ? 'System Administrator Invitation' : isPartner ? 'Channel Partner Invitation' : 'Client Organization Onboarding'}
             </span>
             <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white mt-1">
-              {isInternal ? 'Join AAA Solutions Admin Team' : `Join ${orgName}`}
+              {isInternal ? 'Join AAA Solutions Admin Team' : isPartner ? 'Activate Channel Partner Account' : `Join ${orgName}`}
             </h1>
           </div>
         </div>
@@ -222,7 +229,11 @@ function InviteAcceptContent({ token }: { token: string }) {
             <div className="space-y-1.5">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">Account Created Successfully!</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-                {isInternal ? (
+                {isPartner ? (
+                  <>
+                    You are now registered as a <strong className="text-slate-900 dark:text-white">Channel Partner</strong>. Entering Partner Portal...
+                  </>
+                ) : isInternal ? (
                   <>
                     You are now registered as a <strong className="text-slate-900 dark:text-white">{displayRole}</strong>. Entering Admin Portal...
                   </>
@@ -249,7 +260,7 @@ function InviteAcceptContent({ token }: { token: string }) {
             {/* Invited Organization & Role Info */}
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181c26] border border-slate-200/80 dark:border-[#222834] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400">{isInternal ? 'Scope:' : 'Organization:'}</span>
+                <span className="text-slate-500 dark:text-slate-400">{isInternal ? 'Scope:' : isPartner ? 'Portal:' : 'Organization:'}</span>
                 <span className="font-bold text-slate-900 dark:text-white text-xs">{orgName}</span>
               </div>
               <div className="flex items-center justify-between">
@@ -283,7 +294,7 @@ function InviteAcceptContent({ token }: { token: string }) {
                     </>
                   ) : (
                     <>
-                      <span>{isInternal ? 'Accept & Enter Admin Portal' : 'Accept & Access Dashboard'}</span>
+                      <span>{isPartner ? 'Accept & Enter Partner Portal' : isInternal ? 'Accept & Enter Admin Portal' : 'Accept & Access Dashboard'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -371,7 +382,9 @@ function InviteAcceptContent({ token }: { token: string }) {
                 </div>
 
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-                  {isInternal
+                  {isPartner
+                    ? 'By clicking below, your Channel Partner account will be registered and you will be redirected to the Partner Portal.'
+                    : isInternal
                     ? 'By clicking below, your Sub-Super Administrator account will be registered and you will be redirected to the Admin Portal.'
                     : 'By clicking below, your organization admin account will be created and you will be logged into your workspace.'}
                 </p>
@@ -386,11 +399,11 @@ function InviteAcceptContent({ token }: { token: string }) {
                   {submitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{isInternal ? 'Creating Admin Account...' : 'Creating Account & Entering Workspace...'}</span>
+                      <span>{isPartner ? 'Creating Partner Account...' : isInternal ? 'Creating Admin Account...' : 'Creating Account & Entering Workspace...'}</span>
                     </>
                   ) : (
                     <>
-                      <span>{isInternal ? 'Accept Invite & Enter Admin Portal' : 'Accept Invite & Enter Workspace'}</span>
+                      <span>{isPartner ? 'Accept Invite & Enter Partner Portal' : isInternal ? 'Accept Invite & Enter Admin Portal' : 'Accept Invite & Enter Workspace'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

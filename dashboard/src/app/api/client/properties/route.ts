@@ -120,6 +120,9 @@ export async function GET(request: NextRequest) {
         const gmPhone = prop.general_manager_phone || prop.main_phone || null;
         const gmEmail = prop.general_manager_email || prop.contact_person_email || null;
 
+        const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
+        const e911StatusStr = isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED';
+
         return {
           id: prop.id,
           org_property_id: op.id,
@@ -138,14 +141,14 @@ export async function GET(request: NextRequest) {
           general_manager_name: gmName,
           general_manager_phone: gmPhone,
           general_manager_email: gmEmail,
-          ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
+          ray_baud_and_logs_enabled: isE911Verified,
           ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
           status: propStatus,
           stage: onboardingRecord?.status || (propStatus === 'ACTIVE' ? 'COMPLETED' : 'DRAFT'),
           services_count: servicesList.length,
           services: servicesList,
-          e911_status: e911Record?.status || 'PENDING',
-          e911_verified_at: e911Record?.verified_at || null,
+          e911_status: e911StatusStr,
+          e911_verified_at: isE911Verified ? (e911Record?.verified_at || prop.created_at) : null,
           e911_record: e911Record,
           onboarding_status: onboardingRecord?.status || null,
           onboarding_target_date: onboardingRecord?.target_date || null,
@@ -162,7 +165,7 @@ export async function GET(request: NextRequest) {
     const activeProperties = allRecords.filter((p) => p.status === 'ACTIVE').length;
     const onboardingProperties = allRecords.filter((p) => p.status === 'ONBOARDING' || (p.onboarding_status && p.onboarding_status !== 'COMPLETED')).length;
     const inactiveProperties = allRecords.filter((p) => p.status === 'INACTIVE' || p.status === 'OFFBOARDED').length;
-    const e911VerifiedProperties = allRecords.filter((p) => p.e911_status === 'VERIFIED').length;
+    const e911VerifiedProperties = allRecords.filter((p) => p.ray_baud_and_logs_enabled).length;
 
     // Apply In-Memory Filters & Search
     let filtered = allRecords;

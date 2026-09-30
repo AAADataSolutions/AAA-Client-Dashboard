@@ -32,17 +32,20 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     setError(null);
 
     try {
-      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
 
-      if (resetErr) {
-        setError(resetErr.message);
-      } else {
-        setSuccess(true);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send password reset email.');
       }
-    } catch {
-      setError('An unexpected error occurred. Please try again.');
+
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err?.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

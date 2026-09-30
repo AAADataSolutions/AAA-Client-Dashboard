@@ -92,7 +92,13 @@ export async function GET(request: NextRequest) {
       allServicesLinks = opsData || [];
     }
 
-    // 5. Map and combine
+    // 5. Fetch Partners
+    const { data: partnersData } = await supabase
+      .from('partners')
+      .select('id, name, default_commission_rate, company_name');
+    const allPartners = partnersData || [];
+
+    // 6. Map and combine
     let processed = propList.map((prop: any, idx: number) => {
       const matchingOps = allOrgProps.filter((op: any) => op.property_id === prop.id);
       const matchingOpIds = matchingOps.map((op: any) => op.id);
@@ -103,6 +109,8 @@ export async function GET(request: NextRequest) {
       const dynamicServiceCount = allServicesLinks.filter((sl: any) =>
         matchingOpIds.includes(sl.organization_property_id)
       ).length;
+
+      const partnerObj = allPartners.find((pt: any) => pt.id === prop.partner_id) || null;
 
       // Calculate onboarding stage
       const STAGE_MAP: Record<string, string> = {
@@ -138,6 +146,10 @@ export async function GET(request: NextRequest) {
         code: `PR-${100 + idx}`,
         name: prop.name,
         monthly_price: prop.monthly_price ?? null,
+        partner_id: prop.partner_id || null,
+        partner_commission_override: prop.partner_commission_override ?? null,
+        partner_name: partnerObj?.name || null,
+        partner: partnerObj,
         address: prop.address,
         city: prop.city,
         state: prop.state,
@@ -241,6 +253,8 @@ export async function POST(request: NextRequest) {
     const {
       name,
       organization_id,
+      partner_id,
+      partner_commission_override,
       address,
       city,
       state,
@@ -278,7 +292,7 @@ export async function POST(request: NextRequest) {
         : (e911_status === 'VERIFIED' || e911_status === 'ACTIVE');
 
     const resolvedRayBaum = ray_baum_status || (isE911Verified ? 'ACTIVE' : 'INACTIVE');
-    const resolvedStatus = status || (organization_id ? 'ACTIVE' : 'INACTIVE');
+    const resolvedStatus = 'ACTIVE';
 
     const { data: newProp, error: propErr } = await supabase
       .from('properties')
@@ -297,6 +311,8 @@ export async function POST(request: NextRequest) {
         general_manager_phone: general_manager_phone?.trim() || null,
         general_manager_email: general_manager_email?.trim() || null,
         monthly_price: monthly_price === null || monthly_price === '' || monthly_price === undefined ? null : Number(monthly_price),
+        partner_id: partner_id || null,
+        partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
         ray_baud_and_logs_enabled: isE911Verified,
         ray_baum_status: resolvedRayBaum,
         status: resolvedStatus,
@@ -319,16 +335,16 @@ export async function POST(request: NextRequest) {
         .insert({
           organization_id,
           property_id: newProp.id,
-          status: resolvedStatus,
+          status: 'ACTIVE',
         })
         .select('id')
         .single();
 
       if (newOp) {
-        // Auto-create onboarding record (Rule 3)
+        // Auto-create onboarding record set to COMPLETED for direct property creation
         await supabase.from('onboardings').insert({
           organization_property_id: newOp.id,
-          status: 'DRAFT',
+          status: 'COMPLETED',
         });
 
         // Auto-create e911 record

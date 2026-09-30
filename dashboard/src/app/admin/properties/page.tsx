@@ -53,6 +53,7 @@ import {
   setSortBy,
   setPagination,
   optimisticUpdatePropertyStatus,
+  updatePropertyOptimistic,
   optimisticRemoveProperty,
   PropertyItem,
   PropertyRecord,
@@ -105,6 +106,13 @@ interface OrgOption {
   name: string;
 }
 
+interface PartnerOption {
+  id: string;
+  name: string;
+  company_name?: string;
+  default_commission_rate: number;
+}
+
 interface Toast {
   id: string;
   title: string;
@@ -124,6 +132,7 @@ export default function AdminPropertiesPage() {
   } = useAppSelector((state) => state.properties);
 
   const [orgOptions, setOrgOptions] = useState<OrgOption[]>([]);
+  const [partnerOptions, setPartnerOptions] = useState<PartnerOption[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Search input state (char-by-char)
@@ -203,6 +212,8 @@ export default function AdminPropertiesPage() {
   const [formData, setFormData] = useState({
     name: '',
     organization_id: '',
+    partner_id: '',
+    partner_commission_override: '' as string | number,
     address: '',
     city: '',
     state: '',
@@ -236,6 +247,29 @@ export default function AdminPropertiesPage() {
       }
     }
     loadOrgs();
+  }, []);
+
+  // Load partners for dropdown
+  useEffect(() => {
+    async function loadPartners() {
+      try {
+        const res = await fetch('/api/admin/partners?limit=100');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setPartnerOptions(
+            data.data.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              company_name: p.company_name,
+              default_commission_rate: p.default_commission_rate ?? 0,
+            }))
+          );
+        }
+      } catch (err) {
+        console.warn('Could not load partner options:', err);
+      }
+    }
+    loadPartners();
   }, []);
 
   // Sync search input with Redux (char-by-char instant)
@@ -577,6 +611,8 @@ export default function AdminPropertiesPage() {
     setFormData({
       name: prop.name || '',
       organization_id: prop.primary_organization?.id || prop.organizations?.[0]?.id || prop.organization_id || '',
+      partner_id: (prop as any).partner_id || (prop as any).partner?.id || '',
+      partner_commission_override: (prop as any).partner_commission_override !== null && (prop as any).partner_commission_override !== undefined ? (prop as any).partner_commission_override : '',
       address: prop.address || '',
       city: prop.city || '',
       state: prop.state || '',
@@ -662,6 +698,40 @@ export default function AdminPropertiesPage() {
       loadData();
     } finally {
       setStatusChangeLoading(false);
+    }
+  };
+
+  const handleQuickUpdateStatus = async (propId: string, newStatus: string) => {
+    dispatch(optimisticUpdatePropertyStatus({ id: propId, status: newStatus }));
+    try {
+      const res = await fetch(`/api/admin/properties/${propId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update status.');
+      showToast('Status Updated', `Property status set to ${newStatus}.`, 'success');
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+      loadData();
+    }
+  };
+
+  const handleQuickUpdateStage = async (propId: string, newStage: string) => {
+    dispatch(updatePropertyOptimistic({ id: propId, updates: { onboarding_stage: newStage } }));
+    try {
+      const res = await fetch(`/api/admin/properties/${propId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ onboarding_stage: newStage }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update stage.');
+      showToast('Stage Updated', `Onboarding stage set to ${newStage}.`, 'success');
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+      loadData();
     }
   };
 
@@ -768,6 +838,8 @@ export default function AdminPropertiesPage() {
               setFormData({
                 name: '',
                 organization_id: '',
+                partner_id: '',
+                partner_commission_override: '',
                 address: '',
                 city: '',
                 state: '',
@@ -1083,6 +1155,8 @@ export default function AdminPropertiesPage() {
                 setFormData({
                   name: '',
                   organization_id: '',
+                  partner_id: '',
+                  partner_commission_override: '',
                   address: '',
                   city: '',
                   state: '',
@@ -1115,16 +1189,14 @@ export default function AdminPropertiesPage() {
                 <tr>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MONTHLY PRICE</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">LOCATION</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MAIN PHONE NO.</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MANAGEMENT GROUP</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">NO. OF SERVICES</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">E911 STATUS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY'S LAW</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM PHONE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM EMAIL</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ONBOARDING STAGE</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
@@ -1132,11 +1204,19 @@ export default function AdminPropertiesPage() {
                 {properties.map((prop: PropertyRecord) => {
                   return (
                     <tr key={prop.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
-                      {/* 1. Property Name (Pure Black bold, NO initials icon) */}
+                      {/* 1. Property Name with Address underneath */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-bold text-black dark:text-white text-sm block">
                           {prop.name}
                         </span>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
+                          <MapPin className="w-3 h-3 shrink-0 text-slate-400" />
+                          <span>
+                            {prop.city
+                              ? `${prop.address ? prop.address + ', ' : ''}${prop.city}, ${prop.state || prop.country} ${prop.zip_code || ''}`
+                              : (prop.address || '—')}
+                          </span>
+                        </div>
                       </td>
 
                       {/* 2. Monthly Price */}
@@ -1146,14 +1226,31 @@ export default function AdminPropertiesPage() {
                           : '—'}
                       </td>
 
-                      {/* 3. Location */}
+                      {/* 3. Main Phone No. (with Copy) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="text-slate-700 dark:text-slate-300">
-                          {prop.city ? `${prop.city}, ${prop.state || prop.country} ${prop.zip_code || ''}` : prop.address}
-                        </span>
+                        {prop.main_phone ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-700 dark:text-slate-300 font-medium">
+                              {prop.main_phone}
+                            </span>
+                            <button
+                              onClick={() => handleCopy(prop.main_phone || '', `main-phone-${prop.id}`)}
+                              className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                              title="Copy Main Phone"
+                            >
+                              {copiedField === `main-phone-${prop.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
                       </td>
 
-                      {/* 3. Organization */}
+                      {/* 4. Management Group */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {(prop.organization_name && prop.organization_name !== 'Unassigned') || prop.primary_organization || (prop.organizations && prop.organizations.length > 0) ? (
                           <a
@@ -1173,7 +1270,7 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 4. No. of Associated Services (Dynamic) */}
+                      {/* 5. No. of Associated Services (Dynamic) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-semibold text-slate-800 dark:text-white">
                           {prop.services_count || 0}{' '}
@@ -1181,7 +1278,7 @@ export default function AdminPropertiesPage() {
                         </span>
                       </td>
 
-                      {/* 5. E911 Status */}
+                      {/* 6. E911 Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {prop.ray_baud_and_logs_enabled ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
@@ -1194,7 +1291,7 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 6. Ray Baum and Kary's Law (Active / Inactive) */}
+                      {/* 7. Ray Baum and Kary's Law (Active / Inactive) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {prop.ray_baum_status === 'Active' ? (
                           <button
@@ -1217,38 +1314,14 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 6. GM Name */}
+                      {/* 8. GM Name */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-semibold text-slate-800 dark:text-white">
                           {prop.general_manager_name || prop.contact_person_name || 'N/A'}
                         </span>
                       </td>
 
-                      {/* 7. GM Phone (with Copy) */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {prop.general_manager_phone || prop.main_phone ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-slate-700 dark:text-slate-300">
-                              {prop.general_manager_phone || prop.main_phone}
-                            </span>
-                            <button
-                              onClick={() => handleCopy(prop.general_manager_phone || prop.main_phone || '', `gm-phone-${prop.id}`)}
-                              className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
-                              title="Copy GM Phone"
-                            >
-                              {copiedField === `gm-phone-${prop.id}` ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs">N/A</span>
-                        )}
-                      </td>
-
-                      {/* 8. GM Email (with Copy) */}
+                      {/* 9. GM Email (with Copy) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {prop.general_manager_email || prop.contact_person_email ? (
                           <div className="flex items-center gap-1.5">
@@ -1272,46 +1345,26 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 10. Property Status */}
+                      {/* 10. Property Status (Inline Select) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {!prop.is_assigned && !prop.primary_organization && (!prop.organizations || prop.organizations.length === 0) && (!prop.organization_name || prop.organization_name === 'Unassigned') ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-dashed border-slate-300 dark:border-slate-700">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                            Unassigned
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenStatusModal(prop)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition whitespace-nowrap ${
-                              prop.status === 'ACTIVE'
-                                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
-                                : prop.status === 'ARCHIVED'
-                                ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40'
-                                : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/40'
-                            }`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                prop.status === 'ACTIVE'
-                                  ? 'bg-emerald-500'
-                                  : prop.status === 'ARCHIVED'
-                                  ? 'bg-rose-500'
-                                  : 'bg-blue-500'
-                              }`}
-                            />
-                            {prop.status === 'ACTIVE' ? 'Active' : prop.status === 'ARCHIVED' ? 'Archived' : 'Assigned'}
-                          </button>
-                        )}
+                        <select
+                          value={prop.status === 'ONBOARDING' ? 'ACTIVE' : (prop.status || 'ACTIVE')}
+                          onChange={(e) => handleQuickUpdateStatus(prop.id, e.target.value)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+                            prop.status === 'ACTIVE' || prop.status === 'ONBOARDING'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-900/40'
+                              : prop.status === 'ARCHIVED'
+                              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200/60 dark:border-rose-900/40'
+                              : 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/60 dark:border-blue-900/40'
+                          }`}
+                        >
+                          <option value="ACTIVE" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">Onboarded</option>
+                          <option value="INACTIVE" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">Inactive</option>
+                          <option value="ARCHIVED" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">Archived</option>
+                        </select>
                       </td>
 
-                      {/* 10. Onboarding Stage */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-[#1a1c24] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#222430]">
-                          {(prop as any).onboarding_stage === 'DRAFT' || !(prop as any).onboarding_stage ? 'Draft Initialized' : (prop as any).onboarding_stage}
-                        </span>
-                      </td>
-
-                      {/* 11. Actions */}
+                      {/* 12. Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <button
@@ -1555,6 +1608,22 @@ export default function AdminPropertiesPage() {
                     </p>
                   </div>
                   <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block text-xs">Channel Partner</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                      {(selectedPropForDetails as any).partner?.name || (selectedPropForDetails as any).partner_name || 'No Partner Assigned'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block text-xs">Partner Revenue Share / Commission</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-medium">
+                      {(selectedPropForDetails as any).partner_commission_override !== null && (selectedPropForDetails as any).partner_commission_override !== undefined && (selectedPropForDetails as any).partner_commission_override !== ''
+                        ? `${(selectedPropForDetails as any).partner_commission_override}% (Custom Override)`
+                        : (selectedPropForDetails as any).partner?.default_commission_rate !== undefined
+                        ? `${(selectedPropForDetails as any).partner.default_commission_rate}% (Default Rate)`
+                        : '—'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block text-xs">Main Phone Number</label>
                     <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
                       {selectedPropForDetails.main_phone || (selectedPropForDetails as any).phone || 'N/A'}
@@ -1598,8 +1667,10 @@ export default function AdminPropertiesPage() {
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block text-xs">Property Status</label>
-                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
-                      {selectedPropForDetails.status}
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                      {selectedPropForDetails.status === 'ACTIVE' || selectedPropForDetails.status === 'ONBOARDING'
+                        ? 'Onboarded'
+                        : selectedPropForDetails.status}
                     </p>
                   </div>
                 </div>
@@ -2149,7 +2220,7 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Monthly Price</label>
+                    <label className="font-bold text-black dark:text-white block">Monthly Price ($)</label>
                     <input
                       type="number"
                       min="0"
@@ -2159,6 +2230,67 @@ export default function AdminPropertiesPage() {
                       placeholder="0.00"
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Channel Partner</label>
+                    <select
+                      value={formData.partner_id}
+                      onChange={(e) => {
+                        const pId = e.target.value;
+                        const matched = partnerOptions.find((p) => p.id === pId);
+                        setFormData({
+                          ...formData,
+                          partner_id: pId,
+                          partner_commission_override: matched && formData.partner_commission_override === '' ? matched.default_commission_rate : formData.partner_commission_override,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">No Partner Assigned</option>
+                      {partnerOptions.map((partner) => (
+                        <option key={partner.id} value={partner.id}>
+                          {partner.name} {partner.company_name ? `(${partner.company_name})` : ''} - {partner.default_commission_rate}%
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        disabled={!formData.partner_id}
+                        value={formData.partner_commission_override}
+                        onChange={(e) => setFormData({ ...formData, partner_commission_override: e.target.value })}
+                        placeholder={
+                          formData.partner_id
+                            ? `${partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 0}% (Default)`
+                            : 'Select a partner first'
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">%</span>
+                    </div>
+                    {formData.partner_id && formData.monthly_price && Number(formData.monthly_price) > 0 && (
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                        Est. Monthly Partner Payout: $
+                        {(
+                          (Number(formData.monthly_price) *
+                            Number(
+                              formData.partner_commission_override !== ''
+                                ? formData.partner_commission_override
+                                : partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate || 0
+                            )) /
+                          100
+                        ).toFixed(2)}
+                        /mo
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-2 space-y-1">
@@ -2384,7 +2516,7 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Monthly Price</label>
+                    <label className="font-bold text-black dark:text-white block">Monthly Price ($)</label>
                     <input
                       type="number"
                       min="0"
@@ -2394,6 +2526,67 @@ export default function AdminPropertiesPage() {
                       placeholder="0.00"
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Channel Partner</label>
+                    <select
+                      value={formData.partner_id}
+                      onChange={(e) => {
+                        const pId = e.target.value;
+                        const matched = partnerOptions.find((p) => p.id === pId);
+                        setFormData({
+                          ...formData,
+                          partner_id: pId,
+                          partner_commission_override: matched && (formData.partner_commission_override === '' || formData.partner_commission_override === null) ? matched.default_commission_rate : formData.partner_commission_override,
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">No Partner Assigned</option>
+                      {partnerOptions.map((partner) => (
+                        <option key={partner.id} value={partner.id}>
+                          {partner.name} {partner.company_name ? `(${partner.company_name})` : ''} - {partner.default_commission_rate}%
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        disabled={!formData.partner_id}
+                        value={formData.partner_commission_override}
+                        onChange={(e) => setFormData({ ...formData, partner_commission_override: e.target.value })}
+                        placeholder={
+                          formData.partner_id
+                            ? `${partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 0}% (Default)`
+                            : 'Select a partner first'
+                        }
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">%</span>
+                    </div>
+                    {formData.partner_id && formData.monthly_price && Number(formData.monthly_price) > 0 && (
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                        Est. Monthly Partner Payout: $
+                        {(
+                          (Number(formData.monthly_price) *
+                            Number(
+                              formData.partner_commission_override !== ''
+                                ? formData.partner_commission_override
+                                : partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate || 0
+                            )) /
+                          100
+                        ).toFixed(2)}
+                        /mo
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-2 space-y-1">

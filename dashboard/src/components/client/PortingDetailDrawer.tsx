@@ -27,12 +27,14 @@ interface PortingDetailDrawerProps {
   onCreateTicket?: (propId: string) => void;
 }
 
-const PORTING_STAGES = [
-  { key: 'DRAFT', label: 'Draft' },
-  { key: 'SUBMITTED', label: 'Submitted' },
-  { key: 'IN_PROGRESS', label: 'In Progress' },
-  { key: 'FOC_RECEIVED', label: 'FOC Confirmed' },
-  { key: 'COMPLETED', label: 'Completed' },
+const STAGES_ROAD = [
+  { key: 'DRAFT', label: 'Draft Initialized', step: 1 },
+  { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2 },
+  { key: 'SIGNED', label: 'Contract Signed', step: 3 },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4 },
+  { key: 'SOF_WAITING', label: 'SOF Review', step: 5 },
+  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6 },
+  { key: 'COMPLETED', label: 'Onboarded', step: 7 },
 ];
 
 export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
@@ -53,28 +55,32 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
   const isRejected = porting.status === 'REJECTED';
   const isCancelled = porting.status === 'CANCELLED';
 
+  const normalizedStatus = (
+    porting.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
+    porting.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
+    porting.stage || porting.status || 'DRAFT'
+  );
+
   const getStageIndex = (status: string) => {
     switch (status) {
-      case 'DRAFT':
-        return 0;
-      case 'PENDING':
+      case 'DRAFT': return 0;
+      case 'CONTRACT_SENT': return 1;
+      case 'SIGNED': return 2;
+      case 'PORTING_SUBMITTED':
       case 'SUBMITTED':
-        return 1;
-      case 'IN_PROGRESS':
-        return 2;
-      case 'FOC_RECEIVED':
-        return 3;
-      case 'COMPLETED':
-        return 4;
-      default:
-        return 1;
+      case 'IN_PROGRESS': return 3;
+      case 'SOF_WAITING': return 4;
+      case 'FOC_RECEIVED': return 5;
+      case 'COMPLETED': return 6;
+      default: return 0;
     }
   };
 
-  const currentStageIdx = getStageIndex(porting.status);
+  const currentStageIdx = getStageIndex(normalizedStatus);
+  const currentStageObj = STAGES_ROAD[currentStageIdx] || STAGES_ROAD[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
       <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10 animate-in slide-in-from-right duration-300">
         {/* Header */}
@@ -105,7 +111,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-slate-700 dark:text-slate-300">
-          {/* Status & Stepper Banner */}
+          {/* Status & Stepper Banner (All 7 Stages) */}
           {isRejected || isCancelled ? (
             <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 space-y-1.5">
               <div className="flex items-center gap-2">
@@ -119,61 +125,52 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
               </p>
             </div>
           ) : (
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-4">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                    Carrier Migration Status
+                    Lifecycle &amp; Cutover Status
                   </span>
                   <span className="font-semibold text-slate-900 dark:text-white mt-0.5 block">
-                    {porting.status === 'COMPLETED'
-                      ? 'Porting Completed & Activated'
-                      : porting.status === 'FOC_RECEIVED'
-                      ? 'Firm Order Confirmed (FOC)'
-                      : 'Carrier Processing In Progress'}
+                    Stage {currentStageObj.step}: {currentStageObj.label}
                   </span>
                 </div>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                    porting.status === 'COMPLETED'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60'
-                      : porting.status === 'FOC_RECEIVED'
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60'
-                      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200/60'
-                  }`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                  {porting.status?.replace(/_/g, ' ')}
+                  Stage {currentStageObj.step} of 7
                 </span>
               </div>
 
-              {/* Visual Multi-Stage Progress Stepper */}
+              {/* Visual 7-Stage Progress Stepper */}
               <div className="pt-2">
-                <div className="grid grid-cols-5 gap-1 text-center">
-                  {PORTING_STAGES.map((stage, idx) => {
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {STAGES_ROAD.map((stage, idx) => {
                     const isPassed = idx < currentStageIdx;
                     const isCurrent = idx === currentStageIdx;
                     return (
-                      <div key={stage.key} className="flex flex-col items-center gap-1.5">
+                      <div key={stage.key} className="flex flex-col items-center gap-1">
                         <div
                           className={`w-full h-1.5 rounded-full transition-all ${
                             isPassed
                               ? 'bg-emerald-500'
                               : isCurrent
-                              ? 'bg-purple-600 dark:bg-purple-400 animate-pulse'
-                              : 'bg-slate-200 dark:bg-slate-800'
+                              ? 'bg-blue-600 dark:bg-blue-400 animate-pulse'
+                              : 'bg-slate-200 dark:bg-[#222430]'
                           }`}
                         />
                         <span
-                          className={`text-[9.5px] font-medium leading-tight ${
+                          className={`text-[8.5px] leading-tight block truncate w-full ${
                             isCurrent
-                              ? 'text-purple-600 dark:text-purple-400 font-bold'
+                              ? 'text-blue-600 dark:text-blue-400 font-bold'
                               : isPassed
-                              ? 'text-slate-700 dark:text-slate-300'
+                              ? 'text-slate-700 dark:text-slate-300 font-medium'
                               : 'text-slate-400'
                           }`}
+                          title={`Stage ${stage.step}: ${stage.label}`}
                         >
-                          {stage.label}
+                          {stage.step}. {stage.label.split(' ')[0]}
                         </span>
                       </div>
                     );
@@ -191,7 +188,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
             <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Hotel className="w-4 h-4 text-purple-500" />
+                  <Hotel className="w-4 h-4 text-blue-500" />
                   <span className="font-bold text-slate-900 dark:text-white text-xs">
                     {porting.property_name}
                   </span>
@@ -199,32 +196,48 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                 {onOpenProperty && porting.property_id && (
                   <button
                     onClick={() => onOpenProperty(porting.property_id)}
-                    className="text-purple-600 dark:text-purple-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <span>View 360°</span>
                     <ArrowUpRight className="w-3 h-3" />
                   </button>
                 )}
               </div>
+
+              {/* Organization */}
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-[#222430]">
+                <span className="text-slate-400">Organization:</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {porting.organization_name && porting.organization_name !== 'Unassigned Organization' && porting.organization_name !== 'Direct Portfolio'
+                    ? porting.organization_name
+                    : '—'}
+                </span>
+              </div>
+
               {porting.property_address && (
-                <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                  {porting.property_address}
-                </p>
+                <div className="flex items-start justify-between text-xs">
+                  <span className="text-slate-400">Address:</span>
+                  <span className="text-right text-slate-700 dark:text-slate-300 max-w-[240px]">
+                    {porting.property_address}
+                  </span>
+                </div>
               )}
+
               {porting.property_phone && (
-                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-[#222430]">
-                  <span className="text-slate-400">Phone:</span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Main Phone:</span>
                   <div className="flex items-center gap-1 font-mono text-slate-800 dark:text-slate-200">
                     <span>{porting.property_phone}</span>
                     <button
                       onClick={() => handleCopy(porting.property_phone, 'Phone number')}
-                      className="p-0.5 text-slate-400 hover:text-purple-600 cursor-pointer"
+                      className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
                     >
                       <Copy className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
               )}
+
               {porting.fax && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">Fax:</span>
@@ -232,7 +245,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                     <span>{porting.fax}</span>
                     <button
                       onClick={() => handleCopy(porting.fax, 'Fax number')}
-                      className="p-0.5 text-slate-400 hover:text-purple-600 cursor-pointer"
+                      className="p-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
                     >
                       <Copy className="w-3 h-3" />
                     </button>

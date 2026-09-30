@@ -18,11 +18,15 @@ import {
   Calendar,
   Eye,
   Check,
+  MapPin,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
   GitBranch,
   FileText,
+  ShieldCheck,
+  Download,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -74,6 +78,7 @@ interface PortingRecordItem {
   services: any[];
   created_at: string;
   updated_at: string;
+  organization_name?: string;
 }
 
 export default function ClientPortingPage() {
@@ -91,14 +96,12 @@ export default function ClientPortingPage() {
     completed: 0,
     actionRequired: 0,
   });
-  const [propertyFilterOptions, setPropertyFilterOptions] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Filters & Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [propertyFilter, setPropertyFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -132,7 +135,6 @@ export default function ClientPortingPage() {
         limit: pageSize.toString(),
         q: searchQuery.trim(),
         status: statusFilter,
-        property_id: propertyFilter,
         sortBy: sortBy,
       });
 
@@ -147,16 +149,13 @@ export default function ClientPortingPage() {
       if (json.metrics) {
         setMetrics(json.metrics);
       }
-      if (json.filters?.properties) {
-        setPropertyFilterOptions(json.filters.properties);
-      }
     } catch (err: any) {
       console.error('Error fetching porting data:', err);
       setError(err.message || 'Error loading porting orders');
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, statusFilter, propertyFilter]);
+  }, [currentPage, searchQuery, statusFilter, sortBy]);
 
   useEffect(() => {
     fetchPortings();
@@ -177,14 +176,14 @@ export default function ClientPortingPage() {
 
   const handleCopyNumbers = (record: PortingRecordItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const nums = record.services.map((s) => s.phone_number).join(', ');
+    const nums = record.property_phone || (record.services || []).map((s) => s.phone_number).join(', ');
     if (nums) {
       navigator.clipboard.writeText(nums);
       setCopiedId(record.id);
-      toast.success(`Copied ${record.services.length} number(s) to clipboard`);
+      toast.success(`Copied phone number to clipboard`);
       setTimeout(() => setCopiedId(null), 2000);
     } else {
-      toast.info('No phone numbers attached to this porting batch.');
+      toast.info('No phone number attached to this porting.');
     }
   };
 
@@ -211,159 +210,196 @@ export default function ClientPortingPage() {
     setMenuPosition(null);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || propertyFilter !== 'ALL' || sortBy !== 'NEWEST';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || sortBy !== 'NEWEST';
   const totalPages = Math.ceil(totalRecords / pageSize) || 1;
+
+  const getStageLabel = (stageKey: string) => {
+    switch (stageKey) {
+      case 'DRAFT':
+        return 'Stage 1: Draft Initialized';
+      case 'CONTRACT_SENT':
+        return 'Stage 2: Contract Sent';
+      case 'SIGNED':
+        return 'Stage 3: Contract Signed';
+      case 'PORTING_SUBMITTED':
+      case 'SUBMITTED':
+      case 'IN_PROGRESS':
+        return 'Stage 4: Porting Submitted';
+      case 'SOF_WAITING':
+        return 'Stage 5: SOF Review';
+      case 'FOC_RECEIVED':
+        return 'Stage 6: FOC Confirmed';
+      case 'COMPLETED':
+        return 'Stage 7: Onboarded';
+      default:
+        return 'Submitted';
+    }
+  };
 
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-6 pb-12 font-sans"
+      className="space-y-6 pb-12 font-sans max-w-[1600px] mx-auto text-slate-900 dark:text-slate-100"
     >
-      {/* 1. Header */}
+      {/* 1. Header with Title & Action Buttons */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 flex items-center justify-center overflow-hidden shrink-0 text-black dark:text-white">
-            <ArrowLeftRight size={256} className="w-full h-full object-contain" />
+          <div className="w-9 h-9 flex items-center justify-center shrink-0 text-slate-900 dark:text-white">
+            <ArrowLeftRight className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Number Porting Tracker
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Porting Management
           </h1>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setShowPortingModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition shadow-sm cursor-pointer"
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Export CSV Button */}
+          <button
+            onClick={() => {
+              if (portings.length === 0) {
+                toast.info('No porting records to export.');
+                return;
+              }
+              const headers = ['Property Name', 'Location', 'Organization', 'Stage', 'Phone', 'Fax', 'Target Date'];
+              const rows = portings.map((p) => [
+                `"${p.property_name || ''}"`,
+                `"${p.property_location || p.property_address || ''}"`,
+                `"${p.organization_name || orgName || '—'}"`,
+                `"${getStageLabel(p.status)}"`,
+                `"${p.property_phone || '—'}"`,
+                `"${p.fax || '—'}"`,
+                `"${p.target_date || '—'}"`,
+              ]);
+              const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement('a');
+              link.setAttribute('href', encodedUri);
+              link.setAttribute('download', `porting_management_${Date.now()}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              toast.success('Porting records downloaded as CSV.');
+            }}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1f212c] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Start Porting Request</span>
-          </motion.button>
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <span>Export CSV</span>
+          </button>
+
+          {/* Reset Filters Button */}
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setStatusFilter('ALL');
+              setSortBy('NEWEST');
+              setCurrentPage(1);
+            }}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1f212c] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+            <span>Reset Filters</span>
+          </button>
+
+          {/* Create Porting Request Button */}
+          {isClientAdmin && (
+            <button
+              onClick={() => setShowPortingModal(true)}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Porting Request</span>
+            </button>
+          )}
         </div>
       </motion.div>
 
-      {/* 2. KPI Cards (5 Cards) - ALL VARIANT 1 ONLY */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Card 1: Total Porting Requests */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
+      {/* 2. KPI Cards (4 Cards) - EXACT ROYAL BLUE AS IN IMAGE */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: TOTAL REQUESTS */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[140px]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Total Porting Requests
+              TOTAL REQUESTS
             </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <ArrowLeftRight className="w-4 h-4 text-white" />
-            </div>
+            <ArrowLeftRight className="w-4 h-4 text-white/90" />
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
               {metrics.total}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Orders</span>
+            <span className="text-sm font-semibold text-white ml-2">Ports</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">All carrier migration orders</p>
-        </motion.div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            All porting requests across all orgs
+          </p>
+        </div>
 
-        {/* Card 2: In Progress */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
+        {/* Card 2: IN PROGRESS */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[140px]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              In Progress
+              IN PROGRESS
             </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <Clock className="w-4 h-4 text-white" />
-            </div>
+            <RefreshCw className="w-4 h-4 text-white/90" />
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
               {metrics.inProgress}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Under Review</span>
+            <span className="text-sm font-semibold text-white ml-2">Active</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">Carrier validation in flight</p>
-        </motion.div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            Carrier processing &amp; submitted orders
+          </p>
+        </div>
 
-        {/* Card 3: FOC Received */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
+        {/* Card 3: FOC RECEIVED */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[140px]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              FOC Received
+              FOC RECEIVED
             </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-white" />
-            </div>
+            <ShieldCheck className="w-4 h-4 text-white/90" />
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
               {metrics.focReceived}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Cutover Date</span>
+            <span className="text-sm font-semibold text-white ml-2">Confirmed</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">Firm cutover date confirmed</p>
-        </motion.div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            Firm Order Confirmation received
+          </p>
+        </div>
 
-        {/* Card 4: Completed */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
+        {/* Card 4: COMPLETED */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[140px]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Completed
+              COMPLETED
             </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-white" />
-            </div>
+            <CheckCircle2 className="w-4 h-4 text-white/90" />
           </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
               {metrics.completed}
             </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Ported Live</span>
+            <span className="text-sm font-semibold text-white ml-2">Done</span>
           </div>
-          <p className="text-[11px] text-slate-200 mt-2">Successfully cut over &amp; active</p>
-        </motion.div>
-
-        {/* Card 5: Action Required */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Action Required
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <AlertCircle className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
-              {metrics.actionRequired}
-            </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Issues / Rejected</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">Rejected, cancelled, or pending LOA</p>
-        </motion.div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            Numbers ported &amp; services activated
+          </p>
+        </div>
       </motion.div>
 
-      {/* 3. Search & Filters Bar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col lg:flex-row items-center justify-between gap-3">
-        <div className="flex flex-1 flex-wrap items-center gap-2.5 w-full">
+      {/* 3. Search & Filters Bar — EXACT SCREENSHOT LAYOUT */}
+      <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] space-y-3 shadow-xs">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
@@ -371,323 +407,312 @@ export default function ClientPortingPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by phone number, property name, or notes..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500 transition"
+              placeholder="Search by property, organization, phone number, notes..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
             />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+          </div>
+
+          {/* Dropdown Filters: Status & Sort */}
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            {/* Status Dropdown */}
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium cursor-pointer focus:outline-none focus:border-blue-500 shrink-0"
+            >
+              <option value="ALL">Status: All Statuses</option>
+              <option value="DRAFT">Stage 1: Draft Initialized</option>
+              <option value="CONTRACT_SENT">Stage 2: Contract Sent</option>
+              <option value="SIGNED">Stage 3: Contract Signed</option>
+              <option value="PORTING_SUBMITTED">Stage 4: Porting Submitted</option>
+              <option value="SOF_WAITING">Stage 5: SOF Review</option>
+              <option value="FOC_RECEIVED">Stage 6: FOC Confirmed</option>
+              <option value="COMPLETED">Stage 7: Onboarded</option>
+            </select>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium cursor-pointer focus:outline-none focus:border-blue-500 shrink-0"
+            >
+              <option value="NEWEST">Sort: Recently Added</option>
+              <option value="OLDEST">Sort: Oldest First</option>
+              <option value="PROPERTY_ASC">Sort: Property Name (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Active Filters Bar */}
+        <div className="flex items-center justify-between text-xs pt-1 text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-slate-600 dark:text-slate-300">Active Filters:</span>
+            {statusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-medium">
+                Status: {getStageLabel(statusFilter)}
+                <button
+                  onClick={() => setStatusFilter('ALL')}
+                  className="hover:text-blue-900 cursor-pointer ml-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {searchQuery.trim() !== '' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-medium">
+                Search: &ldquo;{searchQuery}&rdquo;
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="hover:text-blue-900 cursor-pointer ml-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {statusFilter === 'ALL' && searchQuery.trim() === '' && (
+              <span className="text-slate-400 text-[11px] italic">None</span>
             )}
           </div>
 
-          {/* Property Filter */}
-          <select
-            value={propertyFilter}
-            onChange={(e) => {
-              setPropertyFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            aria-label="Filter porting by property location"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="ALL">All Properties</option>
-            {propertyFilterOptions.map((prop) => (
-              <option key={prop.id} value={prop.id}>
-                {prop.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            aria-label="Filter porting by order status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="IN_PROGRESS_ALL">In Progress / Processing</option>
-            <option value="FOC_RECEIVED">FOC Received</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="ACTION_REQUIRED">Action Required</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="PENDING">Pending</option>
-            <option value="DRAFT">Draft</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-
-          {/* Sort By Filter */}
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setCurrentPage(1);
-            }}
-            aria-label="Sort porting requests"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="NEWEST">Sort: Recently Added</option>
-            <option value="PROP_ASC">Sort: Property (A-Z)</option>
-            <option value="TARGET_DATE">Sort: Target Date</option>
-            <option value="STATUS">Sort: Status</option>
-          </select>
-        </div>
-
-        {hasActiveFilters && (
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setStatusFilter('ALL');
-              setPropertyFilter('ALL');
-              setSortBy('NEWEST');
-              setCurrentPage(1);
-            }}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto whitespace-nowrap"
-          >
-            Reset Filters
-          </button>
-        )}
-      </div>
-
-      {/* 4. Porting Table */}
-      {loading ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-6 space-y-4 shadow-xs animate-pulse">
-          <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-md w-1/4" />
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-12 bg-slate-100 dark:bg-slate-800/50 rounded-lg" />
-            ))}
-          </div>
-        </div>
-      ) : error ? (
-        <div className="p-6 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5" />
-            <p className="text-xs font-semibold">{error}</p>
-          </div>
-          <button
-            onClick={fetchPortings}
-            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-2xs transition cursor-pointer"
-          >
-            Retry
-          </button>
-        </div>
-      ) : portings.length === 0 ? (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl p-12 text-center shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mx-auto mb-3">
-            <ArrowLeftRight className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            No porting orders found
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            {hasActiveFilters
-              ? 'No porting requests matched your search and filter criteria.'
-              : 'There are currently no active phone number porting orders for your organization.'}
-          </p>
-          {!hasActiveFilters && (
+          {hasActiveFilters && (
             <button
-              onClick={() => setShowPortingModal(true)}
-              className="mt-4 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('ALL');
+                setSortBy('NEWEST');
+                setCurrentPage(1);
+              }}
+              className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer text-[11px]"
             >
-              <Plus className="w-3.5 h-3.5" /> Start Porting Request
+              Clear All
             </button>
           )}
         </div>
-      ) : (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto [scrollbar-width:thin]">
-            <table className="w-full text-left border-collapse min-w-[900px]">
-              <thead>
-                <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Property Name
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Address
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Phone
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Fax
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Attachments
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    Status
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
-                    Action
-                  </th>
+      </div>
+
+      {/* 4. Porting Table — EXACT COLUMNS & STYLES AS IN SCREENSHOT */}
+      <div className="rounded-2xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] overflow-hidden shadow-xs">
+        <div className="overflow-x-auto min-h-[300px]">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-900 dark:text-white font-extrabold uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-4">PROPERTY NAME</th>
+                <th className="py-3 px-4">PHONE</th>
+                <th className="py-3 px-4">ORGANIZATION NAME</th>
+                <th className="py-3 px-4">FAX</th>
+                <th className="py-3 px-4">ATTACHMENTS</th>
+                <th className="py-3 px-4">STATUS</th>
+                <th className="py-3 px-4 text-right">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-[#222430]/60">
+              {loading && portings.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
+                    Loading porting records...
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
-                {portings.map((item) => (
-                  <tr
-                    key={item.id}
-                    onClick={() => setSelectedPortingForDrawer(item)}
-                    className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
-                  >
-                    {/* Column 1: Property Name */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
-                          <Hotel className="w-4 h-4" />
-                        </div>
-                        <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              ) : portings.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <ArrowLeftRight className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    No porting records found matching your filter.
+                  </td>
+                </tr>
+              ) : (
+                portings.map((item) => {
+                  const normalizedStage = (
+                    item.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
+                    item.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
+                    (item as any).stage || item.status || 'DRAFT'
+                  );
+                  let badge = {
+                    label: 'Stage 1: Draft Initialized',
+                    bg: 'bg-slate-100 dark:bg-[#1a1c24]',
+                    text: 'text-slate-800 dark:text-slate-200',
+                    border: 'border-slate-200 dark:border-[#2a2c3a]',
+                  };
+                  switch (normalizedStage) {
+                    case 'DRAFT':
+                      badge = { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' };
+                      break;
+                    case 'CONTRACT_SENT':
+                      badge = { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50' };
+                      break;
+                    case 'SIGNED':
+                      badge = { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50' };
+                      break;
+                    case 'PORTING_SUBMITTED':
+                    case 'SUBMITTED':
+                    case 'IN_PROGRESS':
+                      badge = { label: 'Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50' };
+                      break;
+                    case 'SOF_WAITING':
+                      badge = { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50' };
+                      break;
+                    case 'FOC_RECEIVED':
+                      badge = { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50' };
+                      break;
+                    case 'COMPLETED':
+                      badge = { label: 'Onboarded', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50' };
+                      break;
+                  }
+
+                  const attCount = item.attachments ? item.attachments.length : 0;
+                  const locationStr = item.property_location || item.property_address || '—';
+
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={() => setSelectedPortingForDrawer(item)}
+                      className="hover:bg-slate-50/70 dark:hover:bg-[#191b24] transition cursor-pointer"
+                    >
+                      {/* 1. Property Name with Address / Location underneath */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="font-bold text-slate-900 dark:text-white">
                           {item.property_name}
-                        </span>
-                      </div>
-                    </td>
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
+                          {locationStr}
+                        </div>
+                      </td>
 
-                    {/* Column 2: Address */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="text-slate-600 dark:text-slate-300 text-xs">
-                        {item.property_address || '—'}
-                      </span>
-                    </td>
-
-                    {/* Column 3: Phone */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 font-mono text-xs text-slate-800 dark:text-slate-200">
-                        <span>{item.property_phone || '—'}</span>
-                        {item.property_phone && item.property_phone !== '—' && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigator.clipboard.writeText(item.property_phone);
-                              setCopiedId(item.id);
-                              toast.success('Phone number copied');
-                              setTimeout(() => setCopiedId(null), 2000);
-                            }}
-                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                            title="Copy phone"
-                          >
-                            {copiedId === item.id ? (
-                              <Check className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </button>
+                      {/* 3. Phone */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-800 dark:text-slate-200 font-mono" onClick={(e) => e.stopPropagation()}>
+                        {item.property_phone && item.property_phone !== '—' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.property_phone}</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.property_phone);
+                                setCopiedId(item.id);
+                                toast.success('Phone copied');
+                                setTimeout(() => setCopiedId(null), 2000);
+                              }}
+                              className="text-slate-400 hover:text-blue-500 cursor-pointer p-0.5"
+                              title="Copy Phone"
+                            >
+                              {copiedId === item.id ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Column 4: Fax */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="text-slate-600 dark:text-slate-400 font-mono text-xs">
-                        {item.fax || '—'}
-                      </span>
-                    </td>
+                      {/* 4. Organization Name */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium">
+                        {item.organization_name && item.organization_name !== 'Unassigned Organization' && item.organization_name !== 'Direct Portfolio' ? (
+                          item.organization_name
+                        ) : (
+                          <span className="text-slate-400 font-semibold">—</span>
+                        )}
+                      </td>
 
-                    {/* Column 5: Attachments (no. of attachments) */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40">
-                        <FileText className="w-3 h-3" />
-                        <span>{item.attachments?.length || 0}</span>
-                      </span>
-                    </td>
+                      {/* 5. Fax */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono">
+                        {item.fax && item.fax !== '—' ? item.fax : '—'}
+                      </td>
 
-                    {/* Column 6: Status */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          item.status === 'COMPLETED'
-                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                            : item.status === 'FOC_RECEIVED'
-                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60'
-                            : item.status === 'REJECTED' || item.status === 'CANCELLED'
-                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                        }`}
-                      >
+                      {/* 6. Attachments */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 font-semibold text-xs">
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>{attCount}</span>
+                        </span>
+                      </td>
+
+                      {/* 7. Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            item.status === 'COMPLETED'
-                              ? 'bg-emerald-500'
-                              : item.status === 'FOC_RECEIVED'
-                              ? 'bg-blue-500'
-                              : item.status === 'REJECTED' || item.status === 'CANCELLED'
-                              ? 'bg-rose-500'
-                              : 'bg-amber-500'
-                          }`}
-                        />
-                        {item.status?.replace(/_/g, ' ')}
-                      </span>
-                    </td>
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                          {badge.label}
+                        </span>
+                      </td>
 
-                    {/* Column 7: Action */}
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => setSelectedPortingForDrawer(item)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View Details</span>
-                        </button>
-                        <button
-                          onClick={(e) => handleOpenMenu(e, item)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
-                          aria-label="More porting actions"
-                        >
-                          <MoreVertical className="w-4 h-4" />
+                      {/* 8. Actions */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedPortingForDrawer(item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 font-semibold text-xs border border-blue-200/60 dark:border-blue-800/60 cursor-pointer transition"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Details</span>
                           </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          <button
+                            onClick={(e) => handleOpenMenu(e, item)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                            title="More Actions"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      {/* 5. Pagination */}
-      {totalRecords > pageSize && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] px-4 py-3 rounded-xl shadow-xs flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-          <div>
-            Showing <strong className="text-slate-800 dark:text-slate-200">{(currentPage - 1) * pageSize + 1}</strong> to{' '}
-            <strong className="text-slate-800 dark:text-slate-200">
-              {Math.min(currentPage * pageSize, totalRecords)}
-            </strong>{' '}
-            of <strong className="text-slate-800 dark:text-slate-200">{totalRecords}</strong> porting orders
-          </div>
+        {/* PAGINATION BAR */}
+        <div className="p-3.5 border-t border-slate-200/80 dark:border-[#222430] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <span className="text-slate-500 dark:text-slate-400">
+            Showing {(currentPage - 1) * pageSize + 1} to{' '}
+            {Math.min(currentPage * pageSize, totalRecords)} of{' '}
+            {totalRecords} requests
+          </span>
+
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1f212a] cursor-pointer"
-              aria-label="Previous page"
+              disabled={currentPage <= 1 || loading}
+              className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer text-xs"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" /> Previous
             </button>
-            <span className="px-2 font-semibold">
-              Page {currentPage} of {totalPages}
-            </span>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+              <button
+                key={num}
+                onClick={() => setCurrentPage(num)}
+                className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  currentPage === num
+                    ? 'bg-blue-600 text-white'
+                    : 'border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212c]'
+                }`}
+              >
+                {num}
+              </button>
+            ))}
+
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1f212a] cursor-pointer"
-              aria-label="Next page"
+              disabled={currentPage >= totalPages || loading}
+              className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-[#1f212c] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer text-xs"
             >
-              <ChevronRight className="w-4 h-4" />
+              Next <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* 6. Fixed 3-Dots Overlay Action Menu */}
+      {/* Fixed 3-Dots Overlay Action Menu */}
       {menuPosition && (
         <>
           <div
@@ -759,7 +784,7 @@ export default function ClientPortingPage() {
         </>
       )}
 
-      {/* 7. Porting Detail Slide-Over Drawer */}
+      {/* Porting Detail Slide-Over Drawer */}
       {selectedPortingForDrawer && (
         <PortingDetailDrawer
           porting={selectedPortingForDrawer}
@@ -772,7 +797,7 @@ export default function ClientPortingPage() {
         />
       )}
 
-      {/* 8. Property 360 Inspection Drawer */}
+      {/* Property 360 Inspection Drawer */}
       {showPropertyDrawer && selectedPropForDrawer && (
         <PropertyDetailDrawer
           property={selectedPropForDrawer}
@@ -788,14 +813,14 @@ export default function ClientPortingPage() {
         />
       )}
 
-      {/* 9. Create Porting Modal (Client Admin only) */}
+      {/* Create Porting Modal */}
       <CreatePortingModal
         isOpen={showPortingModal}
         onClose={() => setShowPortingModal(false)}
         onSuccess={fetchPortings}
       />
 
-      {/* 10. Support Ticket Modal */}
+      {/* Support Ticket Modal */}
       {showTicketModal && (
         <CreateTicketModal
           isOpen={showTicketModal}

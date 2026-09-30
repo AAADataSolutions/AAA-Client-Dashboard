@@ -118,7 +118,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {property.status || 'ACTIVE'}
+                  {property.status === 'ACTIVE' || property.status === 'ONBOARDING' ? 'Onboarded' : (property.status || 'Onboarded')}
                 </span>
               </div>
 
@@ -319,15 +319,13 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                     PSAP Routing Status
                   </span>
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
-                      property.e911_status === 'VERIFIED'
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                      property.ray_baud_and_logs_enabled || property.e911_status === 'VERIFIED'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40'
-                        : property.e911_status === 'CORRECTION_REQUIRED' || property.e911_status === 'FAILED'
-                        ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40'
                         : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40'
                     }`}
                   >
-                    {property.e911_status}
+                    {property.ray_baud_and_logs_enabled || property.e911_status === 'VERIFIED' ? 'PSAP Verified' : 'Audit Required'}
                   </span>
                 </div>
                 <div>

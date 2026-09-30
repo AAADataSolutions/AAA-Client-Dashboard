@@ -1,4 +1,4 @@
-export type AppRole = 'SUPER_ADMIN' | 'SUB_SUPER_ADMIN' | 'CLIENT_USER';
+export type AppRole = 'SUPER_ADMIN' | 'SUB_SUPER_ADMIN' | 'CLIENT_USER' | 'PARTNER';
 export type OrgMemberRole = 'ADMIN' | 'USER';
 export type ProfileStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 export type OrgStatus = 'ACTIVE' | 'SUSPENDED' | 'PENDING_ONBOARDING' | 'ARCHIVED';

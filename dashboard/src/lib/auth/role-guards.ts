@@ -1,6 +1,6 @@
 import { AppRole, OrgMemberRole } from '../supabase/types';
 
-export type EffectiveRole = 'SUPER_ADMIN' | 'SUB_SUPER_ADMIN' | 'ADMIN' | 'USER';
+export type EffectiveRole = 'SUPER_ADMIN' | 'SUB_SUPER_ADMIN' | 'ADMIN' | 'USER' | 'PARTNER';
 
 export function resolveEffectiveRole(
   appRole?: AppRole | null,
@@ -8,6 +8,7 @@ export function resolveEffectiveRole(
 ): EffectiveRole {
   if (appRole === 'SUPER_ADMIN') return 'SUPER_ADMIN';
   if (appRole === 'SUB_SUPER_ADMIN') return 'SUB_SUPER_ADMIN';
+  if (appRole === 'PARTNER') return 'PARTNER';
   if (orgRole === 'ADMIN') return 'ADMIN';
   return 'USER';
 }

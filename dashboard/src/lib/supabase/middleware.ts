@@ -36,13 +36,19 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Do not run page-level route redirects on API endpoints
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse;
+  }
+
   const isAuthRoute = pathname === '/auth' || pathname.startsWith('/auth/');
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const isDashboardRoute = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+  const isPartnerRoute = pathname === '/partner' || pathname.startsWith('/partner/');
   const isOnboardingRoute = pathname === '/onboarding' || pathname.startsWith('/onboarding/');
 
   // 1. If not authenticated and visiting protected areas
-  if (!user && (isAdminRoute || isDashboardRoute || isOnboardingRoute)) {
+  if (!user && (isAdminRoute || isDashboardRoute || isPartnerRoute || isOnboardingRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth';
     url.searchParams.set('redirectTo', pathname);
@@ -65,6 +71,12 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
+    if (profile?.role === 'PARTNER') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/partner';
+      return NextResponse.redirect(url);
+    }
+
     // Check if client user has an active organization
     const { data: membership } = await supabase
       .from('organization_members')
@@ -77,7 +89,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 3. If client user visits /admin, block them
+  // 3. If client or partner user visits /admin, block them
   if (user && isAdminRoute) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -88,7 +100,22 @@ export async function updateSession(request: NextRequest) {
     const isInternal = profile?.role === 'SUPER_ADMIN' || profile?.role === 'SUB_SUPER_ADMIN';
     if (!isInternal) {
       const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
+      url.pathname = profile?.role === 'PARTNER' ? '/partner' : '/dashboard';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // 4. If partner visits /dashboard, redirect to /partner
+  if (user && isDashboardRoute) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.role === 'PARTNER') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/partner';
       return NextResponse.redirect(url);
     }
   }

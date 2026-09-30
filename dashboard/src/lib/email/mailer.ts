@@ -333,3 +333,85 @@ export async function sendInviteEmail(data: InviteEmailData) {
   }
 }
 
+export interface ResetPasswordEmailData {
+  recipientEmail: string;
+  resetUrl: string;
+  recipientName?: string;
+}
+
+export async function sendResetPasswordEmail(data: ResetPasswordEmailData) {
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.warn('[SMTP Mailer] SMTP credentials not configured in .env.local. Skipping password reset email dispatch to:', data.recipientEmail);
+    return { success: false, skipped: true };
+  }
+
+  const nameDisplay = data.recipientName ? `Hello ${data.recipientName},` : 'Hello,';
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+      <div style="background: linear-gradient(135deg, #1d4ed8 0%, #0f172a 100%); padding: 32px 32px 28px;">
+        <div style="display: inline-block; background: rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 10px; margin-bottom: 12px;">
+          <span style="color: #ffffff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Security &bull; Password Reset</span>
+        </div>
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; line-height: 1.3;">
+          Reset Your Account Password
+        </h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0; font-size: 13px;">
+          AAA Data Solutions — Client & Management Portal
+        </p>
+      </div>
+      
+      <div style="padding: 32px;">
+        <p style="font-size: 15px; color: #1e293b; margin: 0 0 16px; line-height: 1.6;">
+          ${nameDisplay}
+        </p>
+        <p style="font-size: 14px; color: #475569; margin: 0 0 24px; line-height: 1.6;">
+          We received a request to reset the password for your AAA Data Solutions account (<strong>${data.recipientEmail}</strong>). Click the button below to choose a new password:
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${data.resetUrl}" 
+             target="_blank" 
+             style="display: inline-block; background: #2563eb; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 13px 28px; border-radius: 8px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);">
+            Reset My Password &rarr;
+          </a>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-top: 24px;">
+          <p style="margin: 0 0 8px; font-size: 12px; color: #64748b; font-weight: 600;">
+            Or copy and paste this link into your browser:
+          </p>
+          <p style="margin: 0; font-size: 12px; color: #2563eb; word-break: break-all; font-family: monospace;">
+            ${data.resetUrl}
+          </p>
+        </div>
+
+        <p style="font-size: 12px; color: #94a3b8; margin: 24px 0 0; line-height: 1.5;">
+          * Note: If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+        </p>
+      </div>
+      
+      <div style="padding: 16px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+        <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+          &copy; ${new Date().getFullYear()} AAA Data Solutions. All rights reserved.
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const info = await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: data.recipientEmail,
+      subject: `Reset Your AAA Data Solutions Password`,
+      html,
+    });
+    console.log('[SMTP Mailer] Password reset email sent successfully to:', data.recipientEmail, 'ID:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error: any) {
+    console.error('[SMTP Mailer] Error sending reset password email:', error?.message || error);
+    return { success: false, error: error?.message || error };
+  }
+}
+

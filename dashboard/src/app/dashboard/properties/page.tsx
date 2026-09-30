@@ -544,13 +544,10 @@ export default function ClientPropertiesPage() {
                     PROPERTY
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    ADDRESS
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     MONTHLY PRICE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    LOCATION
+                    MAIN PHONE NO.
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     NO. OF SERVICES
@@ -565,16 +562,10 @@ export default function ClientPropertiesPage() {
                     GM NAME
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    GM PHONE
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     GM EMAIL
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     PROPERTY STATUS
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    ONBOARDING STAGE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                     ACTIONS
@@ -584,7 +575,6 @@ export default function ClientPropertiesPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
                 {properties.map((prop) => {
                   const gmName = prop.general_manager_name || prop.contact_person_name || '—';
-                  const gmPhone = prop.general_manager_phone || prop.main_phone || null;
                   const gmEmail = prop.general_manager_email || prop.contact_person_email || null;
                   const stageKey = prop.stage || prop.onboarding_status || (prop.status === 'ACTIVE' ? 'COMPLETED' : 'DRAFT');
                   const stageBadge = getStageBadge(stageKey);
@@ -595,28 +585,26 @@ export default function ClientPropertiesPage() {
                       onClick={() => handleOpenPropertyDetails(prop)}
                       className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
                     >
-                      {/* Column 1: PROPERTY */}
+                      {/* Column 1: PROPERTY with Address underneath */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
                             <Hotel className="w-4 h-4" />
                           </div>
                           <div>
-                            <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors block">
                               {prop.name}
                             </span>
-                            <span className="block text-[10px] font-mono text-slate-400">
-                              {prop.id.substring(0, 8)}...
-                            </span>
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
+                              <MapPin className="w-3 h-3 shrink-0 text-slate-400" />
+                              <span>
+                                {prop.city
+                                  ? `${prop.address ? prop.address + ', ' : ''}${prop.city}, ${prop.state || prop.country} ${prop.zip_code || ''}`
+                                  : (prop.address || '—')}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </td>
-
-                      {/* Column: ADDRESS */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                        <span className="truncate max-w-[240px] block" title={prop.address}>
-                          {prop.address || '—'}
-                        </span>
                       </td>
 
                       {/* Column 2: MONTHLY PRICE */}
@@ -626,15 +614,30 @@ export default function ClientPropertiesPage() {
                           : '—'}
                       </td>
 
-                      {/* Column 3: LOCATION */}
-                      <td className="py-3.5 px-4 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{prop.city}, {prop.state}</span>
-                        </div>
+                      {/* Column 3: MAIN PHONE NO. */}
+                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap font-medium">
+                        {prop.main_phone ? (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{prop.main_phone}</span>
+                            <button
+                              onClick={(e) => handleCopyText(prop.main_phone || '', `${prop.id}-main-phone`, 'Main phone', e)}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                              title="Copy Main Phone"
+                            >
+                              {copiedId === `${prop.id}-main-phone` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
-                      {/* Column 3: NO. OF SERVICES */}
+                      {/* Column 4: NO. OF SERVICES */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           <PhoneCall className="w-3 h-3 text-blue-500" />
@@ -642,23 +645,20 @@ export default function ClientPropertiesPage() {
                         </span>
                       </td>
 
-                      {/* Column 4: E911 STATUS */}
+                      {/* Column 5: E911 STATUS */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
-                            prop.e911_status === 'VERIFIED'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                              : prop.e911_status === 'FAILED' || prop.e911_status === 'CORRECTION_REQUIRED'
-                              ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                          }`}
-                        >
-                          <ShieldCheck className="w-3 h-3" />
-                          <span>{prop.e911_status || 'PENDING'}</span>
-                        </span>
+                        {prop.ray_baud_and_logs_enabled || prop.e911_status === 'VERIFIED' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
+                            <ShieldCheck className="w-3 h-3" /> PSAP Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 whitespace-nowrap">
+                            <AlertCircle className="w-3 h-3" /> Audit Required
+                          </span>
+                        )}
                       </td>
 
-                      {/* Column 5: RAY BAUM AND KARY'S LAW */}
+                      {/* Column 6: RAY BAUM AND KARY'S LAW */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {(prop as any).ray_baum_status === 'Active' ? (
                           <button
@@ -681,7 +681,7 @@ export default function ClientPropertiesPage() {
                         )}
                       </td>
 
-                      {/* Column 6: GM NAME */}
+                      {/* Column 7: GM NAME */}
                       <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 whitespace-nowrap font-medium">
                         <div className="flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -689,29 +689,6 @@ export default function ClientPropertiesPage() {
                             {gmName}
                           </span>
                         </div>
-                      </td>
-
-                      {/* Column 7: GM PHONE */}
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {gmPhone && gmPhone !== 'N/A' ? (
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{gmPhone}</span>
-                            <button
-                              onClick={(e) => handleCopyText(gmPhone, `${prop.id}-phone`, 'GM phone', e)}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                              title="Copy phone"
-                            >
-                              {copiedId === `${prop.id}-phone` ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
                       </td>
 
                       {/* Column 8: GM EMAIL */}
@@ -743,31 +720,19 @@ export default function ClientPropertiesPage() {
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                            prop.status === 'ACTIVE'
+                            prop.status === 'ACTIVE' || prop.status === 'ONBOARDING'
                               ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                              : prop.status === 'ONBOARDING'
-                              ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60'
                               : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              prop.status === 'ACTIVE'
+                              prop.status === 'ACTIVE' || prop.status === 'ONBOARDING'
                                 ? 'bg-emerald-500'
-                                : prop.status === 'ONBOARDING'
-                                ? 'bg-purple-500'
                                 : 'bg-slate-400'
                             }`}
                           />
-                          {prop.status}
-                        </span>
-                      </td>
-
-                      {/* Column 10: STAGE */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ${stageBadge.bg} ${stageBadge.text} border ${stageBadge.border}`}>
-                          <GitBranch className="w-3 h-3" />
-                          <span>{stageBadge.label}</span>
+                          {prop.status === 'ACTIVE' || prop.status === 'ONBOARDING' ? 'Onboarded' : prop.status}
                         </span>
                       </td>
 

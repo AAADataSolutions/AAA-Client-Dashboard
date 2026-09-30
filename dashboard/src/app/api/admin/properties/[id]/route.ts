@@ -74,6 +74,15 @@ export async function PATCH(
     if (body.monthly_price !== undefined) {
       updatePayload.monthly_price = body.monthly_price === null || body.monthly_price === '' ? null : Number(body.monthly_price);
     }
+    if (body.partner_id !== undefined) {
+      updatePayload.partner_id = body.partner_id || null;
+    }
+    if (body.partner_commission_override !== undefined) {
+      updatePayload.partner_commission_override =
+        body.partner_commission_override !== null && body.partner_commission_override !== ''
+          ? Number(body.partner_commission_override)
+          : null;
+    }
     if (body.ray_baud_and_logs_enabled !== undefined) {
       updatePayload.ray_baud_and_logs_enabled = Boolean(body.ray_baud_and_logs_enabled);
     } else if (body.e911_status !== undefined) {
@@ -143,6 +152,66 @@ export async function PATCH(
 
     // Keep e911_records in sync with property e911 status
     if (updatePayload.ray_baud_and_logs_enabled !== undefined) {
+      const { data: opList } = await supabase
+        .from('organization_properties')
+        .select('id')
+        .eq('property_id', id);
+
+      if (opList && opList.length > 0) {
+        const isVer = updatePayload.ray_baud_and_logs_enabled;
+        for (const op of opList) {
+          const { data: existingE911 } = await supabase
+            .from('e911_records')
+            .select('id')
+            .eq('organization_property_id', op.id)
+            .maybeSingle();
+
+          if (existingE911) {
+            await supabase
+              .from('e911_records')
+              .update({
+                status: isVer ? 'VERIFIED' : 'PENDING',
+                verified_at: isVer ? new Date().toISOString() : null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existingE911.id);
+          } else {
+            await supabase.from('e911_records').insert({
+              organization_property_id: op.id,
+              emergency_address: `${updatedProp.address}, ${updatedProp.city}, ${updatedProp.state} ${updatedProp.zip_code}`,
+              status: isVer ? 'VERIFIED' : 'PENDING',
+              verified_at: isVer ? new Date().toISOString() : null,
+            });
+          }
+        }
+      }
+    }
+
+    // Update onboarding stage if specified
+    if (body.onboarding_stage !== undefined) {
+      const rawStage = String(body.onboarding_stage).trim().toUpperCase();
+      const STAGE_TRANSFORMS: Record<string, string> = {
+        'DRAFT INITIALIZED': 'DRAFT',
+        'DRAFT': 'DRAFT',
+        'CONTRACT SENT': 'CONTRACT_SENT',
+        'CONTRACT_SENT': 'CONTRACT_SENT',
+        'SIGNED': 'SIGNED',
+        'CONTRACT SIGNED & WAITING FOR LOA': 'SIGNED',
+        'PORTING WAITING': 'PORTING_WAITING',
+        'PORTING_WAITING': 'PORTING_WAITING',
+        'PORTING SUBMITTED': 'PORTING_SUBMITTED',
+        'PORTING_SUBMITTED': 'PORTING_SUBMITTED',
+        'SOF WAITING': 'SOF_WAITING',
+        'SOF REVIEW': 'SOF_WAITING',
+        'SOF_WAITING': 'SOF_WAITING',
+        'FOC RECEIVED': 'FOC_RECEIVED',
+        'FOC CONFIRMED': 'FOC_RECEIVED',
+        'FOC_RECEIVED': 'FOC_RECEIVED',
+        'ONBOARDED': 'COMPLETED',
+        'COMPLETED': 'COMPLETED',
+      };
+      const normalizedStage = STAGE_TRANSFORMS[rawStage] || rawStage;
+
       const { data: op } = await supabase
         .from('organization_properties')
         .select('id')
@@ -150,15 +219,23 @@ export async function PATCH(
         .maybeSingle();
 
       if (op) {
-        const isVer = updatePayload.ray_baud_and_logs_enabled;
-        await supabase
-          .from('e911_records')
-          .update({
-            status: isVer ? 'VERIFIED' : 'PENDING',
-            verified_at: isVer ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('organization_property_id', op.id);
+        const { data: existingOnboarding } = await supabase
+          .from('onboardings')
+          .select('id')
+          .eq('organization_property_id', op.id)
+          .maybeSingle();
+
+        if (existingOnboarding) {
+          await supabase
+            .from('onboardings')
+            .update({ status: normalizedStage, updated_at: new Date().toISOString() })
+            .eq('id', existingOnboarding.id);
+        } else {
+          await supabase.from('onboardings').insert({
+            organization_property_id: op.id,
+            status: normalizedStage,
+          });
+        }
       }
     }
 

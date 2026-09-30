@@ -97,6 +97,7 @@ export default function AdminOrganizationsPage() {
     currentPage,
     searchQuery,
     selectedStatus,
+    selectedTypeFilter,
     selectedPropFilter,
     loading,
     error,
@@ -128,6 +129,7 @@ export default function AdminOrganizationsPage() {
   const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<OrgRecord | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
+    type: 'GROUP' as 'GROUP' | 'INDIVIDUAL',
     address: '',
     city: '',
     state: '',
@@ -184,6 +186,7 @@ export default function AdminOrganizationsPage() {
         limit: '10',
         search: searchQuery,
         status: selectedStatus,
+        type: selectedTypeFilter,
         has_properties: selectedPropFilter,
         sortBy: sortBy,
       });
@@ -206,7 +209,7 @@ export default function AdminOrganizationsPage() {
       console.error('Error fetching organizations:', err);
       dispatch(setError(err.message || 'Error loading organizations.'));
     }
-  }, [currentPage, searchQuery, selectedStatus, selectedPropFilter, sortBy, dispatch]);
+  }, [currentPage, searchQuery, selectedStatus, selectedTypeFilter, selectedPropFilter, sortBy, dispatch]);
 
   useEffect(() => {
     fetchOrganizations();
@@ -214,17 +217,23 @@ export default function AdminOrganizationsPage() {
 
   // Client-side Instant Filtered Items (Keystroke reactivity)
   const displayedOrganizations = useMemo(() => {
-    if (!searchQuery.trim()) return organizations;
-    const lower = searchQuery.toLowerCase();
-    return organizations.filter(
-      (org: OrgRecord) =>
-        org.name.toLowerCase().includes(lower) ||
-        (org.address && org.address.toLowerCase().includes(lower)) ||
-        (org.contact_name && org.contact_name.toLowerCase().includes(lower)) ||
-        (org.email && org.email.toLowerCase().includes(lower)) ||
-        (org.phone && org.phone.toLowerCase().includes(lower))
-    );
-  }, [organizations, searchQuery]);
+    let result = organizations;
+    if (selectedTypeFilter !== 'ALL') {
+      result = result.filter((org) => (org.type || 'GROUP') === selectedTypeFilter);
+    }
+    if (searchQuery.trim()) {
+      const lower = searchQuery.toLowerCase();
+      result = result.filter(
+        (org: OrgRecord) =>
+          org.name.toLowerCase().includes(lower) ||
+          (org.address && org.address.toLowerCase().includes(lower)) ||
+          (org.contact_name && org.contact_name.toLowerCase().includes(lower)) ||
+          (org.email && org.email.toLowerCase().includes(lower)) ||
+          (org.phone && org.phone.toLowerCase().includes(lower))
+      );
+    }
+    return result;
+  }, [organizations, searchQuery, selectedTypeFilter]);
 
   // Open 3-Dots Action Menu (Upside detection)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, org: OrgRecord) => {
@@ -299,6 +308,7 @@ export default function AdminOrganizationsPage() {
     setSelectedOrgForEdit(org);
     setEditFormData({
       name: org.name || '',
+      type: (org.type === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GROUP') as 'GROUP' | 'INDIVIDUAL',
       address: org.street_address || org.address || '',
       city: org.city || '',
       state: org.state || '',
@@ -318,6 +328,7 @@ export default function AdminOrganizationsPage() {
 
     const updates = {
       name: editFormData.name.trim(),
+      type: editFormData.type,
       address: editFormData.address.trim(),
       street_address: editFormData.address.trim(),
       city: editFormData.city.trim(),
@@ -515,7 +526,7 @@ export default function AdminOrganizationsPage() {
     }
   };
 
-  const hasActiveFilters = searchQuery !== '' || selectedStatus !== 'ALL' || selectedPropFilter !== 'ALL';
+  const hasActiveFilters = searchQuery !== '' || selectedStatus !== 'ALL' || selectedTypeFilter !== 'ALL' || selectedPropFilter !== 'ALL';
 
   return (
     <motion.div
@@ -672,6 +683,18 @@ export default function AdminOrganizationsPage() {
             )}
           </div>
 
+          {/* Type Filter */}
+          <select
+            value={selectedTypeFilter}
+            onChange={(e) => dispatch(setFilters({ selectedTypeFilter: e.target.value, currentPage: 1 }))}
+            aria-label="Filter by management group type"
+            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+          >
+            <option value="ALL">All Types</option>
+            <option value="GROUP">Group</option>
+            <option value="INDIVIDUAL">Individual</option>
+          </select>
+
           {/* Status Filter */}
           <select
             value={selectedStatus}
@@ -715,7 +738,7 @@ export default function AdminOrganizationsPage() {
         {hasActiveFilters && (
           <button
             onClick={() => {
-              dispatch(setFilters({ searchQuery: '', selectedStatus: 'ALL', selectedPropFilter: 'ALL', currentPage: 1 }));
+              dispatch(setFilters({ searchQuery: '', selectedStatus: 'ALL', selectedTypeFilter: 'ALL', selectedPropFilter: 'ALL', currentPage: 1 }));
               setSortBy('NEWEST');
             }}
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium self-end lg:self-auto"
@@ -781,11 +804,11 @@ export default function AdminOrganizationsPage() {
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap w-16">
                     Logo
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[200px]">
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[240px]">
                     Management Group Name
                   </th>
-                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[240px]">
-                    Address
+                  <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[110px]">
+                    Type
                   </th>
                   <th className="py-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap min-w-[150px]">
                     Primary Contact
@@ -840,9 +863,9 @@ export default function AdminOrganizationsPage() {
                         )}
                       </td>
 
-                      {/* Column 1: Organization Name */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[200px]">
-                        <div className="flex items-center gap-2">
+                      {/* Column 2: Management Group Name with Address directly under */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[240px]">
+                        <div className="flex flex-col gap-0.5">
                           <Link
                             href={`/admin/organizations/${org.id}`}
                             className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer flex items-center gap-1.5"
@@ -850,17 +873,27 @@ export default function AdminOrganizationsPage() {
                             <span>{org.name}</span>
                             <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </Link>
+                          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[240px]" title={org.address}>
+                            <MapPin className="w-3 h-3 shrink-0 text-slate-400" />
+                            <span className="truncate">{org.address || 'Address not specified'}</span>
+                          </div>
                         </div>
                       </td>
 
-                      {/* Column 2: Address */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[240px]">
-                        <div className="text-slate-700 dark:text-slate-300 truncate max-w-[230px]" title={org.address}>
-                          {org.address || 'Address not specified'}
-                        </div>
+                      {/* Column 3: Type (Individual vs Group) */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[110px]">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border ${
+                            (org.type || 'GROUP') === 'INDIVIDUAL'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                              : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25'
+                          }`}
+                        >
+                          {(org.type || 'GROUP') === 'INDIVIDUAL' ? 'Individual' : 'Group'}
+                        </span>
                       </td>
 
-                      {/* Column 3: Primary Contact Name */}
+                      {/* Column 4: Primary Contact Name */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap min-w-[150px]">
                         <span className="font-semibold text-slate-900 dark:text-white">
                           {org.contact_name || (org as any).primary_contact_name || '—'}
@@ -1252,19 +1285,32 @@ export default function AdminOrganizationsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">Status</label>
-                  <select
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                    <option value="PENDING_ONBOARDING">Pending Onboarding</option>
-                    <option value="SUSPENDED">Suspended</option>
-                    <option value="ARCHIVED">Archived</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">Type</label>
+                    <select
+                      value={editFormData.type}
+                      onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as any })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                    >
+                      <option value="GROUP">Group</option>
+                      <option value="INDIVIDUAL">Individual</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">Status</label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                      <option value="PENDING_ONBOARDING">Pending Onboarding</option>
+                      <option value="SUSPENDED">Suspended</option>
+                      <option value="ARCHIVED">Archived</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">

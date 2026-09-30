@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
+import { sendInviteEmail } from '@/lib/email/mailer';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.max(1, parseInt(searchParams.get('limit') || '10', 10));
     const search = searchParams.get('search')?.trim().toLowerCase() || '';
     const status = searchParams.get('status') || 'ALL';
+    const typeFilter = searchParams.get('type') || 'ALL';
     const hasPropertiesFilter = searchParams.get('has_properties') || 'ALL';
     const sortBy = searchParams.get('sortBy') || 'NEWEST';
 
@@ -105,7 +107,7 @@ export async function GET(request: NextRequest) {
         id: org.id,
         name: org.name,
         logo_url: org.logo_url || null,
-        type: org.type || 'Client Organization',
+        type: org.type === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GROUP',
         address: formattedAddress,
         street_address: org.address || '',
         city: org.city || '',
@@ -160,6 +162,10 @@ export async function GET(request: NextRequest) {
 
     if (status !== 'ALL') {
       filtered = filtered.filter((o: any) => o.status === status);
+    }
+
+    if (typeFilter !== 'ALL') {
+      filtered = filtered.filter((o: any) => (o.type || 'GROUP') === typeFilter);
     }
 
     if (hasPropertiesFilter === 'NO_PROPERTIES') {
@@ -244,6 +250,7 @@ export async function POST(request: NextRequest) {
       contact_name,
       contact_email,
       contact_phone,
+      type = 'GROUP',
       status = 'ACTIVE',
     } = body;
 
@@ -255,6 +262,7 @@ export async function POST(request: NextRequest) {
     }
 
     const adminContactEmail = (contact_email || email || '').trim().toLowerCase();
+    const orgType = (type === 'INDIVIDUAL' || type === 'Individual') ? 'INDIVIDUAL' : 'GROUP';
 
     // 1. Insert Organization record
     const { data: newOrg, error: orgErr } = await dbClient
@@ -268,6 +276,7 @@ export async function POST(request: NextRequest) {
         country: country?.trim() || 'USA',
         phone: phone?.trim() || contact_phone?.trim() || null,
         email: adminContactEmail || null,
+        type: orgType,
         status: status || 'ACTIVE',
       })
       .select()
@@ -304,6 +313,15 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
         const inviteUrl = `${baseUrl}/invite/${rawToken}`;
 
+        // Send invite email directly to the contact
+        await sendInviteEmail({
+          recipientEmail: adminContactEmail,
+          inviteUrl,
+          roleName: 'Organization Administrator',
+          organizationName: newOrg.name,
+          invitedByName: 'AAA Data Solutions Admin Team',
+        });
+
         inviteInfo = {
           id: invite.id,
           rawToken,
@@ -322,10 +340,11 @@ export async function POST(request: NextRequest) {
       entity_id: newOrg.id,
       entity_name: newOrg.name,
       organization_id: newOrg.id,
-      description: `Created new organization '${newOrg.name}' with status ${newOrg.status}`,
+      description: `Created new organization '${newOrg.name}' (${orgType}) with status ${newOrg.status}`,
       changes: {
         id: newOrg.id,
         name: newOrg.name,
+        type: orgType,
         status: newOrg.status,
         address: newOrg.address,
         city: newOrg.city,

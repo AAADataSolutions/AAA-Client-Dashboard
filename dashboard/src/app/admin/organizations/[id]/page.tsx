@@ -1556,12 +1556,11 @@ export default function OrganizationDetailPage({
                 <tr>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">Property</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[120px]">Monthly Price</th>
-                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[160px]">Location</th>
+                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">Main Phone No.</th>
                   <th className="py-3 px-3.5 font-bold text-center whitespace-nowrap min-w-[100px]">No. of Services</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">E911 Status</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">Ray Baum and Kary's Law</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">GM Name</th>
-                  <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">GM Phone</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">GM Email</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">Property Status</th>
                   <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">Stage</th>
@@ -1571,21 +1570,29 @@ export default function OrganizationDetailPage({
               <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
                 {org.properties?.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-12 text-center text-slate-400 text-xs">
+                    <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
                       No properties assigned to this organization yet.
                     </td>
                   </tr>
                 ) : (
                   org.properties?.map((prop: any) => (
                     <tr key={prop.id || prop.link_id} className="hover:bg-slate-50/60 dark:hover:bg-[#181920] transition">
-                      {/* Property */}
-                      <td className="py-3.5 px-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                      {/* Property with Address underneath */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
                         <Link
                           href={`/admin/properties`}
-                          className="hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer"
+                          className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer block"
                         >
                           {prop.name}
                         </Link>
+                        <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
+                          <MapPin className="w-3 h-3 shrink-0 text-slate-400" />
+                          <span>
+                            {prop.city
+                              ? `${prop.address ? prop.address + ', ' : ''}${prop.city}, ${prop.state || prop.country || ''} ${prop.zip_code || ''}`
+                              : (prop.address || '—')}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Monthly Price */}
@@ -1595,9 +1602,19 @@ export default function OrganizationDetailPage({
                           : '—'}
                       </td>
 
-                      {/* Location */}
-                      <td className="py-3.5 px-3.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {prop.city && prop.state ? `${prop.city}, ${prop.state}` : (prop.address || '—')}
+                      {/* Main Phone No. */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        {prop.main_phone ? (
+                          <button
+                            onClick={(e) => handleCopy(prop.main_phone, `main-p-${prop.id}`, e)}
+                            className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 cursor-pointer"
+                          >
+                            <span>{prop.main_phone}</span>
+                            {copiedId === `main-p-${prop.id}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
 
                       {/* No. of Services */}
@@ -1639,21 +1656,6 @@ export default function OrganizationDetailPage({
                       {/* GM Name */}
                       <td className="py-3.5 px-3.5 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                         {prop.general_manager_name || '—'}
-                      </td>
-
-                      {/* GM Phone */}
-                      <td className="py-3.5 px-3.5 whitespace-nowrap">
-                        {prop.general_manager_phone && prop.general_manager_phone !== '—' ? (
-                          <button
-                            onClick={(e) => handleCopy(prop.general_manager_phone, `gm-p-${prop.id}`, e)}
-                            className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 cursor-pointer"
-                          >
-                            <span>{prop.general_manager_phone}</span>
-                            {copiedId === `gm-p-${prop.id}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
-                          </button>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
                       </td>
 
                       {/* GM Email */}

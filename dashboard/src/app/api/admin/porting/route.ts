@@ -54,8 +54,25 @@ export async function GET(request: NextRequest) {
         organization:organizations(id, name),
         organization_property:organization_properties(
           id,
-          property:properties(id, name, address, city, state, zip_code, main_phone),
-          organization:organizations(id, name)
+          status,
+          property:properties(*),
+          organization:organizations(id, name),
+          onboardings(
+            id,
+            status,
+            target_date,
+            draft_date,
+            contract_sent_date,
+            signed_date,
+            porting_submitted_date,
+            sof_review_date,
+            foc_confirmed_date,
+            live_cutover_date,
+            assigned_to,
+            assigned_to_name,
+            internal_notes,
+            attachments
+          )
         ),
         attachments:porting_attachments(
           id, file_name, file_size, mime_type, storage_path, created_at
@@ -70,7 +87,7 @@ export async function GET(request: NextRequest) {
       if (statusFilter === 'ACTION_REQUIRED') {
         query = query.in('status', ['REJECTED', 'CANCELLED', 'PENDING']);
       } else if (statusFilter === 'IN_PROGRESS_ALL') {
-        query = query.in('status', ['IN_PROGRESS', 'SUBMITTED', 'DRAFT']);
+        query = query.in('status', ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'PORTING_SUBMITTED', 'SOF_WAITING']);
       } else {
         query = query.eq('status', statusFilter);
       }
@@ -128,6 +145,7 @@ export async function GET(request: NextRequest) {
       const prop = Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property;
       const directOrg = Array.isArray(item.organization) ? item.organization[0] : item.organization;
       const org = directOrg || (Array.isArray(orgProp?.organization) ? orgProp?.organization[0] : orgProp?.organization);
+      const ob = Array.isArray(orgProp?.onboardings) ? orgProp?.onboardings[0] : orgProp?.onboardings;
 
       const services = (item.services || []).map((s: any) => {
         const svc = s.service || s;
@@ -140,27 +158,78 @@ export async function GET(request: NextRequest) {
         };
       });
 
+      const effectiveStatus = item.status || ob?.status || 'DRAFT';
+      let progressPct = 14;
+      switch (effectiveStatus) {
+        case 'DRAFT': progressPct = 14; break;
+        case 'CONTRACT_SENT': progressPct = 28; break;
+        case 'SIGNED': progressPct = 42; break;
+        case 'PORTING_SUBMITTED':
+        case 'SUBMITTED':
+        case 'IN_PROGRESS': progressPct = 57; break;
+        case 'SOF_WAITING': progressPct = 71; break;
+        case 'FOC_RECEIVED': progressPct = 85; break;
+        case 'COMPLETED': progressPct = 100; break;
+        default: progressPct = 14;
+      }
+
+      // Merge porting attachments & onboarding attachments
+      const rawAtts = item.attachments || [];
+      const obAtts = Array.isArray(ob?.attachments) ? ob.attachments : [];
+      const mergedAtts = [...rawAtts];
+      obAtts.forEach((oa: any) => {
+        if (!mergedAtts.some((a: any) => a.storage_path === oa.storage_path || (a.id && a.id === oa.id))) {
+          mergedAtts.push(oa);
+        }
+      });
+
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
+        onboarding_id: ob?.id || null,
         property_id: prop?.id || '',
         property_name: item.property_name || prop?.name || 'New Property',
         property_address: item.property_address || (prop?.address
           ? `${prop.address}, ${prop.city || ''}, ${prop.state || ''} ${prop.zip_code || ''}`.trim()
           : 'Address pending'),
+        partner_id: prop?.partner_id || null,
+        partner_commission_override: prop?.partner_commission_override ?? null,
         property_phone: item.property_phone || prop?.main_phone || '—',
-        fax: item.fax || '—',
+        fax: item.fax || prop?.fax || '—',
+        monthly_price: prop?.monthly_price || null,
+        general_manager_name: prop?.general_manager_name || prop?.contact_person_name || 'N/A',
+        general_manager_phone: prop?.general_manager_phone || prop?.main_phone || 'N/A',
+        general_manager_email: prop?.general_manager_email || prop?.contact_person_email || 'N/A',
+        city: prop?.city || '',
+        state: prop?.state || '',
+        zip_code: prop?.zip_code || '',
+        country: prop?.country || 'USA',
+        e911_status: (prop?.ray_baud_and_logs_enabled || prop?.status === 'ACTIVE') ? 'VERIFIED' : 'AUDIT_REQUIRED',
+        ray_baud_and_logs_enabled: prop?.ray_baud_and_logs_enabled ?? false,
+        ray_baum_status: prop?.ray_baum_status || (prop?.ray_baud_and_logs_enabled ? 'ACTIVE' : 'INACTIVE'),
         carrier_details: item.carrier_details || '',
         organization_id: org?.id || item.organization_id || '',
         organization_name: org?.name || 'Organization',
-        status: item.status || 'SUBMITTED',
-        target_date: item.target_date,
+        status: effectiveStatus,
+        stage: effectiveStatus,
+        progress_pct: progressPct,
+        target_date: item.target_date || ob?.target_date || null,
+        draft_date: ob?.draft_date || null,
+        contract_sent_date: ob?.contract_sent_date || null,
+        signed_date: ob?.signed_date || null,
+        porting_submitted_date: ob?.porting_submitted_date || null,
+        sof_review_date: ob?.sof_review_date || null,
+        foc_confirmed_date: ob?.foc_confirmed_date || null,
+        live_cutover_date: ob?.live_cutover_date || null,
+        assigned_to: ob?.assigned_to || null,
+        assigned_to_name: ob?.assigned_to_name || null,
+        internal_notes: ob?.internal_notes || item.notes || null,
         foc_date: item.foc_date,
         completed_at: item.completed_at,
         rejection_reason: item.rejection_reason,
-        notes: item.notes,
+        notes: item.notes || ob?.internal_notes || null,
         is_activated: item.is_activated || false,
-        attachments: item.attachments || [],
+        attachments: mergedAtts,
         services_count: services.length,
         services: services,
         created_at: item.created_at,
@@ -229,8 +298,22 @@ export async function POST(request: NextRequest) {
       organization_id,
       property_name,
       property_address,
+      city,
+      state,
+      zip_code,
+      country,
       property_phone,
       fax,
+      monthly_price,
+      general_manager_name,
+      general_manager_phone,
+      general_manager_email,
+      partner_id,
+      partner_commission_override,
+      e911_status,
+      ray_baud_and_logs_enabled,
+      ray_baum_status,
+      target_date,
       carrier_details,
       status,
       attachments,
@@ -243,18 +326,99 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert porting request
+    const isE911 = ray_baud_and_logs_enabled !== undefined
+      ? Boolean(ray_baud_and_logs_enabled)
+      : (e911_status === 'VERIFIED');
+
+    const fullAddress = property_address?.trim() || 'Address Pending';
+    const finalCity = city?.trim() || 'Pending';
+    const finalState = state?.trim() || 'Pending';
+    const finalZip = zip_code?.trim() || '00000';
+
+    // 1. Create property record in properties table with all details
+    const { data: newProp, error: propErr } = await db
+      .from('properties')
+      .insert({
+        name: property_name.trim(),
+        address: fullAddress,
+        city: finalCity,
+        state: finalState,
+        zip_code: finalZip,
+        country: country?.trim() || 'USA',
+        main_phone: property_phone.trim(),
+        fax: fax ? fax.trim() : null,
+        monthly_price: monthly_price ? Number(monthly_price) : null,
+        partner_id: partner_id || null,
+        partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
+        general_manager_name: general_manager_name ? general_manager_name.trim() : null,
+        general_manager_phone: general_manager_phone ? general_manager_phone.trim() : null,
+        general_manager_email: general_manager_email ? general_manager_email.trim() : null,
+        ray_baud_and_logs_enabled: isE911,
+        ray_baum_status: ray_baum_status || (isE911 ? 'ACTIVE' : 'INACTIVE'),
+        status: 'ONBOARDING',
+      })
+      .select()
+      .single();
+
+    let createdOpId: string | null = null;
+    if (newProp && organization_id) {
+      // 2. Link in organization_properties
+      const { data: newOp } = await db
+        .from('organization_properties')
+        .insert({
+          organization_id,
+          property_id: newProp.id,
+          status: 'ACTIVE',
+        })
+        .select('id')
+        .single();
+
+      if (newOp) {
+        createdOpId = newOp.id;
+
+    // 3. Create initial onboarding record with initial stage and dates
+        const onboardingData: Record<string, any> = {
+          organization_property_id: newOp.id,
+          status: status || 'DRAFT',
+          target_date: target_date || null,
+        };
+        if (body.draft_date) onboardingData.draft_date = body.draft_date;
+        if (body.contract_sent_date) onboardingData.contract_sent_date = body.contract_sent_date;
+        if (body.signed_date) onboardingData.signed_date = body.signed_date;
+        if (body.porting_submitted_date) onboardingData.porting_submitted_date = body.porting_submitted_date;
+        if (body.sof_review_date) onboardingData.sof_review_date = body.sof_review_date;
+        if (body.foc_confirmed_date) onboardingData.foc_confirmed_date = body.foc_confirmed_date;
+        if (body.live_cutover_date) onboardingData.live_cutover_date = body.live_cutover_date;
+        if (body.assigned_to) onboardingData.assigned_to = body.assigned_to;
+        if (body.assigned_to_name) onboardingData.assigned_to_name = body.assigned_to_name;
+        if (body.internal_notes) onboardingData.internal_notes = body.internal_notes;
+
+        await db.from('onboardings').insert(onboardingData);
+
+        // 4. Create e911 record
+        await db.from('e911_records').insert({
+          organization_property_id: newOp.id,
+          emergency_address: `${fullAddress}, ${finalCity}, ${finalState} ${finalZip}`,
+          status: isE911 ? 'VERIFIED' : 'PENDING',
+          verified_at: isE911 ? new Date().toISOString() : null,
+        });
+      }
+    }
+
+    // 5. Insert porting request
     const { data: newPorting, error: insertErr } = await db
       .from('porting_requests')
       .insert({
         organization_id: organization_id || null,
+        organization_property_id: createdOpId,
         created_by: user?.id || null,
         property_name: property_name.trim(),
-        property_address: property_address ? property_address.trim() : null,
+        property_address: `${fullAddress}${finalCity !== 'Pending' ? `, ${finalCity}, ${finalState} ${finalZip}` : ''}`,
         property_phone: property_phone.trim(),
         fax: fax ? fax.trim() : null,
         carrier_details: carrier_details ? carrier_details.trim() : null,
-        status: status || 'SUBMITTED',
+        target_date: target_date || null,
+        status: status || 'DRAFT',
         is_activated: false,
       })
       .select()
@@ -264,7 +428,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: insertErr.message }, { status: 400 });
     }
 
-    // Insert attachments if provided
+    // 6. Insert attachments if provided
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const attRows = attachments.map((att: any) => ({
         porting_request_id: newPorting.id,
@@ -299,7 +463,44 @@ export async function PATCH(request: NextRequest) {
     const db = adminClient || supabase;
 
     const body = await request.json();
-    const { id, status, foc_date, target_date, rejection_reason, notes } = body;
+    const {
+      id,
+      status,
+      foc_date,
+      target_date,
+      rejection_reason,
+      notes,
+      draft_date,
+      contract_sent_date,
+      signed_date,
+      porting_submitted_date,
+      sof_review_date,
+      foc_confirmed_date,
+      live_cutover_date,
+      assigned_to,
+      assigned_to_name,
+      internal_notes,
+      attachments,
+      property_name,
+      property_address,
+      city,
+      state,
+      zip_code,
+      country,
+      property_phone,
+      fax,
+      monthly_price,
+      general_manager_name,
+      general_manager_phone,
+      general_manager_email,
+      partner_id,
+      partner_commission_override,
+      e911_status,
+      ray_baud_and_logs_enabled,
+      ray_baum_status,
+      carrier_details,
+      organization_id,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Porting Request ID is required.' }, { status: 400 });
@@ -312,18 +513,117 @@ export async function PATCH(request: NextRequest) {
     if (foc_date !== undefined) updatePayload.foc_date = foc_date;
     if (target_date !== undefined) updatePayload.target_date = target_date;
     if (rejection_reason !== undefined) updatePayload.rejection_reason = rejection_reason;
-    if (notes !== undefined) updatePayload.notes = notes;
-    if (status === 'COMPLETED') updatePayload.completed_at = new Date().toISOString();
+    if (notes !== undefined || internal_notes !== undefined) {
+      updatePayload.notes = internal_notes || notes;
+    }
+    if (property_name !== undefined) updatePayload.property_name = property_name.trim();
+    if (property_address !== undefined) updatePayload.property_address = property_address.trim();
+    if (property_phone !== undefined) updatePayload.property_phone = property_phone.trim();
+    if (fax !== undefined) updatePayload.fax = fax ? fax.trim() : null;
+    if (carrier_details !== undefined) updatePayload.carrier_details = carrier_details ? carrier_details.trim() : null;
+    if (organization_id !== undefined) updatePayload.organization_id = organization_id || null;
+    if (status === 'COMPLETED') {
+      updatePayload.completed_at = new Date().toISOString();
+      updatePayload.is_activated = true;
+    }
 
     const { data: updated, error } = await db
       .from('porting_requests')
       .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select('*, organization_property:organization_properties(id, property_id)')
       .single();
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    const orgPropId = updated?.organization_property_id;
+    const propId = updated?.organization_property?.property_id;
+
+    // 1. Update Property table if property fields were passed
+    if (propId) {
+      const propUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (property_name !== undefined) propUpdate.name = property_name.trim();
+      if (property_address !== undefined) propUpdate.address = property_address.trim();
+      if (city !== undefined) propUpdate.city = city.trim();
+      if (state !== undefined) propUpdate.state = state.trim();
+      if (zip_code !== undefined) propUpdate.zip_code = zip_code.trim();
+      if (country !== undefined) propUpdate.country = country.trim();
+      if (property_phone !== undefined) propUpdate.main_phone = property_phone.trim();
+      if (fax !== undefined) propUpdate.fax = fax ? fax.trim() : null;
+      if (monthly_price !== undefined) propUpdate.monthly_price = monthly_price ? Number(monthly_price) : null;
+      if (partner_id !== undefined) propUpdate.partner_id = partner_id || null;
+      if (partner_commission_override !== undefined) {
+        propUpdate.partner_commission_override =
+          partner_commission_override !== null && partner_commission_override !== ''
+            ? Number(partner_commission_override)
+            : null;
+      }
+      if (general_manager_name !== undefined) propUpdate.general_manager_name = general_manager_name ? general_manager_name.trim() : null;
+      if (general_manager_phone !== undefined) propUpdate.general_manager_phone = general_manager_phone ? general_manager_phone.trim() : null;
+      if (general_manager_email !== undefined) propUpdate.general_manager_email = general_manager_email ? general_manager_email.trim() : null;
+      if (ray_baud_and_logs_enabled !== undefined) propUpdate.ray_baud_and_logs_enabled = Boolean(ray_baud_and_logs_enabled);
+      if (ray_baum_status !== undefined) propUpdate.ray_baum_status = ray_baum_status;
+      if (status === 'COMPLETED') propUpdate.status = 'ACTIVE';
+
+      await db.from('properties').update(propUpdate).eq('id', propId);
+    }
+
+    // 2. Sync organization_properties if organization_id changed
+    if (orgPropId && organization_id !== undefined) {
+      await db
+        .from('organization_properties')
+        .update({ organization_id: organization_id || null, updated_at: new Date().toISOString() })
+        .eq('id', orgPropId);
+    }
+
+    // 3. Sync onboarding table if linked
+    if (orgPropId) {
+      const obUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (status !== undefined) obUpdate.status = status;
+      if (target_date !== undefined) obUpdate.target_date = target_date;
+      if (draft_date !== undefined) obUpdate.draft_date = draft_date;
+      if (contract_sent_date !== undefined) obUpdate.contract_sent_date = contract_sent_date;
+      if (signed_date !== undefined) obUpdate.signed_date = signed_date;
+      if (porting_submitted_date !== undefined) obUpdate.porting_submitted_date = porting_submitted_date;
+      if (sof_review_date !== undefined) obUpdate.sof_review_date = sof_review_date;
+      if (foc_confirmed_date !== undefined) obUpdate.foc_confirmed_date = foc_confirmed_date;
+      if (live_cutover_date !== undefined) obUpdate.live_cutover_date = live_cutover_date;
+      if (assigned_to !== undefined) obUpdate.assigned_to = assigned_to;
+      if (assigned_to_name !== undefined) obUpdate.assigned_to_name = assigned_to_name;
+      if (internal_notes !== undefined) obUpdate.internal_notes = internal_notes;
+      if (attachments !== undefined) obUpdate.attachments = attachments;
+      if (status === 'COMPLETED') obUpdate.completed_at = new Date().toISOString();
+
+      await db
+        .from('onboardings')
+        .update(obUpdate)
+        .eq('organization_property_id', orgPropId);
+    }
+
+    // 4. Insert new attachments into porting_attachments if provided
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      const newAtts = attachments.filter((a: any) => !a.id);
+      if (newAtts.length > 0) {
+        const attRows = newAtts.map((att: any) => ({
+          porting_request_id: id,
+          uploaded_by: user?.id || null,
+          file_name: att.file_name,
+          file_size: att.file_size || 0,
+          mime_type: att.mime_type || 'application/pdf',
+          storage_path: att.storage_path,
+        }));
+        await db.from('porting_attachments').insert(attRows);
+      }
     }
 
     await logAuditEvent({

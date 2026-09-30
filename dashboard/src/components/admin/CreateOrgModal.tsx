@@ -31,6 +31,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     name: '',
+    type: 'GROUP' as 'GROUP' | 'INDIVIDUAL',
     address: '',
     city: '',
     state: '',
@@ -74,6 +75,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name.trim(),
+          type: formData.type,
           address: formData.address.trim() || null,
           city: formData.city.trim() || null,
           state: formData.state.trim() || null,
@@ -235,19 +237,36 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                       Management Group Details
                     </span>
 
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                        Management Group Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="e.g., Marriott Hospitality Group"
-                        required
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                          Management Group Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          placeholder="e.g., Marriott Hospitality Group"
+                          required
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                          Type <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          name="type"
+                          value={formData.type}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs cursor-pointer"
+                        >
+                          <option value="GROUP">Group</option>
+                          <option value="INDIVIDUAL">Individual</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -336,7 +355,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
 
                       <div className="space-y-1.5">
                         <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          Admin Email Address <span className="text-slate-400 font-normal">(Receives Invite)</span>
+                          Admin Email Address
                         </label>
                         <input
                           type="email"

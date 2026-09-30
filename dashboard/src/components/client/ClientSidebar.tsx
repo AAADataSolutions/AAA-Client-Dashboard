@@ -55,8 +55,7 @@ const navItems: NavItem[] = [
     ],
   },
   { label: "E911 Compliance", href: '/dashboard/e911', icon: ShieldCheck },
-  { label: 'Onboarding Tracker', href: '/dashboard/onboarding', icon: GitBranch },
-  { label: 'Porting Tracker', href: '/dashboard/porting', icon: ArrowLeftRight },
+  { label: 'Porting', href: '/dashboard/porting', icon: ArrowLeftRight },
   { label: 'Support Tickets', href: '/dashboard/tickets', icon: LifeBuoy },
   { label: 'Account & Team', href: '/dashboard/account', icon: Users },
 ];
