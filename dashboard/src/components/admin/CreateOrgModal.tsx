@@ -189,7 +189,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                       {createdInvite.orgName} is Ready!
                     </h4>
                     <p className="text-slate-600 dark:text-slate-300 text-xs max-w-md mx-auto leading-relaxed">
-                      An invitation token was generated for <strong className="text-slate-900 dark:text-white">{createdInvite.email}</strong>. The client admin will set their own password upon opening.
+                      An invitation email has been dispatched to <strong className="text-slate-900 dark:text-white">{createdInvite.email}</strong>. The client admin can also use the secure link below to activate their account and set their password.
                     </p>
                   </div>
 

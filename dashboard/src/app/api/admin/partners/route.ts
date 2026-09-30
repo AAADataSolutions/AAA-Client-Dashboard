@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { sendInviteEmail } from '@/lib/email/mailer';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -171,12 +172,22 @@ export async function POST(request: NextRequest) {
     const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
     const inviteUrl = `${origin}/invite/${rawToken}`;
 
+    // Dispatch invite email to partner
+    const emailResult = await sendInviteEmail({
+      recipientEmail: cleanEmail,
+      inviteUrl,
+      inviteType: 'PARTNER',
+      roleName: 'Channel Partner',
+      partnerName: newPartner.name,
+      invitedByName: 'AAA Data Solutions Management',
+    });
+
     await logAuditEvent({
       action: 'PARTNER_CREATED',
       entity_type: 'PARTNER',
       entity_id: newPartner.id,
       entity_name: newPartner.name,
-      changes: { ...newPartner, invite_created: Boolean(inviteRecord) },
+      changes: { ...newPartner, invite_created: Boolean(inviteRecord), email_sent: emailResult.success },
     });
 
     return NextResponse.json({
@@ -184,6 +195,8 @@ export async function POST(request: NextRequest) {
       data: newPartner,
       inviteUrl,
       rawToken,
+      emailSent: emailResult.success,
+      emailSkipped: emailResult.skipped,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });

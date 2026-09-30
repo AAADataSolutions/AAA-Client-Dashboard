@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendInviteEmail } from '@/lib/email/mailer';
 import crypto from 'crypto';
 
 export async function POST(
@@ -53,12 +54,28 @@ export async function POST(
     const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
     const inviteUrl = `${origin}/invite/${rawToken}`;
 
+    // Dispatch automated invitation email
+    const emailResult = await sendInviteEmail({
+      recipientEmail: cleanEmail,
+      inviteUrl,
+      inviteType: 'PARTNER',
+      roleName: 'Channel Partner',
+      partnerName: partner.name,
+      invitedByName: 'AAA Data Solutions Management',
+    });
+
     return NextResponse.json({
       success: true,
       inviteUrl,
       rawToken,
+      emailSent: emailResult.success,
+      emailSkipped: emailResult.skipped,
+      message: emailResult.success
+        ? `Invitation email dispatched to ${cleanEmail}.`
+        : `Invitation link generated successfully.`,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+

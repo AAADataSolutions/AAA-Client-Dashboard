@@ -145,6 +145,7 @@ export async function POST(
       roleName: role === 'ADMIN' ? 'Organization Administrator' : 'Organization Member',
       organizationName: org.name,
       invitedByName: user.email || 'An administrator',
+      inviteType: 'MANAGEMENT_GROUP',
     });
 
     // Audit Log

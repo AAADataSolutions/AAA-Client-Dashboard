@@ -159,6 +159,7 @@ export async function POST(request: Request) {
           : (target_org_role === 'ADMIN' ? 'Organization Administrator' : 'Organization Member'),
       organizationName: orgName,
       invitedByName: callerProfile?.full_name || user.email || 'An administrator',
+      inviteType: invite_type === 'INTERNAL_TEAM' ? 'INTERNAL_TEAM' : 'CLIENT_MEMBER',
     });
 
     await logAdminAction({

@@ -314,9 +314,10 @@ export async function POST(request: NextRequest) {
         const inviteUrl = `${baseUrl}/invite/${rawToken}`;
 
         // Send invite email directly to the contact
-        await sendInviteEmail({
+        const emailResult = await sendInviteEmail({
           recipientEmail: adminContactEmail,
           inviteUrl,
+          inviteType: 'MANAGEMENT_GROUP',
           roleName: 'Organization Administrator',
           organizationName: newOrg.name,
           invitedByName: 'AAA Data Solutions Admin Team',
@@ -329,6 +330,8 @@ export async function POST(request: NextRequest) {
           expires_at: expiresAt,
           email: adminContactEmail,
           contact_name: contact_name || 'Organization Admin',
+          emailSent: emailResult.success,
+          emailSkipped: emailResult.skipped,
         };
       }
     }

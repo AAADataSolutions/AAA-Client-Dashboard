@@ -253,7 +253,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: insertErr.message }, { status: 400 });
     }
 
-    // Insert attachments if provided
+    // Insert attachments if provided and download for email
+    const emailAttachments: { filename: string; content: Buffer; contentType?: string }[] = [];
+
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const attRows = attachments.map((att: any) => ({
         porting_request_id: newPorting.id,
@@ -265,9 +267,30 @@ export async function POST(request: NextRequest) {
       }));
 
       await dbClient.from('porting_attachments').insert(attRows);
+
+      // Download each attachment from Supabase storage for the email
+      for (const att of attachments) {
+        if (!att.storage_path) continue;
+        try {
+          let downloadRes = await dbClient.storage.from('porting-attachments').download(att.storage_path);
+          if (downloadRes.error || !downloadRes.data) {
+            downloadRes = await dbClient.storage.from('attachments').download(att.storage_path);
+          }
+          if (downloadRes.data) {
+            const arrayBuf = await downloadRes.data.arrayBuffer();
+            emailAttachments.push({
+              filename: att.file_name || 'attachment.pdf',
+              content: Buffer.from(arrayBuf),
+              contentType: att.mime_type || downloadRes.data.type || 'application/octet-stream',
+            });
+          }
+        } catch (downloadErr) {
+          console.warn(`Could not download attachment ${att.file_name} for email:`, downloadErr);
+        }
+      }
     }
 
-    // Send email alert via SMTP
+    // Send email alert via SMTP with attachments to dedicated support email
     const orgName = (member.organization as any)?.name || 'Client Organization';
     const profile = (member.profile as any) || { full_name: 'User', email: user.email };
 
@@ -281,7 +304,8 @@ export async function POST(request: NextRequest) {
       organizationName: orgName,
       submittedByName: profile.full_name || 'Client Member',
       submittedByEmail: profile.email || user.email || '',
-      attachmentCount: attachments?.length || 0,
+      attachmentCount: emailAttachments.length || attachments?.length || 0,
+      attachments: emailAttachments,
     });
 
     // Notify all admins via in-app notifications
