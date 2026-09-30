@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/lib/auth/auth-context';
 import {
   Users,
   Search,
@@ -85,6 +86,8 @@ interface PartnerInvoiceItem {
 }
 
 export default function AdminPartnersPage() {
+  const { profile, effectiveRole } = useAuth();
+  const isSuperAdmin = effectiveRole === 'SUPER_ADMIN' || profile?.role === 'SUPER_ADMIN';
   const [activeTab, setActiveTab] = useState<'PARTNERS' | 'INVOICES'>('PARTNERS');
 
   // Partners state
@@ -1195,9 +1198,9 @@ export default function AdminPartnersPage() {
                     <thead className="bg-slate-50 dark:bg-[#111217] border-b border-slate-200 dark:border-[#222430] font-bold text-slate-700 dark:text-slate-300 uppercase text-[10.5px]">
                       <tr>
                         <th className="py-2.5 px-3">PROPERTY</th>
-                        <th className="py-2.5 px-3">MONTHLY PRICE</th>
+                        {isSuperAdmin && <th className="py-2.5 px-3">MONTHLY PRICE</th>}
                         <th className="py-2.5 px-3">PARTNER SHARE</th>
-                        <th className="py-2.5 px-3">MONTHLY COMMISSION</th>
+                        {isSuperAdmin && <th className="py-2.5 px-3">MONTHLY COMMISSION</th>}
                         <th className="py-2.5 px-3 text-right">ACTION</th>
                       </tr>
                     </thead>
@@ -1217,18 +1220,22 @@ export default function AdminPartnersPage() {
                                 {prop.city ? `${prop.city}, ${prop.state || ''}` : prop.address || '—'}
                               </span>
                             </td>
-                            <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                              ${price.toFixed(2)}
-                            </td>
+                            {isSuperAdmin && (
+                              <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                                ${price.toFixed(2)}
+                              </td>
+                            )}
                             <td className="py-3 px-3 font-bold text-blue-600">
                               {effectiveRate}%
                               {prop.partner_commission_override !== null && prop.partner_commission_override !== undefined && (
                                 <span className="ml-1 text-[10px] text-amber-500 font-normal">(Override)</span>
                               )}
                             </td>
-                            <td className="py-3 px-3 font-extrabold text-emerald-600">
-                              ${commAmount.toFixed(2)}
-                            </td>
+                            {isSuperAdmin && (
+                              <td className="py-3 px-3 font-extrabold text-emerald-600">
+                                ${commAmount.toFixed(2)}
+                              </td>
+                            )}
                             <td className="py-3 px-3 text-right">
                               <button
                                 onClick={() => handleUnassignProperty(prop.id)}
@@ -1623,7 +1630,7 @@ export default function AdminPartnersPage() {
                   <option value="">-- Choose a property --</option>
                   {allProperties.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} {p.monthly_price ? `($${p.monthly_price}/mo)` : ''} {p.partner_id === selectedPartner.id ? '(Currently assigned)' : ''}
+                      {p.name} {isSuperAdmin && p.monthly_price ? `($${p.monthly_price}/mo)` : ''} {p.partner_id === selectedPartner.id ? '(Currently assigned)' : ''}
                     </option>
                   ))}
                 </select>

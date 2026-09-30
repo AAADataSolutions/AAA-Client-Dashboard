@@ -50,6 +50,7 @@ interface NavItem {
   statusDot?: string;
   badgeColor?: string;
   superAdminOnly?: boolean;
+  hideForSuperAdmin?: boolean;
   children?: SubNavItem[];
 }
 
@@ -60,18 +61,19 @@ const navItems: NavItem[] = [
   {
     label: 'Services',
     icon: PhoneCall,
+    hideForSuperAdmin: true,
     children: [
       { label: 'Services and Lines', href: '/admin/services', icon: PhoneCall },
       { label: 'Firelines', href: '/admin/firelines', icon: Flame },
       { label: 'Elevator Lines', href: '/admin/elevator-lines', icon: ArrowUpDown },
     ],
   },
-  { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
-  { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]' },
-  { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white' },
+  { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight, hideForSuperAdmin: true },
+  { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]', hideForSuperAdmin: true },
+  { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white', hideForSuperAdmin: true },
   { label: 'Partners', href: '/admin/partners', icon: Users, superAdminOnly: true },
   { label: 'Finances', href: '/admin/finances', icon: DollarSign, superAdminOnly: true },
-  { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock },
+  { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock, hideForSuperAdmin: true },
   { label: 'System Settings', href: '/admin/settings', icon: Settings },
 ];
 
@@ -79,7 +81,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
   const pathname = usePathname();
   const { signOut, effectiveRole, profile } = useAuth();
   const isSuperAdmin = effectiveRole === 'SUPER_ADMIN' || profile?.role === 'SUPER_ADMIN';
-  const visibleNavItems = navItems.filter((item) => !item.superAdminOnly || isSuperAdmin);
+  const visibleNavItems = navItems.filter((item) => {
+    if (isSuperAdmin && item.hideForSuperAdmin) return false;
+    if (!isSuperAdmin && item.superAdminOnly) return false;
+    return true;
+  });
 
   const [servicesExpanded, setServicesExpanded] = React.useState(true);
 

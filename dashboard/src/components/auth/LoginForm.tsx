@@ -1,17 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader2, AlertCircle, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 interface LoginFormProps {
-  onSwitchToSignup: () => void;
   onForgotPassword: () => void;
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({
-  onSwitchToSignup,
   onForgotPassword,
 }) => {
   const router = useRouter();
@@ -19,6 +17,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,69 +65,59 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   };
 
   return (
-    <div className="w-full">
-      {/* 3D Glassmorphic Logo Badge */}
-      <div className="flex justify-center mb-6">
+    <div className="w-full max-w-[420px] mx-auto text-slate-900 bg-white">
+      {/* 1. Logo (Kept as requested) */}
+      <div className="flex justify-center sm:justify-start mb-8">
         <img
           src="/logo.png"
           alt="AAA Data Solutions Logo"
-          className="w-70 h-40 rounded-[36px] object-contain relative z-10 drop-shadow-md"
+          className="w-48 h-auto max-h-16 object-contain"
         />
       </div>
 
-      <div className="space-y-1 text-center sm:text-left mb-6">
-        <h2 className="text-2xl font-bold tracking-tight text-white">
-          Welcome back
-        </h2>
-        <p className="text-xs text-slate-400">
-          Sign in to your AAA Data Solutions portal.
+      {/* 2. Header */}
+      <div className="space-y-2 mb-8 text-center sm:text-left">
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
+          Log in
+        </h1>
+        <p className="text-sm text-slate-500 font-medium">
+          Welcome back! Please enter your details.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 flex items-start gap-2 text-xs text-rose-400">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span className="leading-snug">{error}</span>
-          </div>
-        )}
+      {/* 3. Error Alert */}
+      {error && (
+        <div className="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-700 animate-in fade-in duration-200">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600" />
+          <span className="leading-snug font-medium">{error}</span>
+        </div>
+      )}
 
+      {/* 4. Form */}
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Email Field */}
-        <div className="space-y-1.5">
-          <label htmlFor="login-email" className="block text-xs font-semibold text-slate-200">
-            Email address <span className="text-blue-400">*</span>
+        <div className="space-y-1.5 text-left">
+          <label htmlFor="login-email" className="block text-xs font-semibold text-slate-700">
+            Email
           </label>
-          <div className="relative">
-            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              id="login-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              autoComplete="email"
-              required
-              className="w-full bg-[#121624]/90 border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
-            />
-          </div>
+          <input
+            id="login-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            autoComplete="email"
+            required
+            className="w-full bg-white text-slate-900 border border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl px-4 py-3 text-sm placeholder-slate-400 outline-none transition-all shadow-xs font-medium"
+          />
         </div>
 
         {/* Password Field */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label htmlFor="login-password" className="block text-xs font-semibold text-slate-200">
-              Password <span className="text-blue-400">*</span>
-            </label>
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors cursor-pointer"
-            >
-              Forgot password?
-            </button>
-          </div>
+        <div className="space-y-1.5 text-left">
+          <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700">
+            Password
+          </label>
           <div className="relative">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="login-password"
               type={showPassword ? 'text' : 'password'}
@@ -137,12 +126,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               placeholder="••••••••"
               autoComplete="current-password"
               required
-              className="w-full bg-[#121624]/90 border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition-all"
+              className="w-full bg-white text-slate-900 border border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 rounded-xl pl-4 pr-11 py-3 text-sm placeholder-slate-400 outline-none transition-all shadow-xs font-medium"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -150,11 +139,32 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           </div>
         </div>
 
-        {/* Submit Button */}
+        {/* Remember me & Forgot password Row */}
+        <div className="flex items-center justify-between text-xs pt-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 hover:text-slate-900 transition-colors">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+            />
+            <span>Remember for 30 days</span>
+          </label>
+
+          <button
+            type="button"
+            onClick={onForgotPassword}
+            className="font-semibold text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+          >
+            Forgot password
+          </button>
+        </div>
+
+        {/* Primary Sign In Button (Vibrant Blue) */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 mt-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/25 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-2"
         >
           {loading ? (
             <>
@@ -163,24 +173,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             </>
           ) : (
             <>
-              <span>Sign in to Dashboard</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Sign in</span>
+              <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
       </form>
 
-      {/* Switch to Signup */}
-      {/* <p className="mt-6 text-center text-xs text-slate-400">
-        Don&apos;t have an account?{' '}
-        <button
-          type="button"
-          onClick={onSwitchToSignup}
-          className="font-semibold text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
-        >
-          Sign up
-        </button>
-      </p> */}
+      {/* Footer Info */}
+      <div className="mt-12 text-center text-[11px] text-slate-400">
+        <span>&copy; {new Date().getFullYear()} AAA Data Solutions &bull; All rights reserved.</span>
+      </div>
     </div>
   );
 };

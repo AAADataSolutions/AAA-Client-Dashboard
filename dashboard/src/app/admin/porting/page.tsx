@@ -43,6 +43,7 @@ import {
   Save,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth/auth-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   fetchPortingRequests,
@@ -244,6 +245,8 @@ function formatFileSize(bytes?: number): string {
 }
 
 export default function AdminPortingPage() {
+  const { profile, effectiveRole } = useAuth();
+  const isSuperAdmin = effectiveRole === 'SUPER_ADMIN' || profile?.role === 'SUPER_ADMIN';
   const dispatch = useAppDispatch();
   const {
     items: portings,
@@ -1148,7 +1151,7 @@ export default function AdminPortingPage() {
             <thead>
               <tr className="border-b border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-900 dark:text-white font-extrabold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY</th>
-                <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>
+                {isSuperAdmin && <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>}
                 <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
                 <th className="py-3 px-4 whitespace-nowrap">MANAGEMENT GROUP</th>
                 <th className="py-3 px-4 whitespace-nowrap">NO. OF SERVICES</th>
@@ -1163,14 +1166,14 @@ export default function AdminPortingPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-[#222430]/60">
               {loading && portings.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={isSuperAdmin ? 11 : 10} className="py-12 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
                     Loading porting records...
                   </td>
                 </tr>
               ) : portings.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={isSuperAdmin ? 11 : 10} className="py-12 text-center text-slate-400">
                     <ArrowLeftRight className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     No porting records found matching your filter.
                   </td>
@@ -1204,13 +1207,15 @@ export default function AdminPortingPage() {
                       </td>
 
                       {/* 2. Monthly Price */}
-                      <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">
-                        {rec.monthly_price !== null && rec.monthly_price !== undefined && rec.monthly_price !== '' ? (
-                          <span>${Number(rec.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
+                      {isSuperAdmin && (
+                        <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">
+                          {rec.monthly_price !== null && rec.monthly_price !== undefined && rec.monthly_price !== '' ? (
+                            <span>${Number(rec.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* 3. Main Phone No. */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-800 dark:text-slate-200 font-mono" onClick={(e) => e.stopPropagation()}>
@@ -1604,19 +1609,21 @@ export default function AdminPortingPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Monthly Price ($)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={detailForm.monthly_price}
-                        onChange={(e) => setDetailForm((p) => ({ ...p, monthly_price: e.target.value }))}
-                        placeholder="e.g., 249.00"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                    {isSuperAdmin && (
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          Monthly Price ($)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={detailForm.monthly_price}
+                          onChange={(e) => setDetailForm((p) => ({ ...p, monthly_price: e.target.value }))}
+                          placeholder="e.g., 249.00"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
@@ -1666,7 +1673,7 @@ export default function AdminPortingPage() {
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">%</span>
                       </div>
-                      {detailForm.partner_id && detailForm.monthly_price && Number(detailForm.monthly_price) > 0 && (
+                      {isSuperAdmin && detailForm.partner_id && detailForm.monthly_price && Number(detailForm.monthly_price) > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                           Est. Monthly Partner Payout: $
                           {(
@@ -2441,24 +2448,26 @@ export default function AdminPortingPage() {
                       />
                     </div>
 
-                    <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Monthly Price ($)
-                      </label>
-                      <div className="relative">
-                        <DollarSign className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="e.g., 249.00"
-                          value={createForm.monthly_price}
-                          onChange={(e) =>
-                            setCreateForm((p) => ({ ...p, monthly_price: e.target.value }))
-                          }
-                          className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                        />
+                    {isSuperAdmin && (
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          Monthly Price ($)
+                        </label>
+                        <div className="relative">
+                          <DollarSign className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g., 249.00"
+                            value={createForm.monthly_price}
+                            onChange={(e) =>
+                              setCreateForm((p) => ({ ...p, monthly_price: e.target.value }))
+                            }
+                            className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
@@ -2508,7 +2517,7 @@ export default function AdminPortingPage() {
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">%</span>
                       </div>
-                      {createForm.partner_id && createForm.monthly_price && Number(createForm.monthly_price) > 0 && (
+                      {isSuperAdmin && createForm.partner_id && createForm.monthly_price && Number(createForm.monthly_price) > 0 && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
                           Est. Monthly Partner Payout: $
                           {(

@@ -171,54 +171,54 @@ export default function AdminFinancesPage() {
         </Link>
       </motion.div>
 
-      {/* Financial Metric Cards */}
+      {/* Financial Metric Cards (Blue Color Variant) */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Gross MRR */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white border border-blue-700/50 shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Gross Monthly Revenue (MRR)</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-100">Gross Monthly Revenue (MRR)</span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center border border-white/20 backdrop-blur-xs">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">
+            <span className="text-2xl font-black text-white">
               ${financeData.totalMRR.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">From {financeData.activePropertiesCount} active properties</p>
+          <p className="text-[11px] text-blue-200 mt-1">From {financeData.activePropertiesCount} active properties</p>
         </div>
 
         {/* Partner Commission Outflow */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white border border-blue-700/50 shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Partner Commission Outflow</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-100">Partner Commission Outflow</span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center border border-white/20 backdrop-blur-xs">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+            <span className="text-2xl font-black text-amber-300">
               ${financeData.partnerCommissionOutflow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Across {financeData.activePartnersCount} active channel partners</p>
+          <p className="text-[11px] text-blue-200 mt-1">Across {financeData.activePartnersCount} active channel partners</p>
         </div>
 
         {/* Net Retained Revenue */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white border border-blue-700/50 shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Net Retained Revenue</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-100">Net Retained Revenue</span>
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center border border-white/20 backdrop-blur-xs">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xl font-black text-emerald-300">
               ${financeData.netRetainedRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Company revenue after partner shares</p>
+          <p className="text-[11px] text-blue-200 mt-1">Company revenue after partner shares</p>
         </div>
       </motion.div>
 
