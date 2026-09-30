@@ -16,13 +16,36 @@ import { useAuth } from '@/lib/auth/auth-context';
 
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user } = useAuth();
+  const [partnerDetails, setPartnerDetails] = React.useState<{ name: string; email: string; company_name?: string } | null>(null);
+
+  React.useEffect(() => {
+    const fetchPartner = async () => {
+      try {
+        const res = await fetch('/api/partner/overview');
+        const json = await res.json();
+        if (json.success && json.data?.partner) {
+          setPartnerDetails({
+            name: json.data.partner.name || profile?.full_name || 'Channel Partner',
+            email: json.data.partner.email || profile?.email || user?.email || '',
+            company_name: json.data.partner.company_name,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load partner details:', err);
+      }
+    };
+    fetchPartner();
+  }, [profile, user]);
 
   const navLinks = [
     { label: 'Overview', href: '/partner', icon: LayoutDashboard },
     { label: 'Properties & Share', href: '/partner/properties', icon: Hotel },
     { label: 'Invoices & Payouts', href: '/partner/invoices', icon: FileText },
   ];
+
+  const displayName = partnerDetails?.name || profile?.full_name || user?.user_metadata?.full_name || 'Channel Partner';
+  const displayEmail = partnerDetails?.email || profile?.email || user?.email || 'partner@aaadatasolutions.com';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0f1015] text-slate-900 dark:text-slate-100 flex flex-col font-sans">
@@ -69,16 +92,23 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           {/* User & Sign Out */}
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                {profile?.full_name || 'Channel Partner'}
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono block">
-                {profile?.email || 'partner@aaadatasolutions.com'}
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                  {displayName}
+                </span>
+                {partnerDetails?.company_name && (
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    ({partnerDetails.company_name})
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono block">
+                {displayEmail}
               </span>
             </div>
             <button
               onClick={() => signOut()}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
+              className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer border border-transparent hover:border-rose-200"
               title="Sign Out"
             >
               <LogOut className="w-4 h-4" />

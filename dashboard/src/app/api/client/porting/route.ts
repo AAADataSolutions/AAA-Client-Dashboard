@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         *,
         organization_property:organization_properties(
           id,
-          property:properties(id, name, address, city, state, zip_code, main_phone)
+          property:properties(id, name, address, city, state, zip_code, main_phone, monthly_price, general_manager_name, general_manager_email, ray_baud_and_logs_enabled, ray_baum_status)
         ),
         attachments:porting_attachments(
           id, file_name, file_size, mime_type, storage_path, created_at
@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: portRecords, error } = await portQuery;
+
+    const orgName = (Array.isArray(member.organization) ? (member.organization[0] as any)?.name : (member.organization as any)?.name) || 'Organization';
 
     if (error) {
       console.error('Client porting query error:', error);
@@ -93,6 +95,12 @@ export async function GET(request: NextRequest) {
           property_name: item.property_name || 'Property',
           property_address: item.property_address || '',
           property_phone: item.property_phone || '',
+          monthly_price: null,
+          general_manager_name: '—',
+          general_manager_email: '—',
+          ray_baud_and_logs_enabled: false,
+          ray_baum_status: 'INACTIVE',
+          organization_name: orgName,
           attachments: item.attachments || [],
           services: [],
           services_count: 0,
@@ -122,8 +130,17 @@ export async function GET(request: NextRequest) {
         property_id: prop?.id || null,
         property_name: item.property_name || prop?.name || 'New Property',
         property_address: item.property_address || prop?.address || '—',
+        city: prop?.city || '',
+        state: prop?.state || '',
+        zip_code: prop?.zip_code || '',
         property_phone: item.property_phone || prop?.main_phone || '—',
         fax: item.fax || '—',
+        monthly_price: prop?.monthly_price || null,
+        general_manager_name: prop?.general_manager_name || '—',
+        general_manager_email: prop?.general_manager_email || '—',
+        ray_baud_and_logs_enabled: prop?.ray_baud_and_logs_enabled ?? false,
+        ray_baum_status: prop?.ray_baum_status || 'INACTIVE',
+        organization_name: orgName,
         carrier_details: item.carrier_details || '',
         status: item.status,
         foc_date: item.foc_date || null,

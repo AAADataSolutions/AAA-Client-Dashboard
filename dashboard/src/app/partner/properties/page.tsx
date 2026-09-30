@@ -57,12 +57,12 @@ export default function PartnerPropertiesPage() {
   );
 
   const totalMonthlyCommission = filtered
-    .filter((p) => p.status === 'ACTIVE')
-    .reduce((sum, p) => sum + p.monthly_commission, 0);
+    .reduce((sum, p) => sum + (p.monthly_commission || 0), 0);
 
   const totalMonthlyGross = filtered
-    .filter((p) => p.status === 'ACTIVE')
     .reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
+
+  const activeCount = filtered.filter((p) => p.status === 'ACTIVE' || p.status === 'ONBOARDED').length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6">
@@ -70,7 +70,7 @@ export default function PartnerPropertiesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-            <Hotel className="w-6 h-6 text-blue-600" /> Assigned Properties & Commission
+            <Hotel className="w-6 h-6 text-blue-600" /> Assigned Properties &amp; Commission
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Properties affiliated with your partner account and itemized revenue shares.
@@ -78,34 +78,63 @@ export default function PartnerPropertiesPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* 3 KPI Cards — BLUE VARIANT */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Affiliated Properties</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">{filtered.length}</span>
-            <span className="text-xs text-slate-400 font-semibold">{filtered.filter((p) => p.status === 'ACTIVE').length} Active</span>
+        {/* Card 1: Affiliated Properties */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[130px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              AFFILIATED PROPERTIES
+            </span>
+            <Hotel className="w-4 h-4 text-white/90" />
           </div>
+          <div className="my-2 flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
+              {filtered.length}
+            </span>
+            <span className="text-xs font-semibold text-blue-200">
+              {activeCount > 0 ? `${activeCount} Active` : `${filtered.length} Active`}
+            </span>
+          </div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            Properties linked to your partner account
+          </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Monthly Gross</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">
+        {/* Card 2: Total Monthly Gross */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[130px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              TOTAL MONTHLY GROSS
+            </span>
+            <DollarSign className="w-4 h-4 text-white/90" />
+          </div>
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
               ${totalMonthlyGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-            <DollarSign className="w-4 h-4 text-slate-400" />
           </div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            Combined monthly recurring client billing
+          </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Your Monthly Commission</span>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+        {/* Card 3: Your Monthly Commission */}
+        <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[130px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
+              YOUR MONTHLY COMMISSION
+            </span>
+            <TrendingUp className="w-4 h-4 text-emerald-300" />
+          </div>
+          <div className="my-2">
+            <span className="text-3xl font-extrabold text-emerald-300 tracking-tight">
               ${totalMonthlyCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-            <TrendingUp className="w-4 h-4 text-emerald-500" />
           </div>
+          <p className="text-[11px] text-blue-200/90 font-medium">
+            Estimated monthly commission payout
+          </p>
         </div>
       </div>
 
@@ -193,13 +222,17 @@ export default function PartnerPropertiesPage() {
 
                     {/* Status */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
-                        prop.status === 'ACTIVE'
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200'
-                      }`}>
-                        {prop.status}
-                      </span>
+                      {prop.status === 'ACTIVE' || prop.status === 'ONBOARDED' || prop.status === 'COMPLETED' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          ACTIVE
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          {prop.status.replace(/_/g, ' ')}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -130,8 +130,12 @@ export async function GET(request: NextRequest) {
         case 'DRAFT': pct = 14; break;
         case 'CONTRACT_SENT': pct = 28; break;
         case 'SIGNED': pct = 42; break;
-        case 'PORTING_SUBMITTED': pct = 57; break;
-        case 'SOF_WAITING': pct = 71; break;
+        case 'CUT_SHEET_REVIEW':
+        case 'SOF_WAITING':
+        case 'CUT_SHEET': pct = 57; break;
+        case 'PORTING_SUBMITTED':
+        case 'SUBMITTED':
+        case 'IN_PROGRESS': pct = 71; break;
         case 'FOC_RECEIVED': pct = 85; break;
         case 'COMPLETED': pct = 100; break;
         default: pct = 14;

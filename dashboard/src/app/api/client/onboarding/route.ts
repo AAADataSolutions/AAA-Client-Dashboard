@@ -71,14 +71,17 @@ export async function GET(request: NextRequest) {
     }
 
     const stageWeights: Record<string, { percent: number; stepIndex: number; label: string; waitingClient: boolean }> = {
-      DRAFT: { percent: 12.5, stepIndex: 1, label: 'Draft Initialized', waitingClient: false },
-      CONTRACT_SENT: { percent: 25, stepIndex: 2, label: 'Contract Sent', waitingClient: true },
-      SIGNED: { percent: 37.5, stepIndex: 3, label: 'Contract Signed', waitingClient: false },
-      PORTING_WAITING: { percent: 50, stepIndex: 4, label: 'Waiting for LOA', waitingClient: false },
-      PORTING_SUBMITTED: { percent: 62.5, stepIndex: 5, label: 'Porting Submitted', waitingClient: false },
-      SOF_WAITING: { percent: 75, stepIndex: 6, label: 'SOF Review', waitingClient: true },
-      FOC_RECEIVED: { percent: 87.5, stepIndex: 7, label: 'FOC Confirmed', waitingClient: false },
-      COMPLETED: { percent: 100, stepIndex: 8, label: 'Onboarded', waitingClient: false },
+      DRAFT: { percent: 14, stepIndex: 1, label: 'Draft Initialized', waitingClient: false },
+      CONTRACT_SENT: { percent: 28, stepIndex: 2, label: 'Contract Sent', waitingClient: true },
+      SIGNED: { percent: 42, stepIndex: 3, label: 'Contract Signed', waitingClient: false },
+      CUT_SHEET_REVIEW: { percent: 57, stepIndex: 4, label: 'Cut Sheet Review', waitingClient: false },
+      SOF_WAITING: { percent: 57, stepIndex: 4, label: 'Cut Sheet Review', waitingClient: false },
+      CUT_SHEET: { percent: 57, stepIndex: 4, label: 'Cut Sheet Review', waitingClient: false },
+      PORTING_SUBMITTED: { percent: 71, stepIndex: 5, label: 'Porting Submitted', waitingClient: false },
+      SUBMITTED: { percent: 71, stepIndex: 5, label: 'Porting Submitted', waitingClient: false },
+      IN_PROGRESS: { percent: 71, stepIndex: 5, label: 'Porting Submitted', waitingClient: false },
+      FOC_RECEIVED: { percent: 85, stepIndex: 6, label: 'FOC Confirmed', waitingClient: false },
+      COMPLETED: { percent: 100, stepIndex: 7, label: 'Onboarded', waitingClient: false },
     };
 
     const allOnboardings = (onbRecords || []).map((item: any) => {

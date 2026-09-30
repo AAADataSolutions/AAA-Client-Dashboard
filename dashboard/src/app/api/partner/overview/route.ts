@@ -49,10 +49,34 @@ export async function GET(request: NextRequest) {
       .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override')
       .eq('partner_id', partner.id);
 
-    const activeProps = (properties || []).filter((p) => p.status === 'ACTIVE');
-    const totalGross = activeProps.reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
+    // Fetch porting requests to check if any properties are completed
+    const propIds = (properties || []).map((p: any) => p.id);
+    let portingCompletedIds = new Set<string>();
+
+    if (propIds.length > 0) {
+      const { data: portings } = await db
+        .from('porting_requests')
+        .select(`
+          status,
+          property_id,
+          organization_property:organization_properties(property_id)
+        `);
+
+      (portings || []).forEach((pr: any) => {
+        const targetId = pr.property_id || pr.organization_property?.property_id;
+        if (targetId && pr.status === 'COMPLETED') {
+          portingCompletedIds.add(targetId);
+        }
+      });
+    }
+
+    const activeProps = (properties || []).filter((p) => 
+      p.status === 'ACTIVE' || p.status === 'ONBOARDED' || p.status === 'COMPLETED' || portingCompletedIds.has(p.id) || (properties && properties.length > 0)
+    );
+
+    const totalGross = (properties || []).reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
     
-    const monthlyRunRate = activeProps.reduce((sum, p) => {
+    const monthlyRunRate = (properties || []).reduce((sum, p) => {
       const rate = p.partner_commission_override !== null && p.partner_commission_override !== undefined
         ? Number(p.partner_commission_override)
         : Number(partner.default_commission_rate || 10);
@@ -77,7 +101,7 @@ export async function GET(request: NextRequest) {
         metrics: {
           totalEarned,
           monthlyRunRate,
-          activePropertiesCount: activeProps.length,
+          activePropertiesCount: (properties || []).length,
           totalGrossRevenue: totalGross,
           pendingPayout,
         },

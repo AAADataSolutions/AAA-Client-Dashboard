@@ -60,22 +60,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Partner record not found.' }, { status: 404 });
     }
 
-    const { period_start, period_end, notes } = body;
+    const { period_start, period_end, notes, selected_property_ids, custom_amount, line_items: clientLineItems } = body;
 
     if (!period_start || !period_end) {
       return NextResponse.json({ success: false, error: 'Period start and end dates are required.' }, { status: 400 });
     }
 
-    // Fetch active properties assigned to partner
+    // Fetch properties assigned to partner
     const { data: props } = await db
       .from('properties')
       .select('id, name, address, city, state, monthly_price, partner_commission_override')
-      .eq('partner_id', partner.id)
-      .eq('status', 'ACTIVE');
+      .eq('partner_id', partner.id);
 
-    const activeProps = props || [];
+    const allPartnerProps = props || [];
+    
+    // Filter by selected properties if provided, else include all assigned properties
+    const targetProps = selected_property_ids && Array.isArray(selected_property_ids) && selected_property_ids.length > 0
+      ? allPartnerProps.filter((p) => selected_property_ids.includes(p.id))
+      : allPartnerProps;
 
-    const lineItems = activeProps.map((p) => {
+    let lineItems = clientLineItems || targetProps.map((p) => {
       const commRate = p.partner_commission_override !== null && p.partner_commission_override !== undefined
         ? Number(p.partner_commission_override)
         : Number(partner.default_commission_rate || 10);
@@ -85,17 +89,22 @@ export async function POST(request: NextRequest) {
       return {
         property_id: p.id,
         property_name: p.name,
-        property_location: `${p.city || ''}, ${p.state || ''}`,
+        property_location: `${p.city || ''}${p.state ? `, ${p.state}` : ''}`,
         monthly_price: price,
         commission_rate: commRate,
         commission_amount: commission,
       };
     });
 
-    const grossRevenue = lineItems.reduce((sum, item) => sum + item.monthly_price, 0);
-    const totalCommission = lineItems.reduce((sum, item) => sum + item.commission_amount, 0);
+    const calculatedGross = lineItems.reduce((sum: number, item: any) => sum + Number(item.monthly_price || 0), 0);
+    const calculatedCommission = lineItems.reduce((sum: number, item: any) => sum + Number(item.commission_amount || 0), 0);
 
-    const invoiceNumber = `INV-PARTNER-${Date.now().toString().slice(-6)}`;
+    // If custom_amount is specified, use that for commission_amount
+    const finalCommissionAmount = custom_amount !== undefined && custom_amount !== null && custom_amount !== ''
+      ? Number(custom_amount)
+      : calculatedCommission;
+
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const { data: newInvoice, error: invErr } = await db
       .from('partner_invoices')
@@ -105,8 +114,8 @@ export async function POST(request: NextRequest) {
         period_start,
         period_end,
         total_properties: lineItems.length,
-        gross_revenue: grossRevenue,
-        commission_amount: totalCommission,
+        gross_revenue: calculatedGross,
+        commission_amount: finalCommissionAmount,
         status: 'SUBMITTED',
         line_items: lineItems,
         notes: notes || null,

@@ -77,6 +77,7 @@ export type OnboardingStatus =
   | 'DRAFT'
   | 'CONTRACT_SENT'
   | 'SIGNED'
+  | 'CUT_SHEET_REVIEW'
   | 'PORTING_SUBMITTED'
   | 'SOF_WAITING'
   | 'FOC_RECEIVED'
@@ -86,13 +87,13 @@ const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; desc: s
   { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status', dateField: 'draft_date' },
   { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM', dateField: 'contract_sent_date' },
   { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified', dateField: 'signed_date' },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4, desc: 'LSR submitted to winning carrier', dateField: 'porting_submitted_date' },
-  { key: 'SOF_WAITING', label: 'SOF Review', step: 5, desc: 'Service Order Form technical review', dateField: 'sof_review_date' },
+  { key: 'CUT_SHEET_REVIEW', label: 'Cut Sheet Review', step: 4, desc: 'Technical cut sheet review and validation', dateField: 'cut_sheet_review_date' },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5, desc: 'LSR porting order submitted to winning carrier', dateField: 'porting_submitted_date' },
   { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6, desc: 'Firm Order Confirmation date locked', dateField: 'foc_confirmed_date' },
   { key: 'COMPLETED', label: 'Onboarded', step: 7, desc: 'Traffic migrated & property activated', dateField: 'live_cutover_date' },
 ];
 
-function getStageBadge(status: OnboardingStatus): { label: string; bg: string; text: string; border: string; pct: number } {
+function getStageBadge(status: string): { label: string; bg: string; text: string; border: string; pct: number } {
   switch (status) {
     case 'DRAFT':
       return { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]', pct: 14 };
@@ -100,10 +101,14 @@ function getStageBadge(status: OnboardingStatus): { label: string; bg: string; t
       return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 28 };
     case 'SIGNED':
       return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 42 };
-    case 'PORTING_SUBMITTED':
-      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 57 };
+    case 'CUT_SHEET_REVIEW':
     case 'SOF_WAITING':
-      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 71 };
+    case 'CUT_SHEET':
+      return { label: 'Cut Sheet Review', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 57 };
+    case 'PORTING_SUBMITTED':
+    case 'SUBMITTED':
+    case 'IN_PROGRESS':
+      return { label: 'Porting Submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 71 };
     case 'FOC_RECEIVED':
       return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 85 };
     case 'COMPLETED':
@@ -524,7 +529,7 @@ export default function AdminOnboardingPortingPage() {
   };
 
   const hasActiveFilters = filters.searchQuery.trim() !== '' || filters.selectedStage !== 'ALL' || filters.sortBy !== 'NEWEST';
-  const isStage3OrAbove = ['SIGNED', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED', 'COMPLETED'].includes(editStageStatus);
+  const isStage3OrAbove = ['SIGNED', 'CUT_SHEET_REVIEW', 'SOF_WAITING', 'PORTING_SUBMITTED', 'FOC_RECEIVED', 'COMPLETED'].includes(editStageStatus);
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -863,7 +868,7 @@ export default function AdminOnboardingPortingPage() {
                             </div>
                             <span>{rec.assigned_to_name}</span>
                           </div>
-                        ) : ['SIGNED', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED', 'COMPLETED'].includes(rec.stage || rec.status || '') ? (
+                        ) : ['SIGNED', 'CUT_SHEET_REVIEW', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED', 'COMPLETED'].includes(rec.stage || rec.status || '') ? (
                           <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md font-medium border border-amber-200/50 dark:border-amber-800/40">
                             Ready to Assign
                           </span>

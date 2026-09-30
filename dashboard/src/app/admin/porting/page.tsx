@@ -57,8 +57,8 @@ export type LifecycleStage =
   | 'DRAFT'
   | 'CONTRACT_SENT'
   | 'SIGNED'
+  | 'CUT_SHEET_REVIEW'
   | 'PORTING_SUBMITTED'
-  | 'SOF_WAITING'
   | 'FOC_RECEIVED'
   | 'COMPLETED';
 
@@ -91,18 +91,18 @@ export const STAGES_ROAD: {
     dateField: 'signed_date',
   },
   {
-    key: 'PORTING_SUBMITTED',
-    label: 'Porting Submitted',
+    key: 'CUT_SHEET_REVIEW',
+    label: 'Cut Sheet Review',
     step: 4,
-    desc: 'LSR submitted to winning carrier',
-    dateField: 'porting_submitted_date',
+    desc: 'Technical cut sheet review and validation',
+    dateField: 'cut_sheet_review_date',
   },
   {
-    key: 'SOF_WAITING',
-    label: 'SOF Review',
+    key: 'PORTING_SUBMITTED',
+    label: 'Porting Submitted',
     step: 5,
-    desc: 'Service Order Form technical review',
-    dateField: 'sof_review_date',
+    desc: 'LSR porting order submitted to winning carrier',
+    dateField: 'porting_submitted_date',
   },
   {
     key: 'FOC_RECEIVED',
@@ -156,20 +156,22 @@ export function getStageBadge(status: string): {
         border: 'border-blue-200 dark:border-blue-800/50',
         pct: 42,
       };
-    case 'PORTING_SUBMITTED':
-    case 'SUBMITTED':
-    case 'IN_PROGRESS':
+    case 'CUT_SHEET_REVIEW':
+    case 'SOF_WAITING':
+    case 'CUT_SHEET':
       return {
-        label: 'Stage 4: Porting Submitted',
+        label: 'Stage 4: Cut Sheet Review',
         step: 4,
         bg: 'bg-purple-50 dark:bg-purple-950/50',
         text: 'text-purple-700 dark:text-purple-300',
         border: 'border-purple-200 dark:border-purple-800/50',
         pct: 57,
       };
-    case 'SOF_WAITING':
+    case 'PORTING_SUBMITTED':
+    case 'SUBMITTED':
+    case 'IN_PROGRESS':
       return {
-        label: 'Stage 5: SOF Review',
+        label: 'Stage 5: Porting Submitted',
         step: 5,
         bg: 'bg-amber-50 dark:bg-amber-950/50',
         text: 'text-amber-700 dark:text-amber-300',
@@ -1069,8 +1071,8 @@ export default function AdminPortingPage() {
               <option value="DRAFT">Stage 1: Draft Initialized</option>
               <option value="CONTRACT_SENT">Stage 2: Contract Sent</option>
               <option value="SIGNED">Stage 3: Contract Signed</option>
-              <option value="PORTING_SUBMITTED">Stage 4: Porting Submitted</option>
-              <option value="SOF_WAITING">Stage 5: SOF Review</option>
+              <option value="CUT_SHEET_REVIEW">Stage 4: Cut Sheet Review</option>
+              <option value="PORTING_SUBMITTED">Stage 5: Porting Submitted</option>
               <option value="FOC_RECEIVED">Stage 6: FOC Confirmed</option>
               <option value="COMPLETED">Stage 7: Onboarded</option>
             </select>
@@ -1139,32 +1141,36 @@ export default function AdminPortingPage() {
         </div>
       </div>
 
-      {/* MAIN DATA TABLE — EXACT COLUMNS & STYLES AS IN SCREENSHOT */}
+      {/* MAIN DATA TABLE — 11 REQUESTED COLUMNS */}
       <div className="rounded-2xl border border-slate-200/80 dark:border-[#222430] bg-white dark:bg-[#15161c] overflow-hidden shadow-xs">
         <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-900 dark:text-white font-extrabold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4">PROPERTY NAME</th>
-                <th className="py-3 px-4">PHONE</th>
-                <th className="py-3 px-4">ORGANIZATION NAME</th>
-                <th className="py-3 px-4">FAX</th>
-                <th className="py-3 px-4">ATTACHMENTS</th>
-                <th className="py-3 px-4">STATUS</th>
-                <th className="py-3 px-4 text-right">ACTIONS</th>
+                <th className="py-3 px-4 whitespace-nowrap">PROPERTY</th>
+                <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>
+                <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
+                <th className="py-3 px-4 whitespace-nowrap">MANAGEMENT GROUP</th>
+                <th className="py-3 px-4 whitespace-nowrap">NO. OF SERVICES</th>
+                <th className="py-3 px-4 whitespace-nowrap">E911 STATUS</th>
+                <th className="py-3 px-4 whitespace-nowrap">RAY BAUM AND KARY&apos;S LAW</th>
+                <th className="py-3 px-4 whitespace-nowrap">GM NAME</th>
+                <th className="py-3 px-4 whitespace-nowrap">GM EMAIL</th>
+                <th className="py-3 px-4 whitespace-nowrap">PROPERTY STATUS</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[#222430]/60">
               {loading && portings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
                     Loading porting records...
                   </td>
                 </tr>
               ) : portings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <ArrowLeftRight className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     No porting records found matching your filter.
                   </td>
@@ -1172,10 +1178,14 @@ export default function AdminPortingPage() {
               ) : (
                 portings.map((rec) => {
                   const badge = getStageBadge(rec.status || rec.stage || 'DRAFT');
-                  const attCount = rec.attachments ? rec.attachments.length : 0;
                   const locationStr = rec.city
                     ? `${rec.city}${rec.state ? `, ${rec.state}` : ''}`
                     : rec.property_address || '—';
+                  const servicesCount = rec.services_count !== undefined ? rec.services_count : (rec.services?.length || 0);
+
+                  const isE911Verified = rec.e911_status === 'VERIFIED' || rec.ray_baud_and_logs_enabled || rec.status === 'COMPLETED';
+                  const isE911Correction = rec.e911_status === 'CORRECTION_REQUIRED';
+                  const isRayBaumCompliant = rec.ray_baud_and_logs_enabled ?? (rec.ray_baum_status === 'ACTIVE' || rec.status === 'COMPLETED');
 
                   return (
                     <tr
@@ -1193,7 +1203,16 @@ export default function AdminPortingPage() {
                         </div>
                       </td>
 
-                      {/* 3. Phone */}
+                      {/* 2. Monthly Price */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">
+                        {rec.monthly_price !== null && rec.monthly_price !== undefined && rec.monthly_price !== '' ? (
+                          <span>${Number(rec.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* 3. Main Phone No. */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-800 dark:text-slate-200 font-mono" onClick={(e) => e.stopPropagation()}>
                         {rec.property_phone && rec.property_phone !== '—' ? (
                           <div className="flex items-center gap-1.5">
@@ -1215,7 +1234,7 @@ export default function AdminPortingPage() {
                         )}
                       </td>
 
-                      {/* 4. Organization Name (or -) */}
+                      {/* 4. Management Group (Organization Name or -) */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium">
                         {rec.organization_name && rec.organization_name !== 'Unassigned Organization' && rec.organization_name !== 'Direct Portfolio' ? (
                           rec.organization_name
@@ -1224,26 +1243,78 @@ export default function AdminPortingPage() {
                         )}
                       </td>
 
-                      {/* 5. Fax */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono">
-                        {rec.fax && rec.fax !== '—' ? rec.fax : '—'}
-                      </td>
-
-                      {/* 6. Attachments (blue pill with file icon & count) */}
+                      {/* 5. No. of Services */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openUnifiedModal(rec, 'MEDIA');
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 font-semibold cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/60 transition text-xs"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>{attCount}</span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#2c2e3c] font-semibold text-[11px]">
+                          {servicesCount} {servicesCount === 1 ? 'Service' : 'Services'}
                         </span>
                       </td>
 
-                      {/* 7. Status */}
+                      {/* 6. E911 Status */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {isE911Verified ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10.5px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Verified
+                          </span>
+                        ) : isE911Correction ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 text-[10.5px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                            Correction Req
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 text-[10.5px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            Pending
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 7. Ray Baum and Kari's Law */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {isRayBaumCompliant ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10.5px] font-semibold">
+                            Compliant
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#2c2e3c] text-[10.5px] font-medium">
+                            Pending Audit
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 8. GM Name */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-800 dark:text-slate-200 font-medium">
+                        {rec.general_manager_name && rec.general_manager_name !== 'N/A' && rec.general_manager_name !== '—' ? (
+                          rec.general_manager_name
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* 9. GM Email */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-400 font-medium" onClick={(e) => e.stopPropagation()}>
+                        {rec.general_manager_email && rec.general_manager_email !== 'N/A' && rec.general_manager_email !== '—' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate max-w-[140px]">{rec.general_manager_email}</span>
+                            <button
+                              onClick={() => handleCopy(rec.general_manager_email || '', `gm_email_${rec.id}`)}
+                              className="text-slate-400 hover:text-blue-500 cursor-pointer p-0.5"
+                              title="Copy GM Email"
+                            >
+                              {copiedField === `gm_email_${rec.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* 10. Property Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
@@ -1253,7 +1324,7 @@ export default function AdminPortingPage() {
                         </span>
                       </td>
 
-                      {/* 8. Actions (View Details button + 3 dots) */}
+                      {/* 11. Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           <button

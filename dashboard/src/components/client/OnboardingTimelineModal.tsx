@@ -19,6 +19,7 @@ export type OnboardingStatus =
   | 'DRAFT'
   | 'CONTRACT_SENT'
   | 'SIGNED'
+  | 'CUT_SHEET_REVIEW'
   | 'PORTING_SUBMITTED'
   | 'SOF_WAITING'
   | 'FOC_RECEIVED'
@@ -28,8 +29,8 @@ export const STAGES_ROAD: { key: OnboardingStatus; label: string; step: number; 
   { key: 'DRAFT', label: 'Draft Initialized', step: 1, desc: 'Property draft initialized with inactive status', dateField: 'draft_date' },
   { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2, desc: 'Service agreement dispatched to GM', dateField: 'contract_sent_date' },
   { key: 'SIGNED', label: 'Contract Signed', step: 3, desc: 'Agreement executed and verified', dateField: 'signed_date' },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4, desc: 'LSR submitted to winning carrier', dateField: 'porting_submitted_date' },
-  { key: 'SOF_WAITING', label: 'SOF Review', step: 5, desc: 'Service Order Form technical review', dateField: 'sof_review_date' },
+  { key: 'CUT_SHEET_REVIEW', label: 'Cut Sheet Review', step: 4, desc: 'Technical cut sheet review and validation', dateField: 'cut_sheet_review_date' },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5, desc: 'LSR porting order submitted to winning carrier', dateField: 'porting_submitted_date' },
   { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6, desc: 'Firm Order Confirmation date locked', dateField: 'foc_confirmed_date' },
   { key: 'COMPLETED', label: 'Onboarded', step: 7, desc: 'Traffic migrated & property activated', dateField: 'live_cutover_date' },
 ];
@@ -42,10 +43,14 @@ export function getStageBadge(status: string): { label: string; bg: string; text
       return { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50', pct: 28 };
     case 'SIGNED':
       return { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50', pct: 42 };
-    case 'PORTING_SUBMITTED':
-      return { label: 'Porting Submitted', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 57 };
+    case 'CUT_SHEET_REVIEW':
     case 'SOF_WAITING':
-      return { label: 'SOF Review', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 71 };
+    case 'CUT_SHEET':
+      return { label: 'Cut Sheet Review', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50', pct: 57 };
+    case 'PORTING_SUBMITTED':
+    case 'SUBMITTED':
+    case 'IN_PROGRESS':
+      return { label: 'Porting Submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50', pct: 71 };
     case 'FOC_RECEIVED':
       return { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50', pct: 85 };
     case 'COMPLETED':
@@ -88,9 +93,14 @@ export const OnboardingTimelineModal: React.FC<OnboardingTimelineModalProps> = (
 }) => {
   if (!isOpen || !record) return null;
 
-  const currentStatus = (record.stage || record.status || 'DRAFT') as OnboardingStatus;
-  const currentBadge = getStageBadge(currentStatus);
-  const currentStepIndex = STAGES_ROAD.findIndex((s) => s.key === currentStatus);
+  const rawStatus = record.stage || record.status || 'DRAFT';
+  const normalizedStatus = (
+    rawStatus === 'SOF_WAITING' || rawStatus === 'CUT_SHEET' ? 'CUT_SHEET_REVIEW' :
+    rawStatus === 'SUBMITTED' || rawStatus === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
+    rawStatus
+  ) as OnboardingStatus;
+  const currentBadge = getStageBadge(rawStatus);
+  const currentStepIndex = STAGES_ROAD.findIndex((s) => s.key === normalizedStatus);
   const propertyName = record.property_name || record.name || 'Property';
   const propertyAddress = record.property_address || record.address || 'Address pending';
 

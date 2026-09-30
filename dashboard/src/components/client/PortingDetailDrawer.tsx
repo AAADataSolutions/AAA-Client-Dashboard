@@ -31,8 +31,8 @@ const STAGES_ROAD = [
   { key: 'DRAFT', label: 'Draft Initialized', step: 1 },
   { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2 },
   { key: 'SIGNED', label: 'Contract Signed', step: 3 },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 4 },
-  { key: 'SOF_WAITING', label: 'SOF Review', step: 5 },
+  { key: 'CUT_SHEET_REVIEW', label: 'Cut Sheet Review', step: 4 },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5 },
   { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6 },
   { key: 'COMPLETED', label: 'Onboarded', step: 7 },
 ];
@@ -56,6 +56,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
   const isCancelled = porting.status === 'CANCELLED';
 
   const normalizedStatus = (
+    porting.status === 'SOF_WAITING' ? 'CUT_SHEET_REVIEW' :
     porting.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
     porting.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
     porting.stage || porting.status || 'DRAFT'
@@ -66,10 +67,12 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
       case 'DRAFT': return 0;
       case 'CONTRACT_SENT': return 1;
       case 'SIGNED': return 2;
+      case 'CUT_SHEET_REVIEW':
+      case 'SOF_WAITING':
+      case 'CUT_SHEET': return 3;
       case 'PORTING_SUBMITTED':
       case 'SUBMITTED':
-      case 'IN_PROGRESS': return 3;
-      case 'SOF_WAITING': return 4;
+      case 'IN_PROGRESS': return 4;
       case 'FOC_RECEIVED': return 5;
       case 'COMPLETED': return 6;
       default: return 0;

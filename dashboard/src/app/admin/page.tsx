@@ -100,12 +100,8 @@ export default function AdminOverviewPage() {
 
   const onboardingPipeline = data?.onboardingPipeline || {
     totalActive: 0,
-    stageCounts: { waitingSignature: 0, waitingPorting: 0, portingSubmitted: 0, sofReview: 0, completed: 0 },
+    stageCounts: { draft: 0, contractSent: 0, signed: 0, portingSubmitted: 0, sofWaiting: 0, focReceived: 0, completed: 0, total: 0 },
     keyProperties: [],
-  };
-  const portingPipeline = data?.portingPipeline || {
-    stageCounts: { pending: 0, submitted: 0, inProgress: 0, focReceived: 0, completed: 0, total: 0 },
-    recentOrders: [],
   };
   const ticketAnalytics = data?.ticketAnalytics || {
     openCount: 0,
@@ -125,18 +121,22 @@ export default function AdminOverviewPage() {
   };
   const recentActivities = data?.recentActivities || [];
 
+  // Calculate 7-Stage Pipeline Donut chart stroke segments
+  const stageCounts: any = onboardingPipeline.stageCounts || {};
+  const totalStages = Math.max(1, stageCounts.total || onboardingPipeline.totalActive || 1);
+  const draftPct = Math.round(((stageCounts.draft || 0) / totalStages) * 100);
+  const contractSentPct = Math.round(((stageCounts.contractSent || 0) / totalStages) * 100);
+  const signedPct = Math.round(((stageCounts.signed || 0) / totalStages) * 100);
+  const cutSheetReviewPct = Math.round(((stageCounts.cutSheetReview || stageCounts.sofWaiting || 0) / totalStages) * 100);
+  const portingSubPct = Math.round(((stageCounts.portingSubmitted || 0) / totalStages) * 100);
+  const focRecvPct = Math.round(((stageCounts.focReceived || 0) / totalStages) * 100);
+  const completedPct = Math.round(((stageCounts.completed || 0) / totalStages) * 100);
+
   // Calculate E911 Donut chart stroke segments
-  const totalE911 = Math.max(1, e911Compliance.total || (e911Compliance.verified + e911Compliance.pending + e911Compliance.correctionRequired + e911Compliance.failed));
+  const totalE911 = Math.max(1, e911Compliance.total || (e911Compliance.verified + e911Compliance.pending + e911Compliance.correctionRequired + e911Compliance.failed) || 1);
   const verifiedPct = Math.round((e911Compliance.verified / totalE911) * 100);
   const pendingPct = Math.round((e911Compliance.pending / totalE911) * 100);
   const correctionPct = Math.round(((e911Compliance.correctionRequired + e911Compliance.failed) / totalE911) * 100);
-
-  // Calculate Onboarding Donut chart stroke segments
-  const totalOnb = Math.max(1, onboardingPipeline.totalActive || 1);
-  const onbSofPct = Math.round(((onboardingPipeline.stageCounts.waitingSignature || 0) / totalOnb) * 100);
-  const onbPortWaitPct = Math.round(((onboardingPipeline.stageCounts.waitingPorting || 0) / totalOnb) * 100);
-  const onbPortSubPct = Math.round(((onboardingPipeline.stageCounts.portingSubmitted || 0) / totalOnb) * 100);
-  const onbReviewPct = Math.round(((onboardingPipeline.stageCounts.sofReview || 0) / totalOnb) * 100);
 
   // Build SVG trend points for 7-day tickets
   const maxTicketCount = Math.max(
@@ -216,7 +216,7 @@ export default function AdminOverviewPage() {
               <span className="text-2xl font-bold text-slate-100">
                 {stats.orgsCount}
               </span>
-              <span className="text-xs text-slate-200 ml-1.5 font-medium">Groups</span>
+              <span className="text-xs text-slate-200 ml-1.5 font-medium">Clients</span>
             </div>
             <p className="text-[11px] text-slate-200 mt-2">Active client tenants &rarr;</p>
           </motion.div>
@@ -271,32 +271,6 @@ export default function AdminOverviewPage() {
                 <span className="text-xs text-slate-200 ml-1.5 font-medium">Services</span>
             </div>
             <p className="text-[11px] text-slate-200 mt-2">Total services &rarr;</p>
-          </motion.div>
-        </Link>
-
-        {/* Card 4: Active Onboardings */}
-        <Link href="/admin/onboarding-porting" className="block">
-          <motion.div
-            variants={itemVariants}
-            whileHover={{ y: -4, scale: 1.02 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            className="bg-gradient-to-r from-blue-900 to-blue-800 text-white border border-blue-700/40 p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer h-full"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-                Onboardings
-              </span>
-              <div className="w-7 h-7 rounded-lg text-white flex items-center justify-center">
-                <Send size={18} />
-              </div>
-            </div>
-            <div className="mt-3">
-              <span className="text-2xl font-bold text-slate-100">
-                {stats.onboardingsCount}
-              </span>
-              <span className="text-xs text-slate-200 ml-1.5 font-medium">In Flight</span>
-            </div>
-            <p className="text-[11px] text-slate-200 mt-2">Active setup stages &rarr;</p>
           </motion.div>
         </Link>
 
@@ -355,7 +329,7 @@ export default function AdminOverviewPage() {
         </Link>
       </motion.div>
 
-      {/* 3. Row 1: Onboarding Overview with Donut Chart & Progress Bars */}
+      {/* 3. Row 1: 7-Stage Porting & Onboarding Pipeline Overview */}
       <motion.div
         variants={sectionVariants}
         initial="hidden"
@@ -365,22 +339,22 @@ export default function AdminOverviewPage() {
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] gap-2">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Onboarding Pipeline Overview</h3>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Onboarding &amp; Porting Pipeline</h3>
             <span className="text-[10.5px] font-semibold px-2 py-0.2 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#2c2e3c]">
               {onboardingPipeline.totalActive} Active Total
             </span>
           </div>
-          <Link href="/admin/onboarding-porting" className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
-            View All Onboardings →
+          <Link href="/admin/porting" className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+            View All Porting Requests →
           </Link>
         </div>
         <p className="text-[11px] text-slate-500 dark:text-slate-400 -mt-2">
-          Deployment pipeline velocity and stage progression across prospective tenant locations.
+          Full 7-stage lifecycle progression across all active hospitality property cutovers.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2 items-center">
-          {/* Donut Chart & Legend */}
-          <div className="lg:col-span-5 flex items-center justify-around gap-4">
+          {/* Donut Chart with All 7 Stages & Colors + 7-Stage Legend */}
+          <div className="lg:col-span-6 flex flex-col sm:flex-row items-center justify-start gap-6">
             <motion.div
               initial={{ rotate: -180, scale: 0.8, opacity: 0 }}
               whileInView={{ rotate: 0, scale: 1, opacity: 1 }}
@@ -390,90 +364,158 @@ export default function AdminOverviewPage() {
             >
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                 <circle cx="18" cy="18" r="14" fill="transparent" stroke="currentColor" className="text-slate-100 dark:text-[#20222a]" strokeWidth="4" />
-                <motion.circle
-                  initial={{ strokeDasharray: '0 100' }}
-                  whileInView={{ strokeDasharray: `${onbSofPct} ${100 - onbSofPct}` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.2, ease: 'easeOut' }}
-                  cx="18" cy="18" r="14" fill="transparent" stroke="#f97316" strokeWidth="4" strokeDashoffset="0"
-                />
-                <motion.circle
-                  initial={{ strokeDasharray: '0 100' }}
-                  whileInView={{ strokeDasharray: `${onbPortWaitPct} ${100 - onbPortWaitPct}` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.2, delay: 0.2, ease: 'easeOut' }}
-                  cx="18" cy="18" r="14" fill="transparent" stroke="#0ea5e9" strokeWidth="4" strokeDashoffset={`-${onbSofPct}`}
-                />
-                <motion.circle
-                  initial={{ strokeDasharray: '0 100' }}
-                  whileInView={{ strokeDasharray: `${onbPortSubPct} ${100 - onbPortSubPct}` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.2, delay: 0.3, ease: 'easeOut' }}
-                  cx="18" cy="18" r="14" fill="transparent" stroke="#10b981" strokeWidth="4" strokeDashoffset={`-${onbSofPct + onbPortWaitPct}`}
-                />
-                <motion.circle
-                  initial={{ strokeDasharray: '0 100' }}
-                  whileInView={{ strokeDasharray: `${onbReviewPct} ${100 - onbReviewPct}` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.2, delay: 0.4, ease: 'easeOut' }}
-                  cx="18" cy="18" r="14" fill="transparent" stroke="#a855f7" strokeWidth="4" strokeDashoffset={`-${onbSofPct + onbPortWaitPct + onbPortSubPct}`}
-                />
+                {/* Stage 1: DRAFT (Slate #64748b) */}
+                {draftPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${draftPct} ${100 - draftPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#64748b" strokeWidth="4" strokeDashoffset="0"
+                  />
+                )}
+                {/* Stage 2: CONTRACT_SENT (Indigo #6366f1) */}
+                {contractSentPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${contractSentPct} ${100 - contractSentPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, delay: 0.1, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#6366f1" strokeWidth="4" strokeDashoffset={`-${draftPct}`}
+                  />
+                )}
+                {/* Stage 3: SIGNED (Blue #2563eb) */}
+                {signedPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${signedPct} ${100 - signedPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, delay: 0.2, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#2563eb" strokeWidth="4" strokeDashoffset={`-${draftPct + contractSentPct}`}
+                  />
+                )}
+                {/* Stage 4: CUT_SHEET_REVIEW (Purple #a855f7) */}
+                {cutSheetReviewPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${cutSheetReviewPct} ${100 - cutSheetReviewPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, delay: 0.3, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#a855f7" strokeWidth="4" strokeDashoffset={`-${draftPct + contractSentPct + signedPct}`}
+                  />
+                )}
+                {/* Stage 5: PORTING_SUBMITTED (Amber #f59e0b) */}
+                {portingSubPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${portingSubPct} ${100 - portingSubPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, delay: 0.4, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#f59e0b" strokeWidth="4" strokeDashoffset={`-${draftPct + contractSentPct + signedPct + cutSheetReviewPct}`}
+                  />
+                )}
+                {/* Stage 6: FOC_RECEIVED (Sky #0ea5e9) */}
+                {focRecvPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${focRecvPct} ${100 - focRecvPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, delay: 0.5, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#0ea5e9" strokeWidth="4" strokeDashoffset={`-${draftPct + contractSentPct + signedPct + cutSheetReviewPct + portingSubPct}`}
+                  />
+                )}
+                {/* Stage 7: COMPLETED (Emerald #10b981) */}
+                {completedPct > 0 && (
+                  <motion.circle
+                    initial={{ strokeDasharray: '0 100' }}
+                    whileInView={{ strokeDasharray: `${completedPct} ${100 - completedPct}` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.0, delay: 0.6, ease: 'easeOut' }}
+                    cx="18" cy="18" r="14" fill="transparent" stroke="#10b981" strokeWidth="4" strokeDashoffset={`-${draftPct + contractSentPct + signedPct + cutSheetReviewPct + portingSubPct + focRecvPct}`}
+                  />
+                )}
               </svg>
               <div className="absolute text-center leading-none">
                 <span className="text-xl font-bold text-slate-900 dark:text-white block">
                   {onboardingPipeline.totalActive}
                 </span>
-                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Active</span>
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Total</span>
               </div>
             </motion.div>
 
-            {/* Legend */}
-            <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
-              <div className="flex items-center justify-between gap-4">
+            {/* 7-Stage Color Legend */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-400 w-full">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#f97316]" />
-                  <span className="text-[11px]">Waiting Signature</span>
+                  <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+                  <span className="text-[11px] truncate">1. Draft</span>
                 </div>
-                <strong className="text-slate-900 dark:text-white">{onboardingPipeline.stageCounts.waitingSignature || 0}</strong>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.draft || 0}</strong>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-sky-500" />
-                  <span className="text-[11px]">Waiting Porting</span>
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                  <span className="text-[11px] truncate">2. Sent</span>
                 </div>
-                <strong className="text-slate-900 dark:text-white">{onboardingPipeline.stageCounts.waitingPorting || 0}</strong>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.contractSent || 0}</strong>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-[11px]">Porting Submitted</span>
+                  <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                  <span className="text-[11px] truncate">3. Signed</span>
                 </div>
-                <strong className="text-slate-900 dark:text-white">{onboardingPipeline.stageCounts.portingSubmitted || 0}</strong>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.signed || 0}</strong>
               </div>
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-purple-500" />
-                  <span className="text-[11px]">SOF Review</span>
+                  <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                  <span className="text-[11px] truncate">4. Cut Sheet</span>
                 </div>
-                <strong className="text-slate-900 dark:text-white">{onboardingPipeline.stageCounts.sofReview || 0}</strong>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.cutSheetReview || stageCounts.sofWaiting || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <span className="text-[11px] truncate">5. Submitted</span>
+                </div>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.portingSubmitted || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
+                  <span className="text-[11px] truncate">6. FOC Recv</span>
+                </div>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.focReceived || 0}</strong>
+              </div>
+              <div className="flex items-center justify-between gap-2 col-span-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="text-[11px] truncate">7. Onboarded</span>
+                </div>
+                <strong className="text-slate-900 dark:text-white font-bold text-xs">{stageCounts.completed || 0}</strong>
               </div>
             </div>
           </div>
 
-          {/* Key Properties in Pipeline */}
-          <div className="lg:col-span-7 space-y-3.5 pl-0 lg:pl-4 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-[#222430]">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Key Properties in Pipeline
-            </h4>
+          {/* Key Properties in Pipeline (Last 3 from Porting) */}
+          <div className="lg:col-span-6 space-y-3 pl-0 lg:pl-6 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-[#222430]">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Key Properties in Pipeline
+              </h4>
+              <span className="text-[10px] text-slate-400">Last 3 Porting Properties</span>
+            </div>
 
             {onboardingPipeline.keyProperties.length === 0 ? (
-              <p className="text-xs text-slate-400 py-3">No active property onboarding records.</p>
+              <p className="text-xs text-slate-400 py-3">No active properties in porting pipeline.</p>
             ) : (
-              onboardingPipeline.keyProperties.map((item: any) => (
-                <div key={item.id} className="space-y-1">
+              onboardingPipeline.keyProperties.slice(0, 3).map((item: any) => (
+                <div key={item.id} className="space-y-1.5 p-2.5 rounded-lg bg-slate-50/70 dark:bg-[#181920] border border-slate-100 dark:border-[#20222a]">
                   <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-900 dark:text-white">{item.propertyName}</span>
-                    <span className={`text-[11px] ${item.colorClass.split(' ').find((className: string) => className.startsWith('text-')) || 'text-slate-500'}`}>{item.stageLabel}</span>
+                    <span className="text-slate-900 dark:text-white truncate max-w-[200px]">{item.propertyName}</span>
+                    <span className={`text-[11px] font-bold ${item.colorClass.split(' ').find((cls: string) => cls.startsWith('text-')) || 'text-slate-500'}`}>
+                      {item.stageLabel}
+                    </span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-[#20222a] overflow-hidden">
                     <motion.div
@@ -482,6 +524,7 @@ export default function AdminOverviewPage() {
                       viewport={{ once: true }}
                       transition={{ duration: 1.2, ease: 'easeOut' }}
                       className={`h-full rounded-full ${item.colorClass.split(' ')[0]}`}
+                      style={{ backgroundColor: item.color }}
                     />
                   </div>
                 </div>
@@ -491,113 +534,27 @@ export default function AdminOverviewPage() {
         </div>
       </motion.div>
 
-      {/* 5. Row 3: Porting Overview & Support Tickets */}
+      {/* 4. Row 2: Support Tickets Queue & Volume Analytics */}
       <motion.div
         variants={sectionVariants}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.15 }}
-        className="grid grid-cols-1 lg:grid-cols-12 gap-5"
+        className="p-5 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm space-y-4"
       >
-        {/* Left: Porting Overview (7 cols) */}
-        <motion.div
-          variants={itemVariants}
-          className="lg:col-span-7 p-5 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm space-y-4"
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Porting Pipeline Overview</h3>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">Total: {portingPipeline.stageCounts.total} Orders</span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Carrier number transfer pipeline across CLECs &amp; ILECs</p>
-            </div>
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-              Live Queue
-            </span>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+          <div className="flex items-center gap-2">
+            <LifeBuoy className="w-4 h-4 text-slate-800 dark:text-slate-200" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Support Tickets</h3>
           </div>
+          <span className="text-[10px] font-semibold px-2 py-0.2 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40 uppercase">
+            {ticketAnalytics.urgentCount > 0 ? `${ticketAnalytics.urgentCount} Urgent` : 'Normal Queue'}
+          </span>
+        </div>
 
-          {/* Volume by Stage Pills */}
-          <div className="grid grid-cols-5 gap-2 text-center">
-            <div className="p-2 rounded-lg bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#232530]">
-              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block">Pending</span>
-              <strong className="text-sm font-bold text-slate-900 dark:text-white">{portingPipeline.stageCounts.pending || 0}</strong>
-            </div>
-            <div className="p-2 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
-              <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 block">Submitted</span>
-              <strong className="text-sm font-bold text-blue-600 dark:text-blue-400">{portingPipeline.stageCounts.submitted || 0}</strong>
-            </div>
-            <div className="p-2 rounded-lg bg-orange-50/60 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
-              <span className="text-[10px] font-medium text-[#ea580c] dark:text-[#f97316] block">In Progress</span>
-              <strong className="text-sm font-bold text-[#ea580c] dark:text-[#f97316]">{portingPipeline.stageCounts.inProgress || 0}</strong>
-            </div>
-            <div className="p-2 rounded-lg bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30">
-              <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400 block">FOC Recv.</span>
-              <strong className="text-sm font-bold text-purple-600 dark:text-purple-400">{portingPipeline.stageCounts.focReceived || 0}</strong>
-            </div>
-            <div className="p-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
-              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 block">Completed</span>
-              <strong className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{portingPipeline.stageCounts.completed || 0}</strong>
-            </div>
-          </div>
-
-          {/* Mini Porting Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600 dark:text-slate-400">
-              <thead className="text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100 dark:border-[#222430]">
-                <tr>
-                  <th className="pb-2">Property</th>
-                  <th className="pb-2">Numbers</th>
-                  <th className="pb-2">Status</th>
-                  <th className="pb-2">Target Date</th>
-                  <th className="pb-2 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#1f212a]">
-                {portingPipeline.recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-center text-slate-400 text-xs">
-                      No porting orders recorded.
-                    </td>
-                  </tr>
-                ) : (
-                  portingPipeline.recentOrders.map((order: any) => (
-                    <tr key={order.id} className="hover:bg-slate-50/70 dark:hover:bg-[#1a1b22] transition-colors">
-                      <td className="py-2.5 font-semibold text-slate-900 dark:text-white">{order.propertyName}</td>
-                      <td className="py-2.5">{order.numbersCount}</td>
-                      <td className="py-2.5">
-                        <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10.5px] font-medium border border-blue-200 dark:border-blue-800/40 capitalize">
-                          {order.status?.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="py-2.5">{order.targetDate}</td>
-                      <td className="py-2.5 text-right font-semibold text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
-                        <Link href="/admin/porting">Track →</Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-
-        {/* Right: Support Tickets with Trend Graph (5 cols) */}
-        <motion.div
-          variants={itemVariants}
-          className="lg:col-span-5 p-5 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] shadow-sm space-y-4 flex flex-col justify-between"
-        >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
-              <div className="flex items-center gap-2">
-                <LifeBuoy className="w-4 h-4 text-slate-800 dark:text-slate-200" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Support Tickets</h3>
-              </div>
-              <span className="text-[10px] font-semibold px-2 py-0.2 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/40 uppercase">
-                {ticketAnalytics.urgentCount > 0 ? `${ticketAnalytics.urgentCount} Urgent` : 'Normal Queue'}
-              </span>
-            </div>
-
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          {/* Left metrics */}
+          <div className="lg:col-span-5 space-y-3">
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-400">Active Queue</span>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">{ticketAnalytics.openCount} Open</h2>
@@ -614,59 +571,59 @@ export default function AdminOverviewPage() {
                 <strong className="text-xs font-bold text-slate-900 dark:text-white">{ticketAnalytics.urgentCount} Urgent</strong>
               </div>
             </div>
+          </div>
 
-            {/* Ticket Volume 7-Day Trend Chart */}
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between text-[10.5px]">
-                <span className="font-semibold text-slate-500 dark:text-slate-400">Ticket Activity (Last 7 Days)</span>
-                <div className="flex items-center gap-2 text-[9.5px]">
-                  <span className="flex items-center gap-1 text-rose-500">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Created
-                  </span>
-                  <span className="flex items-center gap-1 text-emerald-500">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Resolved
-                  </span>
-                </div>
-              </div>
-              <svg className="w-full h-12 overflow-visible" viewBox="0 0 200 40">
-                <motion.polyline
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  whileInView={{ pathLength: 1, opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.5, ease: 'easeInOut' }}
-                  fill="none"
-                  stroke="#f43f5e"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  points={createdPoints || '0,35 200,35'}
-                />
-                <motion.polyline
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  whileInView={{ pathLength: 1, opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.5, delay: 0.2, ease: 'easeInOut' }}
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  points={resolvedPoints || '0,35 200,35'}
-                />
-              </svg>
-              <div className="flex justify-between text-[9px] text-slate-400 px-0.5">
-                {ticketAnalytics.last7Days.map((d: any, idx: number) => (
-                  <span key={idx}>{d.dayName}</span>
-                ))}
+          {/* Right 7-Day Trend SVG Graph */}
+          <div className="lg:col-span-7 space-y-2 pl-0 lg:pl-4 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-[#222430]">
+            <div className="flex items-center justify-between text-[10.5px]">
+              <span className="font-semibold text-slate-500 dark:text-slate-400">Ticket Activity (Last 7 Days)</span>
+              <div className="flex items-center gap-2 text-[9.5px]">
+                <span className="flex items-center gap-1 text-rose-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Created
+                </span>
+                <span className="flex items-center gap-1 text-emerald-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Resolved
+                </span>
               </div>
             </div>
-          </div>
+            <svg className="w-full h-12 overflow-visible" viewBox="0 0 200 40">
+              <motion.polyline
+                initial={{ pathLength: 0, opacity: 0 }}
+                whileInView={{ pathLength: 1, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1.5, ease: 'easeInOut' }}
+                fill="none"
+                stroke="#f43f5e"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                points={createdPoints || '0,35 200,35'}
+              />
+              <motion.polyline
+                initial={{ pathLength: 0, opacity: 0 }}
+                whileInView={{ pathLength: 1, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1.5, delay: 0.2, ease: 'easeInOut' }}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                points={resolvedPoints || '0,35 200,35'}
+              />
+            </svg>
+            <div className="flex justify-between text-[9px] text-slate-400 px-0.5">
+              {ticketAnalytics.last7Days.map((d: any, idx: number) => (
+                <span key={idx}>{d.dayName}</span>
+              ))}
+            </div>
 
-          <div className="pt-2 border-t border-slate-100 dark:border-[#222430]">
-            <Link href="/admin/tickets" className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer">
-              <span>Open Ticket Dispatch Console</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
+            <div className="pt-2 text-right">
+              <Link href="/admin/tickets" className="text-[11.5px] font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer">
+                <span>Open Ticket Dispatch Console</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
 
       {/* 6. Row 4: E911 Emergency Compliance Overview */}

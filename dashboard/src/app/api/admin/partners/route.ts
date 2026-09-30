@@ -49,11 +49,11 @@ export async function GET(request: NextRequest) {
     // Map properties and calculations per partner
     const enriched = partners.map((partner: any) => {
       const assignedProps = allProps.filter((p: any) => p.partner_id === partner.id);
-      const activeProps = assignedProps.filter((p: any) => p.status === 'ACTIVE');
+      const activeProps = assignedProps.filter((p: any) => p.status === 'ACTIVE' || p.status === 'ONBOARDED' || p.status === 'COMPLETED');
 
-      const monthlyGross = activeProps.reduce((sum: number, p: any) => sum + Number(p.monthly_price || 0), 0);
+      const monthlyGross = assignedProps.reduce((sum: number, p: any) => sum + Number(p.monthly_price || 0), 0);
 
-      const estimatedCommission = activeProps.reduce((sum: number, p: any) => {
+      const estimatedCommission = assignedProps.reduce((sum: number, p: any) => {
         const rate =
           p.partner_commission_override !== null && p.partner_commission_override !== undefined
             ? Number(p.partner_commission_override)
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       return {
         ...partner,
         total_properties_count: assignedProps.length,
-        active_properties_count: activeProps.length,
+        active_properties_count: assignedProps.length,
         monthly_gross_revenue: monthlyGross,
         monthly_commission_estimated: estimatedCommission,
         has_pending_invite: Boolean(pendingInvite),

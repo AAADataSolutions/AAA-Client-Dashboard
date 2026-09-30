@@ -47,7 +47,7 @@ export async function GET() {
       // 2. Properties
       db
         .from('properties')
-        .select('id, name, city, state, status, created_at')
+        .select('id, name, city, state, address, status, ray_baud_and_logs_enabled, ray_baum_status, created_at')
         .order('created_at', { ascending: false }),
 
       // 3. Total provisioned services
@@ -73,10 +73,16 @@ export async function GET() {
         .from('porting_requests')
         .select(`
           *,
+          organization:organizations(id, name),
           organization_property:organization_properties(
             id,
-            property:properties(id, name, city, state),
-            organization:organizations(id, name)
+            property:properties(id, name, city, state, address, ray_baud_and_logs_enabled),
+            organization:organizations(id, name),
+            onboardings(
+              id,
+              status,
+              target_date
+            )
           )
         `)
         .order('created_at', { ascending: false }),
@@ -103,12 +109,11 @@ export async function GET() {
         .select(`
           id,
           status,
-          caller_name,
-          phone_number,
-          civic_address,
+          emergency_address,
+          psap_id,
           created_at,
           org_property:organization_properties(
-            property:properties(name)
+            property:properties(id, name, address, ray_baud_and_logs_enabled)
           )
         `)
         .order('created_at', { ascending: false }),
@@ -121,13 +126,24 @@ export async function GET() {
         .limit(10),
     ]);
 
-    const orgs = orgsRes.data || [];
-    const props = propsRes.data || [];
-    const onboardings = onboardingsRes.data || [];
-    const portings = portingsRes.data || [];
-    const tickets = ticketsRes.data || [];
-    const e911Records = e911Res.data || [];
-    const auditLogs = activityRes.data || [];
+    let orgs = orgsRes.data || [];
+    let props = propsRes.data || [];
+    let onboardings = onboardingsRes.data || [];
+    let portings = portingsRes.data || [];
+    let tickets = ticketsRes.data || [];
+    let e911Records = e911Res.data || [];
+    let auditLogs = activityRes.data || [];
+
+    // Fallbacks if joins failed
+    if (!portingsRes.data && portingsRes.error) {
+      const { data: fbPortings } = await db.from('porting_requests').select('*').order('created_at', { ascending: false });
+      portings = fbPortings || [];
+    }
+
+    if (!e911Res.data && e911Res.error) {
+      const { data: fbE911 } = await db.from('e911_records').select('*').order('created_at', { ascending: false });
+      e911Records = fbE911 || [];
+    }
 
     // 1. KPI Counts
     const orgsCount = orgs.length;
@@ -143,32 +159,161 @@ export async function GET() {
     );
     const urgentTickets = openTickets.filter((t) => t.priority === 'URGENT');
 
-    // 2. Attention Required Items
-    const attentionRequired: any[] = [];
+    // 2. Map all Porting Items with the 7 Lifecycle Stages & Colors
+    // Stage 1: DRAFT (14%, Slate #64748b)
+    // Stage 2: CONTRACT_SENT (28%, Indigo #6366f1)
+    // Stage 3: SIGNED (42%, Blue #2563eb)
+    // Stage 4: CUT_SHEET_REVIEW (57%, Purple #a855f7)
+    // Stage 5: PORTING_SUBMITTED (71%, Amber #f59e0b)
+    // Stage 6: FOC_RECEIVED (85%, Sky #0ea5e9)
+    // Stage 7: COMPLETED (100%, Emerald #10b981)
 
-    const e911Corrections = e911Records.filter((e) => e.status === 'CORRECTION_REQUIRED');
-    if (e911Corrections.length > 0) {
-      const propNames = Array.from(
-        new Set(e911Corrections.map((e: any) => e.org_property?.property?.name).filter(Boolean))
-      ).slice(0, 2);
+    const allPortingItems = portings.map((p: any) => {
+      const orgProp = p.organization_property;
+      const prop = Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property;
+      const ob = Array.isArray(orgProp?.onboardings) ? orgProp?.onboardings[0] : orgProp?.onboardings;
+      const rawStatus = (p.status || ob?.status || 'DRAFT').toUpperCase();
+      const propName = p.property_name || prop?.name || 'Property Location';
+
+      let stageKey = 'DRAFT';
+      let stageLabel = 'Draft Initialized';
+      let percent = 14;
+      let color = '#64748b'; // Slate
+      let colorClass = 'bg-slate-500 text-slate-400';
+
+      switch (rawStatus) {
+        case 'CONTRACT_SENT':
+          stageKey = 'CONTRACT_SENT';
+          stageLabel = 'Contract Sent';
+          percent = 28;
+          color = '#6366f1';
+          colorClass = 'bg-indigo-500 text-indigo-400';
+          break;
+        case 'SIGNED':
+          stageKey = 'SIGNED';
+          stageLabel = 'Contract Signed';
+          percent = 42;
+          color = '#2563eb';
+          colorClass = 'bg-blue-600 text-blue-400';
+          break;
+        case 'CUT_SHEET_REVIEW':
+        case 'CUT_SHEET':
+        case 'CUTSHEET':
+        case 'SOF_WAITING':
+          stageKey = 'CUT_SHEET_REVIEW';
+          stageLabel = 'Cut Sheet Review';
+          percent = 57;
+          color = '#a855f7';
+          colorClass = 'bg-purple-500 text-purple-400';
+          break;
+        case 'PORTING_SUBMITTED':
+        case 'SUBMITTED':
+        case 'IN_PROGRESS':
+          stageKey = 'PORTING_SUBMITTED';
+          stageLabel = 'Porting Submitted';
+          percent = 71;
+          color = '#f59e0b';
+          colorClass = 'bg-amber-500 text-amber-400';
+          break;
+        case 'FOC_RECEIVED':
+          stageKey = 'FOC_RECEIVED';
+          stageLabel = 'FOC Confirmed';
+          percent = 85;
+          color = '#0ea5e9';
+          colorClass = 'bg-sky-500 text-sky-400';
+          break;
+        case 'COMPLETED':
+          stageKey = 'COMPLETED';
+          stageLabel = 'Onboarded';
+          percent = 100;
+          color = '#10b981';
+          colorClass = 'bg-emerald-500 text-emerald-400';
+          break;
+        default:
+          stageKey = 'DRAFT';
+          stageLabel = 'Draft Initialized';
+          percent = 14;
+          color = '#64748b';
+          colorClass = 'bg-slate-500 text-slate-400';
+          break;
+      }
+
+      return {
+        id: p.id,
+        propertyName: propName,
+        stageKey,
+        stageName: stageLabel,
+        stageLabel: `${stageLabel} · ${percent}%`,
+        percent,
+        color,
+        colorClass,
+        created_at: p.created_at,
+        updated_at: p.updated_at || p.created_at,
+      };
+    });
+
+    // 7 Stages Counts
+    const stageCounts7 = {
+      draft: allPortingItems.filter((i: any) => i.stageKey === 'DRAFT').length,
+      contractSent: allPortingItems.filter((i: any) => i.stageKey === 'CONTRACT_SENT').length,
+      signed: allPortingItems.filter((i: any) => i.stageKey === 'SIGNED').length,
+      cutSheetReview: allPortingItems.filter((i: any) => i.stageKey === 'CUT_SHEET_REVIEW').length,
+      portingSubmitted: allPortingItems.filter((i: any) => i.stageKey === 'PORTING_SUBMITTED').length,
+      focReceived: allPortingItems.filter((i: any) => i.stageKey === 'FOC_RECEIVED').length,
+      completed: allPortingItems.filter((i: any) => i.stageKey === 'COMPLETED').length,
+      total: allPortingItems.length,
+    };
+
+    // REQUIREMENT 2: Show only the last 3 properties present under the porting section
+    const keyPipelineProperties = allPortingItems.slice(0, 3);
+
+    // 3. E911 Compliance Status Breakdown (Dynamic from e911_records and properties)
+    const e911VerifiedRecords = e911Records.filter(
+      (e: any) => e.status === 'VERIFIED' || e.status === 'ACTIVE'
+    ).length;
+    const e911PendingRecords = e911Records.filter(
+      (e: any) => e.status === 'PENDING'
+    ).length;
+    const e911CorrectionRecords = e911Records.filter(
+      (e: any) => e.status === 'CORRECTION_REQUIRED'
+    ).length;
+    const e911FailedRecords = e911Records.filter(
+      (e: any) => e.status === 'FAILED'
+    ).length;
+
+    let finalVerified = e911VerifiedRecords;
+    let finalPending = e911PendingRecords;
+    let finalCorrection = e911CorrectionRecords;
+    let finalFailed = e911FailedRecords;
+    let finalTotal = e911Records.length;
+
+    // If e911_records table is empty, dynamically derive from properties
+    if (finalTotal === 0 && props.length > 0) {
+      finalVerified = props.filter(
+        (p: any) => p.ray_baud_and_logs_enabled || p.status === 'ACTIVE'
+      ).length;
+      finalPending = Math.max(0, props.length - finalVerified);
+      finalCorrection = 0;
+      finalTotal = props.length;
+    }
+
+    const e911Stats = {
+      verified: finalVerified,
+      pending: finalPending,
+      correctionRequired: finalCorrection,
+      failed: finalFailed,
+      total: finalTotal,
+    };
+
+    // 4. Attention Required Items
+    const attentionRequired: any[] = [];
+    if (finalCorrection > 0) {
       attentionRequired.push({
         id: 'e911-corr',
         severity: 'Critical',
-        title: `${e911Corrections.length} E911 correction${e911Corrections.length > 1 ? 's' : ''} required`,
-        description: `PSAP routing mismatch identified${propNames.length > 0 ? ` on ${propNames.join(' & ')}.` : '.'}`,
+        title: `${finalCorrection} E911 correction${finalCorrection > 1 ? 's' : ''} required`,
+        description: 'PSAP routing mismatch identified on property emergency addresses.',
         actionText: 'Fix Now →',
-        actionHref: '/admin/e911',
-      });
-    }
-
-    const e911Failed = e911Records.filter((e) => e.status === 'FAILED');
-    if (e911Failed.length > 0) {
-      attentionRequired.push({
-        id: 'e911-fail',
-        severity: 'Critical',
-        title: `${e911Failed.length} E911 verification${e911Failed.length > 1 ? 's' : ''} failed`,
-        description: 'Dispatch validation error: Address unverified against MSAG database.',
-        actionText: 'Review →',
         actionHref: '/admin/e911',
       });
     }
@@ -184,125 +329,7 @@ export async function GET() {
       });
     }
 
-    const waitingSofOnb = onboardings.filter((o) => o.status === 'SOF_WAITING' || o.status === 'DRAFT');
-    if (waitingSofOnb.length > 0) {
-      attentionRequired.push({
-        id: 'onb-sof',
-        severity: 'Attention',
-        title: `${waitingSofOnb.length} onboarding${waitingSofOnb.length > 1 ? 's' : ''} pending sign-off`,
-        description: 'Pending Service Order Form (SOF) sign-off from tenant managers.',
-        actionText: 'Notify →',
-        actionHref: '/admin/onboarding-porting',
-      });
-    }
-
-    const portingDueSoon = portings.filter((p) => p.status === 'FOC_RECEIVED' || p.status === 'IN_PROGRESS');
-    if (portingDueSoon.length > 0) {
-      attentionRequired.push({
-        id: 'port-due',
-        severity: 'Attention',
-        title: `${portingDueSoon.length} porting cutover${portingDueSoon.length > 1 ? 's' : ''} active`,
-        description: 'FOC cutover window active. Pre-testing and trunk verification pending.',
-        actionText: 'Schedule →',
-        actionHref: '/admin/porting',
-      });
-    }
-
-    // 3. Upcoming Deadlines
-    const upcomingDeadlines: any[] = [];
-    const combinedDeadlines = [
-      ...onboardings
-        .filter((o) => o.target_date && o.status !== 'COMPLETED')
-        .map((o) => ({
-          id: `onb-${o.id}`,
-          date: new Date(o.target_date),
-          propertyName: o.org_property?.property?.name || 'Hospitality Location',
-          stage: o.status ? `Stage: ${o.status.replace(/_/g, ' ')}` : 'Stage: In Flight',
-          type: 'Onboarding',
-        })),
-      ...portings
-        .filter((p) => p.target_date && p.status !== 'COMPLETED' && p.status !== 'CANCELLED')
-        .map((p) => ({
-          id: `port-${p.id}`,
-          date: new Date(p.target_date),
-          propertyName: p.organization_property?.property?.name || 'Carrier Trunk Cut',
-          stage: p.status ? `Stage: ${p.status.replace(/_/g, ' ')}` : 'Stage: Cutover Milestone',
-          type: 'Porting',
-        })),
-    ].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-    combinedDeadlines.slice(0, 5).forEach((item) => {
-      const month = item.date.toLocaleString('en-US', { month: 'short' });
-      const day = item.date.getDate().toString().padStart(2, '0');
-      upcomingDeadlines.push({
-        id: item.id,
-        month,
-        day,
-        propertyName: item.propertyName,
-        stage: item.stage,
-        type: item.type,
-      });
-    });
-
-    // 4. Onboarding Pipeline Breakdown & Progress Items
-    const onbStageCounts = {
-      waitingSignature: onboardings.filter((o) => o.status === 'SOF_WAITING' || o.status === 'CONTRACT_SENT').length,
-      waitingPorting: onboardings.filter((o) => o.status === 'PORTING_WAITING').length,
-      portingSubmitted: onboardings.filter((o) => o.status === 'PORTING_SUBMITTED').length,
-      sofReview: onboardings.filter((o) => o.status === 'DRAFT' || o.status === 'SIGNED').length,
-      completed: onboardings.filter((o) => o.status === 'COMPLETED').length,
-    };
-
-    const getOnboardingProgressPercent = (status: string) => {
-      switch (status) {
-        case 'COMPLETED': return 100;
-        case 'FOC_RECEIVED': return 90;
-        case 'PORTING_SUBMITTED': return 75;
-        case 'PORTING_WAITING': return 55;
-        case 'SOF_WAITING': return 40;
-        case 'CONTRACT_SENT': return 25;
-        default: return 15;
-      }
-    };
-
-    const keyPipelineProperties = onboardings
-      .filter((o) => o.status !== 'COMPLETED')
-      .slice(0, 5)
-      .map((o) => {
-        const percent = getOnboardingProgressPercent(o.status);
-        return {
-          id: o.id,
-          propertyName: o.org_property?.property?.name || 'Property Location',
-          stageLabel: `${o.status?.replace(/_/g, ' ') || 'In Progress'} · ${percent}%`,
-          percent,
-          colorClass:
-            percent >= 80 ? 'bg-emerald-500 text-emerald-500' :
-            percent >= 60 ? 'bg-sky-500 text-sky-500' :
-            percent >= 40 ? 'bg-[#f97316] text-[#f97316]' : 'bg-purple-500 text-purple-400',
-        };
-      });
-
-    // 5. Porting Pipeline Breakdown & Mini Table
-    const portingStageCounts = {
-      pending: portings.filter((p) => p.status === 'PENDING').length,
-      submitted: portings.filter((p) => p.status === 'SUBMITTED').length,
-      inProgress: portings.filter((p) => p.status === 'IN_PROGRESS').length,
-      focReceived: portings.filter((p) => p.status === 'FOC_RECEIVED').length,
-      completed: portings.filter((p) => p.status === 'COMPLETED').length,
-      total: portings.length,
-    };
-
-    const recentPortingTable = portings.slice(0, 5).map((p) => ({
-      id: p.id,
-      propertyName: p.organization_property?.property?.name || 'Carrier Trunk Port',
-      numbersCount: p.numbers_count ? `${p.numbers_count} DIDs` : 'Multiple DIDs',
-      status: p.status || 'SUBMITTED',
-      targetDate: p.target_date
-        ? new Date(p.target_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : 'Pending FOC',
-    }));
-
-    // 6. Support Tickets & 7-Day Trend
+    // 5. Support Tickets & 7-Day Trend
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -314,7 +341,7 @@ export async function GET() {
       };
     });
 
-    tickets.forEach((t) => {
+    tickets.forEach((t: any) => {
       const createdDate = t.created_at?.split('T')[0];
       const matchCreated = last7Days.find((d) => d.dateStr === createdDate);
       if (matchCreated) matchCreated.created++;
@@ -326,16 +353,7 @@ export async function GET() {
       }
     });
 
-    // 7. E911 Compliance Status Breakdown
-    const e911Stats = {
-      verified: e911Records.filter((e) => e.status === 'VERIFIED').length,
-      pending: e911Records.filter((e) => e.status === 'PENDING').length,
-      correctionRequired: e911Corrections.length,
-      failed: e911Failed.length,
-      total: e911Records.length,
-    };
-
-    // 8. Organizations Overview Table
+    // 6. Organizations Overview Table
     const topOrganizations = orgs.slice(0, 6).map((org: any) => {
       const orgPropsCount = org.org_properties?.length || 0;
       const initials = (org.name || 'Org')
@@ -354,7 +372,7 @@ export async function GET() {
       };
     });
 
-    // 9. Recent Activity Format
+    // 7. Recent Activity Format
     const formattedActivities = auditLogs.map((log: any) => {
       const timeAgo = formatTimeAgo(new Date(log.created_at));
       return {
@@ -378,15 +396,10 @@ export async function GET() {
           urgentTicketsCount: urgentTickets.length,
         },
         attentionRequired,
-        upcomingDeadlines,
         onboardingPipeline: {
-          totalActive: activeOnboardings.length,
-          stageCounts: onbStageCounts,
+          totalActive: stageCounts7.total,
+          stageCounts: stageCounts7,
           keyProperties: keyPipelineProperties,
-        },
-        portingPipeline: {
-          stageCounts: portingStageCounts,
-          recentOrders: recentPortingTable,
         },
         ticketAnalytics: {
           openCount: openTickets.length,

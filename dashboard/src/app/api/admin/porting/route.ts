@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       if (statusFilter === 'ACTION_REQUIRED') {
         query = query.in('status', ['REJECTED', 'CANCELLED', 'PENDING']);
       } else if (statusFilter === 'IN_PROGRESS_ALL') {
-        query = query.in('status', ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'PORTING_SUBMITTED', 'SOF_WAITING']);
+        query = query.in('status', ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'CUT_SHEET_REVIEW', 'CUT_SHEET', 'PORTING_SUBMITTED', 'SOF_WAITING']);
       } else {
         query = query.eq('status', statusFilter);
       }
@@ -164,10 +164,12 @@ export async function GET(request: NextRequest) {
         case 'DRAFT': progressPct = 14; break;
         case 'CONTRACT_SENT': progressPct = 28; break;
         case 'SIGNED': progressPct = 42; break;
+        case 'CUT_SHEET_REVIEW':
+        case 'SOF_WAITING':
+        case 'CUT_SHEET': progressPct = 57; break;
         case 'PORTING_SUBMITTED':
         case 'SUBMITTED':
-        case 'IN_PROGRESS': progressPct = 57; break;
-        case 'SOF_WAITING': progressPct = 71; break;
+        case 'IN_PROGRESS': progressPct = 71; break;
         case 'FOC_RECEIVED': progressPct = 85; break;
         case 'COMPLETED': progressPct = 100; break;
         default: progressPct = 14;
