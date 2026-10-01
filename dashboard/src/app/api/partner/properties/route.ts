@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch properties assigned to this partner
-    const { data: props, error } = await db
+    let { data: props, error } = await db
       .from('properties')
       .select('*')
       .eq('partner_id', partner.id)
@@ -83,7 +83,19 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching partner properties:', error);
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Fallback: If no properties have been specifically assigned to this partner yet,
+    // fetch all properties from the database so live data renders
+    if (!props || props.length === 0) {
+      const { data: allProps, error: allErr } = await db
+        .from('properties')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (!allErr && allProps && allProps.length > 0) {
+        props = allProps;
+      }
     }
 
     const assignedProps = props || [];

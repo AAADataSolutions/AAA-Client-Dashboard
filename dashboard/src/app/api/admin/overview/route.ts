@@ -54,7 +54,7 @@ export async function GET() {
       // 3. Partners
       db
         .from('partners')
-        .select('id, full_name, email, phone, default_commission_rate, status, company_name, created_at')
+        .select('*')
         .order('created_at', { ascending: false }),
 
       // 4. Total provisioned services

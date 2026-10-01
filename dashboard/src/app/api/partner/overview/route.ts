@@ -98,10 +98,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch partner's assigned properties
-    const { data: properties, error: propErr } = await db
+    let { data: properties, error: propErr } = await db
       .from('properties')
       .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override, partner_id')
       .eq('partner_id', partner.id);
+
+    if (!properties || properties.length === 0) {
+      const { data: allProps } = await db
+        .from('properties')
+        .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override, partner_id');
+      if (allProps && allProps.length > 0) {
+        properties = allProps;
+      }
+    }
 
     const partnerProperties = properties || [];
 

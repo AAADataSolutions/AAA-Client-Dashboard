@@ -77,6 +77,19 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
+    // Check if user is in partners table even if profile.role was not set yet
+    const { data: partnerRecord } = await supabase
+      .from('partners')
+      .select('id')
+      .or(`user_id.eq.${user.id},email.eq.${user.email?.toLowerCase()}`)
+      .maybeSingle();
+
+    if (partnerRecord) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/partner';
+      return NextResponse.redirect(url);
+    }
+
     // Check if client user has an active organization
     const { data: membership } = await supabase
       .from('organization_members')
