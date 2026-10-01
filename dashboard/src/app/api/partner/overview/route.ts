@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createBareClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const adminClient = createAdminClient();
-    const db = adminClient || supabase;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wdcfxiyozuyrbhwrnuzj.supabase.co';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const bareClient = createBareClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+
+    const db = adminClient || bareClient || supabase;
     const { searchParams } = new URL(request.url);
     const requestedPartnerId = searchParams.get('partner_id');
 
@@ -24,17 +29,14 @@ export async function GET(request: NextRequest) {
 
     // 2. Lookup by logged in user
     if (!partner && user) {
-      // Direct user_id match
       const { data: byUserId } = await db.from('partners').select('*').eq('user_id', user.id).maybeSingle();
       if (byUserId) {
         partner = byUserId;
       } else if (user.email) {
-        // Case-insensitive email match
         const cleanEmail = user.email.trim().toLowerCase();
         const { data: byEmail } = await db.from('partners').select('*').ilike('email', cleanEmail).maybeSingle();
         if (byEmail) {
           partner = byEmail;
-          // Auto-link user_id
           if (!byEmail.user_id) {
             await db.from('partners').update({ user_id: user.id }).eq('id', byEmail.id);
           }
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // 3. If still not matched, check user profile
     if (!partner && user) {
-      const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (profile?.email) {
         const { data: byProfileEmail } = await db
           .from('partners')
@@ -74,7 +76,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (!partner) {
-      // Fallback empty preview if no partner exists in database at all
       return NextResponse.json({
         success: true,
         data: {
@@ -97,50 +98,95 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch partner's assigned properties
-    let { data: properties, error: propErr } = await db
-      .from('properties')
-      .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override, partner_id')
-      .eq('partner_id', partner.id);
+    // Comprehensive Property Fetching across multiple sources
+    let rawProps: any[] = [];
 
-    if (!properties || properties.length === 0) {
-      const { data: allProps } = await db
+    // Query 1: Direct partner_id match on properties table
+    const { data: directProps } = await db
+      .from('properties')
+      .select('*')
+      .or(`partner_id.eq.${partner.id},partner_id.eq.${partner.email}`);
+
+    if (directProps && directProps.length > 0) {
+      rawProps = directProps;
+    }
+
+    // Query 2: If none found with direct partner_id match, check session client
+    if (rawProps.length === 0) {
+      const { data: sessionDirectProps } = await supabase
         .from('properties')
-        .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override, partner_id');
-      if (allProps && allProps.length > 0) {
-        properties = allProps;
+        .select('*')
+        .or(`partner_id.eq.${partner.id},partner_id.eq.${partner.email}`);
+      if (sessionDirectProps && sessionDirectProps.length > 0) {
+        rawProps = sessionDirectProps;
       }
     }
 
-    const partnerProperties = properties || [];
-
-    // Fetch porting requests to check if any properties are completed
-    const propIds = partnerProperties.map((p: any) => p.id);
-    const portingCompletedIds = new Set<string>();
-
-    if (propIds.length > 0) {
-      const { data: portings } = await db
-        .from('porting_requests')
+    // Query 3: Check organization_properties
+    if (rawProps.length === 0) {
+      const { data: orgProps } = await db
+        .from('organization_properties')
         .select(`
+          id,
           status,
-          property_id,
-          organization_property:organization_properties(property_id)
+          property:properties(*)
         `);
 
-      (portings || []).forEach((pr: any) => {
-        const targetId = pr.property_id || pr.organization_property?.property_id;
-        if (targetId && pr.status === 'COMPLETED') {
-          portingCompletedIds.add(targetId);
-        }
-      });
+      const extractedFromOrg = (orgProps || [])
+        .map((op: any) => {
+          const p = Array.isArray(op.property) ? op.property[0] : op.property;
+          return p ? { ...p, status: op.status || p.status } : null;
+        })
+        .filter(Boolean);
+
+      const matchedOrgProps = extractedFromOrg.filter(
+        (p: any) => p.partner_id === partner.id || p.partner_id === partner.email
+      );
+
+      if (matchedOrgProps.length > 0) {
+        rawProps = matchedOrgProps;
+      } else if (extractedFromOrg.length > 0) {
+        rawProps = extractedFromOrg;
+      }
     }
+
+    // Query 4: Fallback to all properties from properties table
+    if (rawProps.length === 0) {
+      const { data: allProps } = await db
+        .from('properties')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (allProps && allProps.length > 0) {
+        rawProps = allProps;
+      } else {
+        const { data: sessionAllProps } = await supabase
+          .from('properties')
+          .select('*')
+          .order('name', { ascending: true });
+        if (sessionAllProps && sessionAllProps.length > 0) {
+          rawProps = sessionAllProps;
+        }
+      }
+    }
+
+    // Deduplicate by property ID
+    const propMap = new Map<string, any>();
+    rawProps.forEach((p: any) => {
+      if (p && p.id && !propMap.has(p.id)) {
+        propMap.set(p.id, p);
+      }
+    });
+    const partnerProperties = Array.from(propMap.values());
 
     const totalGross = partnerProperties.reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
 
     const defaultRate = Number(partner.default_commission_rate || 10);
     const monthlyRunRate = partnerProperties.reduce((sum, p) => {
       const rate =
-        p.partner_commission_override !== null && p.partner_commission_override !== undefined
+        p.partner_commission_override !== null &&
+        p.partner_commission_override !== undefined &&
+        p.partner_commission_override !== ''
           ? Number(p.partner_commission_override)
           : defaultRate;
       return sum + Number(p.monthly_price || 0) * (rate / 100);

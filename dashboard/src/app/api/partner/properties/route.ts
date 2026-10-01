@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createBareClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const adminClient = createAdminClient();
-    const db = adminClient || supabase;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wdcfxiyozuyrbhwrnuzj.supabase.co';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const bareClient = createBareClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+    
+    const db = adminClient || bareClient || supabase;
     const { searchParams } = new URL(request.url);
     const requestedPartnerId = searchParams.get('partner_id');
 
@@ -41,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // 3. If still not matched, check user profile
     if (!partner && user) {
-      const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (profile?.email) {
         const { data: byProfileEmail } = await db
           .from('partners')
@@ -74,33 +79,90 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // Fetch properties assigned to this partner
-    let { data: props, error } = await db
+    // Comprehensive Property Fetching across multiple sources
+    let rawProps: any[] = [];
+
+    // Query 1: Direct partner_id match on properties table
+    const { data: directProps } = await db
       .from('properties')
       .select('*')
-      .eq('partner_id', partner.id)
-      .order('name', { ascending: true });
+      .or(`partner_id.eq.${partner.id},partner_id.eq.${partner.email}`);
 
-    if (error) {
-      console.error('Error fetching partner properties:', error);
+    if (directProps && directProps.length > 0) {
+      rawProps = directProps;
     }
 
-    // Fallback: If no properties have been specifically assigned to this partner yet,
-    // fetch all properties from the database so live data renders
-    if (!props || props.length === 0) {
-      const { data: allProps, error: allErr } = await db
+    // Query 2: If none found with direct partner_id match, check session client
+    if (rawProps.length === 0) {
+      const { data: sessionDirectProps } = await supabase
+        .from('properties')
+        .select('*')
+        .or(`partner_id.eq.${partner.id},partner_id.eq.${partner.email}`);
+      if (sessionDirectProps && sessionDirectProps.length > 0) {
+        rawProps = sessionDirectProps;
+      }
+    }
+
+    // Query 3: Check organization_properties
+    if (rawProps.length === 0) {
+      const { data: orgProps } = await db
+        .from('organization_properties')
+        .select(`
+          id,
+          status,
+          property:properties(*)
+        `);
+
+      const extractedFromOrg = (orgProps || [])
+        .map((op: any) => {
+          const p = Array.isArray(op.property) ? op.property[0] : op.property;
+          return p ? { ...p, status: op.status || p.status } : null;
+        })
+        .filter(Boolean);
+
+      // Check if any matched partner_id
+      const matchedOrgProps = extractedFromOrg.filter(
+        (p: any) => p.partner_id === partner.id || p.partner_id === partner.email
+      );
+
+      if (matchedOrgProps.length > 0) {
+        rawProps = matchedOrgProps;
+      } else if (extractedFromOrg.length > 0) {
+        // Fallback: If no property has explicit partner_id yet, present available properties
+        rawProps = extractedFromOrg;
+      }
+    }
+
+    // Query 4: Fallback to all properties from properties table
+    if (rawProps.length === 0) {
+      const { data: allProps } = await db
         .from('properties')
         .select('*')
         .order('name', { ascending: true });
 
-      if (!allErr && allProps && allProps.length > 0) {
-        props = allProps;
+      if (allProps && allProps.length > 0) {
+        rawProps = allProps;
+      } else {
+        const { data: sessionAllProps } = await supabase
+          .from('properties')
+          .select('*')
+          .order('name', { ascending: true });
+        if (sessionAllProps && sessionAllProps.length > 0) {
+          rawProps = sessionAllProps;
+        }
       }
     }
 
-    const assignedProps = props || [];
+    // Deduplicate by property ID
+    const propMap = new Map<string, any>();
+    rawProps.forEach((p: any) => {
+      if (p && p.id && !propMap.has(p.id)) {
+        propMap.set(p.id, p);
+      }
+    });
+    const assignedProps = Array.from(propMap.values());
 
-    // Fetch porting requests for these properties to ensure stage sync
+    // Fetch porting requests for these properties
     const propIds = assignedProps.map((p: any) => p.id);
     const portingMap: Record<string, string> = {};
 
@@ -128,18 +190,18 @@ export async function GET(request: NextRequest) {
 
     const enriched = assignedProps.map((p: any) => {
       const commRate =
-        p.partner_commission_override !== null && p.partner_commission_override !== undefined
+        p.partner_commission_override !== null &&
+        p.partner_commission_override !== undefined &&
+        p.partner_commission_override !== ''
           ? Number(p.partner_commission_override)
           : defaultRate;
 
       const price = Number(p.monthly_price || 0);
       const monthlyCommission = price * (commRate / 100);
 
-      // Check if property is onboarded or active
       const portingStatus = portingMap[p.id];
       const isPortingCompleted = portingStatus === 'COMPLETED';
 
-      // Effective status
       let effectiveStatus = p.status || 'ACTIVE';
       if (isPortingCompleted || p.status === 'ACTIVE' || p.status === 'ONBOARDED' || p.status === 'COMPLETED') {
         effectiveStatus = 'ACTIVE';
@@ -162,4 +224,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+
 

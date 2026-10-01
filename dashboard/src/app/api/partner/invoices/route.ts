@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createBareClient } from '@supabase/supabase-js';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const adminClient = createAdminClient();
-    const db = adminClient || supabase;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wdcfxiyozuyrbhwrnuzj.supabase.co';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const bareClient = createBareClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+
+    const db = adminClient || bareClient || supabase;
     const { searchParams } = new URL(request.url);
     const requestedPartnerId = searchParams.get('partner_id');
 
@@ -91,7 +96,11 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const adminClient = createAdminClient();
-    const db = adminClient || supabase;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wdcfxiyozuyrbhwrnuzj.supabase.co';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const bareClient = createBareClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+
+    const db = adminClient || bareClient || supabase;
     const {
       data: { user },
     } = await supabase.auth.getUser();
