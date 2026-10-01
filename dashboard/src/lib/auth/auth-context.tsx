@@ -129,12 +129,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setOrgMembership(null);
-    setLoading(false);
-    window.location.href = '/auth';
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' });
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Sign out error:', e);
+    } finally {
+      setUser(null);
+      setProfile(null);
+      setOrgMembership(null);
+      setLoading(false);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+        } catch {}
+        window.location.href = '/auth';
+      }
+    }
   };
 
   const effectiveRole = useMemo(() => {

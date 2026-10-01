@@ -58,6 +58,7 @@ export type LifecycleStage =
   | 'DRAFT'
   | 'CONTRACT_SENT'
   | 'SIGNED'
+  | 'CSR_DETAILS'
   | 'CUT_SHEET_REVIEW'
   | 'PORTING_SUBMITTED'
   | 'FOC_RECEIVED'
@@ -72,50 +73,57 @@ export const STAGES_ROAD: {
 }[] = [
   {
     key: 'DRAFT',
-    label: 'Draft Initialized',
+    label: 'Draft initialized',
     step: 1,
     desc: 'Property draft initialized with inactive status',
     dateField: 'draft_date',
   },
   {
     key: 'CONTRACT_SENT',
-    label: 'Contract Sent',
+    label: 'Contract sent',
     step: 2,
     desc: 'Service agreement dispatched to GM',
     dateField: 'contract_sent_date',
   },
   {
     key: 'SIGNED',
-    label: 'Contract Signed',
+    label: 'Contract signed',
     step: 3,
     desc: 'Agreement executed and verified',
     dateField: 'signed_date',
   },
   {
-    key: 'CUT_SHEET_REVIEW',
-    label: 'Cut Sheet Review',
+    key: 'CSR_DETAILS',
+    label: 'CSR and contract details',
     step: 4,
+    desc: 'Customer service record & contract verified',
+    dateField: 'csr_details_date',
+  },
+  {
+    key: 'CUT_SHEET_REVIEW',
+    label: 'Cut sheet review',
+    step: 5,
     desc: 'Technical cut sheet review and validation',
     dateField: 'cut_sheet_review_date',
   },
   {
     key: 'PORTING_SUBMITTED',
-    label: 'Porting Submitted',
-    step: 5,
+    label: 'Porting submitted',
+    step: 6,
     desc: 'LSR porting order submitted to winning carrier',
     dateField: 'porting_submitted_date',
   },
   {
     key: 'FOC_RECEIVED',
-    label: 'FOC Confirmed',
-    step: 6,
+    label: 'FOC Confirm',
+    step: 7,
     desc: 'Firm Order Confirmation date locked',
     dateField: 'foc_confirmed_date',
   },
   {
     key: 'COMPLETED',
-    label: 'Onboarded',
-    step: 7,
+    label: 'Onboarding',
+    step: 8,
     desc: 'Traffic migrated & property activated',
     dateField: 'live_cutover_date',
   },
@@ -132,66 +140,76 @@ export function getStageBadge(status: string): {
   switch (status) {
     case 'DRAFT':
       return {
-        label: 'Stage 1: Draft Initialized',
+        label: 'Stage 1: Draft initialized',
         step: 1,
         bg: 'bg-slate-100 dark:bg-[#1a1c24]',
         text: 'text-slate-800 dark:text-slate-200',
         border: 'border-slate-200 dark:border-[#2a2c3a]',
-        pct: 14,
+        pct: 12.5,
       };
     case 'CONTRACT_SENT':
       return {
-        label: 'Stage 2: Contract Sent',
+        label: 'Stage 2: Contract sent',
         step: 2,
         bg: 'bg-indigo-50 dark:bg-indigo-950/50',
         text: 'text-indigo-700 dark:text-indigo-300',
         border: 'border-indigo-200 dark:border-indigo-800/50',
-        pct: 28,
+        pct: 25,
       };
     case 'SIGNED':
       return {
-        label: 'Stage 3: Contract Signed',
+        label: 'Stage 3: Contract signed',
         step: 3,
         bg: 'bg-blue-50 dark:bg-blue-950/50',
         text: 'text-blue-700 dark:text-blue-300',
         border: 'border-blue-200 dark:border-blue-800/50',
-        pct: 42,
+        pct: 37.5,
+      };
+    case 'CSR_DETAILS':
+    case 'CSR_AND_CONTRACT_DETAILS':
+      return {
+        label: 'Stage 4: CSR and contract details',
+        step: 4,
+        bg: 'bg-teal-50 dark:bg-teal-950/50',
+        text: 'text-teal-700 dark:text-teal-300',
+        border: 'border-teal-200 dark:border-teal-800/50',
+        pct: 50,
       };
     case 'CUT_SHEET_REVIEW':
     case 'SOF_WAITING':
     case 'CUT_SHEET':
       return {
-        label: 'Stage 4: Cut Sheet Review',
-        step: 4,
+        label: 'Stage 5: Cut sheet review',
+        step: 5,
         bg: 'bg-purple-50 dark:bg-purple-950/50',
         text: 'text-purple-700 dark:text-purple-300',
         border: 'border-purple-200 dark:border-purple-800/50',
-        pct: 57,
+        pct: 62.5,
       };
     case 'PORTING_SUBMITTED':
     case 'SUBMITTED':
     case 'IN_PROGRESS':
       return {
-        label: 'Stage 5: Porting Submitted',
-        step: 5,
+        label: 'Stage 6: Porting submitted',
+        step: 6,
         bg: 'bg-amber-50 dark:bg-amber-950/50',
         text: 'text-amber-700 dark:text-amber-300',
         border: 'border-amber-200 dark:border-amber-800/50',
-        pct: 71,
+        pct: 75,
       };
     case 'FOC_RECEIVED':
       return {
-        label: 'Stage 6: FOC Confirmed',
-        step: 6,
+        label: 'Stage 7: FOC Confirm',
+        step: 7,
         bg: 'bg-sky-50 dark:bg-sky-950/50',
         text: 'text-sky-700 dark:text-sky-300',
         border: 'border-sky-200 dark:border-sky-800/50',
-        pct: 85,
+        pct: 87.5,
       };
     case 'COMPLETED':
       return {
-        label: 'Stage 7: Onboarded',
-        step: 7,
+        label: 'Stage 8: Onboarding',
+        step: 8,
         bg: 'bg-emerald-50 dark:bg-emerald-950/50',
         text: 'text-emerald-700 dark:text-emerald-300',
         border: 'border-emerald-200 dark:border-emerald-800/50',
@@ -199,12 +217,12 @@ export function getStageBadge(status: string): {
       };
     default:
       return {
-        label: status || 'Stage 1: Draft Initialized',
+        label: status || 'Stage 1: Draft initialized',
         step: 1,
         bg: 'bg-slate-100 dark:bg-slate-800',
         text: 'text-slate-800 dark:text-slate-200',
         border: 'border-slate-200 dark:border-slate-700',
-        pct: 14,
+        pct: 12.5,
       };
   }
 }
@@ -302,17 +320,24 @@ export default function AdminPortingPage() {
     draft_date: '',
     contract_sent_date: '',
     signed_date: '',
+    csr_details_date: '',
+    cut_sheet_review_date: '',
     porting_submitted_date: '',
-    sof_review_date: '',
     foc_confirmed_date: '',
     live_cutover_date: '',
   });
 
-  // Internal Assignment, Notes & Attachments (Admin Only)
-  const [assignedTo, setAssignedTo] = useState<string>('');
-  const [assignedToName, setAssignedToName] = useState<string>('');
-  const [assignmentMode, setAssignmentMode] = useState<'TEAMMATE' | 'CUSTOM'>('TEAMMATE');
-  const [internalNotes, setInternalNotes] = useState<string>('');
+  // Stage 3 & Stage 4 Assignee, Notes (Admin Only)
+  const [stage3AssignedTo, setStage3AssignedTo] = useState<string>('');
+  const [stage3AssignedToName, setStage3AssignedToName] = useState<string>('');
+  const [stage3AssignmentMode, setStage3AssignmentMode] = useState<'TEAMMATE' | 'CUSTOM'>('TEAMMATE');
+  const [stage3Notes, setStage3Notes] = useState<string>('');
+
+  const [stage4AssignedTo, setStage4AssignedTo] = useState<string>('');
+  const [stage4AssignedToName, setStage4AssignedToName] = useState<string>('');
+  const [stage4AssignmentMode, setStage4AssignmentMode] = useState<'TEAMMATE' | 'CUSTOM'>('TEAMMATE');
+  const [stage4Notes, setStage4Notes] = useState<string>('');
+
   const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
   const [modalNewFiles, setModalNewFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -478,8 +503,9 @@ export default function AdminPortingPage() {
     setSelectedRecord(record);
     setActiveTab(defaultTab);
     const normalizedStage = (
-      record.stage === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
-      record.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
+      record.stage === 'CSR_DETAILS' || record.stage === 'CSR_AND_CONTRACT_DETAILS' || record.status === 'CSR_DETAILS' || record.status === 'CSR_AND_CONTRACT_DETAILS' ? 'CSR_DETAILS' :
+      record.stage === 'SUBMITTED' || record.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
+      record.stage === 'IN_PROGRESS' || record.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
       record.status || record.stage || 'DRAFT'
     ) as LifecycleStage;
     setEditStageStatus(normalizedStage);
@@ -488,14 +514,18 @@ export default function AdminPortingPage() {
       draft_date: record.draft_date || '',
       contract_sent_date: record.contract_sent_date || '',
       signed_date: record.signed_date || '',
+      csr_details_date: (record as any).csr_details_date || '',
+      cut_sheet_review_date: record.cut_sheet_review_date || (record as any).sof_review_date || '',
       porting_submitted_date: record.porting_submitted_date || '',
-      sof_review_date: record.sof_review_date || '',
       foc_confirmed_date: record.foc_confirmed_date || '',
       live_cutover_date: record.live_cutover_date || '',
     });
-    setAssignedTo(record.assigned_to || '');
-    setAssignedToName(record.assigned_to_name || '');
-    setInternalNotes(record.internal_notes || record.notes || '');
+    setStage3AssignedTo((record as any).stage3_assigned_to || record.assigned_to || '');
+    setStage3AssignedToName((record as any).stage3_assigned_to_name || record.assigned_to_name || '');
+    setStage3Notes((record as any).stage3_notes || record.internal_notes || record.notes || '');
+    setStage4AssignedTo((record as any).stage4_assigned_to || '');
+    setStage4AssignedToName((record as any).stage4_assigned_to_name || '');
+    setStage4Notes((record as any).stage4_notes || '');
     setExistingAttachments(record.attachments || []);
     setModalNewFiles([]);
 
@@ -809,13 +839,20 @@ export default function AdminPortingPage() {
           draft_date: stageDates.draft_date || null,
           contract_sent_date: stageDates.contract_sent_date || null,
           signed_date: stageDates.signed_date || null,
+          csr_details_date: stageDates.csr_details_date || null,
+          cut_sheet_review_date: stageDates.cut_sheet_review_date || null,
           porting_submitted_date: stageDates.porting_submitted_date || null,
-          sof_review_date: stageDates.sof_review_date || null,
           foc_confirmed_date: stageDates.foc_confirmed_date || null,
           live_cutover_date: stageDates.live_cutover_date || null,
-          assigned_to: assignedTo || null,
-          assigned_to_name: assignedToName || null,
-          internal_notes: internalNotes || null,
+          stage3_assigned_to: stage3AssignedTo || null,
+          stage3_assigned_to_name: stage3AssignedToName || null,
+          stage3_notes: stage3Notes || null,
+          stage4_assigned_to: stage4AssignedTo || null,
+          stage4_assigned_to_name: stage4AssignedToName || null,
+          stage4_notes: stage4Notes || null,
+          assigned_to: stage3AssignedTo || stage4AssignedTo || null,
+          assigned_to_name: stage3AssignedToName || stage4AssignedToName || null,
+          internal_notes: stage3Notes || stage4Notes || null,
           attachments: combinedAttachments,
         }),
       });
@@ -1071,13 +1108,14 @@ export default function AdminPortingPage() {
               className="px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium cursor-pointer focus:outline-none focus:border-blue-500 shrink-0"
             >
               <option value="ALL">Status: All Statuses</option>
-              <option value="DRAFT">Stage 1: Draft Initialized</option>
-              <option value="CONTRACT_SENT">Stage 2: Contract Sent</option>
-              <option value="SIGNED">Stage 3: Contract Signed</option>
-              <option value="CUT_SHEET_REVIEW">Stage 4: Cut Sheet Review</option>
-              <option value="PORTING_SUBMITTED">Stage 5: Porting Submitted</option>
-              <option value="FOC_RECEIVED">Stage 6: FOC Confirmed</option>
-              <option value="COMPLETED">Stage 7: Onboarded</option>
+              <option value="DRAFT">Stage 1: Draft initialized</option>
+              <option value="CONTRACT_SENT">Stage 2: Contract sent</option>
+              <option value="SIGNED">Stage 3: Contract signed</option>
+              <option value="CSR_DETAILS">Stage 4: CSR and contract details</option>
+              <option value="CUT_SHEET_REVIEW">Stage 5: Cut sheet review</option>
+              <option value="PORTING_SUBMITTED">Stage 6: Porting submitted</option>
+              <option value="FOC_RECEIVED">Stage 7: FOC Confirm</option>
+              <option value="COMPLETED">Stage 8: Onboarding</option>
             </select>
 
             {/* Sort Dropdown */}
@@ -1996,17 +2034,17 @@ export default function AdminPortingPage() {
                       </div>
                     </div>
 
-                    {/* Milestone Expected Completion Dates (All 7 Stages) */}
+                    {/* Milestone Expected Completion Dates (All 8 Stages) */}
                     <div className="p-3.5 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] space-y-2.5">
                       <div className="flex items-center justify-between">
                         <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                          Milestone Expected Dates (All 7 Stages)
+                          Milestone Expected Dates (All 8 Stages)
                         </label>
                         <span className="text-[10px] text-slate-400">
                           Synced with client tracking view
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         {STAGES_ROAD.map((s) => (
                           <div key={s.dateField} className="space-y-1">
                             <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 block truncate">
@@ -2028,111 +2066,219 @@ export default function AdminPortingPage() {
                       </div>
                     </div>
 
-                    {/* STAGE 3+: INTERNAL TASK ASSIGNMENT, ATTACHMENTS & NOTES (ADMIN ONLY) */}
+                    {/* STAGE 3 & STAGE 4: ASSIGNEE & NOTES (ADMIN ONLY) */}
                     {isStage3OrAbove ? (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-4 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-purple-50/50 dark:from-[#171827] dark:via-[#13141a] dark:to-[#1a1728] border border-indigo-200/80 dark:border-indigo-800/50 rounded-xl space-y-4 shadow-sm"
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-950/60 pb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
-                              <UserCheck className="w-4 h-4" />
+                      <div className="space-y-4">
+                        {/* STAGE 3 ASSIGNMENT & NOTES */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 dark:from-[#131728] dark:via-[#13141a] dark:to-[#171a2a] border border-blue-200/80 dark:border-blue-800/50 rounded-xl space-y-4 shadow-sm"
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-blue-100 dark:border-blue-950/60 pb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                                3
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white text-xs">
+                                  Stage 3: Contract Signed — Assignee &amp; Notes
+                                </h4>
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                  Executed agreement verification, contract handoff &amp; operational notes
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <h4 className="font-bold text-slate-900 dark:text-white text-xs">
-                                Internal Task Assignment &amp; Operations
-                              </h4>
-                              <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
-                                Active at Stage 3 (Contract Signed) &bull; Visible strictly on Admin Side
-                              </p>
-                            </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-semibold text-[10px] border border-blue-200 dark:border-blue-800">
+                              <Lock className="w-3 h-3" /> Admin Only
+                            </span>
                           </div>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold text-[10px] border border-indigo-200 dark:border-indigo-800">
-                            <Lock className="w-3 h-3" /> Admin Only
-                          </span>
-                        </div>
 
-                        {/* Task Assignee */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
+                          {/* Stage 3 Assignee */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                                Stage 3 Assignee:
+                              </label>
+                              <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setStage3AssignmentMode('TEAMMATE')}
+                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                                    stage3AssignmentMode === 'TEAMMATE'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-slate-500'
+                                  }`}
+                                >
+                                  Teammate List
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setStage3AssignmentMode('CUSTOM')}
+                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                                    stage3AssignmentMode === 'CUSTOM'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'text-slate-500'
+                                  }`}
+                                >
+                                  Custom Name
+                                </button>
+                              </div>
+                            </div>
+
+                            {stage3AssignmentMode === 'TEAMMATE' ? (
+                              <select
+                                value={stage3AssignedTo}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setStage3AssignedTo(val);
+                                  const found = teammates.find((t) => t.id === val);
+                                  setStage3AssignedToName(found ? found.full_name || found.email : '');
+                                }}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+                              >
+                                <option value="">-- Select Teammate to Assign (Stage 3) --</option>
+                                {teammates.map((tm) => (
+                                  <option key={tm.id} value={tm.id}>
+                                    {tm.full_name || tm.email} ({tm.role || 'Member'})
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="Enter custom assignee name or role for Stage 3..."
+                                value={stage3AssignedToName}
+                                onChange={(e) => {
+                                  setStage3AssignedToName(e.target.value);
+                                  setStage3AssignedTo('');
+                                }}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                              />
+                            )}
+                          </div>
+
+                          {/* Stage 3 Notes */}
+                          <div className="space-y-1.5">
                             <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                              Assign Porting Task To:
+                              Stage 3 Operational Notes:
                             </label>
-                            <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
-                              <button
-                                type="button"
-                                onClick={() => setAssignmentMode('TEAMMATE')}
-                                className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                                  assignmentMode === 'TEAMMATE'
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'text-slate-500'
-                                }`}
-                              >
-                                Teammate List
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setAssignmentMode('CUSTOM')}
-                                className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                                  assignmentMode === 'CUSTOM'
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'text-slate-500'
-                                }`}
-                              >
-                                Custom Name
-                              </button>
+                            <textarea
+                              rows={2}
+                              placeholder="Add Stage 3 notes, contract signature details, GM signoff notes..."
+                              value={stage3Notes}
+                              onChange={(e) => setStage3Notes(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </motion.div>
+
+                        {/* STAGE 4 ASSIGNMENT & NOTES */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 bg-gradient-to-br from-teal-50/70 via-slate-50 to-emerald-50/50 dark:from-[#112022] dark:via-[#13141a] dark:to-[#12221b] border border-teal-200/80 dark:border-teal-800/50 rounded-xl space-y-4 shadow-sm"
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-teal-100 dark:border-teal-950/60 pb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-xs">
+                                4
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white text-xs">
+                                  Stage 4: CSR and Contract Details — Assignee &amp; Notes
+                                </h4>
+                                <p className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+                                  Customer Service Record (CSR) validation, losing carrier PIN &amp; technical details
+                                </p>
+                              </div>
                             </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 font-semibold text-[10px] border border-teal-200 dark:border-teal-800">
+                              <Lock className="w-3 h-3" /> Admin Only
+                            </span>
                           </div>
 
-                          {assignmentMode === 'TEAMMATE' ? (
-                            <select
-                              value={assignedTo}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setAssignedTo(val);
-                                const found = teammates.find((t) => t.id === val);
-                                setAssignedToName(found ? found.full_name || found.email : '');
-                              }}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
-                            >
-                              <option value="">-- Select Teammate to Assign --</option>
-                              {teammates.map((tm) => (
-                                <option key={tm.id} value={tm.id}>
-                                  {tm.full_name || tm.email} ({tm.role || 'Member'})
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              placeholder="Enter custom assignee name or role..."
-                              value={assignedToName}
-                              onChange={(e) => {
-                                setAssignedToName(e.target.value);
-                                setAssignedTo('');
-                              }}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500"
-                            />
-                          )}
-                        </div>
+                          {/* Stage 4 Assignee */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                                Stage 4 Assignee:
+                              </label>
+                              <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={() => setStage4AssignmentMode('TEAMMATE')}
+                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                                    stage4AssignmentMode === 'TEAMMATE'
+                                      ? 'bg-teal-600 text-white'
+                                      : 'text-slate-500'
+                                  }`}
+                                >
+                                  Teammate List
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setStage4AssignmentMode('CUSTOM')}
+                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                                    stage4AssignmentMode === 'CUSTOM'
+                                      ? 'bg-teal-600 text-white'
+                                      : 'text-slate-500'
+                                  }`}
+                                >
+                                  Custom Name
+                                </button>
+                              </div>
+                            </div>
 
-                        {/* Internal Notes */}
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                            Internal Operations Notes
-                          </label>
-                          <textarea
-                            rows={3}
-                            placeholder="Add private operational notes, porting PIN, carrier contact details..."
-                            value={internalNotes}
-                            onChange={(e) => setInternalNotes(e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                      </motion.div>
+                            {stage4AssignmentMode === 'TEAMMATE' ? (
+                              <select
+                                value={stage4AssignedTo}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setStage4AssignedTo(val);
+                                  const found = teammates.find((t) => t.id === val);
+                                  setStage4AssignedToName(found ? found.full_name || found.email : '');
+                                }}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-teal-500 cursor-pointer"
+                              >
+                                <option value="">-- Select Teammate to Assign (Stage 4) --</option>
+                                {teammates.map((tm) => (
+                                  <option key={tm.id} value={tm.id}>
+                                    {tm.full_name || tm.email} ({tm.role || 'Member'})
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="Enter custom assignee name or role for Stage 4..."
+                                value={stage4AssignedToName}
+                                onChange={(e) => {
+                                  setStage4AssignedToName(e.target.value);
+                                  setStage4AssignedTo('');
+                                }}
+                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-teal-500"
+                              />
+                            )}
+                          </div>
+
+                          {/* Stage 4 Notes */}
+                          <div className="space-y-1.5">
+                            <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                              Stage 4 Operational Notes:
+                            </label>
+                            <textarea
+                              rows={2}
+                              placeholder="Add Stage 4 CSR notes, losing carrier BTN, account number, authorized contact info..."
+                              value={stage4Notes}
+                              onChange={(e) => setStage4Notes(e.target.value)}
+                              className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-teal-500"
+                            />
+                          </div>
+                        </motion.div>
+                      </div>
                     ) : (
                       /* Locked banner for Stage 1 & 2 */
                       <div className="p-4 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] flex items-center gap-3 text-slate-500 dark:text-slate-400">
@@ -2141,11 +2287,9 @@ export default function AdminPortingPage() {
                         </div>
                         <p className="text-xs leading-relaxed">
                           <strong className="text-slate-800 dark:text-slate-200">
-                            Task Assignment &amp; Internal Handoff
+                            Task Assignment &amp; Internal Notes
                           </strong>{' '}
-                          unlocks at <strong>Stage 3 (Contract Signed)</strong>. Once contract is
-                          signed, you can assign teammates, attach LOA/CSR files, and log private
-                          operational notes.
+                          unlocks at <strong>Stage 3 (Contract signed)</strong> and <strong>Stage 4 (CSR and contract details)</strong>. Once reached, you can assign teammates and log private operational notes for both stages.
                         </p>
                       </div>
                     )}

@@ -32,6 +32,8 @@ export interface PortingRecord {
   draft_date?: string | null;
   contract_sent_date?: string | null;
   signed_date?: string | null;
+  csr_details_date?: string | null;
+  cut_sheet_review_date?: string | null;
   porting_submitted_date?: string | null;
   sof_review_date?: string | null;
   foc_confirmed_date?: string | null;
@@ -39,6 +41,12 @@ export interface PortingRecord {
   assigned_to?: string | null;
   assigned_to_name?: string | null;
   internal_notes?: string | null;
+  stage3_assigned_to?: string | null;
+  stage3_assigned_to_name?: string | null;
+  stage3_notes?: string | null;
+  stage4_assigned_to?: string | null;
+  stage4_assigned_to_name?: string | null;
+  stage4_notes?: string | null;
   progress_pct?: number;
   stage?: string;
   attachments?: {

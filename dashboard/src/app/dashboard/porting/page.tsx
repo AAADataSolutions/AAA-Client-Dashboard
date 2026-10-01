@@ -228,25 +228,28 @@ export default function ClientPortingPage() {
   const getStageLabel = (stageKey: string) => {
     switch (stageKey) {
       case 'DRAFT':
-        return 'Stage 1: Draft Initialized';
+        return 'Stage 1: Draft initialized';
       case 'CONTRACT_SENT':
-        return 'Stage 2: Contract Sent';
+        return 'Stage 2: Contract sent';
       case 'SIGNED':
-        return 'Stage 3: Contract Signed';
+        return 'Stage 3: Contract signed';
+      case 'CSR_DETAILS':
+      case 'CSR_AND_CONTRACT_DETAILS':
+        return 'Stage 4: CSR and contract details';
       case 'CUT_SHEET_REVIEW':
       case 'SOF_WAITING':
       case 'CUT_SHEET':
-        return 'Stage 4: Cut Sheet Review';
+        return 'Stage 5: Cut sheet review';
       case 'PORTING_SUBMITTED':
       case 'SUBMITTED':
       case 'IN_PROGRESS':
-        return 'Stage 5: Porting Submitted';
+        return 'Stage 6: Porting submitted';
       case 'FOC_RECEIVED':
-        return 'Stage 6: FOC Confirmed';
+        return 'Stage 7: FOC Confirm';
       case 'COMPLETED':
-        return 'Stage 7: Onboarded';
+        return 'Stage 8: Onboarding';
       default:
-        return 'Submitted';
+        return stageKey || 'Submitted';
     }
   };
 
@@ -438,13 +441,14 @@ export default function ClientPortingPage() {
               className="px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium cursor-pointer focus:outline-none focus:border-blue-500 shrink-0"
             >
               <option value="ALL">Status: All Statuses</option>
-              <option value="DRAFT">Stage 1: Draft Initialized</option>
-              <option value="CONTRACT_SENT">Stage 2: Contract Sent</option>
-              <option value="SIGNED">Stage 3: Contract Signed</option>
-              <option value="CUT_SHEET_REVIEW">Stage 4: Cut Sheet Review</option>
-              <option value="PORTING_SUBMITTED">Stage 5: Porting Submitted</option>
-              <option value="FOC_RECEIVED">Stage 6: FOC Confirmed</option>
-              <option value="COMPLETED">Stage 7: Onboarded</option>
+              <option value="DRAFT">Stage 1: Draft initialized</option>
+              <option value="CONTRACT_SENT">Stage 2: Contract sent</option>
+              <option value="SIGNED">Stage 3: Contract signed</option>
+              <option value="CSR_DETAILS">Stage 4: CSR and contract details</option>
+              <option value="CUT_SHEET_REVIEW">Stage 5: Cut sheet review</option>
+              <option value="PORTING_SUBMITTED">Stage 6: Porting submitted</option>
+              <option value="FOC_RECEIVED">Stage 7: FOC Confirm</option>
+              <option value="COMPLETED">Stage 8: Onboarding</option>
             </select>
 
             {/* Sort Dropdown */}
@@ -546,42 +550,47 @@ export default function ClientPortingPage() {
               ) : (
                 portings.map((item) => {
                   const normalizedStage = (
+                    item.status === 'CSR_DETAILS' || item.status === 'CSR_AND_CONTRACT_DETAILS' || (item as any).stage === 'CSR_DETAILS' || (item as any).stage === 'CSR_AND_CONTRACT_DETAILS' ? 'CSR_DETAILS' :
                     item.status === 'SOF_WAITING' ? 'CUT_SHEET_REVIEW' :
                     item.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
                     item.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
                     (item as any).stage || item.status || 'DRAFT'
                   );
                   let badge = {
-                    label: 'Stage 1: Draft Initialized',
+                    label: 'Stage 1: Draft initialized',
                     bg: 'bg-slate-100 dark:bg-[#1a1c24]',
                     text: 'text-slate-800 dark:text-slate-200',
                     border: 'border-slate-200 dark:border-[#2a2c3a]',
                   };
                   switch (normalizedStage) {
                     case 'DRAFT':
-                      badge = { label: 'Draft Initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' };
+                      badge = { label: 'Draft initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' };
                       break;
                     case 'CONTRACT_SENT':
-                      badge = { label: 'Contract Sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50' };
+                      badge = { label: 'Contract sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50' };
                       break;
                     case 'SIGNED':
-                      badge = { label: 'Contract Signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50' };
+                      badge = { label: 'Contract signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50' };
+                      break;
+                    case 'CSR_DETAILS':
+                    case 'CSR_AND_CONTRACT_DETAILS':
+                      badge = { label: 'CSR and contract details', bg: 'bg-teal-50 dark:bg-teal-950/50', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-200 dark:border-teal-800/50' };
                       break;
                     case 'CUT_SHEET_REVIEW':
                     case 'SOF_WAITING':
                     case 'CUT_SHEET':
-                      badge = { label: 'Cut Sheet Review', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50' };
+                      badge = { label: 'Cut sheet review', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50' };
                       break;
                     case 'PORTING_SUBMITTED':
                     case 'SUBMITTED':
                     case 'IN_PROGRESS':
-                      badge = { label: 'Porting Submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50' };
+                      badge = { label: 'Porting submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50' };
                       break;
                     case 'FOC_RECEIVED':
-                      badge = { label: 'FOC Confirmed', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50' };
+                      badge = { label: 'FOC Confirm', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50' };
                       break;
                     case 'COMPLETED':
-                      badge = { label: 'Onboarded', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50' };
+                      badge = { label: 'Onboarding', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50' };
                       break;
                   }
 

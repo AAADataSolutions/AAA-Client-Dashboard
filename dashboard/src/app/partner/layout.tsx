@@ -55,7 +55,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           {/* Brand Logo & Partner Badge */}
           <div className="flex items-center gap-4">
             <Link href="/partner" className="flex items-center gap-3">
-              <img src="/logo.png" alt="AAA Data Solutions" className="h-8" />
+              <img src="/logo3.png" alt="AAA Data Solutions" className="h-8 object-contain" />
               <div>
                 <span className="font-black text-sm text-slate-900 dark:text-white tracking-tight block leading-tight">
                   AAA Data Solutions
@@ -109,7 +109,6 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
             <button
               onClick={async () => {
                 await signOut();
-                window.location.href = '/auth';
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200/60 dark:border-rose-900/40 transition cursor-pointer shadow-xs"
               title="Sign Out to Auth Page"
@@ -141,7 +140,6 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           <button
             onClick={async () => {
               await signOut();
-              window.location.href = '/auth';
             }}
             className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 text-rose-600 dark:text-rose-400 cursor-pointer"
           >

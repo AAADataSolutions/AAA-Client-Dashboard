@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
         *,
         organization_property:organization_properties(
           id,
-          property:properties(id, name, address, city, state, zip_code, main_phone, monthly_price, general_manager_name, general_manager_email, ray_baud_and_logs_enabled, ray_baum_status)
+          property:properties(id, name, address, city, state, zip_code, main_phone, monthly_price, general_manager_name, general_manager_email, ray_baud_and_logs_enabled, ray_baum_status),
+          onboardings(id, status, target_date, draft_date, contract_sent_date, signed_date, csr_details_date, cut_sheet_review_date, porting_submitted_date, sof_review_date, foc_confirmed_date, live_cutover_date, assigned_to, assigned_to_name, internal_notes, stage3_assigned_to, stage3_assigned_to_name, stage3_notes, stage4_assigned_to, stage4_assigned_to_name, stage4_notes)
         ),
         attachments:porting_attachments(
           id, file_name, file_size, mime_type, storage_path, created_at
@@ -113,6 +114,10 @@ export async function GET(request: NextRequest) {
 
     const allPortings = (portRecords || []).map((item: any) => {
       const prop = item.organization_property?.property;
+      const ob = Array.isArray(item.organization_property?.onboardings)
+        ? item.organization_property?.onboardings[0]
+        : item.organization_property?.onboardings;
+
       const services = (item.services || []).map((s: any) => {
         const svc = s.service || s;
         return {
@@ -142,11 +147,29 @@ export async function GET(request: NextRequest) {
         ray_baum_status: prop?.ray_baum_status || 'INACTIVE',
         organization_name: orgName,
         carrier_details: item.carrier_details || '',
-        status: item.status,
+        status: item.status || ob?.status || 'DRAFT',
         foc_date: item.foc_date || null,
-        target_date: item.target_date || null,
+        target_date: item.target_date || ob?.target_date || null,
+        draft_date: ob?.draft_date || null,
+        contract_sent_date: ob?.contract_sent_date || null,
+        signed_date: ob?.signed_date || null,
+        csr_details_date: ob?.csr_details_date || null,
+        cut_sheet_review_date: ob?.cut_sheet_review_date || ob?.sof_review_date || null,
+        porting_submitted_date: ob?.porting_submitted_date || null,
+        sof_review_date: ob?.sof_review_date || null,
+        foc_confirmed_date: ob?.foc_confirmed_date || null,
+        live_cutover_date: ob?.live_cutover_date || null,
+        assigned_to: ob?.assigned_to || null,
+        assigned_to_name: ob?.assigned_to_name || null,
+        internal_notes: ob?.internal_notes || item.notes || null,
+        stage3_assigned_to: ob?.stage3_assigned_to || ob?.assigned_to || null,
+        stage3_assigned_to_name: ob?.stage3_assigned_to_name || ob?.assigned_to_name || null,
+        stage3_notes: ob?.stage3_notes || ob?.internal_notes || null,
+        stage4_assigned_to: ob?.stage4_assigned_to || null,
+        stage4_assigned_to_name: ob?.stage4_assigned_to_name || null,
+        stage4_notes: ob?.stage4_notes || null,
         rejection_reason: item.rejection_reason || null,
-        notes: item.notes || '',
+        notes: item.notes || ob?.internal_notes || '',
         is_activated: item.is_activated || false,
         created_at: item.created_at,
         updated_at: item.updated_at,
@@ -161,10 +184,13 @@ export async function GET(request: NextRequest) {
       if (statusFilter === 'ACTION_REQUIRED') {
         filtered = filtered.filter((p) => ['REJECTED', 'CANCELLED', 'PENDING'].includes(p.status));
       } else if (statusFilter === 'IN_PROGRESS_ALL') {
-        filtered = filtered.filter((p) => ['IN_PROGRESS', 'SUBMITTED', 'DRAFT'].includes(p.status));
+        filtered = filtered.filter((p) => ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'CSR_DETAILS', 'CUT_SHEET_REVIEW', 'PORTING_SUBMITTED', 'FOC_RECEIVED'].includes(p.status));
       } else {
         filtered = filtered.filter((p) => p.status === statusFilter);
       }
+    } else {
+      // Once onboarded/completed, automatically remove from default active porting list
+      filtered = filtered.filter((p) => p.status !== 'COMPLETED');
     }
 
     if (search) {
@@ -185,12 +211,13 @@ export async function GET(request: NextRequest) {
       data: paginated,
       total,
       metrics: {
-        total: allPortings.length,
-        inProgress: allPortings.filter((p) => ['IN_PROGRESS', 'SUBMITTED'].includes(p.status)).length,
-        focReceived: allPortings.filter((p) => p.status === 'FOC_RECEIVED').length,
+        total: allPortings.filter((p) => p.status !== 'COMPLETED').length,
+        inProgress: allPortings.filter((p) => ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'CSR_DETAILS', 'CUT_SHEET_REVIEW', 'PORTING_SUBMITTED'].includes(p.status)).length,
+        focReceived: allPortings.filter((p) => ['FOC_RECEIVED', 'FOC_CONFIRMED'].includes(p.status)).length,
         completed: allPortings.filter((p) => p.status === 'COMPLETED').length,
         actionRequired: allPortings.filter((p) => ['REJECTED', 'CANCELLED', 'PENDING'].includes(p.status)).length,
       },
+      filters: { properties: [] },
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });

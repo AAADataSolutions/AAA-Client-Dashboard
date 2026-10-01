@@ -31,10 +31,11 @@ const STAGES_ROAD = [
   { key: 'DRAFT', label: 'Draft Initialized', step: 1 },
   { key: 'CONTRACT_SENT', label: 'Contract Sent', step: 2 },
   { key: 'SIGNED', label: 'Contract Signed', step: 3 },
-  { key: 'CUT_SHEET_REVIEW', label: 'Cut Sheet Review', step: 4 },
-  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 5 },
-  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 6 },
-  { key: 'COMPLETED', label: 'Onboarded', step: 7 },
+  { key: 'CSR_DETAILS', label: 'CSR and Contract Details', step: 4 },
+  { key: 'CUT_SHEET_REVIEW', label: 'Cut Sheet Review', step: 5 },
+  { key: 'PORTING_SUBMITTED', label: 'Porting Submitted', step: 6 },
+  { key: 'FOC_RECEIVED', label: 'FOC Confirmed', step: 7 },
+  { key: 'COMPLETED', label: 'Onboarded', step: 8 },
 ];
 
 export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
@@ -56,6 +57,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
   const isCancelled = porting.status === 'CANCELLED';
 
   const normalizedStatus = (
+    porting.status === 'CSR_DETAILS' || porting.status === 'CSR_AND_CONTRACT_DETAILS' || porting.stage === 'CSR_DETAILS' || porting.stage === 'CSR_AND_CONTRACT_DETAILS' ? 'CSR_DETAILS' :
     porting.status === 'SOF_WAITING' ? 'CUT_SHEET_REVIEW' :
     porting.status === 'SUBMITTED' ? 'PORTING_SUBMITTED' :
     porting.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
@@ -67,14 +69,16 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
       case 'DRAFT': return 0;
       case 'CONTRACT_SENT': return 1;
       case 'SIGNED': return 2;
+      case 'CSR_DETAILS':
+      case 'CSR_AND_CONTRACT_DETAILS': return 3;
       case 'CUT_SHEET_REVIEW':
       case 'SOF_WAITING':
-      case 'CUT_SHEET': return 3;
+      case 'CUT_SHEET': return 4;
       case 'PORTING_SUBMITTED':
       case 'SUBMITTED':
-      case 'IN_PROGRESS': return 4;
-      case 'FOC_RECEIVED': return 5;
-      case 'COMPLETED': return 6;
+      case 'IN_PROGRESS': return 5;
+      case 'FOC_RECEIVED': return 6;
+      case 'COMPLETED': return 7;
       default: return 0;
     }
   };
@@ -114,7 +118,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-slate-700 dark:text-slate-300">
-          {/* Status & Stepper Banner (All 7 Stages) */}
+          {/* Status & Stepper Banner (All 8 Stages) */}
           {isRejected || isCancelled ? (
             <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 space-y-1.5">
               <div className="flex items-center gap-2">
@@ -142,13 +146,13 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                  Stage {currentStageObj.step} of 7
+                  Stage {currentStageObj.step} of 8
                 </span>
               </div>
 
-              {/* Visual 7-Stage Progress Stepper */}
+              {/* Visual 8-Stage Progress Stepper */}
               <div className="pt-2">
-                <div className="grid grid-cols-7 gap-1 text-center">
+                <div className="grid grid-cols-8 gap-1 text-center">
                   {STAGES_ROAD.map((stage, idx) => {
                     const isPassed = idx < currentStageIdx;
                     const isCurrent = idx === currentStageIdx;

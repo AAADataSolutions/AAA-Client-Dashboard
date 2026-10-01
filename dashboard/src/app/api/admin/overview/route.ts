@@ -313,7 +313,7 @@ export async function GET() {
 
       let stageKey = 'DRAFT';
       let stageLabel = 'Draft Initialized';
-      let percent = 14;
+      let percent = 12.5;
       let color = '#64748b';
 
       switch (rawStatus) {
@@ -321,14 +321,21 @@ export async function GET() {
         case 'SENT':
           stageKey = 'CONTRACT_SENT';
           stageLabel = 'Contract Sent';
-          percent = 28;
+          percent = 25;
           color = '#6366f1';
           break;
         case 'SIGNED':
           stageKey = 'SIGNED';
           stageLabel = 'Contract Signed';
-          percent = 42;
+          percent = 37.5;
           color = '#2563eb';
+          break;
+        case 'CSR_DETAILS':
+        case 'CSR_AND_CONTRACT_DETAILS':
+          stageKey = 'CSR_DETAILS';
+          stageLabel = 'CSR and Contract Details';
+          percent = 50;
+          color = '#0d9488';
           break;
         case 'CUT_SHEET_REVIEW':
         case 'CUT_SHEET':
@@ -336,7 +343,7 @@ export async function GET() {
         case 'SOF_WAITING':
           stageKey = 'CUT_SHEET_REVIEW';
           stageLabel = 'Cut Sheet Review';
-          percent = 57;
+          percent = 62.5;
           color = '#a855f7';
           break;
         case 'PORTING_SUBMITTED':
@@ -345,7 +352,7 @@ export async function GET() {
         case 'IN_PROGRESS':
           stageKey = 'PORTING_SUBMITTED';
           stageLabel = 'Porting Submitted';
-          percent = 71;
+          percent = 75;
           color = '#f59e0b';
           break;
         case 'FOC_RECEIVED':
@@ -353,7 +360,7 @@ export async function GET() {
         case 'FOC_CONFIRMED':
           stageKey = 'FOC_RECEIVED';
           stageLabel = 'FOC Confirmed';
-          percent = 85;
+          percent = 87.5;
           color = '#0ea5e9';
           break;
         case 'COMPLETED':
@@ -367,7 +374,7 @@ export async function GET() {
         default:
           stageKey = 'DRAFT';
           stageLabel = 'Draft Initialized';
-          percent = 14;
+          percent = 12.5;
           color = '#64748b';
           break;
       }

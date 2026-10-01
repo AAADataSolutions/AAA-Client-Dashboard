@@ -125,20 +125,22 @@ export async function GET(request: NextRequest) {
       const prop = orgProp?.property;
       const org = orgProp?.organization;
 
-      let pct = 10;
+      let pct = 12.5;
       switch (item.status) {
-        case 'DRAFT': pct = 14; break;
-        case 'CONTRACT_SENT': pct = 28; break;
-        case 'SIGNED': pct = 42; break;
+        case 'DRAFT': pct = 12.5; break;
+        case 'CONTRACT_SENT': pct = 25; break;
+        case 'SIGNED': pct = 37.5; break;
+        case 'CSR_DETAILS':
+        case 'CSR_AND_CONTRACT_DETAILS': pct = 50; break;
         case 'CUT_SHEET_REVIEW':
         case 'SOF_WAITING':
-        case 'CUT_SHEET': pct = 57; break;
+        case 'CUT_SHEET': pct = 62.5; break;
         case 'PORTING_SUBMITTED':
         case 'SUBMITTED':
-        case 'IN_PROGRESS': pct = 71; break;
-        case 'FOC_RECEIVED': pct = 85; break;
+        case 'IN_PROGRESS': pct = 75; break;
+        case 'FOC_RECEIVED': pct = 87.5; break;
         case 'COMPLETED': pct = 100; break;
-        default: pct = 14;
+        default: pct = 12.5;
       }
 
       // Merge relational attachments and JSONB attachments

@@ -101,7 +101,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
           {/* Brand Header */}
           <div className="h-16 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
             <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">
-                            <img src="/logo.png" alt="" className='h-8' />
+              <img src="/logo3.png" alt="AAA Data Solutions" className="h-8 object-contain" />
               {isOpen && (
                 <div className="truncate">
                   <span className="font-semibold text-[13px] text-[#f4f4f5] tracking-tight block leading-tight truncate">

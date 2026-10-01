@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
             draft_date,
             contract_sent_date,
             signed_date,
+            csr_details_date,
+            cut_sheet_review_date,
             porting_submitted_date,
             sof_review_date,
             foc_confirmed_date,
@@ -71,6 +73,12 @@ export async function GET(request: NextRequest) {
             assigned_to,
             assigned_to_name,
             internal_notes,
+            stage3_assigned_to,
+            stage3_assigned_to_name,
+            stage3_notes,
+            stage4_assigned_to,
+            stage4_assigned_to_name,
+            stage4_notes,
             attachments
           )
         ),
@@ -87,7 +95,7 @@ export async function GET(request: NextRequest) {
       if (statusFilter === 'ACTION_REQUIRED') {
         query = query.in('status', ['REJECTED', 'CANCELLED', 'PENDING']);
       } else if (statusFilter === 'IN_PROGRESS_ALL') {
-        query = query.in('status', ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'CUT_SHEET_REVIEW', 'CUT_SHEET', 'PORTING_SUBMITTED', 'SOF_WAITING']);
+        query = query.in('status', ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'CSR_DETAILS', 'CUT_SHEET_REVIEW', 'CUT_SHEET', 'PORTING_SUBMITTED', 'SOF_WAITING', 'FOC_RECEIVED']);
       } else {
         query = query.eq('status', statusFilter);
       }
@@ -159,20 +167,25 @@ export async function GET(request: NextRequest) {
       });
 
       const effectiveStatus = item.status || ob?.status || 'DRAFT';
-      let progressPct = 14;
+      let progressPct = 12.5;
       switch (effectiveStatus) {
-        case 'DRAFT': progressPct = 14; break;
-        case 'CONTRACT_SENT': progressPct = 28; break;
-        case 'SIGNED': progressPct = 42; break;
+        case 'DRAFT': progressPct = 12.5; break;
+        case 'CONTRACT_SENT': progressPct = 25; break;
+        case 'SIGNED':
+        case 'CONTRACT_SIGNED': progressPct = 37.5; break;
+        case 'CSR_DETAILS':
+        case 'CSR_AND_CONTRACT_DETAILS': progressPct = 50; break;
         case 'CUT_SHEET_REVIEW':
         case 'SOF_WAITING':
-        case 'CUT_SHEET': progressPct = 57; break;
+        case 'CUT_SHEET': progressPct = 62.5; break;
         case 'PORTING_SUBMITTED':
         case 'SUBMITTED':
-        case 'IN_PROGRESS': progressPct = 71; break;
-        case 'FOC_RECEIVED': progressPct = 85; break;
-        case 'COMPLETED': progressPct = 100; break;
-        default: progressPct = 14;
+        case 'IN_PROGRESS': progressPct = 75; break;
+        case 'FOC_RECEIVED':
+        case 'FOC_CONFIRMED': progressPct = 87.5; break;
+        case 'COMPLETED':
+        case 'ONBOARDED': progressPct = 100; break;
+        default: progressPct = 12.5;
       }
 
       // Merge porting attachments & onboarding attachments
@@ -219,6 +232,8 @@ export async function GET(request: NextRequest) {
         draft_date: ob?.draft_date || null,
         contract_sent_date: ob?.contract_sent_date || null,
         signed_date: ob?.signed_date || null,
+        csr_details_date: ob?.csr_details_date || null,
+        cut_sheet_review_date: ob?.cut_sheet_review_date || ob?.sof_review_date || null,
         porting_submitted_date: ob?.porting_submitted_date || null,
         sof_review_date: ob?.sof_review_date || null,
         foc_confirmed_date: ob?.foc_confirmed_date || null,
@@ -226,6 +241,12 @@ export async function GET(request: NextRequest) {
         assigned_to: ob?.assigned_to || null,
         assigned_to_name: ob?.assigned_to_name || null,
         internal_notes: ob?.internal_notes || item.notes || null,
+        stage3_assigned_to: ob?.stage3_assigned_to || ob?.assigned_to || null,
+        stage3_assigned_to_name: ob?.stage3_assigned_to_name || ob?.assigned_to_name || null,
+        stage3_notes: ob?.stage3_notes || ob?.internal_notes || null,
+        stage4_assigned_to: ob?.stage4_assigned_to || null,
+        stage4_assigned_to_name: ob?.stage4_assigned_to_name || null,
+        stage4_notes: ob?.stage4_notes || null,
         foc_date: item.foc_date,
         completed_at: item.completed_at,
         rejection_reason: item.rejection_reason,
@@ -387,6 +408,8 @@ export async function POST(request: NextRequest) {
         if (body.draft_date) onboardingData.draft_date = body.draft_date;
         if (body.contract_sent_date) onboardingData.contract_sent_date = body.contract_sent_date;
         if (body.signed_date) onboardingData.signed_date = body.signed_date;
+        if (body.csr_details_date) onboardingData.csr_details_date = body.csr_details_date;
+        if (body.cut_sheet_review_date) onboardingData.cut_sheet_review_date = body.cut_sheet_review_date;
         if (body.porting_submitted_date) onboardingData.porting_submitted_date = body.porting_submitted_date;
         if (body.sof_review_date) onboardingData.sof_review_date = body.sof_review_date;
         if (body.foc_confirmed_date) onboardingData.foc_confirmed_date = body.foc_confirmed_date;
@@ -394,6 +417,12 @@ export async function POST(request: NextRequest) {
         if (body.assigned_to) onboardingData.assigned_to = body.assigned_to;
         if (body.assigned_to_name) onboardingData.assigned_to_name = body.assigned_to_name;
         if (body.internal_notes) onboardingData.internal_notes = body.internal_notes;
+        if (body.stage3_assigned_to) onboardingData.stage3_assigned_to = body.stage3_assigned_to;
+        if (body.stage3_assigned_to_name) onboardingData.stage3_assigned_to_name = body.stage3_assigned_to_name;
+        if (body.stage3_notes) onboardingData.stage3_notes = body.stage3_notes;
+        if (body.stage4_assigned_to) onboardingData.stage4_assigned_to = body.stage4_assigned_to;
+        if (body.stage4_assigned_to_name) onboardingData.stage4_assigned_to_name = body.stage4_assigned_to_name;
+        if (body.stage4_notes) onboardingData.stage4_notes = body.stage4_notes;
 
         await db.from('onboardings').insert(onboardingData);
 
@@ -690,6 +719,8 @@ export async function PATCH(request: NextRequest) {
       if (draft_date !== undefined) obUpdate.draft_date = draft_date;
       if (contract_sent_date !== undefined) obUpdate.contract_sent_date = contract_sent_date;
       if (signed_date !== undefined) obUpdate.signed_date = signed_date;
+      if (body.csr_details_date !== undefined) obUpdate.csr_details_date = body.csr_details_date;
+      if (body.cut_sheet_review_date !== undefined) obUpdate.cut_sheet_review_date = body.cut_sheet_review_date;
       if (porting_submitted_date !== undefined) obUpdate.porting_submitted_date = porting_submitted_date;
       if (sof_review_date !== undefined) obUpdate.sof_review_date = sof_review_date;
       if (foc_confirmed_date !== undefined) obUpdate.foc_confirmed_date = foc_confirmed_date;
@@ -697,6 +728,12 @@ export async function PATCH(request: NextRequest) {
       if (assigned_to !== undefined) obUpdate.assigned_to = assigned_to;
       if (assigned_to_name !== undefined) obUpdate.assigned_to_name = assigned_to_name;
       if (internal_notes !== undefined) obUpdate.internal_notes = internal_notes;
+      if (body.stage3_assigned_to !== undefined) obUpdate.stage3_assigned_to = body.stage3_assigned_to;
+      if (body.stage3_assigned_to_name !== undefined) obUpdate.stage3_assigned_to_name = body.stage3_assigned_to_name;
+      if (body.stage3_notes !== undefined) obUpdate.stage3_notes = body.stage3_notes;
+      if (body.stage4_assigned_to !== undefined) obUpdate.stage4_assigned_to = body.stage4_assigned_to;
+      if (body.stage4_assigned_to_name !== undefined) obUpdate.stage4_assigned_to_name = body.stage4_assigned_to_name;
+      if (body.stage4_notes !== undefined) obUpdate.stage4_notes = body.stage4_notes;
       if (attachments !== undefined) obUpdate.attachments = attachments;
       if (status === 'COMPLETED') obUpdate.completed_at = new Date().toISOString();
 
