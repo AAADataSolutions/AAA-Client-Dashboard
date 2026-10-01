@@ -660,7 +660,7 @@ export default function ClientPropertiesPage() {
 
                       {/* Column 6: RAY BAUM AND KARY'S LAW */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {(prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' ? (
+                        {(prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' || (prop as any).ray_baud_and_logs_enabled === true || (prop as any).is_ray_baum_active === true ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -670,7 +670,7 @@ export default function ClientPropertiesPage() {
                             title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>View Ray Baum No.s</span>
+                            <span>View Ray Baum&apos;s No.</span>
                             <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
                           </button>
                         ) : (
@@ -948,16 +948,7 @@ export default function ClientPropertiesPage() {
               <span>View Services ({menuPosition.prop.services_count})</span>
             </button>
 
-            {/* Action 3: Manage contacts */}
-            <button
-              onClick={() => handleOpenEditGM(menuPosition.prop)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <Users className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Manage Contacts</span>
-            </button>
-
-            {/* Action 4: View tickets */}
+            {/* Action 3: View tickets */}
             <button
               onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'TICKETS')}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
@@ -966,16 +957,7 @@ export default function ClientPropertiesPage() {
               <span>View Tickets ({menuPosition.prop.tickets?.length || 0})</span>
             </button>
 
-            {/* Action 5: View onboarding stage */}
-            <button
-              onClick={() => handleOpenTimeline(menuPosition.prop)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <GitBranch className="w-3.5 h-3.5 text-purple-500" />
-              <span>View Onboarding Stage</span>
-            </button>
-
-            {/* Action 6: Edit GM details */}
+            {/* Action 4: Edit GM details */}
             <button
               onClick={() => handleOpenEditGM(menuPosition.prop)}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-2 transition cursor-pointer"

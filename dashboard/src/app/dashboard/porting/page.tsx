@@ -592,7 +592,12 @@ export default function ClientPortingPage() {
 
                   const isE911Verified = item.e911_status === 'VERIFIED' || item.ray_baud_and_logs_enabled || item.status === 'COMPLETED';
                   const isE911Correction = item.e911_status === 'CORRECTION_REQUIRED';
-                  const isRayBaumCompliant = item.ray_baud_and_logs_enabled ?? (item.ray_baum_status === 'ACTIVE' || item.status === 'COMPLETED');
+                  const isRayBaumCompliant =
+                    item.ray_baud_and_logs_enabled === true ||
+                    item.ray_baum_status === 'ACTIVE' ||
+                    item.ray_baum_status === 'Active' ||
+                    item.ray_baum_status === 'VERIFIED' ||
+                    (item as any).is_ray_baum_active === true;
 
                   return (
                     <tr
@@ -689,12 +694,13 @@ export default function ClientPortingPage() {
                             title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>View Ray Baum No.s</span>
+                            <span>View Ray Baum&apos;s No.</span>
                             <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
                           </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#2c2e3c] text-[10.5px] font-medium">
-                            Pending Audit
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span>Inactive</span>
                           </span>
                         )}
                       </td>
@@ -870,6 +876,26 @@ export default function ClientPortingPage() {
               >
                 <Hotel className="w-3.5 h-3.5 text-blue-500" />
                 <span>View Property 360°</span>
+              </button>
+            )}
+
+            {menuPosition.record.property_id && (
+              menuPosition.record.ray_baud_and_logs_enabled === true ||
+              menuPosition.record.ray_baum_status === 'ACTIVE' ||
+              menuPosition.record.ray_baum_status === 'Active' ||
+              menuPosition.record.ray_baum_status === 'VERIFIED' ||
+              (menuPosition.record as any).is_ray_baum_active === true
+            ) && (
+              <button
+                onClick={() => {
+                  const propId = menuPosition.record.property_id;
+                  setMenuPosition(null);
+                  window.open(`/dashboard/ray-baum/${propId}`, '_blank');
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-2 transition cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>View Ray Baum&apos;s No.</span>
               </button>
             )}
 

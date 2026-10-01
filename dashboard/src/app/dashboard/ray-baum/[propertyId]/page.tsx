@@ -49,18 +49,19 @@ export default function ClientRayBaumPropertyPage({
     setLoading(true);
     try {
       // 1. Fetch Client Properties to identify name & address
-      const propRes = await fetch('/api/client/properties');
+      const propRes = await fetch('/api/client/properties?limit=100');
       const propJson = await propRes.json();
+      let foundProp: any = null;
       if (propJson.success && Array.isArray(propJson.data)) {
-        const found = propJson.data.find((p: any) => p.id === propertyId);
-        if (found) {
+        foundProp = propJson.data.find((p: any) => p.id === propertyId || p.org_property_id === propertyId);
+        if (foundProp) {
           setProperty({
-            id: found.id,
-            name: found.name,
-            address: found.address,
-            city: found.city,
-            state: found.state,
-            zip_code: found.zip_code,
+            id: foundProp.id,
+            name: foundProp.name,
+            address: foundProp.address,
+            city: foundProp.city,
+            state: foundProp.state,
+            zip_code: foundProp.zip_code,
           });
         }
       }
@@ -69,7 +70,19 @@ export default function ClientRayBaumPropertyPage({
       const recRes = await fetch(`/api/client/ray-baum?propertyId=${propertyId}`);
       const recJson = await recRes.json();
       if (recJson.success) {
-        setRecords(recJson.data || []);
+        const fetchedRecords = recJson.data || [];
+        setRecords(fetchedRecords);
+        if (!foundProp && fetchedRecords.length > 0 && fetchedRecords[0]?.property) {
+          const p = fetchedRecords[0].property;
+          setProperty({
+            id: p.id,
+            name: p.name,
+            address: p.address,
+            city: p.city,
+            state: p.state,
+            zip_code: p.zip_code,
+          });
+        }
       }
     } catch (err) {
       console.error('Error fetching Ray Baum data for client:', err);

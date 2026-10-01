@@ -255,6 +255,35 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Ray Baum and Kary's Law Compliance */}
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-[#222430]">
+                <span className="text-slate-400">Ray Baum Compliance:</span>
+                {(porting.ray_baud_and_logs_enabled === true ||
+                  porting.ray_baum_status === 'ACTIVE' ||
+                  porting.ray_baum_status === 'Active' ||
+                  porting.ray_baum_status === 'VERIFIED' ||
+                  porting.is_ray_baum_active === true) ? (
+                  <button
+                    onClick={() => {
+                      if (porting.property_id) {
+                        window.open(`/dashboard/ray-baum/${porting.property_id}`, '_blank');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                    title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>View Ray Baum&apos;s No.</span>
+                    <ArrowUpRight className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>Inactive</span>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

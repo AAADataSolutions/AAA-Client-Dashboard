@@ -435,9 +435,6 @@ export default function ClientServicesPage() {
                     SERVICE TYPE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    ORGANIZATION
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     PROPERTY
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -452,7 +449,6 @@ export default function ClientServicesPage() {
                 {services.map((item) => {
                   const serviceId = item.custom_service_id || `SVC-${item.id.slice(0, 6).toUpperCase()}`;
                   const serviceName = item.service_name || item.description || 'Standard Voice Line';
-                  const organization = item.organization_name || orgName;
 
                   return (
                     <tr
@@ -502,15 +498,7 @@ export default function ClientServicesPage() {
                         </span>
                       </td>
 
-                      {/* Column 5: ORGANIZATION */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300 font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[140px]">{organization}</span>
-                        </div>
-                      </td>
-
-                      {/* Column 6: PROPERTY */}
+                      {/* Column 5: PROPERTY */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium">
                         <div className="flex items-center gap-1.5">
                           <Hotel className="w-3.5 h-3.5 text-slate-400 shrink-0" />

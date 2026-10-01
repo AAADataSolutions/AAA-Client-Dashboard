@@ -45,17 +45,31 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       }
 
       if (data?.user) {
-        // Fetch user profile to direct to /admin or /dashboard
+        // Fetch user profile and partner record to route properly
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', data.user.id)
           .maybeSingle();
 
+        const { data: partnerRec } = await supabase
+          .from('partners')
+          .select('id')
+          .or(`user_id.eq.${data.user.id},email.ilike.${data.user.email?.toLowerCase()}`)
+          .maybeSingle();
+
         const isInternal =
           profile?.role === 'SUPER_ADMIN' || profile?.role === 'SUB_SUPER_ADMIN';
+        const isPartner =
+          profile?.role === 'PARTNER' || Boolean(partnerRec);
 
-        router.push(isInternal ? '/admin' : '/dashboard');
+        if (isInternal) {
+          router.push('/admin');
+        } else if (isPartner) {
+          router.push('/partner');
+        } else {
+          router.push('/dashboard');
+        }
         router.refresh();
       }
     } catch {

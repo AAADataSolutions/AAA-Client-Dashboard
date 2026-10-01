@@ -17,10 +17,19 @@ export async function GET(request: Request) {
           .from('profiles')
           .select('role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+
+        const { data: partnerRec } = await supabase
+          .from('partners')
+          .select('id')
+          .or(`user_id.eq.${user.id},email.ilike.${user.email?.toLowerCase()}`)
+          .maybeSingle();
 
         const isInternal = profile?.role === 'SUPER_ADMIN' || profile?.role === 'SUB_SUPER_ADMIN';
-        return NextResponse.redirect(`${origin}${isInternal ? '/admin' : '/dashboard'}`);
+        const isPartner = profile?.role === 'PARTNER' || Boolean(partnerRec);
+
+        const dest = isInternal ? '/admin' : isPartner ? '/partner' : '/dashboard';
+        return NextResponse.redirect(`${origin}${dest}`);
       }
     }
   }

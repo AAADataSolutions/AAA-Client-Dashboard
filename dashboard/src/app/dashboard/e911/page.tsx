@@ -17,6 +17,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -390,9 +391,6 @@ export default function ClientE911Page() {
                     PROPERTY ADDRESS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    ORGANIZATION NAME
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     EMERGENCY DISPATCH ADDRESS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -408,8 +406,6 @@ export default function ClientE911Page() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
                 {paginatedRecords.map((item) => {
-                  const organization = item.organization_name || orgName;
-
                   return (
                     <tr
                       key={item.id}
@@ -433,15 +429,7 @@ export default function ClientE911Page() {
                         </span>
                       </td>
 
-                      {/* Column 3: ORGANIZATION NAME */}
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[150px]">{organization}</span>
-                        </div>
-                      </td>
-
-                      {/* Column 4: EMERGENCY DISPATCH ADDRESS */}
+                      {/* Column 3: EMERGENCY DISPATCH ADDRESS */}
                       <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 whitespace-nowrap font-medium">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -486,17 +474,27 @@ export default function ClientE911Page() {
                         </span>
                       </td>
 
-                      {/* Column 6: RAY BAUM ACT */}
+                      {/* Column 6: RAY BAUM AND KARY'S LAW */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
-                            item.ray_baud_and_logs_enabled
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
-                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                          }`}
-                        >
-                          {item.ray_baud_and_logs_enabled ? 'COMPLIANT' : 'AUDIT REQUIRED'}
-                        </span>
+                        {item.ray_baud_and_logs_enabled || (item as any).ray_baum_status === 'ACTIVE' || (item as any).ray_baum_status === 'Active' ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`/dashboard/ray-baum/${item.property_id}`, '_blank');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                            title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>View Ray Baum&apos;s No.</span>
+                            <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span>Inactive</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* Column 7: ACTIONS (View Details Only) */}

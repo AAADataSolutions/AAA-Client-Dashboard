@@ -154,31 +154,9 @@ export default function ClientDashboardOverviewPage() {
         </div>
       </motion.div>
 
-      {/* 2. Top KPI Cards Row - VARIANT 1 ONLY FOR ALL CARDS */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5">
-        {/* Card 1: Organization */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Management Group
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-xl font-bold text-white truncate block">
-              {orgName}
-            </span>
-            <span className="text-xs text-slate-200 font-medium">Active Tenant</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">Verified enterprise account</p>
-        </motion.div>
-
-        {/* Card 2: Properties */}
+      {/* 2. Top KPI Cards Row - 4 Primary Operational Cards */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Properties */}
         <Link href="/dashboard/properties" className="block">
           <motion.div
             whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
@@ -202,7 +180,7 @@ export default function ClientDashboardOverviewPage() {
           </motion.div>
         </Link>
 
-        {/* Card 3: Services & Lines */}
+        {/* Card 2: Services & Lines */}
         <Link href="/dashboard/services" className="block">
           <motion.div
             whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
@@ -226,31 +204,7 @@ export default function ClientDashboardOverviewPage() {
           </motion.div>
         </Link>
 
-        {/* Card 4: Active Onboardings */}
-        <Link href="/dashboard/onboarding" className="block">
-          <motion.div
-            whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-            className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer h-full"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-                Onboardings
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-                <GitBranch className="w-4 h-4 text-white" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <span className="text-2xl font-bold text-white">
-                {metrics.activeOnboardingsCount}
-              </span>
-              <span className="text-xs text-slate-200 ml-1.5 font-medium">Pipelines</span>
-            </div>
-            <p className="text-[11px] text-slate-200 mt-2">Track deployment &rarr;</p>
-          </motion.div>
-        </Link>
-
-        {/* Card 5: Active Porting */}
+        {/* Card 3: Porting */}
         <Link href="/dashboard/porting" className="block">
           <motion.div
             whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
@@ -258,7 +212,7 @@ export default function ClientDashboardOverviewPage() {
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-                Active Porting
+                Porting
               </span>
               <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
                 <ArrowLeftRight className="w-4 h-4 text-white" />
@@ -266,15 +220,15 @@ export default function ClientDashboardOverviewPage() {
             </div>
             <div className="mt-3">
               <span className="text-2xl font-bold text-white">
-                {metrics.activePortingCount}
+                {metrics.portingPropertiesCount !== undefined ? metrics.portingPropertiesCount : metrics.activePortingCount}
               </span>
-              <span className="text-xs text-slate-200 ml-1.5 font-medium">Orders</span>
+              <span className="text-xs text-slate-200 ml-1.5 font-medium">Properties</span>
             </div>
             <p className="text-[11px] text-slate-200 mt-2">Carrier migration queue &rarr;</p>
           </motion.div>
         </Link>
 
-        {/* Card 6: Open Tickets */}
+        {/* Card 4: Open Tickets */}
         <Link href="/dashboard/tickets" className="block">
           <motion.div
             whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}

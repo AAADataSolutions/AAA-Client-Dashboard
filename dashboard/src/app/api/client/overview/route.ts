@@ -131,6 +131,20 @@ export async function GET() {
       (p) => p.status !== 'COMPLETED' && p.status !== 'CANCELLED' && p.status !== 'REJECTED'
     ).length;
 
+    // Count unique properties in porting
+    const portingPropertyIds = new Set<string>();
+    portingRecords.forEach((pr: any) => {
+      const propId =
+        pr.property_id ||
+        pr.organization_property?.property_id ||
+        pr.organization_property?.property?.id ||
+        pr.organization_property_id;
+      if (propId) {
+        portingPropertyIds.add(propId);
+      }
+    });
+    const portingPropertiesCount = portingPropertyIds.size > 0 ? portingPropertyIds.size : portingRecords.length;
+
     // 5. Fetch Support Tickets
     let openTicketsCount = 0;
     let ticketsInLast24Hours = 0;
@@ -281,6 +295,7 @@ export async function GET() {
           servicesCount,
           activeOnboardingsCount,
           activePortingCount,
+          portingPropertiesCount,
           openTicketsCount,
           ticketsInLast24Hours,
         },

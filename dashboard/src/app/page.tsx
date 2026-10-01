@@ -15,10 +15,24 @@ export default async function HomePage() {
     .from('profiles')
     .select('role')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
+
+  const { data: partnerRec } = await supabase
+    .from('partners')
+    .select('id')
+    .or(`user_id.eq.${user.id},email.ilike.${user.email?.toLowerCase()}`)
+    .maybeSingle();
 
   const isInternal =
     profile?.role === 'SUPER_ADMIN' || profile?.role === 'SUB_SUPER_ADMIN';
+  const isPartner =
+    profile?.role === 'PARTNER' || Boolean(partnerRec);
 
-  redirect(isInternal ? '/admin' : '/dashboard');
+  if (isInternal) {
+    redirect('/admin');
+  } else if (isPartner) {
+    redirect('/partner');
+  } else {
+    redirect('/dashboard');
+  }
 }

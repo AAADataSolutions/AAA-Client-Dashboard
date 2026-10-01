@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,8 +18,10 @@ export async function GET(request: NextRequest) {
     const propertyId = searchParams.get('propertyId');
     const search = searchParams.get('search')?.trim();
 
+    const dbClient = createAdminClient() || supabase;
+
     // Fetch user's org properties
-    const { data: memberData } = await supabase
+    const { data: memberData } = await dbClient
       .from('organization_members')
       .select('organization_id')
       .eq('profile_id', user.id)
@@ -28,18 +31,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    const { data: orgProps } = await supabase
+    const { data: orgProps } = await dbClient
       .from('organization_properties')
       .select('property_id')
       .eq('organization_id', memberData.organization_id);
 
-    const allowedPropertyIds = (orgProps || []).map((p) => p.property_id);
+    const allowedPropertyIds = (orgProps || []).map((p: any) => p.property_id).filter(Boolean);
 
     if (allowedPropertyIds.length === 0) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    let query = supabase
+    let query = dbClient
       .from('ray_baum_records')
       .select(`
         *,

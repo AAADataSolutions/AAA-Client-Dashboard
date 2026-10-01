@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         id,
         created_at,
         organization:organizations(id, name),
-        property:properties(id, name, address, city, state, zip_code, main_phone, ray_baud_and_logs_enabled),
+        property:properties(id, name, address, city, state, zip_code, main_phone, ray_baud_and_logs_enabled, ray_baum_status),
         e911:e911_records(id, status, emergency_address, correction_notes, verified_at, created_at, updated_at)
       `)
       .eq('organization_id', member.organization_id);
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
           correction_notes: e911?.correction_notes || (e911?.status === 'VERIFIED' ? 'Verified with local PSAP dispatch database.' : null),
           verified_at: e911?.verified_at || null,
           ray_baud_and_logs_enabled: prop.ray_baud_and_logs_enabled ?? true,
+          ray_baum_status: prop.ray_baum_status || 'ACTIVE',
           created_at: e911?.created_at || op.created_at || new Date().toISOString(),
           updated_at: e911?.updated_at || op.created_at,
         };

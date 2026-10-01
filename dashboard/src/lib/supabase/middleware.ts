@@ -131,6 +131,18 @@ export async function updateSession(request: NextRequest) {
       url.pathname = '/partner';
       return NextResponse.redirect(url);
     }
+
+    const { data: partnerRecord } = await supabase
+      .from('partners')
+      .select('id')
+      .or(`user_id.eq.${user.id},email.ilike.${user.email?.toLowerCase()}`)
+      .maybeSingle();
+
+    if (partnerRecord) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/partner';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

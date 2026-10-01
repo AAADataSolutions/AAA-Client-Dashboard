@@ -453,9 +453,6 @@ export default function ClientOnboardingPage() {
                     ADDRESS
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    ORGANIZATION
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     STAGE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -481,7 +478,6 @@ export default function ClientOnboardingPage() {
                   const gmName = item.general_manager_name || item.contact_person_name || '—';
                   const gmPhone = item.general_manager_phone || item.property_phone || null;
                   const gmEmail = item.general_manager_email || null;
-                  const organization = item.organization_name || orgName;
 
                   return (
                     <tr
@@ -506,15 +502,7 @@ export default function ClientOnboardingPage() {
                         </span>
                       </td>
 
-                      {/* Column 3: ORGANIZATION */}
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[140px]">{organization}</span>
-                        </div>
-                      </td>
-
-                      {/* Column 4: STAGE */}
+                      {/* Column 3: STAGE */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${stageBadge.bg} ${stageBadge.text} border ${stageBadge.border}`}>
                           <GitBranch className="w-3 h-3" />
