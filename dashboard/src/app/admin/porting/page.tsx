@@ -1278,12 +1278,23 @@ export default function AdminPortingPage() {
                       {/* 7. Ray Baum and Kari's Law */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {isRayBaumCompliant ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10.5px] font-semibold">
-                            Compliant
-                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const targetId = rec.property_id || rec.organization_property_id || rec.id;
+                              window.open(`/admin/ray-baum/${targetId}`, '_blank');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                            title="Click to view Ray Baum and Kari's Law dispatch records in a new tab"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>View Ray Baum No.s</span>
+                            <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#2c2e3c] text-[10.5px] font-medium">
-                            Pending Audit
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span>Inactive</span>
                           </span>
                         )}
                       </td>

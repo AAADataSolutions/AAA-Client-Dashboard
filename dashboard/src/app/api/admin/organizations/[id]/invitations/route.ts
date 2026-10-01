@@ -39,7 +39,7 @@ export async function GET(
         target_org_role: inv.target_org_role,
         expires_at: inv.expires_at,
         created_at: inv.created_at,
-        invite_url: `${baseUrl}/invite/${inv.token_hash}`,
+        invite_url: `${baseUrl}/invite/${inv.target_org_role === 'ADMIN' ? 'organization' : 'member'}/${inv.token_hash}`,
       };
     });
 
@@ -136,7 +136,7 @@ export async function POST(
     const host = request.headers.get('host') || 'localhost:3000';
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
-    const inviteUrl = `${baseUrl}/invite/${rawToken}`;
+    const inviteUrl = `${baseUrl}/invite/${role === 'ADMIN' ? 'organization' : 'member'}/${rawToken}`;
 
     // Dispatch automated invitation email
     const emailResult = await sendInviteEmail({

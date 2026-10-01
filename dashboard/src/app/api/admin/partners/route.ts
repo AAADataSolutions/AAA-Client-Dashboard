@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-    const inviteUrl = `${origin}/invite/${rawToken}`;
+    const inviteUrl = `${origin}/invite/partner/${rawToken}`;
 
     // Dispatch invite email to partner
     const emailResult = await sendInviteEmail({

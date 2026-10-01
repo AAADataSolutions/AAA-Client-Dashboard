@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,10 +15,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search')?.trim();
+    const search = searchParams.get('search')?.trim().toLowerCase() || '';
     const propertyId = searchParams.get('propertyId');
 
-    const { data: memberData } = await supabase
+    const db = createAdminClient() || supabase;
+
+    const { data: memberData } = await db
       .from('organization_members')
       .select('organization_id')
       .eq('profile_id', user.id)
@@ -27,42 +30,157 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    const { data: orgProps } = await supabase
+    const { data: orgProps } = await db
       .from('organization_properties')
-      .select('property_id')
+      .select('id, property_id, property:properties(id, name, address, city, state)')
       .eq('organization_id', memberData.organization_id);
 
-    const allowedPropertyIds = (orgProps || []).map((p) => p.property_id);
+    const allowedPropertyIds = (orgProps || []).map((p) => p.property_id).filter(Boolean);
+    const orgPropIds = (orgProps || []).map((p) => p.id).filter(Boolean);
 
     if (allowedPropertyIds.length === 0) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    let query = supabase
+    // 1. Fetch from elevator_lines table
+    let query = db
       .from('elevator_lines')
       .select(`
         *,
         property:properties(id, name, address, city, state),
-        service:services(id, service_name, phone_number)
+        service:services(id, service_name, phone_number, status, description)
       `)
-      .in('property_id', allowedPropertyIds)
-      .order('created_at', { ascending: false });
+      .in('property_id', allowedPropertyIds);
 
+    const { data: eleData, error: eleErr } = await query;
+    if (eleErr) {
+      console.warn('elevator_lines query warning:', eleErr.message);
+    }
+
+    const existingKeys = new Set<string>();
+    const existingServiceIds = new Set<string>();
+    const combinedList: any[] = [];
+
+    (eleData || []).forEach((item: any) => {
+      if (item.service_id) existingServiceIds.add(item.service_id);
+      if (item.phone_number && item.property_id) {
+        existingKeys.add(`${item.phone_number.trim()}_${item.property_id}`);
+      }
+      combinedList.push(item);
+    });
+
+    // 2. Also fetch services assigned to these properties that are Elevator Lines
+    if (orgPropIds.length > 0) {
+      const { data: opsRecords } = await db
+        .from('organization_property_services')
+        .select(`
+          id,
+          organization_property_id,
+          organization_property:organization_properties(
+            property_id,
+            property:properties(id, name, address, city, state)
+          ),
+          service:services(
+            id,
+            phone_number,
+            service_name,
+            custom_service_id,
+            status,
+            description,
+            created_at,
+            service_type:service_types(id, name)
+          )
+        `)
+        .in('organization_property_id', orgPropIds);
+
+      for (const link of opsRecords || []) {
+        const svc: any = link.service;
+        const op: any = link.organization_property;
+        if (!svc) continue;
+
+        const typeName = (svc.service_type?.name || '').toLowerCase();
+        const svcName = (svc.service_name || '').toLowerCase();
+        const desc = (svc.description || '').toLowerCase();
+
+        const isElevator =
+          typeName.includes('elevator') ||
+          svcName.includes('elevator') ||
+          desc.includes('elevator');
+
+        if (!isElevator) continue;
+
+        const propId = op?.property_id;
+        const phone = svc.phone_number?.trim();
+        const dedupeKey = `${phone}_${propId}`;
+
+        if (existingServiceIds.has(svc.id) || (phone && propId && existingKeys.has(dedupeKey))) {
+          continue;
+        }
+
+        existingServiceIds.add(svc.id);
+        if (phone && propId) existingKeys.add(dedupeKey);
+
+        const propObj = Array.isArray(op?.property) ? op?.property[0] : op?.property;
+        const newItem = {
+          id: svc.id,
+          service_id: svc.id,
+          property_id: propId || null,
+          phone_number: svc.phone_number || '',
+          extension: null,
+          description: svc.description || svc.service_name || 'Elevator Emergency Voice Circuit',
+          status: svc.status || 'ACTIVE',
+          created_at: svc.created_at || new Date().toISOString(),
+          property: propObj || null,
+          service: svc,
+        };
+
+        combinedList.push(newItem);
+
+        // Auto-backfill to elevator_lines table for persistent integrity
+        if (propId && phone) {
+          db.from('elevator_lines')
+            .insert({
+              property_id: propId,
+              service_id: svc.id,
+              phone_number: phone,
+              status: svc.status || 'ACTIVE',
+              description: svc.description || svc.service_name || null,
+            })
+            .then(({ error: insertErr }) => {
+              if (insertErr) console.warn('Could not backfill elevator_lines:', insertErr.message);
+            });
+        }
+      }
+    }
+
+    // 3. Filter by propertyId if requested
+    let result = combinedList;
     if (propertyId && propertyId !== 'ALL' && allowedPropertyIds.includes(propertyId)) {
-      query = query.eq('property_id', propertyId);
+      result = result.filter((item) => item.property_id === propertyId);
     }
 
+    // 4. Filter by search query if requested
     if (search) {
-      query = query.or(`phone_number.ilike.%${search}%,extension.ilike.%${search}%,description.ilike.%${search}%,status.ilike.%${search}%`);
+      result = result.filter((item) => {
+        const pName = item.property?.name?.toLowerCase() || '';
+        const phone = (item.phone_number || '').toLowerCase();
+        const ext = (item.extension || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        const statusStr = (item.status || '').toLowerCase();
+        return (
+          pName.includes(search) ||
+          phone.includes(search) ||
+          ext.includes(search) ||
+          desc.includes(search) ||
+          statusStr.includes(search)
+        );
+      });
     }
 
-    const { data, error } = await query;
+    // Sort by created_at descending
+    result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    if (error) {
-      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ success: true, data: data || [] });
+    return NextResponse.json({ success: true, data: result });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }

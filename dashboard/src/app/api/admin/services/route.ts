@@ -275,6 +275,32 @@ export async function POST(request: NextRequest) {
         const { data: propData } = await supabase.from('properties').select('name').eq('id', property_id).maybeSingle();
         if (propData) assignedPropName = propData.name;
       }
+
+      // 3. Mirror into fire_lines or elevator_lines if applicable
+      const checkTypeName = (service_type_name || '').toLowerCase();
+      const checkSvcName = (service_name || '').toLowerCase();
+      const checkDesc = (description || '').toLowerCase();
+
+      const isFireSvc = checkTypeName.includes('fire') || checkSvcName.includes('fire') || checkDesc.includes('fire');
+      const isElevatorSvc = checkTypeName.includes('elevator') || checkSvcName.includes('elevator') || checkDesc.includes('elevator');
+
+      if (isFireSvc) {
+        await supabase.from('fire_lines').insert({
+          property_id: property_id,
+          service_id: newService.id,
+          phone_number: newService.phone_number,
+          device_type: service_type_name?.trim() || 'Fire Alarm Communicator',
+          description: description?.trim() || service_name?.trim() || null,
+        });
+      } else if (isElevatorSvc) {
+        await supabase.from('elevator_lines').insert({
+          property_id: property_id,
+          service_id: newService.id,
+          phone_number: newService.phone_number,
+          status: status || 'ACTIVE',
+          description: description?.trim() || service_name?.trim() || null,
+        });
+      }
     }
 
     // Central Audit Log
@@ -370,6 +396,40 @@ export async function PUT(request: NextRequest) {
             organization_property_id: orgProp.id,
             service_id: id,
           });
+        }
+
+        // Check if fire or elevator service
+        const checkTypeName = (service_type_name || '').toLowerCase();
+        const checkSvcName = (updatedService.service_name || '').toLowerCase();
+        const isFireSvc = checkTypeName.includes('fire') || checkSvcName.includes('fire');
+        const isElevatorSvc = checkTypeName.includes('elevator') || checkSvcName.includes('elevator');
+
+        if (isFireSvc) {
+          const { data: existingFl } = await supabase.from('fire_lines').select('id').eq('service_id', id).maybeSingle();
+          if (existingFl) {
+            await supabase.from('fire_lines').update({ property_id, phone_number: updatedService.phone_number }).eq('id', existingFl.id);
+          } else {
+            await supabase.from('fire_lines').insert({
+              property_id,
+              service_id: id,
+              phone_number: updatedService.phone_number,
+              device_type: service_type_name || 'Fire Alarm Communicator',
+              description: updatedService.description,
+            });
+          }
+        } else if (isElevatorSvc) {
+          const { data: existingEl } = await supabase.from('elevator_lines').select('id').eq('service_id', id).maybeSingle();
+          if (existingEl) {
+            await supabase.from('elevator_lines').update({ property_id, phone_number: updatedService.phone_number }).eq('id', existingEl.id);
+          } else {
+            await supabase.from('elevator_lines').insert({
+              property_id,
+              service_id: id,
+              phone_number: updatedService.phone_number,
+              status: updatedService.status || 'ACTIVE',
+              description: updatedService.description,
+            });
+          }
         }
       }
     }

@@ -348,7 +348,7 @@ export async function GET(
         target_org_role: inv.target_org_role,
         expires_at: inv.expires_at,
         created_at: inv.created_at,
-        invite_url: `${baseUrl}/invite/${inv.token_hash}`,
+        invite_url: `${baseUrl}/invite/${inv.target_org_role === 'ADMIN' ? 'organization' : 'member'}/${inv.token_hash}`,
       };
     });
 

@@ -1646,14 +1646,14 @@ export default function OrganizationDetailPage({
 
                       {/* Ray Baum and Kary's Law: STRICTLY Active / Inactive */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap">
-                        {prop.ray_baum_status === 'Active' ? (
+                        {prop.ray_baum_status === 'Active' || prop.ray_baum_status === 'ACTIVE' ? (
                           <button
                             onClick={() => window.open(`/admin/ray-baum/${prop.id}`, '_blank')}
                             className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/30 transition cursor-pointer"
                             title="Open Ray Baum and Kary's Law in new tab"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Active</span>
+                            <span>View Ray Baum No.s</span>
                             <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
                           </button>
                         ) : (

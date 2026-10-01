@@ -16,8 +16,11 @@ import {
   AlertTriangle,
   X,
   RefreshCw,
+  Upload,
+  Download,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ImportRayBaumModal } from '@/components/admin/ImportRayBaumModal';
 
 interface RayBaumRecord {
   id: string;
@@ -52,6 +55,7 @@ export default function AdminRayBaumPropertyPage({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submittingAdd, setSubmittingAdd] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -76,6 +80,34 @@ export default function AdminRayBaumPropertyPage({
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMsg({ text, type });
     setTimeout(() => setToastMsg(null), 4000);
+  };
+
+  // Export CSV Function (Headers: PHONE NO., ASSIGNED TO ROOM, LOCATION)
+  const handleExportCSV = () => {
+    if (records.length === 0) {
+      showToast('No dispatch records available to export.', 'error');
+      return;
+    }
+
+    const headers = ['PHONE NO.', 'ASSIGNED TO ROOM', 'LOCATION'];
+    const rows = records.map((rec) => [
+      `"${(rec.phone_number || '').replace(/"/g, '""')}"`,
+      `"${(rec.assigned_to_room || '').replace(/"/g, '""')}"`,
+      `"${(rec.location || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const safeName = (property?.name || propertyId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    link.setAttribute('download', `Ray_Baum_Records_${safeName}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Successfully exported ${records.length} records to CSV.`);
   };
 
   const fetchData = useCallback(async () => {
@@ -270,7 +302,7 @@ export default function AdminRayBaumPropertyPage({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={fetchData}
               disabled={loading}
@@ -278,6 +310,22 @@ export default function AdminRayBaumPropertyPage({
               title="Refresh records"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#181920] text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              title="Export all Ray Baum records to CSV"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="px-3.5 py-2 rounded-lg border border-blue-200 dark:border-blue-900/40 bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+              title="Import Ray Baum records from CSV"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import CSV</span>
             </button>
             <button
               onClick={() => setShowAddModal(true)}
@@ -646,6 +694,14 @@ export default function AdminRayBaumPropertyPage({
           </div>
         )}
       </AnimatePresence>
+      {/* Modal: Import CSV */}
+      <ImportRayBaumModal
+        isOpen={showImportModal}
+        propertyId={propertyId}
+        propertyName={property?.name}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={fetchData}
+      />
     </div>
   );
 }

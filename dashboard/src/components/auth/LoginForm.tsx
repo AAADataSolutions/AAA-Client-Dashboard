@@ -66,12 +66,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
   return (
     <div className="w-full max-w-[420px] mx-auto text-slate-900 bg-white">
-      {/* 1. Logo (Kept as requested) */}
-      <div className="flex justify-center sm:justify-start mb-8">
+      {/* 1. Logo */}
+      <div className="flex justify-center items-center sm:justify-start mb-8">
         <img
-          src="/logo.png"
+          src="/logo2.png"
           alt="AAA Data Solutions Logo"
-          className="w-48 h-auto max-h-16 object-contain"
+          className="w-48 h-30"
         />
       </div>
 
@@ -141,7 +141,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
         {/* Remember me & Forgot password Row */}
         <div className="flex items-center justify-between text-xs pt-1">
-          <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 hover:text-slate-900 transition-colors">
+          {/* <label className="flex items-center gap-2 cursor-pointer select-none text-slate-600 hover:text-slate-900 transition-colors">
             <input
               type="checkbox"
               checked={rememberMe}
@@ -149,7 +149,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
               className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
             />
             <span>Remember for 30 days</span>
-          </label>
+          </label> */}
 
           <button
             type="button"

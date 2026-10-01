@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       if (latestInvite) {
         const isExpired = new Date(latestInvite.expires_at) < new Date();
         inviteStatus = isExpired && latestInvite.status === 'PENDING' ? 'EXPIRED' : latestInvite.status;
-        inviteUrl = `${baseUrl}/invite/${latestInvite.token_hash}`;
+        inviteUrl = `${baseUrl}/invite/organization/${latestInvite.token_hash}`;
         inviteExpiresAt = latestInvite.expires_at;
       }
 
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
         const host = request.headers.get('host') || 'localhost:3000';
         const protocol = request.headers.get('x-forwarded-proto') || 'http';
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
-        const inviteUrl = `${baseUrl}/invite/${rawToken}`;
+        const inviteUrl = `${baseUrl}/invite/organization/${rawToken}`;
 
         // Send invite email directly to the contact
         const emailResult = await sendInviteEmail({

@@ -300,11 +300,15 @@ export async function GET() {
     );
     const urgentTickets = openTickets.filter((t) => t.priority === 'URGENT');
 
+    const propsMap = new Map<string, any>(props.map((p: any) => [p.id, p]));
+
     const allPortingItems = portings.map((p: any) => {
       const orgProp = p.organization_property;
-      const prop = Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property;
+      const propFromJoin = Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property;
+      const propFromMap = p.property_id ? propsMap.get(p.property_id) : null;
+      const prop = propFromJoin || propFromMap;
       const ob = Array.isArray(orgProp?.onboardings) ? orgProp?.onboardings[0] : orgProp?.onboardings;
-      const rawStatus = (p.status || ob?.status || 'DRAFT').toUpperCase();
+      const rawStatus = (p.status || ob?.status || prop?.status || 'DRAFT').toUpperCase();
       const propName = p.property_name || prop?.name || 'Property Location';
 
       let stageKey = 'DRAFT';
@@ -314,6 +318,7 @@ export async function GET() {
 
       switch (rawStatus) {
         case 'CONTRACT_SENT':
+        case 'SENT':
           stageKey = 'CONTRACT_SENT';
           stageLabel = 'Contract Sent';
           percent = 28;
@@ -335,6 +340,7 @@ export async function GET() {
           color = '#a855f7';
           break;
         case 'PORTING_SUBMITTED':
+        case 'PORTING':
         case 'SUBMITTED':
         case 'IN_PROGRESS':
           stageKey = 'PORTING_SUBMITTED';
@@ -343,12 +349,16 @@ export async function GET() {
           color = '#f59e0b';
           break;
         case 'FOC_RECEIVED':
+        case 'FOC':
+        case 'FOC_CONFIRMED':
           stageKey = 'FOC_RECEIVED';
           stageLabel = 'FOC Confirmed';
           percent = 85;
           color = '#0ea5e9';
           break;
         case 'COMPLETED':
+        case 'ONBOARDED':
+        case 'ACTIVE':
           stageKey = 'COMPLETED';
           stageLabel = 'Onboarded';
           percent = 100;
@@ -364,6 +374,7 @@ export async function GET() {
 
       return {
         id: p.id,
+        propertyId: prop?.id || p.property_id || '',
         propertyName: propName,
         stageKey,
         stageName: stageLabel,
@@ -373,6 +384,32 @@ export async function GET() {
         created_at: p.created_at,
         updated_at: p.updated_at || p.created_at,
       };
+    });
+
+    // Also include any properties that are marked as ONBOARDED / ACTIVE in properties table but don't have portings
+    const existingPropIdsInPortings = new Set(allPortingItems.map((i: any) => i.propertyId).filter(Boolean));
+    props.forEach((prop: any) => {
+      if (!existingPropIdsInPortings.has(prop.id)) {
+        const isCompleted = prop.status === 'ONBOARDED' || prop.status === 'ACTIVE' || prop.status === 'COMPLETED';
+        const isPorting = prop.status === 'PORTING' || prop.status === 'IN_PROGRESS' || prop.status === 'SUBMITTED';
+        const stageKey = isCompleted ? 'COMPLETED' : isPorting ? 'PORTING_SUBMITTED' : 'DRAFT';
+        const stageLabel = isCompleted ? 'Onboarded' : isPorting ? 'Porting Submitted' : 'Draft Initialized';
+        const percent = isCompleted ? 100 : isPorting ? 71 : 14;
+        const color = isCompleted ? '#10b981' : isPorting ? '#f59e0b' : '#64748b';
+
+        allPortingItems.push({
+          id: `prop-${prop.id}`,
+          propertyId: prop.id,
+          propertyName: prop.name || 'Property Location',
+          stageKey,
+          stageName: stageLabel,
+          stageLabel: `${stageLabel} · ${percent}%`,
+          percent,
+          color,
+          created_at: prop.created_at,
+          updated_at: prop.created_at,
+        });
+      }
     });
 
     const stageCounts7 = {

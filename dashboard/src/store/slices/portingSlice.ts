@@ -3,6 +3,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 export interface PortingRecord {
   id: string;
   org_property_id: string;
+  organization_property_id?: string;
   property_id: string;
   property_name: string;
   property_address: string;

@@ -242,15 +242,20 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                       </span>
                     </div>
                   </div>
-                  <span
-                    className={`text-[10.5px] font-bold px-2 py-0.5 rounded ${
-                      property.ray_baud_and_logs_enabled
-                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                    }`}
-                  >
-                    {property.ray_baud_and_logs_enabled ? 'ENABLED' : 'DISABLED'}
-                  </span>
+                  {property.ray_baud_and_logs_enabled || property.ray_baum_status === 'Active' || property.ray_baum_status === 'ACTIVE' ? (
+                    <button
+                      onClick={() => window.open(`/dashboard/ray-baum/${property.id}`, '_blank')}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>View Ray Baum No.s</span>
+                      <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  ) : (
+                    <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                      DISABLED
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

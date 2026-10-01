@@ -660,7 +660,7 @@ export default function ClientPropertiesPage() {
 
                       {/* Column 6: RAY BAUM AND KARY'S LAW */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {(prop as any).ray_baum_status === 'Active' ? (
+                        {(prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -670,7 +670,7 @@ export default function ClientPropertiesPage() {
                             title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Active</span>
+                            <span>View Ray Baum No.s</span>
                             <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
                           </button>
                         ) : (

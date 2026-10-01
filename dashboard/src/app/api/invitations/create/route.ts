@@ -134,7 +134,8 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-    const inviteUrl = `${baseUrl}/invite/${rawToken}`;
+    const inviteKind = invite_type === 'INTERNAL_TEAM' ? 'admin' : (target_org_role === 'ADMIN' ? 'organization' : 'member');
+    const inviteUrl = `${baseUrl}/invite/${inviteKind}/${rawToken}`;
 
     // Look up organization name if this is a client member invite
     let orgName: string | undefined;

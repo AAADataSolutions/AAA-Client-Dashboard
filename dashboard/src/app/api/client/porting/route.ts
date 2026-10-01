@@ -232,18 +232,69 @@ export async function POST(request: NextRequest) {
 
     const dbClient = createAdminClient() || supabase;
 
-    // Insert porting request
+    // 1. Create or link property record in properties table
+    const { data: newProp, error: propErr } = await dbClient
+      .from('properties')
+      .insert({
+        name: property_name.trim(),
+        address: property_address ? property_address.trim() : 'Address pending',
+        city: 'City',
+        state: 'IL',
+        zip_code: '00000',
+        country: 'USA',
+        main_phone: property_phone.trim(),
+        fax: fax ? fax.trim() : null,
+        status: 'ONBOARDING',
+        ray_baud_and_logs_enabled: false,
+        ray_baum_status: 'INACTIVE',
+      })
+      .select()
+      .single();
+
+    let createdOpId: string | null = null;
+    if (newProp) {
+      // 2. Link in organization_properties
+      const { data: newOp } = await dbClient
+        .from('organization_properties')
+        .insert({
+          organization_id: member.organization_id,
+          property_id: newProp.id,
+          status: 'ACTIVE',
+        })
+        .select('id')
+        .single();
+
+      if (newOp) {
+        createdOpId = newOp.id;
+
+        // 3. Create initial onboarding record in DRAFT stage
+        await dbClient.from('onboardings').insert({
+          organization_property_id: newOp.id,
+          status: 'DRAFT',
+        });
+
+        // 4. Create initial e911 record
+        await dbClient.from('e911_records').insert({
+          organization_property_id: newOp.id,
+          emergency_address: property_address ? property_address.trim() : 'Address pending',
+          status: 'PENDING',
+        });
+      }
+    }
+
+    // 5. Insert porting request with DRAFT stage
     const { data: newPorting, error: insertErr } = await dbClient
       .from('porting_requests')
       .insert({
         organization_id: member.organization_id,
+        organization_property_id: createdOpId,
         created_by: user.id,
         property_name: property_name.trim(),
         property_address: property_address ? property_address.trim() : null,
         property_phone: property_phone.trim(),
         fax: fax ? fax.trim() : null,
         carrier_details: carrier_details ? carrier_details.trim() : null,
-        status: 'SUBMITTED',
+        status: 'DRAFT',
         is_activated: false,
       })
       .select()

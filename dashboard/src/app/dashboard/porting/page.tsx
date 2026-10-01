@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Download,
   SlidersHorizontal,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -518,7 +519,6 @@ export default function ClientPortingPage() {
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY</th>
                 <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>
                 <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
-                <th className="py-3 px-4 whitespace-nowrap">MANAGEMENT GROUP</th>
                 <th className="py-3 px-4 whitespace-nowrap">NO. OF SERVICES</th>
                 <th className="py-3 px-4 whitespace-nowrap">E911 STATUS</th>
                 <th className="py-3 px-4 whitespace-nowrap">RAY BAUM AND KARY&apos;S LAW</th>
@@ -531,14 +531,14 @@ export default function ClientPortingPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-[#222430]/60">
               {loading && portings.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
                     Loading porting records...
                   </td>
                 </tr>
               ) : portings.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <ArrowLeftRight className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     No porting records found matching your filter.
                   </td>
@@ -646,23 +646,14 @@ export default function ClientPortingPage() {
                         )}
                       </td>
 
-                      {/* 4. Management Group (Organization Name or -) */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium">
-                        {item.organization_name && item.organization_name !== 'Unassigned Organization' && item.organization_name !== 'Direct Portfolio' ? (
-                          item.organization_name
-                        ) : (
-                          <span className="text-slate-400 font-semibold">—</span>
-                        )}
-                      </td>
-
-                      {/* 5. No. of Services */}
+                      {/* 4. No. of Services */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#2c2e3c] font-semibold text-[11px]">
                           {servicesCount} {servicesCount === 1 ? 'Service' : 'Services'}
                         </span>
                       </td>
 
-                      {/* 6. E911 Status */}
+                      {/* 5. E911 Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {isE911Verified ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10.5px] font-semibold">
@@ -682,12 +673,25 @@ export default function ClientPortingPage() {
                         )}
                       </td>
 
-                      {/* 7. Ray Baum and Kari's Law */}
+                      {/* 6. Ray Baum and Kari's Law */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {isRayBaumCompliant ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10.5px] font-semibold">
-                            Compliant
-                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (item.property_id) {
+                                window.open(`/dashboard/ray-baum/${item.property_id}`, '_blank');
+                              } else {
+                                setSelectedPortingForDrawer(item);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
+                            title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>View Ray Baum No.s</span>
+                            <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+                          </button>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#2c2e3c] text-[10.5px] font-medium">
                             Pending Audit

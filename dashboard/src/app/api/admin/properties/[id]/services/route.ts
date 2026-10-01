@@ -150,8 +150,47 @@ export async function POST(
       return NextResponse.json({ success: false, error: linkErr.message }, { status: 400 });
     }
 
-    // Fetch service info for audit log
-    const { data: svc } = await supabase.from('services').select('phone_number').eq('id', service_id).maybeSingle();
+    // Fetch service info for audit log and sync
+    const { data: svc } = await supabase
+      .from('services')
+      .select('id, phone_number, service_name, description, status, service_type:service_types(name)')
+      .eq('id', service_id)
+      .maybeSingle();
+
+    if (svc) {
+      const typeName = ((svc.service_type as any)?.name || '').toLowerCase();
+      const sName = (svc.service_name || '').toLowerCase();
+      const isFire = typeName.includes('fire') || sName.includes('fire');
+      const isElevator = typeName.includes('elevator') || sName.includes('elevator');
+
+      if (isFire) {
+        const { data: existingFl } = await supabase.from('fire_lines').select('id').eq('service_id', service_id).maybeSingle();
+        if (existingFl) {
+          await supabase.from('fire_lines').update({ property_id: propertyId, phone_number: svc.phone_number }).eq('id', existingFl.id);
+        } else {
+          await supabase.from('fire_lines').insert({
+            property_id: propertyId,
+            service_id: service_id,
+            phone_number: svc.phone_number,
+            device_type: (svc.service_type as any)?.name || 'Fire Alarm Communicator',
+            description: svc.description || svc.service_name,
+          });
+        }
+      } else if (isElevator) {
+        const { data: existingEl } = await supabase.from('elevator_lines').select('id').eq('service_id', service_id).maybeSingle();
+        if (existingEl) {
+          await supabase.from('elevator_lines').update({ property_id: propertyId, phone_number: svc.phone_number }).eq('id', existingEl.id);
+        } else {
+          await supabase.from('elevator_lines').insert({
+            property_id: propertyId,
+            service_id: service_id,
+            phone_number: svc.phone_number,
+            status: svc.status || 'ACTIVE',
+            description: svc.description || svc.service_name,
+          });
+        }
+      }
+    }
 
     // 4. Audit Log
     const propName = Array.isArray((orgProp as any)?.property)
@@ -212,6 +251,10 @@ export async function DELETE(
         .eq('service_id', serviceId)
         .in('organization_property_id', orgPropIds);
     }
+
+    // Clean up or unlink from fire_lines / elevator_lines
+    await supabase.from('fire_lines').delete().eq('service_id', serviceId).eq('property_id', propertyId);
+    await supabase.from('elevator_lines').delete().eq('service_id', serviceId).eq('property_id', propertyId);
 
     // Audit Log
     await logAuditEvent({

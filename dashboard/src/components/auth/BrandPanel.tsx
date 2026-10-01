@@ -1,323 +1,138 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-const SLIDES = [
-  {
-    title: 'Welcome to your new dashboard',
-    desc: "Sign in to explore changes we've made across your hospitality portfolio.",
-    metricTitle: 'Active properties',
-    metricValue: '1,000+',
-    chartTitle: 'Property traffic & voice calls',
-  },
-  {
-    title: 'Real-Time Carrier Porting',
-    desc: 'Track 7-stage LSR cutovers and FOC dates with 100% transparency.',
-    metricTitle: 'Carrier cuts',
-    metricValue: '99.8%',
-    chartTitle: 'LSR & DID trunk migrations',
-  },
-  {
-    title: 'Automated E911 Compliance',
-    desc: 'Automated Kari’s Law and RAY BAUM’S Act location dispatch records.',
-    metricTitle: 'Compliance rate',
-    metricValue: '100%',
-    chartTitle: 'E911 verified endpoints',
-  },
-  {
-    title: 'Multi-Property Hospitality PBX',
-    desc: 'Centralized telecom management for hotel General Managers & regional teams.',
-    metricTitle: 'Active lines',
-    metricValue: '25,000+',
-    chartTitle: 'Enterprise PBX uptime',
-  },
-];
+import React from 'react';
+import { motion } from 'framer-motion';
+import { PhoneCall, ShieldCheck, Wifi, Building2 } from 'lucide-react';
 
 export const BrandPanel: React.FC = () => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-
-  // Auto-advance slide every 6 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
-    }, 6000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
-  };
-
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
-  };
-
-  const slide = SLIDES[currentSlide];
-
   return (
-    <section className="relative w-full h-full min-h-[560px] lg:min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden select-none text-white">
-      {/* Decorative Radial Grid Ticks (White on Blue Background) */}
-      <div className="absolute top-4 right-4 w-72 h-72 opacity-20 pointer-events-none">
-        <svg viewBox="0 0 200 200" className="w-full h-full stroke-white" strokeWidth="1.5">
-          {Array.from({ length: 24 }).map((_, i) => {
-            const angle = (i * 360) / 24;
-            const rad = (angle * Math.PI) / 180;
-            const x1 = 100 + Math.cos(rad) * 45;
-            const y1 = 100 + Math.sin(rad) * 45;
-            const x2 = 100 + Math.cos(rad) * 90;
-            const y2 = 100 + Math.sin(rad) * 90;
-            return (
-              <line
-                key={i}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                strokeDasharray="2 4"
-                transform={`rotate(${i * 6} 100 100)`}
-              />
-            );
-          })}
-        </svg>
-      </div>
-
-      <div className="absolute -bottom-10 -left-10 w-80 h-80 opacity-15 pointer-events-none">
-        <svg viewBox="0 0 200 200" className="w-full h-full stroke-white" strokeWidth="1.5">
-          {Array.from({ length: 28 }).map((_, i) => {
-            const angle = (i * 360) / 28;
-            const rad = (angle * Math.PI) / 180;
-            const x1 = 100 + Math.cos(rad) * 40;
-            const y1 = 100 + Math.sin(rad) * 40;
-            const x2 = 100 + Math.cos(rad) * 95;
-            const y2 = 100 + Math.sin(rad) * 95;
-            return (
-              <line
-                key={i}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                strokeDasharray="2 5"
-              />
-            );
-          })}
-        </svg>
-      </div>
-
-      {/* Top Branding Pill */}
-      <div className="relative z-10">
-        <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 shadow-xs">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-bold tracking-tight text-white">
-            AAA Data Solutions
-          </span>
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-white bg-white/20 px-2 py-0.5 rounded-full border border-white/30">
-            Enterprise Portal
+    <section className="relative w-full h-full min-h-[580px] lg:min-h-screen bg-gradient-to-r from-blue-900 to-blue-800 flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden select-none text-white">
+      {/* Top Header & Badge */}
+      <div className="relative z-10 space-y-2.5">
+        <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+          AAA Data Solutions
+        </h3>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 shadow-2xs">
+          <span className="text-xs font-semibold text-white">
+            Voice <span className="text-blue-300 mx-1">•</span> Video <span className="text-blue-300 mx-1">•</span> Data
           </span>
         </div>
       </div>
 
-      {/* Center: Floating White Dashboard Preview KPI Cards */}
-      <div className="relative z-10 my-auto py-8 max-w-[460px] mx-auto w-full">
-        <div className="relative">
-          {/* Main Card: Line Analytics Chart (Crisp White Card) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="w-full bg-white text-slate-900 border border-white/80 rounded-2xl p-5 shadow-2xl shadow-blue-950/40 relative z-10"
-          >
-            <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
-              <span className="text-xs font-bold text-slate-900">
-                {slide.chartTitle}
-              </span>
-              <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                +14.8% this month
-              </span>
-            </div>
-
-            {/* SVG Spline Curves Graph */}
-            <div className="w-full h-36 pt-2">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 320 120">
-                <defs>
-                  <linearGradient id="chartBlueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Horizontal Grid lines */}
-                <line x1="0" y1="20" x2="320" y2="20" stroke="#f1f5f9" strokeDasharray="3 3" />
-                <line x1="0" y1="60" x2="320" y2="60" stroke="#f1f5f9" strokeDasharray="3 3" />
-                <line x1="0" y1="100" x2="320" y2="100" stroke="#f1f5f9" strokeDasharray="3 3" />
-
-                {/* Area 1: Blue */}
-                <path
-                  d="M 0,85 C 40,75 70,80 110,65 C 160,45 200,60 250,35 C 285,18 305,22 320,15 L 320,110 L 0,110 Z"
-                  fill="url(#chartBlueGrad)"
-                />
-
-                {/* Spline Line 1 (Top vibrant royal blue) */}
-                <path
-                  d="M 0,85 C 40,75 70,80 110,65 C 160,45 200,60 250,35 C 285,18 305,22 320,15"
-                  fill="none"
-                  stroke="#2563eb"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-
-                {/* Spline Line 2 (Middle light blue) */}
-                <path
-                  d="M 0,98 C 45,95 80,90 120,80 C 170,68 210,74 260,54 C 290,42 305,48 320,38"
-                  fill="none"
-                  stroke="#93c5fd"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-
-                {/* Spline Line 3 (Bottom subtle line) */}
-                <path
-                  d="M 0,108 C 50,104 90,102 130,96 C 180,88 220,92 270,78 C 295,70 310,72 320,65"
-                  fill="none"
-                  stroke="#cbd5e1"
-                  strokeWidth="1.5"
-                  strokeDasharray="2 2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-
-            {/* X-Axis Labels */}
-            <div className="flex justify-between text-[10px] font-medium text-slate-400 pt-2 border-t border-slate-100 mt-1">
-              <span>Jan</span>
-              <span>Mar</span>
-              <span>May</span>
-              <span>Jul</span>
-              <span>Sep</span>
-              <span>Nov</span>
-            </div>
-          </motion.div>
-
-          {/* Overlaid Card: Circular Concentric Progress Ring */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, x: 20, y: 20 }}
-            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
-            className="absolute -bottom-8 -right-4 sm:-right-6 w-44 bg-white text-slate-900 border border-slate-100 rounded-2xl p-4 shadow-2xl z-20"
-          >
-            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                {/* Track background */}
-                <circle cx="18" cy="18" r="14" fill="transparent" stroke="#f1f5f9" strokeWidth="3.5" />
-                {/* Outer Ring - Royal Blue */}
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14"
-                  fill="transparent"
-                  stroke="#2563eb"
-                  strokeWidth="3.5"
-                  strokeDasharray="88 100"
-                  strokeLinecap="round"
-                />
-                {/* Middle Ring - Indigo */}
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="10.5"
-                  fill="transparent"
-                  stroke="#818cf8"
-                  strokeWidth="2.5"
-                  strokeDasharray="72 100"
-                  strokeLinecap="round"
-                />
-                {/* Inner Ring - Sky Blue */}
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="7.5"
-                  fill="transparent"
-                  stroke="#38bdf8"
-                  strokeWidth="2"
-                  strokeDasharray="60 100"
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              {/* Center Counter */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-tight">
-                <span className="text-[9px] uppercase tracking-wider font-bold text-slate-500">
-                  {slide.metricTitle}
-                </span>
-                <span className="text-sm font-black text-slate-900">
-                  {slide.metricValue}
-                </span>
-              </div>
-            </div>
-          </motion.div>
+      {/* Center: Hero Headings, Subtitle & 2x2 Feature Cards */}
+      <div className="relative z-10 my-auto py-8 max-w-[560px] w-full space-y-6">
+        {/* Main Headings */}
+        <div className="space-y-1">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-[1.12]">
+            Decades of Trust.
+          </h1>
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-sky-300 leading-[1.12]">
+            Built for Hospitality.
+          </h1>
         </div>
-      </div>
 
-      {/* Bottom: Carousel Text & Pagination Controls */}
-      <div className="relative z-10 space-y-4 pt-6 max-w-[460px] mx-auto w-full">
-        <AnimatePresence mode="wait">
+        {/* Subtitle */}
+        <p className="text-sm sm:text-[15px] text-blue-100/90 leading-relaxed font-normal">
+          Enterprise telephony, carrier-grade E911 compliance, and high-performance communication infrastructure trusted by leading hotels, clubs, and property groups nationwide.
+        </p>
+
+        {/* 4 Feature Cards (2x2 Grid) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+          {/* Card 1: Voice, Cloud and on Premise PBX */}
           <motion.div
-            key={currentSlide}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25 }}
-            className="space-y-1.5"
+            transition={{ duration: 0.35, delay: 0.05 }}
+            className="p-4 rounded-2xl bg-white border border-white/90 text-slate-900 shadow-xl shadow-blue-950/30 flex items-start gap-3.5"
           >
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              {slide.title}
-            </h2>
-            <p className="text-xs sm:text-sm text-blue-100 leading-relaxed">
-              {slide.desc}
-            </p>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <PhoneCall className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="text-[13px] font-bold text-slate-900 leading-snug">
+                Voice, Cloud and on Premise PBX
+              </h4>
+              <p className="text-[11.5px] text-slate-500 font-medium">
+                Carrier SIP trunking &amp; DIDs
+              </p>
+            </div>
           </motion.div>
-        </AnimatePresence>
 
-        {/* Carousel Dots + Arrows */}
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
-            {SLIDES.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentSlide(idx)}
-                aria-label={`Slide ${idx + 1}`}
-                className={`h-2 rounded-full transition-all cursor-pointer ${
-                  currentSlide === idx
-                    ? 'w-6 bg-white'
-                    : 'w-2 bg-white/40 hover:bg-white/60'
-                }`}
-              />
-            ))}
-          </div>
+          {/* Card 2: Kary's Law & RAY BAUM'S */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
+            className="p-4 rounded-2xl bg-white border border-white/90 text-slate-900 shadow-xl shadow-blue-950/30 flex items-start gap-3.5"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="text-[13px] font-bold text-slate-900 leading-snug">
+                Kary&apos;s Law &amp; RAY BAUM&apos;S
+              </h4>
+              <p className="text-[11.5px] text-slate-500 font-medium">
+                Automated E911 compliance
+              </p>
+            </div>
+          </motion.div>
 
-          <div className="flex items-center gap-1.5 text-white">
-            <button
-              onClick={prevSlide}
-              aria-label="Previous slide"
-              className="w-8 h-8 rounded-full border border-white/30 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={nextSlide}
-              aria-label="Next slide"
-              className="w-8 h-8 rounded-full border border-white/30 hover:bg-white/20 flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Card 3: Hospitality Data & Wi-Fi */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            className="p-4 rounded-2xl bg-white border border-white/90 text-slate-900 shadow-xl shadow-blue-950/30 flex items-start gap-3.5"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <Wifi className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="text-[13px] font-bold text-slate-900 leading-snug">
+                Hospitality Data &amp; Wi-Fi
+              </h4>
+              <p className="text-[11.5px] text-slate-500 font-medium">
+                Dedicated high-speed fiber
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Card 4: Turnkey Multi-Property */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.2 }}
+            className="p-4 rounded-2xl bg-white border border-white/90 text-slate-900 shadow-xl shadow-blue-950/30 flex items-start gap-3.5"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="text-[13px] font-bold text-slate-900 leading-snug">
+                Turnkey Multi-Property
+              </h4>
+              <p className="text-[11.5px] text-slate-500 font-medium">
+                Centralized tenant management
+              </p>
+            </div>
+          </motion.div>
         </div>
+      </div>
 
-        {/* Footer Copyright */}
-        <div className="pt-4 border-t border-white/20 text-[11px] text-blue-100/70">
-          <span>&copy; {new Date().getFullYear()} AAA Data Solutions &bull; An Active Telephones Company</span>
+      {/* Footer Section */}
+      <div className="relative z-10 pt-4 border-t border-white/20 space-y-2 text-blue-100/80 text-xs font-normal">
+        {/* <div className="flex flex-wrap items-center justify-end">
+          <span className="text-blue-100/90 font-medium">Decades of Trust. Built for Hospitality.</span>
+        </div> */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px]">
+          <span>Support: <strong className="text-white font-semibold">203-599-0500</strong></span>
+          <span>•</span>
+          <a href="mailto:support@aaadatasolutions.com" className="text-white font-semibold hover:text-sky-300 transition-colors">
+            support@aaadatasolutions.com
+          </a>
+          <span className="text-white/40">|</span>
+          <span>Billing: <a href="mailto:billing@aaadatasolutions.com" className="text-white font-semibold hover:text-sky-300 transition-colors">billing@aaadatasolutions.com</a></span>
         </div>
       </div>
     </section>

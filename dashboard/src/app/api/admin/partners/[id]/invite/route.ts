@@ -40,7 +40,7 @@ export async function POST(
       .insert({
         email: cleanEmail,
         token_hash: tokenHash,
-        invite_type: 'INTERNAL_TEAM',
+        invite_type: 'PARTNER',
         target_app_role: 'PARTNER',
         organization_id: null,
         status: 'PENDING',
@@ -52,7 +52,7 @@ export async function POST(
     }
 
     const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-    const inviteUrl = `${origin}/invite/${rawToken}`;
+    const inviteUrl = `${origin}/invite/partner/${rawToken}`;
 
     // Dispatch automated invitation email
     const emailResult = await sendInviteEmail({

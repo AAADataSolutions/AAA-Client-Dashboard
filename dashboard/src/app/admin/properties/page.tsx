@@ -41,7 +41,9 @@ import {
   Link as LinkIcon,
   Unlink,
   ExternalLink,
+  Upload,
 } from 'lucide-react';
+import { ImportPropertiesModal } from '@/components/admin/ImportPropertiesModal';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -197,6 +199,9 @@ export default function AdminPropertiesPage() {
   const [selectedPropForAssignOrg, setSelectedPropForAssignOrg] = useState<PropertyItem | null>(null);
   const [targetOrgId, setTargetOrgId] = useState('');
   const [assigningOrgLoading, setAssigningOrgLoading] = useState(false);
+
+  // Import CSV Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -823,9 +828,17 @@ export default function AdminPropertiesPage() {
               a.click();
               showToast('Exported', 'Properties list exported as CSV.', 'info');
             }}
-            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-2xs"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" /> Export CSV
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowImportModal(true)}
+            className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-2xs"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Import CSV
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.03 }}
@@ -1301,7 +1314,7 @@ export default function AdminPropertiesPage() {
 
                       {/* 7. Ray Baum and Kary's Law (Active / Inactive) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        {prop.ray_baum_status === 'Active' ? (
+                        {prop.ray_baum_status === 'Active' || prop.ray_baum_status === 'ACTIVE' ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1311,7 +1324,7 @@ export default function AdminPropertiesPage() {
                             title="Open Ray Baum and Kary's Law in a new tab"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Active</span>
+                            <span>View Ray Baum No.s</span>
                             <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
                           </button>
                         ) : (
@@ -2859,6 +2872,16 @@ export default function AdminPropertiesPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* IMPORT CSV MODAL */}
+      <ImportPropertiesModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          loadData();
+          showToast('Properties Imported', 'All properties were successfully imported and marked as Onboarded.', 'success');
+        }}
+      />
     </motion.div>
   );
 }

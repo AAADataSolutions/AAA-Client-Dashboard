@@ -4,11 +4,11 @@ import React, { use } from 'react';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { InviteForm } from '@/components/auth/InviteForm';
 
-export default function GenericInvitePage({ params }: { params: Promise<{ token: string }> }) {
+export default function OrganizationInvitePage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = use(params);
   return (
     <AuthProvider>
-      <InviteForm token={resolvedParams.token} kind="generic" />
+      <InviteForm token={resolvedParams.token} kind="organization" />
     </AuthProvider>
   );
 }
