@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { sendInviteEmail } from '@/lib/email/mailer';
+import { getAppBaseUrl } from '@/lib/utils/url';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -19,9 +20,7 @@ export async function GET(request: NextRequest) {
     const hasPropertiesFilter = searchParams.get('has_properties') || 'ALL';
     const sortBy = searchParams.get('sortBy') || 'NEWEST';
 
-    const host = request.headers.get('host') || 'localhost:3000';
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const baseUrl = `${protocol}://${host}`;
+    const baseUrl = getAppBaseUrl(request);
 
     // 1. Fetch Organizations with relations
     const { data: rawOrgs, error } = await dbClient
@@ -308,9 +307,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (!inviteErr && invite) {
-        const host = request.headers.get('host') || 'localhost:3000';
-        const protocol = request.headers.get('x-forwarded-proto') || 'http';
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+        const baseUrl = getAppBaseUrl(request);
         const inviteUrl = `${baseUrl}/invite/organization/${rawToken}`;
 
         // Send invite email directly to the contact

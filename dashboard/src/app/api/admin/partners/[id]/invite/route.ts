@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendInviteEmail } from '@/lib/email/mailer';
+import { getAppBaseUrl } from '@/lib/utils/url';
 import crypto from 'crypto';
 
 export async function POST(
@@ -51,7 +52,7 @@ export async function POST(
       return NextResponse.json({ success: false, error: inviteErr.message }, { status: 400 });
     }
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    const origin = getAppBaseUrl(request);
     const inviteUrl = `${origin}/invite/partner/${rawToken}`;
 
     // Dispatch automated invitation email

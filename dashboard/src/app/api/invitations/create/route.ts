@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { logAdminAction } from '@/lib/audit/logger';
 import { sendInviteEmail } from '@/lib/email/mailer';
+import { getAppBaseUrl } from '@/lib/utils/url';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    const baseUrl = getAppBaseUrl(request);
     const inviteKind = invite_type === 'INTERNAL_TEAM' ? 'admin' : (target_org_role === 'ADMIN' ? 'organization' : 'member');
     const inviteUrl = `${baseUrl}/invite/${inviteKind}/${rawToken}`;
 

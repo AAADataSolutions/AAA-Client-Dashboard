@@ -7,27 +7,81 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient();
     const db = adminClient || supabase;
-    const { data: { user } } = await supabase.auth.getUser();
+    const { searchParams } = new URL(request.url);
+    const requestedPartnerId = searchParams.get('partner_id');
 
-    // Check if user is logged in
-    let partnerQuery = db.from('partners').select('*');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (user) {
-      partnerQuery = partnerQuery.or(`user_id.eq.${user.id},email.eq.${user.email?.toLowerCase()}`);
+    let partner: any = null;
+
+    // 1. If explicit partner_id was passed
+    if (requestedPartnerId) {
+      const { data } = await db.from('partners').select('*').eq('id', requestedPartnerId).maybeSingle();
+      if (data) partner = data;
     }
 
-    const { data: partnerRecords } = await partnerQuery;
-    const partner = partnerRecords?.[0] || null;
+    // 2. Lookup by logged in user
+    if (!partner && user) {
+      // Direct user_id match
+      const { data: byUserId } = await db.from('partners').select('*').eq('user_id', user.id).maybeSingle();
+      if (byUserId) {
+        partner = byUserId;
+      } else if (user.email) {
+        // Case-insensitive email match
+        const cleanEmail = user.email.trim().toLowerCase();
+        const { data: byEmail } = await db.from('partners').select('*').ilike('email', cleanEmail).maybeSingle();
+        if (byEmail) {
+          partner = byEmail;
+          // Auto-link user_id
+          if (!byEmail.user_id) {
+            await db.from('partners').update({ user_id: user.id }).eq('id', byEmail.id);
+          }
+        }
+      }
+    }
+
+    // 3. If still not matched, check user profile
+    if (!partner && user) {
+      const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (profile?.email) {
+        const { data: byProfileEmail } = await db
+          .from('partners')
+          .select('*')
+          .ilike('email', profile.email.trim().toLowerCase())
+          .maybeSingle();
+        if (byProfileEmail) {
+          partner = byProfileEmail;
+          if (!byProfileEmail.user_id) {
+            await db.from('partners').update({ user_id: user.id }).eq('id', byProfileEmail.id);
+          }
+        }
+      }
+    }
+
+    // 4. Fallback for Admin preview or initial partner
+    if (!partner) {
+      const { data: allPartners } = await db
+        .from('partners')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (allPartners && allPartners.length > 0) {
+        partner = allPartners[0];
+      }
+    }
 
     if (!partner) {
-      // Fallback preview data if viewing as demo/admin
+      // Fallback empty preview if no partner exists in database at all
       return NextResponse.json({
         success: true,
         data: {
           partner: {
             name: user?.user_metadata?.full_name || 'Partner Account',
-            company_name: 'Partner Organization',
-            email: user?.email || 'partner@example.com',
+            company_name: 'Affiliate Partner',
+            email: user?.email || 'partner@aaadatasolutions.com',
             default_commission_rate: 10.0,
             status: 'ACTIVE',
           },
@@ -44,14 +98,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch partner's assigned properties
-    const { data: properties } = await db
+    const { data: properties, error: propErr } = await db
       .from('properties')
-      .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override')
+      .select('id, name, address, city, state, zip_code, monthly_price, status, partner_commission_override, partner_id')
       .eq('partner_id', partner.id);
 
+    const partnerProperties = properties || [];
+
     // Fetch porting requests to check if any properties are completed
-    const propIds = (properties || []).map((p: any) => p.id);
-    let portingCompletedIds = new Set<string>();
+    const propIds = partnerProperties.map((p: any) => p.id);
+    const portingCompletedIds = new Set<string>();
 
     if (propIds.length > 0) {
       const { data: portings } = await db
@@ -70,17 +126,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const activeProps = (properties || []).filter((p) => 
-      p.status === 'ACTIVE' || p.status === 'ONBOARDED' || p.status === 'COMPLETED' || portingCompletedIds.has(p.id) || (properties && properties.length > 0)
-    );
+    const totalGross = partnerProperties.reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
 
-    const totalGross = (properties || []).reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
-    
-    const monthlyRunRate = (properties || []).reduce((sum, p) => {
-      const rate = p.partner_commission_override !== null && p.partner_commission_override !== undefined
-        ? Number(p.partner_commission_override)
-        : Number(partner.default_commission_rate || 10);
-      return sum + (Number(p.monthly_price || 0) * (rate / 100));
+    const defaultRate = Number(partner.default_commission_rate || 10);
+    const monthlyRunRate = partnerProperties.reduce((sum, p) => {
+      const rate =
+        p.partner_commission_override !== null && p.partner_commission_override !== undefined
+          ? Number(p.partner_commission_override)
+          : defaultRate;
+      return sum + Number(p.monthly_price || 0) * (rate / 100);
     }, 0);
 
     // Fetch invoices
@@ -91,8 +145,12 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     const allInvoices = invoices || [];
-    const totalEarned = allInvoices.filter((inv) => inv.status === 'PAID').reduce((sum, inv) => sum + Number(inv.commission_amount || 0), 0);
-    const pendingPayout = allInvoices.filter((inv) => inv.status === 'APPROVED' || inv.status === 'SUBMITTED').reduce((sum, inv) => sum + Number(inv.commission_amount || 0), 0);
+    const totalEarned = allInvoices
+      .filter((inv) => inv.status === 'PAID')
+      .reduce((sum, inv) => sum + Number(inv.commission_amount || 0), 0);
+    const pendingPayout = allInvoices
+      .filter((inv) => inv.status === 'APPROVED' || inv.status === 'SUBMITTED')
+      .reduce((sum, inv) => sum + Number(inv.commission_amount || 0), 0);
 
     return NextResponse.json({
       success: true,
@@ -101,7 +159,7 @@ export async function GET(request: NextRequest) {
         metrics: {
           totalEarned,
           monthlyRunRate,
-          activePropertiesCount: (properties || []).length,
+          activePropertiesCount: partnerProperties.length,
           totalGrossRevenue: totalGross,
           pendingPayout,
         },
@@ -109,6 +167,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err: any) {
+    console.error('Partner overview API error:', err);
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

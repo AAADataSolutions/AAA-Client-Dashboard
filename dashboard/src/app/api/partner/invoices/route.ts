@@ -8,15 +8,64 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient();
     const db = adminClient || supabase;
-    const { data: { user } } = await supabase.auth.getUser();
+    const { searchParams } = new URL(request.url);
+    const requestedPartnerId = searchParams.get('partner_id');
 
-    let partnerQuery = db.from('partners').select('*');
-    if (user) {
-      partnerQuery = partnerQuery.or(`user_id.eq.${user.id},email.eq.${user.email?.toLowerCase()}`);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let partner: any = null;
+
+    if (requestedPartnerId) {
+      const { data } = await db.from('partners').select('*').eq('id', requestedPartnerId).maybeSingle();
+      if (data) partner = data;
     }
 
-    const { data: partnerRecords } = await partnerQuery;
-    const partner = partnerRecords?.[0] || null;
+    if (!partner && user) {
+      const { data: byUserId } = await db.from('partners').select('*').eq('user_id', user.id).maybeSingle();
+      if (byUserId) {
+        partner = byUserId;
+      } else if (user.email) {
+        const cleanEmail = user.email.trim().toLowerCase();
+        const { data: byEmail } = await db.from('partners').select('*').ilike('email', cleanEmail).maybeSingle();
+        if (byEmail) {
+          partner = byEmail;
+          if (!byEmail.user_id) {
+            await db.from('partners').update({ user_id: user.id }).eq('id', byEmail.id);
+          }
+        }
+      }
+    }
+
+    if (!partner && user) {
+      const { data: profile } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (profile?.email) {
+        const { data: byProfileEmail } = await db
+          .from('partners')
+          .select('*')
+          .ilike('email', profile.email.trim().toLowerCase())
+          .maybeSingle();
+        if (byProfileEmail) {
+          partner = byProfileEmail;
+          if (!byProfileEmail.user_id) {
+            await db.from('partners').update({ user_id: user.id }).eq('id', byProfileEmail.id);
+          }
+        }
+      }
+    }
+
+    if (!partner) {
+      const { data: allPartners } = await db
+        .from('partners')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (allPartners && allPartners.length > 0) {
+        partner = allPartners[0];
+      }
+    }
 
     if (!partner) {
       return NextResponse.json({ success: true, data: [] });
@@ -43,18 +92,37 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient();
     const db = adminClient || supabase;
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const body = await request.json();
 
-    let partnerQuery = db.from('partners').select('*');
+    let partner: any = null;
+
     if (body.partner_id) {
-      partnerQuery = partnerQuery.eq('id', body.partner_id);
-    } else if (user) {
-      partnerQuery = partnerQuery.or(`user_id.eq.${user.id},email.eq.${user.email?.toLowerCase()}`);
+      const { data } = await db.from('partners').select('*').eq('id', body.partner_id).maybeSingle();
+      if (data) partner = data;
     }
 
-    const { data: partnerRecords } = await partnerQuery;
-    const partner = partnerRecords?.[0] || null;
+    if (!partner && user) {
+      const { data: byUserId } = await db.from('partners').select('*').eq('user_id', user.id).maybeSingle();
+      if (byUserId) {
+        partner = byUserId;
+      } else if (user.email) {
+        const cleanEmail = user.email.trim().toLowerCase();
+        const { data: byEmail } = await db.from('partners').select('*').ilike('email', cleanEmail).maybeSingle();
+        if (byEmail) partner = byEmail;
+      }
+    }
+
+    if (!partner) {
+      const { data: allPartners } = await db
+        .from('partners')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (allPartners && allPartners.length > 0) partner = allPartners[0];
+    }
 
     if (!partner) {
       return NextResponse.json({ success: false, error: 'Partner record not found.' }, { status: 404 });

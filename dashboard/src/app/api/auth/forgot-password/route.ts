@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { sendResetPasswordEmail } from '@/lib/email/mailer';
+import { getAppBaseUrl } from '@/lib/utils/url';
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
     const adminClient = createAdminClient();
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    const baseUrl = getAppBaseUrl(request);
     const redirectTo = `${baseUrl}/auth/reset-password`;
 
     let resetUrl = '';

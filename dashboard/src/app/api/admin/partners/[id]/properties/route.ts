@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function POST(
@@ -9,6 +10,7 @@ export async function POST(
   try {
     const { id: partnerId } = await params;
     const supabase = await createClient();
+    const dbClient = createAdminClient() || supabase;
     const body = await request.json();
 
     const { property_id, action, commission_override } = body;
@@ -18,7 +20,7 @@ export async function POST(
     }
 
     if (action === 'UNASSIGN') {
-      const { error } = await supabase
+      const { error } = await dbClient
         .from('properties')
         .update({ partner_id: null, partner_commission_override: null, updated_at: new Date().toISOString() })
         .eq('id', property_id);
@@ -49,7 +51,7 @@ export async function POST(
       updatePayload.partner_commission_override = null;
     }
 
-    const { data: updatedProp, error: propErr } = await supabase
+    const { data: updatedProp, error: propErr } = await dbClient
       .from('properties')
       .update(updatePayload)
       .eq('id', property_id)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
+import { getAppBaseUrl } from '@/lib/utils/url';
 
 export async function GET(
   request: NextRequest,
@@ -12,9 +13,7 @@ export async function GET(
     const supabase = await createClient();
     const dbClient = createAdminClient() || supabase;
 
-    const host = request.headers.get('host') || 'localhost:3000';
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const baseUrl = `${protocol}://${host}`;
+    const baseUrl = getAppBaseUrl(request);
 
     // 1. Fetch Organization core data
     const { data: org, error: orgErr } = await dbClient

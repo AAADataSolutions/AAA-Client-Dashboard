@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { sendInviteEmail } from '@/lib/email/mailer';
+import { getAppBaseUrl } from '@/lib/utils/url';
 import crypto from 'crypto';
 
 export async function GET(
@@ -24,9 +25,7 @@ export async function GET(
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
-    const host = request.headers.get('host') || 'localhost:3000';
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const baseUrl = `${protocol}://${host}`;
+    const baseUrl = getAppBaseUrl(request);
 
     const formattedInvites = (invites || []).map((inv: any) => {
       const isExpired = new Date(inv.expires_at) < new Date();
@@ -133,9 +132,7 @@ export async function POST(
       throw inviteErr || new Error('Failed to create invitation record');
     }
 
-    const host = request.headers.get('host') || 'localhost:3000';
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+    const baseUrl = getAppBaseUrl(request);
     const inviteUrl = `${baseUrl}/invite/${role === 'ADMIN' ? 'organization' : 'member'}/${rawToken}`;
 
     // Dispatch automated invitation email

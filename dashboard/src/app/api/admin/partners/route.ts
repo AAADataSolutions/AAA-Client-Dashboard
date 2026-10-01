@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { sendInviteEmail } from '@/lib/email/mailer';
+import { getAppBaseUrl } from '@/lib/utils/url';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -169,7 +170,7 @@ export async function POST(request: NextRequest) {
       console.error('Partner invitation creation error:', inviteErr);
     }
 
-    const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    const origin = getAppBaseUrl(request);
     const inviteUrl = `${origin}/invite/partner/${rawToken}`;
 
     // Dispatch invite email to partner
