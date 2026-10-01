@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { sendTicketEmail } from '@/lib/email/mailer';
 
 export async function GET(request: NextRequest) {
   try {
@@ -285,6 +286,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Process attachments if any
+    const emailAttachments: { filename: string; content?: Buffer; contentType?: string }[] = [];
     if (files.length > 0) {
       for (const file of files) {
         const fileExt = file.name.split('.').pop() || 'png';
@@ -292,6 +294,12 @@ export async function POST(request: NextRequest) {
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
+
+        emailAttachments.push({
+          filename: file.name,
+          content: buffer,
+          contentType: file.type || 'application/octet-stream',
+        });
 
         const { error: uploadErr } = await supabase.storage
           .from('ticket-attachments')
@@ -318,6 +326,55 @@ export async function POST(request: NextRequest) {
           console.error('Admin ticket_attachments table insert error:', attInsertErr);
         }
       }
+    }
+
+    // Fetch org and property info for email
+    let orgName = 'System Administration';
+    let propName = 'General Property';
+    if (targetOrgPropId) {
+      const { data: opData } = await supabase
+        .from('organization_properties')
+        .select('property:properties(name), organization:organizations(name)')
+        .eq('id', targetOrgPropId)
+        .maybeSingle();
+
+      if ((opData as any)?.property?.name) propName = (opData as any).property.name;
+      if ((opData as any)?.organization?.name) orgName = (opData as any).organization.name;
+    }
+
+    // Fetch creator details
+    let creatorName = 'Support Admin';
+    let creatorEmail = user?.email || '';
+    let creatorPhone = phone_number || '';
+    if (user?.id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email, phone_number')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (profile) {
+        if (profile.full_name) creatorName = profile.full_name;
+        if (profile.email) creatorEmail = profile.email;
+        if (profile.phone_number && !creatorPhone) creatorPhone = profile.phone_number;
+      }
+    }
+
+    // Dispatch email with person's name, phone, and attachments
+    try {
+      await sendTicketEmail({
+        ticketId: newTicket.id,
+        subject: newTicket.subject,
+        description: newTicket.description,
+        priority: newTicket.priority,
+        organizationName: orgName,
+        propertyName: propName,
+        raisedByName: creatorName,
+        raisedByEmail: creatorEmail,
+        raisedByPhone: creatorPhone || undefined,
+        attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
+      });
+    } catch (eErr) {
+      console.error('Failed to send admin ticket email:', eErr);
     }
 
     // Central Audit Log

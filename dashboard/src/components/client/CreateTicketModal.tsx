@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, LifeBuoy, Loader2, AlertCircle, Paperclip } from 'lucide-react';
+import { X, LifeBuoy, Loader2, AlertCircle, Paperclip, FileText } from 'lucide-react';
 import { useToast } from './ClientToast';
 
 interface SelectOption {
@@ -82,7 +82,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   // Cleanup previews on unmount
   useEffect(() => {
     return () => {
-      attachmentPreviews.forEach((url) => URL.revokeObjectURL(url));
+      attachmentPreviews.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
     };
   }, [attachmentPreviews]);
 
@@ -101,12 +103,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     }
 
     const validFiles = filesToAdd.filter((f) => {
-      if (f.size > 5 * 1024 * 1024) {
-        toast.error(`${f.name} exceeds 5MB limit.`);
-        return false;
-      }
-      if (!f.type.startsWith('image/')) {
-        toast.error(`${f.name} is not an image file.`);
+      if (f.size > 10 * 1024 * 1024) {
+        toast.error(`${f.name} exceeds 10MB limit.`);
         return false;
       }
       return true;
@@ -114,7 +112,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
 
     if (validFiles.length === 0) return;
 
-    const newPreviews = validFiles.map((f) => URL.createObjectURL(f));
+    const newPreviews = validFiles.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : ''));
     setAttachments((prev) => [...prev, ...validFiles]);
     setAttachmentPreviews((prev) => [...prev, ...newPreviews]);
 
@@ -122,7 +120,9 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   };
 
   const handleRemoveAttachment = (index: number) => {
-    URL.revokeObjectURL(attachmentPreviews[index]);
+    if (attachmentPreviews[index]) {
+      URL.revokeObjectURL(attachmentPreviews[index]);
+    }
     setAttachments((prev) => prev.filter((_, i) => i !== index));
     setAttachmentPreviews((prev) => prev.filter((_, i) => i !== index));
   };
@@ -315,7 +315,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             {/* 6. Attachments */}
             <div className="space-y-1.5">
               <label className={labelClasses}>
-                Attachments <span className="text-slate-400 font-normal">(Max 3 images)</span>
+                Attachments <span className="text-slate-400 font-normal">(Max 3 files &bull; Images, PDFs, Docs up to 10MB)</span>
               </label>
 
               {attachments.length < 3 && (
@@ -327,7 +327,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 >
                   <Paperclip className="w-3.5 h-3.5" />
                   <span className="text-[11px] font-semibold">
-                    Attach Image ({3 - attachments.length} remaining)
+                    Attach Files / Screenshots ({3 - attachments.length} remaining)
                   </span>
                 </button>
               )}
@@ -335,25 +335,34 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv"
                 multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
 
-              {/* Preview attached images */}
+              {/* Preview attached files */}
               {attachments.length > 0 && (
                 <div className="flex gap-2 flex-wrap mt-1">
                   {attachments.map((file, idx) => (
                     <div
                       key={idx}
-                      className="relative group w-16 h-16 rounded-lg border border-slate-200 dark:border-[#2a2c3a] overflow-hidden bg-slate-100 dark:bg-[#111217]"
+                      className="relative group w-20 h-16 rounded-lg border border-slate-200 dark:border-[#2a2c3a] overflow-hidden bg-slate-100 dark:bg-[#111217] flex items-center justify-center"
                     >
-                      <img
-                        src={attachmentPreviews[idx]}
-                        alt={file.name}
-                        className="w-full h-full object-cover"
-                      />
+                      {attachmentPreviews[idx] ? (
+                        <img
+                          src={attachmentPreviews[idx]}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-1 text-slate-500">
+                          <FileText className="w-5 h-5 text-blue-500" />
+                          <span className="text-[8px] font-mono mt-0.5 uppercase truncate max-w-[50px]">
+                            {file.name.split('.').pop()}
+                          </span>
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleRemoveAttachment(idx)}
@@ -361,8 +370,8 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                       >
                         <X className="w-2.5 h-2.5" />
                       </button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-0.5 py-px">
-                        <p className="text-[7px] text-white truncate">{file.name}</p>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-px">
+                        <p className="text-[7.5px] text-white truncate">{file.name}</p>
                       </div>
                     </div>
                   ))}

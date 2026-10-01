@@ -36,6 +36,13 @@ export interface InviteEmailData {
   partnerName?: string;
 }
 
+export interface TicketEmailAttachment {
+  filename: string;
+  content?: Buffer;
+  path?: string;
+  contentType?: string;
+}
+
 export interface TicketEmailData {
   ticketId: string;
   subject: string;
@@ -46,7 +53,9 @@ export interface TicketEmailData {
   propertyName: string;
   raisedByName: string;
   raisedByEmail: string;
+  raisedByPhone?: string;
   attachmentUrls?: string[];
+  attachments?: TicketEmailAttachment[];
 }
 
 export interface PortingEmailAttachment {
@@ -100,70 +109,92 @@ export async function sendTicketEmail(data: TicketEmailData) {
       : '#f0fdf4';
 
   const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-      <div style="background: linear-gradient(135deg, #1275e2 0%, #0d5bb5 100%); padding: 24px 32px;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+      <div style="background: linear-gradient(135deg, #1275e2 0%, #0d5bb5 100%); padding: 28px 32px;">
+        <div style="display: inline-block; background: rgba(255,255,255,0.2); border-radius: 6px; padding: 4px 10px; margin-bottom: 10px;">
+          <span style="color: #ffffff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Support Dispatch Console</span>
+        </div>
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em;">
           🎫 New Support Ticket Raised
         </h1>
-        <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">
-          AAA Data Solutions — Support Management System
+        <p style="color: rgba(255,255,255,0.88); margin: 6px 0 0; font-size: 13.5px;">
+          A client has raised an operational or technical inquiry requiring assistance.
         </p>
       </div>
       
-      <div style="padding: 24px 32px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; width: 140px; font-weight: 500;">Ticket ID:</td>
-            <td style="padding: 8px 0; font-weight: 700; color: #1e293b;">${data.ticketId.substring(0, 8).toUpperCase()}</td>
+      <div style="padding: 26px 32px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; width: 150px; font-weight: 600;">Ticket ID:</td>
+            <td style="padding: 9px 0; font-weight: 700; color: #1e293b; font-family: monospace;">#${data.ticketId.substring(0, 8).toUpperCase()}</td>
           </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Subject:</td>
-            <td style="padding: 8px 0; font-weight: 600; color: #0f172a;">${data.subject}</td>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Subject:</td>
+            <td style="padding: 9px 0; font-weight: 700; color: #0f172a;">${data.subject}</td>
           </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Priority:</td>
-            <td style="padding: 8px 0;">
-              <span style="background: ${priorityBg}; color: ${priorityColor}; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700;">
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Priority:</td>
+            <td style="padding: 9px 0;">
+              <span style="background: ${priorityBg}; color: ${priorityColor}; padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 700; display: inline-block;">
                 ${data.priority}
               </span>
             </td>
           </tr>
           ${data.category ? `
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Category:</td>
-            <td style="padding: 8px 0; color: #1e293b;">${data.category}</td>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Category:</td>
+            <td style="padding: 9px 0; color: #1e293b; font-weight: 600;">${data.category}</td>
           </tr>` : ''}
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Organization:</td>
-            <td style="padding: 8px 0; font-weight: 600; color: #1e293b;">${data.organizationName}</td>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Management Group:</td>
+            <td style="padding: 9px 0; font-weight: 700; color: #1e293b;">${data.organizationName}</td>
           </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Property:</td>
-            <td style="padding: 8px 0; color: #1e293b;">${data.propertyName}</td>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Property Location:</td>
+            <td style="padding: 9px 0; color: #1e293b; font-weight: 600;">${data.propertyName}</td>
           </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Submitted By:</td>
-            <td style="padding: 8px 0; color: #1e293b;">${data.raisedByName} (${data.raisedByEmail})</td>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Raised By (Name):</td>
+            <td style="padding: 9px 0; font-weight: 700; color: #0f172a;">${data.raisedByName}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Contact Email:</td>
+            <td style="padding: 9px 0; color: #2563eb; font-weight: 600;"><a href="mailto:${data.raisedByEmail}" style="color: #2563eb; text-decoration: none;">${data.raisedByEmail}</a></td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 9px 0; color: #64748b; font-weight: 600;">Contact Phone:</td>
+            <td style="padding: 9px 0; font-weight: 700; color: #0f172a;">
+              ${data.raisedByPhone ? `<a href="tel:${data.raisedByPhone}" style="color: #0f172a; text-decoration: none;">📞 ${data.raisedByPhone}</a>` : '<span style="color: #94a3b8; font-style: italic;">Not provided</span>'}
+            </td>
           </tr>
         </table>
         
-        <div style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-          <p style="margin: 0 0 8px; font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Description</p>
-          <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.6; white-space: pre-wrap;">${data.description}</p>
+        <div style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 8px; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Ticket Description</p>
+          <p style="margin: 0; font-size: 13.5px; color: #334155; line-height: 1.6; white-space: pre-wrap;">${data.description}</p>
         </div>
 
-        ${data.attachmentUrls && data.attachmentUrls.length > 0 ? `
-        <div style="margin-top: 16px; padding: 12px; background: #f1f5f9; border-radius: 6px;">
-          <p style="margin: 0; font-size: 13px; color: #475569; font-weight: 600;">
-            📎 ${data.attachmentUrls.length} file attachment(s) uploaded. View in Admin Ticket View.
+        ${data.attachments && data.attachments.length > 0 ? `
+        <div style="margin-top: 18px; padding: 14px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+          <p style="margin: 0 0 8px; font-size: 12px; color: #1d4ed8; font-weight: 700;">
+            📎 ${data.attachments.length} File Attachment(s) Attached to This Email:
+          </p>
+          <ul style="margin: 0; padding-left: 20px; font-size: 12.5px; color: #1e40af;">
+            ${data.attachments.map((a) => `<li><strong>${a.filename}</strong></li>`).join('')}
+          </ul>
+        </div>
+        ` : (data.attachmentUrls && data.attachmentUrls.length > 0 ? `
+        <div style="margin-top: 18px; padding: 14px 16px; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0;">
+          <p style="margin: 0; font-size: 12.5px; color: #475569; font-weight: 600;">
+            📎 ${data.attachmentUrls.length} file attachment(s) uploaded. View in Ticket Console.
           </p>
         </div>
-        ` : ''}
+        ` : '')}
       </div>
       
       <div style="padding: 16px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
         <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-          Sent via AAA Data Solutions SMTP Mailer &bull; Please respond via the dashboard.
+          Sent to dedicated support desk &bull; AAA Data Solutions Ticketing System
         </p>
       </div>
     </div>
@@ -173,10 +204,11 @@ export async function sendTicketEmail(data: TicketEmailData) {
     const info = await transporter.sendMail({
       from: FROM_EMAIL,
       to: SUPPORT_EMAIL,
-      subject: `[Support Ticket] ${data.subject} — ${data.organizationName}`,
+      subject: `[Support Ticket] #${data.ticketId.substring(0, 8).toUpperCase()}: ${data.subject} — ${data.raisedByName} (${data.organizationName})`,
       html,
+      attachments: data.attachments && data.attachments.length > 0 ? data.attachments : undefined,
     });
-    console.log('[SMTP Mailer] Ticket email sent successfully:', info.messageId);
+    console.log('[SMTP Mailer] Ticket email with attachments sent successfully to:', SUPPORT_EMAIL, 'Message ID:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('[SMTP Mailer] Error sending ticket email:', error);

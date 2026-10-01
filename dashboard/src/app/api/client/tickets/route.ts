@@ -187,6 +187,8 @@ async function sendTicketNotifications({
   member,
   propertyName,
   category,
+  phone,
+  attachments = [],
   attachmentFileNames = [],
   userId,
 }: {
@@ -194,14 +196,17 @@ async function sendTicketNotifications({
   member: any;
   propertyName: string;
   category?: string | null;
+  phone?: string | null;
+  attachments?: { filename: string; content?: Buffer; contentType?: string }[];
   attachmentFileNames?: string[];
   userId: string;
 }) {
   const dbClient = createAdminClient();
   const orgName = (member.organization as any)?.name || 'Client Organization';
-  const profile = (member.profile as any) || { full_name: 'Client User', email: '' };
+  const profile = (member.profile as any) || { full_name: 'Client User', email: '', phone_number: '' };
+  const effectivePhone = phone?.trim() || profile.phone_number || '';
 
-  // 1. Send Email via SMTP to support@aaadatasolutions.com
+  // 1. Send Email via SMTP to support@aaadatasolutions.com with full person details & attachments
   try {
     await sendTicketEmail({
       ticketId: ticket.id,
@@ -213,7 +218,9 @@ async function sendTicketNotifications({
       propertyName,
       raisedByName: profile.full_name || 'Client User',
       raisedByEmail: profile.email || '',
+      raisedByPhone: effectivePhone || undefined,
       attachmentUrls: attachmentFileNames,
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
     });
   } catch (emailErr) {
     console.error('Failed to send ticket email:', emailErr);
@@ -261,7 +268,7 @@ export async function POST(request: NextRequest) {
 
     const { data: member } = await supabase
       .from('organization_members')
-      .select('organization_id, organization:organizations(name), profile:profiles(full_name, email)')
+      .select('organization_id, organization:organizations(name), profile:profiles(full_name, email, phone_number)')
       .eq('profile_id', user.id)
       .maybeSingle();
 
@@ -365,6 +372,8 @@ export async function POST(request: NextRequest) {
       // Handle file attachments (max 3)
       const files: File[] = [];
       const fileNames: string[] = [];
+      const emailAttachments: { filename: string; content?: Buffer; contentType?: string }[] = [];
+
       for (let i = 0; i < 3; i++) {
         const file = formData.get(`attachment_${i}`) as File | null;
         if (file && file.size > 0) {
@@ -380,6 +389,12 @@ export async function POST(request: NextRequest) {
 
           const arrayBuffer = await file.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
+
+          emailAttachments.push({
+            filename: file.name,
+            content: buffer,
+            contentType: file.type || 'application/octet-stream',
+          });
 
           const { error: uploadErr } = await supabase.storage
             .from('ticket-attachments')
@@ -408,12 +423,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Trigger email and in-app notifications
+      // Trigger email and in-app notifications with name, phone, and attachments
       await sendTicketNotifications({
         ticket: newTicket,
         member,
         propertyName,
         category,
+        phone: phone_number,
+        attachments: emailAttachments,
         attachmentFileNames: fileNames,
         userId: user.id,
       });
@@ -514,6 +531,8 @@ export async function POST(request: NextRequest) {
       member,
       propertyName,
       category,
+      phone: phone_number,
+      attachments: [],
       attachmentFileNames: [],
       userId: user.id,
     });
