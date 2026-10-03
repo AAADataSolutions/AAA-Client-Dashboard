@@ -67,12 +67,58 @@ export async function GET(request: NextRequest) {
         (inv: any) => inv.email?.toLowerCase() === partner.email?.toLowerCase() && inv.status === 'PENDING'
       );
 
+      const hasCustomOverride = assignedProps.some(
+        (p: any) =>
+          p.partner_commission_override !== null &&
+          p.partner_commission_override !== undefined &&
+          p.partner_commission_override !== ''
+      );
+
+      let effectiveShareRate = Number(partner.default_commission_rate || 10);
+      let shareDisplay = `${partner.default_commission_rate || 10}%`;
+
+      if (assignedProps.length === 1) {
+        const p = assignedProps[0];
+        if (
+          p.partner_commission_override !== null &&
+          p.partner_commission_override !== undefined &&
+          p.partner_commission_override !== ''
+        ) {
+          effectiveShareRate = Number(p.partner_commission_override);
+          shareDisplay = `${Number(p.partner_commission_override)}%`;
+        }
+      } else if (assignedProps.length > 1) {
+        const rates = assignedProps.map((p: any) =>
+          p.partner_commission_override !== null &&
+          p.partner_commission_override !== undefined &&
+          p.partner_commission_override !== ''
+            ? Number(p.partner_commission_override)
+            : Number(partner.default_commission_rate || 10)
+        );
+        const unique = Array.from(new Set(rates));
+        if (unique.length === 1) {
+          effectiveShareRate = unique[0];
+          shareDisplay = `${unique[0]}%`;
+        } else {
+          const minRate = Math.min(...rates);
+          const maxRate = Math.max(...rates);
+          shareDisplay = `${minRate}% - ${maxRate}%`;
+          effectiveShareRate =
+            monthlyGross > 0
+              ? Math.round((estimatedCommission / monthlyGross) * 100 * 10) / 10
+              : Number(partner.default_commission_rate || 10);
+        }
+      }
+
       return {
         ...partner,
         total_properties_count: assignedProps.length,
         active_properties_count: assignedProps.length,
         monthly_gross_revenue: monthlyGross,
         monthly_commission_estimated: estimatedCommission,
+        effective_share_rate: effectiveShareRate,
+        share_display: shareDisplay,
+        has_custom_override: hasCustomOverride,
         has_pending_invite: Boolean(pendingInvite),
       };
     });

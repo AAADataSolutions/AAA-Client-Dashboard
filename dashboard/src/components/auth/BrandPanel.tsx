@@ -126,7 +126,7 @@ export const BrandPanel: React.FC = () => {
       {/* Footer Section */}
       <div className="pt-4 border-t border-white/15 text-blue-200/70 text-xs font-normal">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-          <span>Support: <strong className="text-white font-medium">203-928-9500</strong></span>
+          <span>Support: <strong className="text-white font-medium">203-599-0500</strong></span>
           <span className="text-white/30">|</span>
           <a href="mailto:support@aaadatasolutions.com" className="text-blue-200 hover:text-white transition-colors">
             support@aaadatasolutions.com

@@ -47,6 +47,9 @@ interface Partner {
   active_properties_count: number;
   monthly_gross_revenue: number;
   monthly_commission_estimated: number;
+  effective_share_rate?: number;
+  share_display?: string;
+  has_custom_override?: boolean;
   has_pending_invite?: boolean;
   created_at: string;
 }
@@ -832,8 +835,22 @@ export default function AdminPartnersPage() {
                           </td>
 
                           {/* 4. SHARE */}
-                          <td className="py-3.5 px-4 whitespace-nowrap font-black text-blue-600 dark:text-blue-400 text-xs">
-                            {partner.default_commission_rate}%
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-black text-blue-600 dark:text-blue-400 text-xs">
+                                {partner.share_display || `${partner.effective_share_rate ?? partner.default_commission_rate}%`}
+                              </span>
+                              {partner.has_custom_override && (
+                                <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/80">
+                                  Override
+                                </span>
+                              )}
+                            </div>
+                            {partner.total_properties_count > 0 && partner.has_custom_override && (
+                              <span className="text-[10px] text-slate-400 block mt-0.5 font-normal">
+                                Base: {partner.default_commission_rate}%
+                              </span>
+                            )}
                           </td>
 
                           {/* 5. NO. OF PROPERTIES ASSIGNED */}
