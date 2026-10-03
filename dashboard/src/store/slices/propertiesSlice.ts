@@ -15,6 +15,10 @@ export interface PropertyRecord {
   id: string;
   name: string;
   monthly_price?: number | null;
+  partner_id?: string | null;
+  partner_commission_override?: number | null;
+  partner_name?: string | null;
+  partner?: any;
   address: string;
   city: string;
   state: string;

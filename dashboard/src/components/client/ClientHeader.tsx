@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useTheme } from '@/lib/theme/theme-context';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { LogoutConfirmModal } from '@/components/common/LogoutConfirmModal';
 
 interface ClientHeaderProps {
   onOpenSidebar: () => void;
@@ -36,6 +37,20 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedOrgId, setCopiedOrgId] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleConfirmSignOut = async () => {
+    try {
+      setIsLoggingOut(true);
+      await signOut();
+    } catch (e) {
+      console.error('Sign out error:', e);
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+    }
+  };
 
   const userName = profile?.full_name || profile?.email?.split('@')[0] || 'Member';
   const initial = userName.charAt(0).toUpperCase();
@@ -217,9 +232,10 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
                 <div className="border-t border-slate-100 dark:border-[#222430] my-0.5"></div>
 
                 <button
+                  type="button"
                   onClick={() => {
                     setShowUserMenu(false);
-                    signOut();
+                    setShowLogoutModal(true);
                   }}
                   className="w-full px-3 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2 cursor-pointer"
                 >
@@ -230,6 +246,15 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
           )}
         </div>
       </div>
+
+      {/* Confirmation Ask Modal for Client Logout */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmSignOut}
+        isLoading={isLoggingOut}
+        portalName="Client Dashboard"
+      />
     </header>
   );
 };

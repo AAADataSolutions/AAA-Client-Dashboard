@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -9,15 +9,16 @@ import {
   FileText,
   LogOut,
   Sparkles,
-  ExternalLink,
-  DollarSign,
 } from 'lucide-react';
-import { useAuth } from '@/lib/auth/auth-context';
+import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { LogoutConfirmModal } from '@/components/common/LogoutConfirmModal';
 
-export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+function PartnerLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { signOut, profile, user } = useAuth();
   const [partnerDetails, setPartnerDetails] = React.useState<{ name: string; email: string; company_name?: string } | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   React.useEffect(() => {
     const fetchPartner = async () => {
@@ -46,6 +47,18 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
   const displayName = partnerDetails?.name || profile?.full_name || user?.user_metadata?.full_name || 'Channel Partner';
   const displayEmail = partnerDetails?.email || profile?.email || user?.email || 'partner@aaadatasolutions.com';
+
+  const handleConfirmSignOut = async () => {
+    try {
+      setIsLoggingOut(true);
+      await signOut();
+    } catch (e) {
+      console.error('Sign out error:', e);
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0f1015] text-slate-900 dark:text-slate-100 flex flex-col font-sans">
@@ -107,11 +120,10 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
               </span>
             </div>
             <button
-              onClick={async () => {
-                await signOut();
-              }}
+              type="button"
+              onClick={() => setShowLogoutModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200/60 dark:border-rose-900/40 transition cursor-pointer shadow-xs"
-              title="Sign Out to Auth Page"
+              title="Sign Out of Partner Portal"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Logout</span>
@@ -138,9 +150,8 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
             );
           })}
           <button
-            onClick={async () => {
-              await signOut();
-            }}
+            type="button"
+            onClick={() => setShowLogoutModal(true)}
             className="px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 text-rose-600 dark:text-rose-400 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -151,6 +162,23 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
 
       {/* Main Page Body */}
       <main className="flex-1 pb-12">{children}</main>
+
+      {/* Confirmation Ask Modal for Logout */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmSignOut}
+        isLoading={isLoggingOut}
+        portalName="Partner Portal"
+      />
     </div>
+  );
+}
+
+export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      <PartnerLayoutInner>{children}</PartnerLayoutInner>
+    </AuthProvider>
   );
 }

@@ -29,7 +29,10 @@ import {
   Eye,
   MoreVertical,
   Unlink,
+  Power,
+  PowerOff,
 } from 'lucide-react';
+import PartnerMonthlyAnalytics from '@/components/admin/PartnerMonthlyAnalytics';
 
 interface Partner {
   id: string;
@@ -136,6 +139,8 @@ export default function AdminPartnersPage() {
   // Invoice statement preview modal
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<PartnerInvoiceItem | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [updatingPartnerStatusId, setUpdatingPartnerStatusId] = useState<string | null>(null);
+  const [generatingMonthlyInvoices, setGeneratingMonthlyInvoices] = useState(false);
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -323,6 +328,34 @@ export default function AdminPartnersPage() {
     }
   };
 
+  const handleTogglePartnerStatus = async (partnerId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      setUpdatingPartnerStatusId(partnerId);
+      const res = await fetch(`/api/admin/partners/${partnerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update partner status.');
+
+      showToast('Status Updated', `Partner set to ${newStatus === 'ACTIVE' ? 'Active' : 'Inactive'}.`, 'success');
+      setPartners((prev) =>
+        prev.map((p) => (p.id === partnerId ? { ...p, status: newStatus as any } : p))
+      );
+      setPartnerMetrics((prev) => ({
+        ...prev,
+        activePartners: newStatus === 'ACTIVE' ? prev.activePartners + 1 : Math.max(0, prev.activePartners - 1),
+      }));
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to update partner status.', 'error');
+    } finally {
+      setUpdatingPartnerStatusId(null);
+    }
+  };
+
   const handleGenerateInviteLink = async (partner: Partner) => {
     try {
       setGeneratingInviteId(partner.id);
@@ -456,6 +489,24 @@ export default function AdminPartnersPage() {
     }
   };
 
+  const handleRunMonthlyInvoices = async () => {
+    try {
+      setGeneratingMonthlyInvoices(true);
+      const res = await fetch('/api/admin/partners/invoices/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to generate monthly partner invoices.');
+      showToast('Monthly Invoices Generated', json.message || 'Invoices created successfully for all active partners.', 'success');
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Generation failed', 'error');
+    } finally {
+      setGeneratingMonthlyInvoices(false);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -540,6 +591,16 @@ export default function AdminPartnersPage() {
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add Partner
+            </button>
+          )}
+          {activeTab === 'INVOICES' && (
+            <button
+              onClick={handleRunMonthlyInvoices}
+              disabled={generatingMonthlyInvoices}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm transition cursor-pointer disabled:opacity-50"
+            >
+              {generatingMonthlyInvoices ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Generate Monthly Invoices
             </button>
           )}
         </div>
@@ -629,9 +690,7 @@ export default function AdminPartnersPage() {
               <p className="text-[11px] text-blue-200/90 font-medium">
                 Hospitality locations with revenue share
               </p>
-            </div>
-
-            {/* Card 3: EST. MONTHLY COMMISSION / RUN RATE */}
+            </div>            {/* Card 3: EST. MONTHLY COMMISSION / RUN RATE */}
             <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[140px]">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
@@ -650,6 +709,12 @@ export default function AdminPartnersPage() {
               </p>
             </div>
           </div>
+
+          {/* REQUESTED COMPONENT: MONTHLY REVENUE GRAPH (LEFT) & SELECTED MONTH KPI (RIGHT) */}
+          <PartnerMonthlyAnalytics
+            currentMonthlyRunRate={partnerMetrics.totalCommissionPayout}
+            onRefreshNeeded={loadData}
+          />
 
           {/* Filter Bar */}
           <div className="p-3 bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
@@ -788,18 +853,31 @@ export default function AdminPartnersPage() {
                             ${partner.monthly_commission_estimated.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          {/* 7. STATUS (Active / Inactive) */}
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${
-                                isActive
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200'
-                              }`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                              {isActive ? 'Active' : 'Inactive'}
-                            </span>
+                          {/* 7. STATUS (Active / Inactive Interactive Toggle) */}
+                          <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={partner.status}
+                                disabled={updatingPartnerStatusId === partner.id}
+                                onChange={(e) => {
+                                  const targetStatus = e.target.value;
+                                  if (targetStatus !== partner.status) {
+                                    handleTogglePartnerStatus(partner.id, partner.status);
+                                  }
+                                }}
+                                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer focus:outline-none transition ${
+                                  isActive
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
+                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                <option value="ACTIVE">● Active</option>
+                                <option value="INACTIVE">● Inactive</option>
+                              </select>
+                              {updatingPartnerStatusId === partner.id && (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                              )}
+                            </div>
                           </td>
 
                           {/* 8. THREE DOTS FOR ACTIONS */}
@@ -1114,6 +1192,31 @@ export default function AdminPartnersPage() {
             </div>
 
             <div className="py-1">
+              {/* Toggle Status (Active / Inactive) */}
+              <button
+                onClick={() => {
+                  handleTogglePartnerStatus(menuPosition.partner.id, menuPosition.partner.status);
+                  setMenuPosition(null);
+                }}
+                className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#222432] flex items-center gap-2 cursor-pointer font-semibold ${
+                  menuPosition.partner.status === 'ACTIVE'
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+                }`}
+              >
+                {menuPosition.partner.status === 'ACTIVE' ? (
+                  <>
+                    <PowerOff className="w-3.5 h-3.5" />
+                    <span>Set as Inactive</span>
+                  </>
+                ) : (
+                  <>
+                    <Power className="w-3.5 h-3.5" />
+                    <span>Set as Active</span>
+                  </>
+                )}
+              </button>
+
               {/* Edit Partner */}
               <button
                 onClick={() => {
@@ -1516,17 +1619,29 @@ export default function AdminPartnersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Default Revenue Share (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={formData.default_commission_rate}
-                    onChange={(e) => setFormData({ ...formData, default_commission_rate: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-                  />
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Partner Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE' })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Default Revenue Share (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={formData.default_commission_rate}
+                  onChange={(e) => setFormData({ ...formData, default_commission_rate: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
               </div>
 
               <div>

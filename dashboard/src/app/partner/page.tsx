@@ -14,6 +14,7 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
+import PartnerPersonalMonthlyAnalytics from '@/components/partner/PartnerPersonalMonthlyAnalytics';
 
 interface PartnerOverviewData {
   partner: {
@@ -170,6 +171,9 @@ export default function PartnerOverviewPage() {
           <p className="text-[11px] text-slate-400 mt-1">Monthly billing under partner accounts</p>
         </div>
       </div>
+
+      {/* PERSONAL MONTHLY FINANCIAL PERFORMANCE GRAPH & KPI COMPONENT */}
+      <PartnerPersonalMonthlyAnalytics currentMonthlyRunRate={metrics.monthlyRunRate} />
 
       {/* Quick Navigation Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

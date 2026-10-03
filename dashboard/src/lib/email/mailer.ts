@@ -1,11 +1,24 @@
 import nodemailer from 'nodemailer';
 
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || process.env.SMTP_USER || 'support@aaadatasolutions.com';
-const FROM_EMAIL = process.env.SMTP_FROM || `"AAA Data Solutions" <${process.env.SMTP_USER || 'support@aaadatasolutions.com'}>`;
+const NOREPLY_EMAIL = process.env.NOREPLY_EMAIL || 'noreply@aaadatasolutions.com';
+
+export function getNoReplyFromAddress(): string {
+  return `"AAA Data Solutions" <${NOREPLY_EMAIL}>`;
+}
+
+export function getSupportFromAddress(): string {
+  const user = process.env.SMTP_USER || 'support@aaadatasolutions.com';
+  return `"AAA Data Solutions Support" <${user}>`;
+}
+
+function getFromAddress(): string {
+  return getNoReplyFromAddress();
+}
 
 function getTransporter() {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
+  const host = process.env.SMTP_HOST || 'smtp.office365.com';
+  const user = process.env.SMTP_USER || 'support@aaadatasolutions.com';
   const pass = process.env.SMTP_PASS;
 
   if (!host || !user || !pass || pass === 'your-outlook-password') {
@@ -21,7 +34,7 @@ function getTransporter() {
       pass,
     },
     tls: {
-      rejectUnauthorized: process.env.NODE_ENV === 'production',
+      rejectUnauthorized: false,
     },
   });
 }
@@ -86,9 +99,11 @@ export interface PortingEmailData {
 export async function sendTicketEmail(data: TicketEmailData) {
   const transporter = getTransporter();
   if (!transporter) {
-    console.warn('[SMTP Mailer] SMTP credentials not configured in .env.local. Skipping email dispatch for Ticket:', data.ticketId);
+    console.warn('[SMTP Mailer] SMTP credentials not configured. Skipping email dispatch for Ticket:', data.ticketId);
     return { success: false, skipped: true };
   }
+
+  const fromAddress = getSupportFromAddress();
 
   const priorityColor =
     data.priority === 'URGENT'
@@ -202,13 +217,63 @@ export async function sendTicketEmail(data: TicketEmailData) {
 
   try {
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      from: fromAddress,
       to: SUPPORT_EMAIL,
       subject: `[Support Ticket] #${data.ticketId.substring(0, 8).toUpperCase()}: ${data.subject} — ${data.raisedByName} (${data.organizationName})`,
       html,
       attachments: data.attachments && data.attachments.length > 0 ? data.attachments : undefined,
     });
-    console.log('[SMTP Mailer] Ticket email with attachments sent successfully to:', SUPPORT_EMAIL, 'Message ID:', info.messageId);
+    console.log('[SMTP Mailer] Ticket email sent successfully to support desk:', SUPPORT_EMAIL, 'Message ID:', info.messageId);
+
+    // Also send an automated confirmation receipt to the user who raised it
+    if (data.raisedByEmail && data.raisedByEmail.includes('@') && data.raisedByEmail.toLowerCase() !== SUPPORT_EMAIL.toLowerCase()) {
+      try {
+        const clientReceiptHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: linear-gradient(135deg, #1275e2 0%, #0d5bb5 100%); padding: 24px 28px;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;">
+                Support Request Received: #${data.ticketId.substring(0, 8).toUpperCase()}
+              </h1>
+              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">
+                AAA Data Solutions Technical Support Desk
+              </p>
+            </div>
+            <div style="padding: 24px 28px;">
+              <p style="font-size: 14px; color: #334155; margin: 0 0 16px;">
+                Hello <strong>${data.raisedByName}</strong>,
+              </p>
+              <p style="font-size: 14px; color: #475569; margin: 0 0 16px; line-height: 1.6;">
+                Thank you for contacting AAA Data Solutions. We have received your support request regarding <strong>"${data.subject}"</strong> for property <strong>${data.propertyName}</strong>.
+              </p>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+                <p style="margin: 0 0 6px; font-size: 12px; color: #64748b; font-weight: 700;">Ticket Reference:</p>
+                <p style="margin: 0; font-size: 13px; font-family: monospace; font-weight: 700; color: #0f172a;">#${data.ticketId.substring(0, 8).toUpperCase()}</p>
+                <p style="margin: 8px 0 0; font-size: 12.5px; color: #475569;">Priority: <strong>${data.priority}</strong> &bull; Status: <strong>OPEN</strong></p>
+              </div>
+              <p style="font-size: 13.5px; color: #475569; line-height: 1.6;">
+                Our telecom support engineering team has been notified and will review your ticket promptly. You can track real-time progress and replies inside your client dashboard.
+              </p>
+            </div>
+            <div style="padding: 14px 28px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                AAA Data Solutions &bull; Dedicated 24/7 Hospitality Support
+              </p>
+            </div>
+          </div>
+        `;
+
+        await transporter.sendMail({
+          from: fromAddress,
+          to: data.raisedByEmail,
+          subject: `Ticket Received [#${data.ticketId.substring(0, 8).toUpperCase()}]: ${data.subject}`,
+          html: clientReceiptHtml,
+        });
+        console.log('[SMTP Mailer] Client ticket receipt sent to:', data.raisedByEmail);
+      } catch (clientMailErr) {
+        console.warn('[SMTP Mailer] Warning: Could not send client confirmation email:', clientMailErr);
+      }
+    }
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('[SMTP Mailer] Error sending ticket email:', error);
@@ -219,10 +284,11 @@ export async function sendTicketEmail(data: TicketEmailData) {
 export async function sendPortingEmail(data: PortingEmailData) {
   const transporter = getTransporter();
   if (!transporter) {
-    console.warn('[SMTP Mailer] SMTP credentials not configured in .env.local. Skipping email dispatch for Porting:', data.portingRequestId);
+    console.warn('[SMTP Mailer] SMTP credentials not configured. Skipping email dispatch for Porting:', data.portingRequestId);
     return { success: false, skipped: true };
   }
 
+  const fromAddress = getSupportFromAddress();
   const locationStr = data.propertyAddress || [data.city, data.state, data.zipCode].filter(Boolean).join(', ') || 'Address pending';
 
   const html = `
@@ -243,7 +309,7 @@ export async function sendPortingEmail(data: PortingEmailData) {
         <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
           <tr style="border-bottom: 1px solid #f1f5f9;">
             <td style="padding: 10px 0; color: #64748b; width: 150px; font-weight: 600;">Porting Request ID:</td>
-            <td style="padding: 10px 0; font-weight: 700; color: #1e293b; font-family: monospace;">${data.portingRequestId.substring(0, 8).toUpperCase()}</td>
+            <td style="padding: 10px 0; font-weight: 700; color: #1e293b; font-family: monospace;">#${data.portingRequestId.substring(0, 8).toUpperCase()}</td>
           </tr>
           <tr style="border-bottom: 1px solid #f1f5f9;">
             <td style="padding: 10px 0; color: #64748b; font-weight: 600;">Management Group:</td>
@@ -312,13 +378,63 @@ export async function sendPortingEmail(data: PortingEmailData) {
 
   try {
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      from: fromAddress,
       to: SUPPORT_EMAIL,
       subject: `[Porting Request] New Order: ${data.propertyName} (${data.propertyPhone}) — ${data.organizationName}`,
       html,
       attachments: data.attachments && data.attachments.length > 0 ? data.attachments : undefined,
     });
-    console.log('[SMTP Mailer] Porting email with attachments sent successfully to:', SUPPORT_EMAIL, 'Message ID:', info.messageId);
+    console.log('[SMTP Mailer] Porting email sent successfully to support desk:', SUPPORT_EMAIL, 'Message ID:', info.messageId);
+
+    // Also send an automated confirmation receipt to the submitter
+    if (data.submittedByEmail && data.submittedByEmail.includes('@') && data.submittedByEmail.toLowerCase() !== SUPPORT_EMAIL.toLowerCase()) {
+      try {
+        const clientPortingReceiptHtml = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="background: linear-gradient(135deg, #7c3aed 0%, #4338ca 100%); padding: 24px 28px;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;">
+                Porting Request Received: ${data.propertyName}
+              </h1>
+              <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 13px;">
+                AAA Data Solutions Carrier Operations
+              </p>
+            </div>
+            <div style="padding: 24px 28px;">
+              <p style="font-size: 14px; color: #334155; margin: 0 0 16px;">
+                Hello <strong>${data.submittedByName}</strong>,
+              </p>
+              <p style="font-size: 14px; color: #475569; margin: 0 0 16px; line-height: 1.6;">
+                We have received your telephone number porting request for <strong>${data.propertyName}</strong> (${data.propertyPhone}).
+              </p>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+                <p style="margin: 0 0 6px; font-size: 12px; color: #64748b; font-weight: 700;">Porting Order Reference:</p>
+                <p style="margin: 0; font-size: 13px; font-family: monospace; font-weight: 700; color: #0f172a;">#${data.portingRequestId.substring(0, 8).toUpperCase()}</p>
+                <p style="margin: 8px 0 0; font-size: 12.5px; color: #475569;">Management Group: <strong>${data.organizationName}</strong></p>
+              </div>
+              <p style="font-size: 13.5px; color: #475569; line-height: 1.6;">
+                Our telecom provisioning desk will review the submitted carrier documents and submit the LSR (Local Service Request) to the losing carrier. You will receive milestone updates (FOC date and cutover schedule) directly through your client dashboard.
+              </p>
+            </div>
+            <div style="padding: 14px 28px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                AAA Data Solutions &bull; Carrier Provisioning &amp; Porting Department
+              </p>
+            </div>
+          </div>
+        `;
+
+        await transporter.sendMail({
+          from: fromAddress,
+          to: data.submittedByEmail,
+          subject: `Porting Request Received: ${data.propertyName} (${data.propertyPhone})`,
+          html: clientPortingReceiptHtml,
+        });
+        console.log('[SMTP Mailer] Client porting confirmation receipt sent to:', data.submittedByEmail);
+      } catch (clientMailErr) {
+        console.warn('[SMTP Mailer] Warning: Could not send client porting confirmation email:', clientMailErr);
+      }
+    }
+
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('[SMTP Mailer] Error sending porting email:', error);
@@ -329,9 +445,11 @@ export async function sendPortingEmail(data: PortingEmailData) {
 export async function sendInviteEmail(data: InviteEmailData) {
   const transporter = getTransporter();
   if (!transporter) {
-    console.warn('[SMTP Mailer] SMTP credentials not configured or placeholder password in .env.local. Skipping email dispatch for Invite:', data.recipientEmail);
+    console.warn('[SMTP Mailer] SMTP credentials not configured. Skipping email dispatch for Invite:', data.recipientEmail);
     return { success: false, skipped: true };
   }
+
+  const fromAddress = getNoReplyFromAddress();
 
   const inviteType = data.inviteType || (data.roleName?.includes('Partner') ? 'PARTNER' : data.roleName?.includes('Sub-Super') || data.roleName?.includes('Administrator') ? 'INTERNAL_TEAM' : 'CLIENT_MEMBER');
   const roleDisplay = data.roleName || (inviteType === 'PARTNER' ? 'Channel Partner' : inviteType === 'INTERNAL_TEAM' ? 'Sub-Super Administrator' : 'Organization Member');
@@ -364,7 +482,7 @@ export async function sendInviteEmail(data: InviteEmailData) {
         <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #0c4a6e; line-height: 1.6;">
           <li>Real-time view of your assigned properties portfolio</li>
           <li>Dynamic monthly run rate and partner revenue share metrics</li>
-          <li>Submit itemized partner statements and invoices</li>
+          <li>Automated monthly gross revenue statements and payout tracking</li>
         </ul>
       </div>
     `;
@@ -467,7 +585,7 @@ export async function sendInviteEmail(data: InviteEmailData) {
 
   try {
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      from: fromAddress,
       to: data.recipientEmail,
       subject,
       html,
@@ -489,10 +607,11 @@ export interface ResetPasswordEmailData {
 export async function sendResetPasswordEmail(data: ResetPasswordEmailData) {
   const transporter = getTransporter();
   if (!transporter) {
-    console.warn('[SMTP Mailer] SMTP credentials not configured in .env.local. Skipping password reset email dispatch to:', data.recipientEmail);
+    console.warn('[SMTP Mailer] SMTP credentials not configured. Skipping password reset email dispatch to:', data.recipientEmail);
     return { success: false, skipped: true };
   }
 
+  const fromAddress = getNoReplyFromAddress();
   const nameDisplay = data.recipientName ? `Hello ${data.recipientName},` : 'Hello,';
 
   const html = `
@@ -549,7 +668,7 @@ export async function sendResetPasswordEmail(data: ResetPasswordEmailData) {
 
   try {
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      from: fromAddress,
       to: data.recipientEmail,
       subject: `Reset Your AAA Data Solutions Password`,
       html,

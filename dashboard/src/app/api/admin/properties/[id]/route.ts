@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(
@@ -52,6 +53,8 @@ export async function PATCH(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
     const body = await request.json();
 
     const updatePayload: Record<string, any> = {
@@ -75,11 +78,19 @@ export async function PATCH(
       updatePayload.monthly_price = body.monthly_price === null || body.monthly_price === '' ? null : Number(body.monthly_price);
     }
     if (body.partner_id !== undefined) {
-      updatePayload.partner_id = body.partner_id || null;
+      const cleanPId = body.partner_id && body.partner_id.trim() ? body.partner_id.trim() : null;
+      updatePayload.partner_id = cleanPId;
+      if (!cleanPId) {
+        updatePayload.partner_commission_override = null;
+      }
     }
     if (body.partner_commission_override !== undefined) {
+      const targetPartnerId = updatePayload.partner_id !== undefined ? updatePayload.partner_id : body.partner_id;
       updatePayload.partner_commission_override =
-        body.partner_commission_override !== null && body.partner_commission_override !== ''
+        targetPartnerId &&
+        body.partner_commission_override !== null &&
+        body.partner_commission_override !== '' &&
+        !isNaN(Number(body.partner_commission_override))
           ? Number(body.partner_commission_override)
           : null;
     }
@@ -91,7 +102,7 @@ export async function PATCH(
     if (body.ray_baum_status !== undefined) updatePayload.ray_baum_status = body.ray_baum_status;
     if (body.status !== undefined) updatePayload.status = body.status;
 
-    const { data: updatedProp, error: propErr } = await supabase
+    const { data: updatedProp, error: propErr } = await db
       .from('properties')
       .update(updatePayload)
       .eq('id', id)

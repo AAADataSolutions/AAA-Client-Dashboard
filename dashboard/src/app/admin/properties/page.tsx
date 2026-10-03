@@ -2267,7 +2267,7 @@ export default function AdminPropertiesPage() {
                         setFormData({
                           ...formData,
                           partner_id: pId,
-                          partner_commission_override: matched && formData.partner_commission_override === '' ? matched.default_commission_rate : formData.partner_commission_override,
+                          partner_commission_override: pId ? (matched ? matched.default_commission_rate : '') : '',
                         });
                       }}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
@@ -2282,7 +2282,14 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                      {formData.partner_id && (
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          Partner Base: {partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 10}%
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <input
                         type="number"
@@ -2294,26 +2301,36 @@ export default function AdminPropertiesPage() {
                         onChange={(e) => setFormData({ ...formData, partner_commission_override: e.target.value })}
                         placeholder={
                           formData.partner_id
-                            ? `${partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 0}% (Default)`
+                            ? `${partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 0}% (Enter custom % to override)`
                             : 'Select a partner first'
                         }
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">%</span>
                     </div>
                     {isSuperAdmin && formData.partner_id && formData.monthly_price && Number(formData.monthly_price) > 0 && (
-                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
-                        Est. Monthly Partner Payout: $
-                        {(
-                          (Number(formData.monthly_price) *
-                            Number(
-                              formData.partner_commission_override !== ''
-                                ? formData.partner_commission_override
-                                : partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate || 0
-                            )) /
-                          100
-                        ).toFixed(2)}
-                        /mo
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>
+                          Est. Monthly Partner Payout: $
+                          {(
+                            (Number(formData.monthly_price) *
+                              Number(
+                                formData.partner_commission_override !== '' && formData.partner_commission_override !== null
+                                  ? formData.partner_commission_override
+                                  : partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate || 0
+                              )) /
+                            100
+                          ).toFixed(2)}
+                          /mo
+                        </span>
+                        {formData.partner_commission_override !== '' &&
+                          formData.partner_commission_override !== null &&
+                          Number(formData.partner_commission_override) !==
+                            (partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 10) && (
+                            <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[9.5px]">
+                              Custom Override Applied
+                            </span>
+                          )}
                       </p>
                     )}
                   </div>
@@ -2565,7 +2582,7 @@ export default function AdminPropertiesPage() {
                         setFormData({
                           ...formData,
                           partner_id: pId,
-                          partner_commission_override: matched && (formData.partner_commission_override === '' || formData.partner_commission_override === null) ? matched.default_commission_rate : formData.partner_commission_override,
+                          partner_commission_override: pId ? (matched ? matched.default_commission_rate : '') : '',
                         });
                       }}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
@@ -2580,7 +2597,14 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                      {formData.partner_id && (
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          Partner Base: {partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 10}%
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <input
                         type="number"
@@ -2592,26 +2616,36 @@ export default function AdminPropertiesPage() {
                         onChange={(e) => setFormData({ ...formData, partner_commission_override: e.target.value })}
                         placeholder={
                           formData.partner_id
-                            ? `${partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 0}% (Default)`
+                            ? `${partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 0}% (Enter custom % to override)`
                             : 'Select a partner first'
                         }
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">%</span>
                     </div>
                     {isSuperAdmin && formData.partner_id && formData.monthly_price && Number(formData.monthly_price) > 0 && (
-                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
-                        Est. Monthly Partner Payout: $
-                        {(
-                          (Number(formData.monthly_price) *
-                            Number(
-                              formData.partner_commission_override !== ''
-                                ? formData.partner_commission_override
-                                : partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate || 0
-                            )) /
-                          100
-                        ).toFixed(2)}
-                        /mo
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>
+                          Est. Monthly Partner Payout: $
+                          {(
+                            (Number(formData.monthly_price) *
+                              Number(
+                                formData.partner_commission_override !== '' && formData.partner_commission_override !== null
+                                  ? formData.partner_commission_override
+                                  : partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate || 0
+                              )) /
+                            100
+                          ).toFixed(2)}
+                          /mo
+                        </span>
+                        {formData.partner_commission_override !== '' &&
+                          formData.partner_commission_override !== null &&
+                          Number(formData.partner_commission_override) !==
+                            (partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 10) && (
+                            <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-[9.5px]">
+                              Custom Override Applied
+                            </span>
+                          )}
                       </p>
                     )}
                   </div>

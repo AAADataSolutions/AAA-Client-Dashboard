@@ -4,16 +4,20 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'global' });
 
     const response = NextResponse.json({ success: true });
     
-    // Clear auth cookies explicitly
+    // Clear all cookies explicitly with path / and maxAge 0
     const cookiesToClear = request.cookies.getAll();
     for (const cookie of cookiesToClear) {
-      if (cookie.name.includes('supabase') || cookie.name.includes('sb-') || cookie.name.includes('auth')) {
-        response.cookies.delete(cookie.name);
-      }
+      response.cookies.set(cookie.name, '', {
+        maxAge: 0,
+        path: '/',
+        expires: new Date(0),
+        sameSite: 'lax',
+      });
+      response.cookies.delete(cookie.name);
     }
 
     return response;
@@ -25,7 +29,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'global' });
   } catch {
     // Ignore error
   }
@@ -33,9 +37,13 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(url);
   const cookiesToClear = request.cookies.getAll();
   for (const cookie of cookiesToClear) {
-    if (cookie.name.includes('supabase') || cookie.name.includes('sb-') || cookie.name.includes('auth')) {
-      response.cookies.delete(cookie.name);
-    }
+    response.cookies.set(cookie.name, '', {
+      maxAge: 0,
+      path: '/',
+      expires: new Date(0),
+      sameSite: 'lax',
+    });
+    response.cookies.delete(cookie.name);
   }
   return response;
 }

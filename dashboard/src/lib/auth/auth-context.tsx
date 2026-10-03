@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       await fetch('/api/auth/signout', { method: 'POST' });
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'global' });
     } catch (e) {
       console.error('Sign out error:', e);
     } finally {
@@ -143,8 +143,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           localStorage.clear();
           sessionStorage.clear();
+          document.cookie.split(';').forEach((c) => {
+            const eqPos = c.indexOf('=');
+            const name = eqPos > -1 ? c.substring(0, eqPos).trim() : c.trim();
+            if (name) {
+              document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+            }
+          });
         } catch {}
-        window.location.href = '/auth';
+        window.location.replace('/auth');
       }
     }
   };

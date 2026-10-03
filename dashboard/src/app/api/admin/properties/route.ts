@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
     const { searchParams } = new URL(request.url);
 
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
@@ -248,6 +251,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const adminClient = createAdminClient();
+    const db = adminClient || supabase;
     const body = await request.json();
 
     const {
@@ -294,7 +299,17 @@ export async function POST(request: NextRequest) {
     const resolvedRayBaum = ray_baum_status || (isE911Verified ? 'ACTIVE' : 'INACTIVE');
     const resolvedStatus = 'ACTIVE';
 
-    const { data: newProp, error: propErr } = await supabase
+    const cleanPartnerId = partner_id && partner_id.trim() ? partner_id.trim() : null;
+    const cleanOverride =
+      cleanPartnerId &&
+      partner_commission_override !== null &&
+      partner_commission_override !== '' &&
+      partner_commission_override !== undefined &&
+      !isNaN(Number(partner_commission_override))
+        ? Number(partner_commission_override)
+        : null;
+
+    const { data: newProp, error: propErr } = await db
       .from('properties')
       .insert({
         name: name.trim(),
@@ -311,8 +326,8 @@ export async function POST(request: NextRequest) {
         general_manager_phone: general_manager_phone?.trim() || null,
         general_manager_email: general_manager_email?.trim() || null,
         monthly_price: monthly_price === null || monthly_price === '' || monthly_price === undefined ? null : Number(monthly_price),
-        partner_id: partner_id || null,
-        partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
+        partner_id: cleanPartnerId,
+        partner_commission_override: cleanOverride,
         ray_baud_and_logs_enabled: isE911Verified,
         ray_baum_status: resolvedRayBaum,
         status: resolvedStatus,
@@ -327,10 +342,11 @@ export async function POST(request: NextRequest) {
     // Link to organization if specified (Rule 1: One property can be assigned to only one organization)
     let orgName = 'Unassigned';
     if (organization_id) {
-      const { data: org } = await supabase.from('organizations').select('name').eq('id', organization_id).maybeSingle();
+      const { data: org } = await db.from('organizations').select('name').eq('id', organization_id).maybeSingle();
+
       if (org) orgName = org.name;
 
-      const { data: newOp } = await supabase
+      const { data: newOp } = await db
         .from('organization_properties')
         .insert({
           organization_id,
@@ -342,13 +358,13 @@ export async function POST(request: NextRequest) {
 
       if (newOp) {
         // Auto-create onboarding record set to COMPLETED for direct property creation
-        await supabase.from('onboardings').insert({
+        await db.from('onboardings').insert({
           organization_property_id: newOp.id,
           status: 'COMPLETED',
         });
 
         // Auto-create e911 record
-        await supabase.from('e911_records').insert({
+        await db.from('e911_records').insert({
           organization_property_id: newOp.id,
           emergency_address: `${address.trim()}, ${city.trim()}, ${state.trim()} ${zip_code.trim()}`,
           status: isE911Verified ? 'VERIFIED' : 'PENDING',

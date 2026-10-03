@@ -19,6 +19,7 @@ import {
   Check,
   TrendingUp,
 } from 'lucide-react';
+import PartnerPersonalMonthlyAnalytics from '@/components/partner/PartnerPersonalMonthlyAnalytics';
 
 interface PartnerInvoice {
   id: string;
@@ -305,6 +306,9 @@ export default function PartnerInvoicesPage() {
           </p>
         </div>
       </div>
+
+      {/* MONTHLY COMMISSION GRAPH & SELECTED MONTH KPI */}
+      <PartnerPersonalMonthlyAnalytics />
 
       {/* Invoices List Table */}
       <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-2xl shadow-xs overflow-hidden">
