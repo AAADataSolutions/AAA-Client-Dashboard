@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Lock, CheckCircle2, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -16,9 +16,66 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const establishSession = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const tokenHash = url.searchParams.get('token_hash');
+        const code = url.searchParams.get('code');
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const accessToken = hash.get('access_token');
+        const refreshToken = hash.get('refresh_token');
+        const urlError = hash.get('error_description') || url.searchParams.get('error_description');
+
+        if (tokenHash) {
+          const { error: e } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' });
+          if (e) throw e;
+        } else if (code) {
+          const { error: e } = await supabase.auth.exchangeCodeForSession(code);
+          if (e) throw e;
+        } else if (accessToken && refreshToken) {
+          const { error: e } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (e) throw e;
+        } else if (urlError) {
+          throw new Error(urlError.replace(/\+/g, ' '));
+        }
+
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          throw new Error('This reset link is invalid or has expired. Please request a new one.');
+        }
+        if (!cancelled) {
+          setSessionReady(true);
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.message || 'This reset link is invalid or has expired. Please request a new one.');
+        }
+      } finally {
+        if (!cancelled) setVerifying(false);
+      }
+    };
+    establishSession();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!sessionReady) {
+      setError('This reset link is invalid or has expired. Please request a new one.');
+      return;
+    }
     if (!password) {
       setError('Please enter a new password.');
       return;
@@ -158,7 +215,7 @@ export default function ResetPasswordPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || verifying || !sessionReady}
                 className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold py-3 rounded-xl transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer mt-2"
               >
                 {loading ? (

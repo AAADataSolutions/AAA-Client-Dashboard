@@ -100,7 +100,7 @@ export async function PATCH(
       updatePayload.ray_baud_and_logs_enabled = body.e911_status === 'VERIFIED' || body.e911_status === 'ACTIVE';
     }
     if (body.ray_baum_status !== undefined) updatePayload.ray_baum_status = body.ray_baum_status;
-    if (body.status !== undefined) updatePayload.status = body.status;
+    if (body.status !== undefined && body.status !== 'UNASSIGNED') updatePayload.status = body.status;
 
     const { data: updatedProp, error: propErr } = await db
       .from('properties')
@@ -132,7 +132,7 @@ export async function PATCH(
           .insert({
             organization_id: body.organization_id,
             property_id: id,
-            status: body.status || 'ACTIVE',
+            status: body.status && body.status !== 'UNASSIGNED' ? body.status : 'ACTIVE',
           })
           .select('id')
           .single();

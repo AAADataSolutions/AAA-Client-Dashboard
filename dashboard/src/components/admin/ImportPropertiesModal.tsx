@@ -102,10 +102,11 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
 
         if (char === '"') {
           if (inQuotes && nextChar === '"') {
-            currentLine += '"';
+            currentLine += '""'; // keep escaped quote for the row parser
             i++;
           } else {
             inQuotes = !inQuotes;
+            currentLine += char; // keep quote so row parser knows the cell is quoted
           }
         } else if ((char === '\r' || char === '\n') && !inQuotes) {
           if (char === '\r' && nextChar === '\n') {

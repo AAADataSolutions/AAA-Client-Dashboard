@@ -15,10 +15,11 @@ function parseCSV(text: string): Record<string, string>[] {
 
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
-        currentLine += '"';
-        i++; // skip escaped quote
+        currentLine += '""'; // keep escaped quote for the row parser
+        i++;
       } else {
         inQuotes = !inQuotes;
+        currentLine += char; // keep quote so row parser knows the cell is quoted
       }
     } else if ((char === '\r' || char === '\n') && !inQuotes) {
       if (char === '\r' && nextChar === '\n') {

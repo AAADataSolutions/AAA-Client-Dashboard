@@ -33,7 +33,10 @@ export async function POST(request: Request) {
           },
         });
 
-        if (!linkErr && linkData?.properties?.action_link) {
+        if (!linkErr && linkData?.properties?.hashed_token) {
+          // Direct app link; the reset page verifies the token itself via verifyOtp
+          resetUrl = `${redirectTo}?token_hash=${encodeURIComponent(linkData.properties.hashed_token)}&type=recovery`;
+        } else if (!linkErr && linkData?.properties?.action_link) {
           resetUrl = linkData.properties.action_link;
         }
       } catch (adminErr) {
