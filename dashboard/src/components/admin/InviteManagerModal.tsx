@@ -248,15 +248,7 @@ export const InviteManagerModal: React.FC<InviteManagerModalProps> = ({
 
                   {/* Actions Bar */}
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-[#222430]">
-                    <a
-                      href={activeInvite.invite_url || activeInvite.inviteUrl || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold cursor-pointer"
-                    >
-                      <span>Preview Invite Page</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    
 
                     <motion.button
                       type="button"

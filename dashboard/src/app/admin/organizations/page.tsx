@@ -51,6 +51,7 @@ import {
   type OrgContact,
 } from '@/store/slices/organizationsSlice';
 import { CreateOrgModal } from '@/components/admin/CreateOrgModal';
+import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -124,6 +125,9 @@ export default function AdminOrganizationsPage() {
   const [orgToDelete, setOrgToDelete] = useState<OrgRecord | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Invite Modal State
+  const [inviteModalOrg, setInviteModalOrg] = useState<{ id: string; name: string } | null>(null);
+
   // Edit Organization Drawer
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<OrgRecord | null>(null);
@@ -136,6 +140,7 @@ export default function AdminOrganizationsPage() {
     zip_code: '',
     phone: '',
     email: '',
+    contact_name: '',
     status: 'ACTIVE',
   });
   const [editSaving, setEditSaving] = useState(false);
@@ -315,6 +320,7 @@ export default function AdminOrganizationsPage() {
       zip_code: org.zip_code || '',
       phone: org.phone && org.phone !== '—' ? org.phone : '',
       email: org.email && org.email !== '—' ? org.email : '',
+      contact_name: org.contact_name || (org as any).primary_contact_name || '',
       status: org.status || 'ACTIVE',
     });
     setShowEditDrawer(true);
@@ -336,6 +342,8 @@ export default function AdminOrganizationsPage() {
       zip_code: editFormData.zip_code.trim(),
       phone: editFormData.phone.trim() || '—',
       email: editFormData.email.trim() || '—',
+      contact_name: editFormData.contact_name.trim(),
+      primary_contact_name: editFormData.contact_name.trim(),
       status: editFormData.status as any,
     };
 
@@ -351,6 +359,7 @@ export default function AdminOrganizationsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update organization');
+      fetchOrganizations();
     } catch (err: any) {
       showToast(err.message || 'Error updating organization', 'error');
       fetchOrganizations();
@@ -1091,6 +1100,18 @@ export default function AdminOrganizationsPage() {
           </Link>
 
           <button
+            onClick={() => {
+              const targetOrg = menuPosition.org;
+              setMenuPosition(null);
+              setInviteModalOrg({ id: targetOrg.id, name: targetOrg.name });
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer text-left font-semibold"
+          >
+            <Send className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Generate / View Invite Link</span>
+          </button>
+
+          <button
             onClick={() => handleOpenEditDrawer(menuPosition.org)}
             className="w-full flex items-center gap-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212a] transition cursor-pointer text-left"
           >
@@ -1218,7 +1239,20 @@ export default function AdminOrganizationsPage() {
                     required
                     value={editFormData.name}
                     onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Primary Contact Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.contact_name}
+                    onChange={(e) => setEditFormData({ ...editFormData, contact_name: e.target.value })}
+                    placeholder="e.g., Jane Doe"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500"
                   />
                 </div>
 
@@ -1230,7 +1264,7 @@ export default function AdminOrganizationsPage() {
                     rows={2}
                     value={editFormData.address}
                     onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 resize-none"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-hidden focus:border-blue-500 resize-none"
                   />
                 </div>
 
@@ -1866,6 +1900,17 @@ export default function AdminOrganizationsPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Invite Manager Modal */}
+      {inviteModalOrg && (
+        <InviteManagerModal
+          isOpen={Boolean(inviteModalOrg)}
+          onClose={() => setInviteModalOrg(null)}
+          orgId={inviteModalOrg.id}
+          orgName={inviteModalOrg.name}
+          onSuccess={fetchOrganizations}
+        />
+      )}
     </motion.div>
   );
 }

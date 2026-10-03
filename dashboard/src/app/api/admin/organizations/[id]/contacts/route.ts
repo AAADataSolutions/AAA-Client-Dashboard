@@ -15,7 +15,7 @@ export async function GET(
     // 1. Fetch Organization metadata
     const { data: org } = await dbClient
       .from('organizations')
-      .select('id, name, email, phone, contact_name, created_at')
+      .select('id, name, email, phone, created_at')
       .eq('id', orgId)
       .single();
 
@@ -42,11 +42,11 @@ export async function GET(
       created_at: oc.created_at,
     }));
 
-    // If no contacts record yet in organization_contacts, fallback to organization's contact metadata
-    if (contacts.length === 0 && org && (org.contact_name || org.email)) {
+    // If no contacts record yet in organization_contacts, fallback to organization's metadata
+    if (contacts.length === 0 && org && org.email) {
       contacts.push({
         id: `org-contact-default-${org.id}`,
-        name: org.contact_name || `${org.name} Contact`,
+        name: `${org.name} Contact`,
         email: org.email || '—',
         phone: org.phone || '—',
         role: 'Primary Contact',
@@ -124,7 +124,6 @@ export async function POST(
       await dbClient
         .from('organizations')
         .update({
-          contact_name: cleanName,
           email: cleanEmail,
           phone: cleanPhone || undefined,
           updated_at: new Date().toISOString(),
@@ -209,11 +208,10 @@ export async function PATCH(
 
     if (patchErr) throw patchErr;
 
-    if (isPrimaryBool && updates.name && updates.email) {
+    if (isPrimaryBool && updates.email) {
       await dbClient
         .from('organizations')
         .update({
-          contact_name: updates.name,
           email: updates.email,
           phone: updates.phone || undefined,
           updated_at: new Date().toISOString(),
@@ -270,10 +268,10 @@ export async function DELETE(
     }
 
     if (contactId.startsWith('org-contact-default-')) {
-      // Clear contact_name & email on organization table
+      // Clear email on organization table
       await dbClient
         .from('organizations')
-        .update({ contact_name: null, email: null, phone: null, updated_at: new Date().toISOString() })
+        .update({ email: null, phone: null, updated_at: new Date().toISOString() })
         .eq('id', organizationId);
 
       return NextResponse.json({ success: true, message: 'Contact record cleared.' });

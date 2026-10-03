@@ -79,11 +79,31 @@ export async function GET(request: NextRequest) {
     const isRevoked = invite.status === 'REVOKED' || invite.status === 'REJECTED';
     const isAccepted = invite.status === 'ACCEPTED' || invite.status === 'APPROVED';
 
+    // Fetch primary contact name if available
+    let primaryContactName: string | null = null;
+    if (invite.organization_id) {
+      try {
+        const db = adminClient || supabase;
+        const { data: contactRow } = await db
+          .from('organization_contacts')
+          .select('name')
+          .eq('organization_id', invite.organization_id)
+          .eq('is_primary', true)
+          .maybeSingle();
+        if (contactRow?.name) {
+          primaryContactName = contactRow.name;
+        }
+      } catch (e) {
+        // Ignore contact lookup failure
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         id: invite.id,
         email: invite.email,
+        contact_name: primaryContactName,
         invite_type: invite.invite_type,
         target_org_role: invite.target_org_role || 'ADMIN',
         target_app_role: invite.target_app_role || 'CLIENT_USER',

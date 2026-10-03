@@ -38,6 +38,15 @@ export async function GET(request: NextRequest) {
           status,
           profile:profiles(id, full_name, email, phone_number, avatar_url, status)
         ),
+        contacts:organization_contacts(
+          id,
+          name,
+          email,
+          phone,
+          role,
+          is_primary,
+          created_at
+        ),
         invitations:invitations(
           id,
           email,
@@ -76,16 +85,20 @@ export async function GET(request: NextRequest) {
         };
       });
 
+      const orgContacts = Array.isArray(org.contacts) ? org.contacts : [];
+      const primaryContactRecord = orgContacts.find((c: any) => c.is_primary) || orgContacts[0] || null;
+
       const primaryMember = members.find((m: any) => m.is_primary) || members[0] || null;
+      const memberFullName = primaryMember?.full_name && primaryMember.full_name !== 'Contact Person' ? primaryMember.full_name : null;
 
       // Find latest invitation
       const invitesList = Array.isArray(org.invitations) ? [...org.invitations] : [];
       invitesList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       const latestInvite = invitesList[0] || null;
 
-      const primaryContactName = primaryMember?.full_name || org.contact_name || (latestInvite?.email ? latestInvite.email.split('@')[0] : 'Not Configured');
-      const primaryContactEmail = primaryMember?.email || org.email || latestInvite?.email || '—';
-      const primaryContactPhone = primaryMember?.phone_number || org.phone || '—';
+      const primaryContactName = primaryContactRecord?.name || memberFullName || (latestInvite?.email ? latestInvite.email.split('@')[0] : '—');
+      const primaryContactEmail = primaryContactRecord?.email || primaryMember?.email || org.email || latestInvite?.email || '—';
+      const primaryContactPhone = primaryContactRecord?.phone || primaryMember?.phone_number || org.phone || '—';
 
       // Format formatted full address
       const addressParts = [org.address, org.city, org.state, org.zip_code].filter(Boolean);
@@ -114,6 +127,7 @@ export async function GET(request: NextRequest) {
         zip_code: org.zip_code || '',
         country: org.country || 'USA',
         primary_contact_name: primaryContactName,
+        contact_name: primaryContactName,
         email: primaryContactEmail,
         phone: primaryContactPhone,
         properties_count: propCount,
@@ -126,7 +140,8 @@ export async function GET(request: NextRequest) {
           id: latestInvite?.id || null,
         },
         members,
-        contacts_count: members.length,
+        contacts: orgContacts,
+        contacts_count: orgContacts.length > 0 ? orgContacts.length : members.length,
         created_at: org.created_at,
         updated_at: org.updated_at || org.created_at,
       };
@@ -153,7 +168,8 @@ export async function GET(request: NextRequest) {
         (o: any) =>
           o.name.toLowerCase().includes(search) ||
           o.address.toLowerCase().includes(search) ||
-          o.primary_contact_name.toLowerCase().includes(search) ||
+          (o.primary_contact_name && o.primary_contact_name.toLowerCase().includes(search)) ||
+          (o.contact_name && o.contact_name.toLowerCase().includes(search)) ||
           o.email.toLowerCase().includes(search) ||
           o.phone.toLowerCase().includes(search)
       );
@@ -283,6 +299,22 @@ export async function POST(request: NextRequest) {
 
     if (orgErr || !newOrg) {
       throw orgErr || new Error('Failed to create organization');
+    }
+
+    // 1.1 Also create initial primary contact entry in organization_contacts
+    if (contact_name?.trim() || adminContactEmail) {
+      try {
+        await dbClient.from('organization_contacts').insert({
+          organization_id: newOrg.id,
+          name: contact_name?.trim() || (adminContactEmail ? adminContactEmail.split('@')[0] : 'Primary Contact'),
+          email: adminContactEmail || null,
+          phone: contact_phone?.trim() || phone?.trim() || null,
+          role: 'Primary Contact',
+          is_primary: true,
+        });
+      } catch (cErr) {
+        console.warn('Could not insert initial organization contact:', cErr);
+      }
     }
 
     // 2. If an admin contact email is provided, generate an invitation automatically

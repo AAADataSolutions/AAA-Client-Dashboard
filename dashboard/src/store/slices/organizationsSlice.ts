@@ -18,6 +18,7 @@ export interface OrgRecord {
   logo_url?: string | null;
   type?: 'INDIVIDUAL' | 'GROUP' | string;
   contact_name: string;
+  primary_contact_name?: string;
   email: string;
   phone: string;
   address?: string;

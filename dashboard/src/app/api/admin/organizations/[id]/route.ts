@@ -155,7 +155,7 @@ export async function GET(
     if (contacts.length === 0 && org.email) {
       contacts.push({
         id: `org-contact-default-${org.id}`,
-        name: org.contact_name || `${org.name} Contact`,
+        name: `${org.name} Contact`,
         email: org.email,
         phone: org.phone || '—',
         role: 'Primary Contact',
@@ -168,7 +168,7 @@ export async function GET(
     contacts.sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
 
     const primaryContact = contacts.find((c) => c.is_primary) || contacts[0] || {
-      name: org.contact_name || `${org.name} Contact`,
+      name: `${org.name} Contact`,
       email: org.email || '—',
       phone: org.phone || '—',
       role: 'Primary Contact',
@@ -371,6 +371,8 @@ export async function GET(
         country: org.country || 'USA',
         phone: org.phone || '—',
         email: org.email || '—',
+        contact_name: primaryContact.name,
+        primary_contact_name: primaryContact.name,
         status: org.status || 'ACTIVE',
         created_at: org.created_at,
         updated_at: org.updated_at || org.created_at,
@@ -427,6 +429,8 @@ export async function PATCH(
     if (body.logo_url !== undefined) updatePayload.logo_url = body.logo_url ? body.logo_url.trim() : null;
     if (body.status !== undefined) updatePayload.status = body.status;
 
+    const cleanContactName = body.contact_name !== undefined ? body.contact_name : body.primary_contact_name;
+
     const { data: updatedOrg, error } = await dbClient
       .from('organizations')
       .update(updatePayload)
@@ -436,6 +440,59 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Synchronize primary organization_contacts
+    if (cleanContactName !== undefined || body.email !== undefined || body.phone !== undefined) {
+      try {
+        const { data: primaryContacts } = await dbClient
+          .from('organization_contacts')
+          .select('id')
+          .eq('organization_id', id)
+          .eq('is_primary', true)
+          .limit(1);
+
+        if (primaryContacts && primaryContacts.length > 0) {
+          const cUpdates: any = { updated_at: new Date().toISOString() };
+          if (cleanContactName !== undefined) cUpdates.name = cleanContactName ? cleanContactName.trim() : 'Primary Contact';
+          if (body.email !== undefined) cUpdates.email = body.email ? body.email.trim() : null;
+          if (body.phone !== undefined) cUpdates.phone = body.phone ? body.phone.trim() : null;
+          await dbClient.from('organization_contacts').update(cUpdates).eq('id', primaryContacts[0].id);
+        } else if (cleanContactName || body.email) {
+          await dbClient.from('organization_contacts').insert({
+            organization_id: id,
+            name: cleanContactName ? cleanContactName.trim() : 'Primary Contact',
+            email: body.email ? body.email.trim() : null,
+            phone: body.phone ? body.phone.trim() : null,
+            role: 'Primary Contact',
+            is_primary: true,
+          });
+        }
+      } catch (cErr) {
+        console.warn('Could not sync organization_contacts:', cErr);
+      }
+
+      // Synchronize with member profile full_name if exists
+      if (cleanContactName && cleanContactName.trim()) {
+        try {
+          const { data: orgMembers } = await dbClient
+            .from('organization_members')
+            .select('profile_id')
+            .eq('organization_id', id);
+
+          if (orgMembers && orgMembers.length > 0) {
+            const profileIds = orgMembers.map((m: any) => m.profile_id).filter(Boolean);
+            if (profileIds.length > 0) {
+              await dbClient
+                .from('profiles')
+                .update({ full_name: cleanContactName.trim() })
+                .in('id', profileIds);
+            }
+          }
+        } catch (pErr) {
+          console.warn('Could not sync profiles full_name:', pErr);
+        }
+      }
     }
 
     // Log Audit Event
