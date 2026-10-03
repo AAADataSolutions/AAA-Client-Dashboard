@@ -90,20 +90,20 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs lg:hidden"
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#0f3496] border-r border-[#1740ab]/60 text-white flex flex-col justify-between transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#070c1e] border-r border-[#131f42] text-white flex flex-col justify-between transition-all duration-300 ease-in-out ${
           isOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-16'
         }`}
       >
         {/* Top Header & Navigation */}
         <div className="flex flex-col flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Brand Header */}
-          <div className="h-16 px-4 border-b border-[#1740ab]/60 flex items-center justify-between shrink-0">
+          <div className="h-16 px-4 border-b border-[#131f42] flex items-center justify-between shrink-0">
             <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden cursor-pointer">
               <img src="/logo3.png" alt="AAA Data Solutions" className="h-8 object-contain" />
               {isOpen && (
@@ -118,7 +118,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
             {/* Close Button for Mobile */}
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-white/80 hover:text-white hover:bg-white/10 lg:hidden cursor-pointer"
+              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 lg:hidden cursor-pointer"
               aria-label="Close sidebar"
             >
               <X className="w-5 h-5" />
@@ -127,7 +127,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
 
           {/* Active Tenant Card (when open) */}
           {isOpen && (
-            <div className="mx-3 mt-3 p-2.5 rounded-xl bg-[#0b2774] border border-[#1740ab]/70 flex items-center justify-between gap-2 shadow-xs">
+            <div className="mx-3 mt-3 p-2.5 rounded-xl bg-[#050918] border border-[#131f42] flex items-center justify-between gap-2 shadow-xs">
               <div className="truncate">
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
@@ -135,12 +135,12 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                     {orgName}
                   </span>
                 </div>
-                <span className="text-[10px] text-blue-200 block pl-3">
+                <span className="text-[10px] text-[#8fa3ca] block pl-3">
                   {isClientAdmin ? 'Admin Access' : 'Member Access'}
                 </span>
               </div>
               <span
-                className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-white/20 text-white border border-white/30"
+                className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-white/10 text-white border border-white/20"
               >
                 {isClientAdmin ? 'ADMIN' : 'USER'}
               </span>
@@ -164,22 +164,24 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                       <button
                         type="button"
                         onClick={() => setServicesExpanded(!servicesExpanded)}
-                        className={`w-full group flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                        className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer ${
                           isGroupActive
-                            ? 'bg-white/20 text-white font-bold'
-                            : 'text-white/90 hover:text-white hover:bg-white/10'
+                            ? 'bg-gradient-to-r from-[#1c367d] via-[#172b68] to-[#12204d] text-white font-semibold shadow-xs border border-white/5'
+                            : 'text-[#8fa3ca] hover:text-white hover:bg-white/5'
                         }`}
                       >
                         <div className="flex items-center gap-3 truncate">
                           <Icon
                             className={`w-4 h-4 shrink-0 transition-colors ${
-                              isGroupActive ? 'text-white' : 'text-white/80 group-hover:text-white'
+                              isGroupActive ? 'text-white' : 'text-[#8fa3ca] group-hover:text-white'
                             }`}
                           />
                           <span className="truncate">{item.label}</span>
                         </div>
                         <ChevronDown
-                          className={`w-3.5 h-3.5 text-white/80 transition-transform duration-200 ${
+                          className={`w-3.5 h-3.5 ${
+                            isGroupActive ? 'text-white' : 'text-[#8fa3ca] group-hover:text-white'
+                          } transition-transform duration-200 ${
                             servicesExpanded ? 'rotate-0' : '-rotate-90'
                           }`}
                         />
@@ -188,22 +190,22 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                       <Link
                         href={item.children[0].href}
                         title={item.label}
-                        className={`group flex items-center justify-center px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                        className={`group flex items-center justify-center px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer ${
                           isGroupActive
-                            ? 'bg-white/20 text-white shadow-xs'
-                            : 'text-white/80 hover:text-white hover:bg-white/10'
+                            ? 'bg-gradient-to-r from-[#1c367d] via-[#172b68] to-[#12204d] text-white shadow-xs border border-white/5'
+                            : 'text-[#8fa3ca] hover:text-white hover:bg-white/5'
                         }`}
                       >
                         <Icon
                           className={`w-4 h-4 shrink-0 transition-colors ${
-                            isGroupActive ? 'text-white' : 'text-white/80 group-hover:text-white'
+                            isGroupActive ? 'text-white' : 'text-[#8fa3ca] group-hover:text-white'
                           }`}
                         />
                       </Link>
                     )}
 
                     {isOpen && servicesExpanded && (
-                      <div className="pl-4 ml-3 border-l border-white/25 space-y-1 my-1">
+                      <div className="pl-4 ml-3 border-l border-[#18274f] space-y-1 my-1">
                         {item.children.map((subItem) => {
                           const isSubActive =
                             pathname === subItem.href || pathname.startsWith(subItem.href);
@@ -215,15 +217,15 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                               onClick={() => {
                                 if (window.innerWidth < 1024) onClose();
                               }}
-                              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                              className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer ${
                                 isSubActive
-                                  ? 'bg-white/25 text-white font-bold shadow-xs'
-                                  : 'text-white/90 hover:text-white hover:bg-white/10'
+                                  ? 'bg-gradient-to-r from-[#1c367d] to-[#12204d] text-white font-semibold shadow-xs'
+                                  : 'text-[#8fa3ca] hover:text-white hover:bg-white/5'
                               }`}
                             >
                               <SubIcon
                                 className={`w-3.5 h-3.5 shrink-0 ${
-                                  isSubActive ? 'text-white' : 'text-white/80'
+                                  isSubActive ? 'text-white' : 'text-[#8fa3ca]'
                                 }`}
                               />
                               <span className="truncate">{subItem.label}</span>
@@ -252,23 +254,23 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                     if (window.innerWidth < 1024) onClose();
                   }}
                   title={!isOpen ? item.label : undefined}
-                  className={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer ${
+                  className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-white/20 text-white font-bold shadow-xs'
-                      : 'text-white/90 hover:text-white hover:bg-white/10'
+                      ? 'bg-gradient-to-r from-[#1c367d] via-[#172b68] to-[#12204d] text-white font-semibold shadow-xs border border-white/5'
+                      : 'text-[#8fa3ca] hover:text-white hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center gap-3 truncate">
                     <Icon
                       className={`w-4 h-4 shrink-0 transition-colors ${
-                        isActive ? 'text-white' : 'text-white/80 group-hover:text-white'
+                        isActive ? 'text-white' : 'text-[#8fa3ca] group-hover:text-white'
                       }`}
                     />
                     {isOpen && <span className="truncate">{item.label}</span>}
                   </div>
 
                   {isOpen && isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_rgba(56,189,248,0.8)] shrink-0" />
                   )}
                 </Link>
               );
@@ -278,16 +280,16 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
 
         {/* Bottom Section: Telemetry Box & Footer (visible when open) */}
         {isOpen ? (
-          <div className="p-3 space-y-2.5 border-t border-[#1740ab]/60 bg-[#0b2774] shrink-0">
+          <div className="p-3 space-y-2.5 border-t border-[#131f42] bg-[#050918] shrink-0">
             {/* Quick Footer Links */}
-            <div className="flex items-center justify-between px-1 text-[11px] text-white/80 pt-1">
-              <span className="text-[10.5px] text-blue-200 truncate max-w-[130px]">
+            <div className="flex items-center justify-between px-1 text-[11px] text-[#8fa3ca] pt-1">
+              <span className="text-[10.5px] text-[#8fa3ca] truncate max-w-[130px]">
                 {profile?.email}
               </span>
               <button
                 type="button"
                 onClick={() => setShowLogoutModal(true)}
-                className="flex items-center gap-1.5 text-white/90 hover:text-rose-300 hover:bg-white/10 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-[#8fa3ca] hover:text-rose-300 hover:bg-white/5 px-2 py-1 rounded-lg transition-colors cursor-pointer"
                 title="Sign out of your session"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -296,12 +298,12 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
             </div>
           </div>
         ) : (
-          <div className="p-2 border-t border-[#1740ab]/60 bg-[#0b2774] flex flex-col items-center gap-3 shrink-0">
+          <div className="p-2 border-t border-[#131f42] bg-[#050918] flex flex-col items-center gap-3 shrink-0">
             <button
               type="button"
               onClick={() => setShowLogoutModal(true)}
               title="Sign Out"
-              className="p-2 rounded-lg text-white/80 hover:text-rose-300 hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-[#8fa3ca] hover:text-rose-300 hover:bg-white/5 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
