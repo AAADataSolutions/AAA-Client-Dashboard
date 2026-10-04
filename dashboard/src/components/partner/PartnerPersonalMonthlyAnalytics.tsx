@@ -116,7 +116,7 @@ export default function PartnerPersonalMonthlyAnalytics({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#20222c] pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+            <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
               <PiggyBank className="w-4 h-4" />
             </span>
             <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
@@ -143,8 +143,8 @@ export default function PartnerPersonalMonthlyAnalytics({
             </select>
           </div>
 
-          <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+          <div className="px-3 py-1 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
             <span>YTD Commission: ${totalYearCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
@@ -190,15 +190,15 @@ export default function PartnerPersonalMonthlyAnalytics({
                       {/* Hover Tooltip */}
                       {(isHovered || (isSelected && !hoveredMonth)) && (
                         <div className="absolute -top-12 z-30 bg-slate-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap pointer-events-none transform -translate-y-1 font-mono transition-all animate-in fade-in zoom-in-95">
-                          <p className="font-bold text-[11px] text-emerald-300 font-sans">{d.monthName}</p>
-                          <p className="text-emerald-400 font-bold">${d.commissionAmount.toFixed(2)} Commission</p>
+                          <p className="font-bold text-[11px] text-blue-300 font-sans">{d.monthName}</p>
+                          <p className="text-blue-400 font-bold">${d.commissionAmount.toFixed(2)} Commission</p>
                           <p className="text-slate-400 text-[9px]">${d.grossRevenue.toFixed(2)} Portfolio Gross</p>
                         </div>
                       )}
 
                       {/* Bar Value on top if selected */}
                       {isSelected && (
-                        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 mb-1 font-mono">
+                        <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 mb-1 font-mono">
                           ${d.commissionAmount >= 1000 ? `${(d.commissionAmount / 1000).toFixed(1)}k` : d.commissionAmount.toFixed(0)}
                         </span>
                       )}
@@ -208,15 +208,15 @@ export default function PartnerPersonalMonthlyAnalytics({
                         style={{ height: `${heightPercent}%` }}
                         className={`w-full rounded-t-lg transition-all duration-200 relative ${
                           isSelected
-                            ? 'bg-gradient-to-t from-emerald-600 to-teal-500 shadow-md shadow-emerald-500/30 ring-2 ring-emerald-500'
+                            ? 'bg-gradient-to-t from-blue-600 to-indigo-500 shadow-md shadow-blue-500/30 ring-2 ring-blue-500'
                             : d.commissionAmount > 0
-                            ? 'bg-gradient-to-t from-emerald-500/80 to-emerald-400/80 hover:from-emerald-600 hover:to-emerald-500'
+                            ? 'bg-gradient-to-t from-blue-500/80 to-blue-400/80 hover:from-blue-600 hover:to-blue-500'
                             : 'bg-slate-200/80 dark:bg-slate-800/80 hover:bg-slate-300 dark:hover:bg-slate-700'
                         }`}
                       >
                         {d.isCurrentMonth && (
                           <span
-                            className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-blue-400 ring-2 ring-white dark:ring-[#15161c]"
+                            className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-[#15161c]"
                             title="Current Active Billing Month"
                           />
                         )}
@@ -226,7 +226,7 @@ export default function PartnerPersonalMonthlyAnalytics({
                       <span
                         className={`text-[10px] mt-2 font-bold transition ${
                           isSelected
-                            ? 'text-emerald-600 dark:text-emerald-400 scale-110'
+                            ? 'text-blue-600 dark:text-blue-400 scale-110'
                             : d.isCurrentMonth
                             ? 'text-blue-600 dark:text-blue-400 font-black'
                             : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200'
@@ -245,11 +245,11 @@ export default function PartnerPersonalMonthlyAnalytics({
           <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-[#1f212c] text-[11px] text-slate-500 dark:text-slate-400 flex-wrap gap-2">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded bg-emerald-600" />
+                <span className="w-2.5 h-2.5 rounded bg-blue-600" />
                 <span>Selected Month</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
                 <span>Current Month</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -261,12 +261,12 @@ export default function PartnerPersonalMonthlyAnalytics({
           </div>
         </div>
 
-        {/* RIGHT SIDE: PARTNER SELECTED MONTH KPI CARD (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col justify-between bg-gradient-to-br from-[#064e3b] via-[#047857] to-[#0f766e] text-white rounded-2xl p-5 md:p-6 shadow-md border border-emerald-600/40 relative overflow-hidden">
+        {/* RIGHT SIDE: PARTNER SELECTED MONTH KPI CARD (5 cols) — ROYAL BLUE VARIANT */}
+        <div className="lg:col-span-5 flex flex-col justify-between bg-gradient-to-br from-[#0c2872] via-[#0f3496] to-[#1442bb] text-white rounded-2xl p-5 md:p-6 shadow-md border border-[#1e4ad4]/40 relative overflow-hidden">
           
           {/* Subtle background glow */}
-          <div className="absolute -top-16 -right-16 w-40 h-40 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-teal-400/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -top-16 -right-16 w-40 h-40 bg-blue-400/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-indigo-400/10 rounded-full blur-2xl pointer-events-none" />
 
           {/* Header & Month Selector */}
           <div className="relative z-10 space-y-3">
@@ -276,7 +276,7 @@ export default function PartnerPersonalMonthlyAnalytics({
                   Personal Month KPI
                 </span>
                 {selectedMonth?.isCurrentMonth && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-300/20 text-emerald-200 text-[10px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-400/20 text-blue-200 text-[10px] font-bold">
                     Active Month
                   </span>
                 )}
@@ -301,11 +301,11 @@ export default function PartnerPersonalMonthlyAnalytics({
               </div>
             </div>
 
-            {/* Dropdown Selector for Month */}
+            {/* Dropdown Selector for Month — WHITE BACKGROUND */}
             <div className="flex items-center justify-between gap-2 bg-white/10 backdrop-blur-xs border border-white/15 rounded-xl p-2">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-emerald-200" />
-                <span className="text-xs font-semibold text-emerald-100">Selected Month:</span>
+                <Calendar className="w-4 h-4 text-blue-200" />
+                <span className="text-xs font-semibold text-blue-100">Selected Month:</span>
               </div>
               <select
                 value={selectedMonthKey}
@@ -324,14 +324,14 @@ export default function PartnerPersonalMonthlyAnalytics({
           {/* MAIN SELECTED MONTH COMMISSION RATE KPI */}
           <div className="relative z-10 my-4 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-200">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-200">
                 {selectedMonth?.shortMonth.toUpperCase()} COMMISSION EARNINGS
               </span>
               {selectedMonth?.growthPct !== null && selectedMonth?.growthPct !== undefined && (
                 <div
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     selectedMonth.growthPct >= 0
-                      ? 'bg-emerald-300/20 text-emerald-200'
+                      ? 'bg-emerald-400/20 text-emerald-300'
                       : 'bg-rose-400/20 text-rose-200'
                   }`}
                 >
@@ -345,12 +345,12 @@ export default function PartnerPersonalMonthlyAnalytics({
               <span className="text-4xl font-black text-white tracking-tight">
                 ${(selectedMonth?.commissionAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
-              <span className="text-sm font-semibold text-emerald-200">
+              <span className="text-sm font-semibold text-blue-200">
                 for {selectedMonth?.shortMonth}
               </span>
             </div>
 
-            <p className="text-[11px] text-emerald-100/80">
+            <p className="text-[11px] text-blue-100/80">
               Your calculated commission earnings for {selectedMonth?.monthName}
             </p>
           </div>
@@ -358,14 +358,14 @@ export default function PartnerPersonalMonthlyAnalytics({
           {/* CURRENT RECURRING RUN RATE */}
           <div className="relative z-10 p-3 rounded-xl bg-white/10 border border-white/15 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[11px] font-bold text-emerald-200 uppercase tracking-wide">
+              <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wide">
                 YOUR MONTHLY RUN RATE
               </span>
               <span className="font-mono font-black text-white text-sm">
-                ${effectiveRunRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-normal text-emerald-200">/ Mo</span>
+                ${effectiveRunRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-normal text-blue-200">/ Mo</span>
               </span>
             </div>
-            <p className="text-[10.5px] text-emerald-100/70 leading-tight">
+            <p className="text-[10.5px] text-blue-100/70 leading-tight">
               Expected recurring commission from your active assigned hotel accounts.
             </p>
           </div>
@@ -374,8 +374,8 @@ export default function PartnerPersonalMonthlyAnalytics({
           <div className="relative z-10 grid grid-cols-2 gap-2 pt-3 border-t border-white/15">
             {/* Portfolio Gross Volume */}
             <div className="p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-1.5 text-emerald-200 text-[10px] font-bold uppercase">
-                <DollarSign className="w-3 h-3 text-emerald-300" />
+              <div className="flex items-center gap-1.5 text-blue-200 text-[10px] font-bold uppercase">
+                <DollarSign className="w-3 h-3 text-blue-300" />
                 <span>Hotel Billing</span>
               </div>
               <p className="text-base font-black text-white mt-1">
@@ -385,25 +385,25 @@ export default function PartnerPersonalMonthlyAnalytics({
 
             {/* Contributing Hotels */}
             <div className="p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-1.5 text-emerald-200 text-[10px] font-bold uppercase">
-                <Hotel className="w-3 h-3 text-emerald-300" />
+              <div className="flex items-center gap-1.5 text-blue-200 text-[10px] font-bold uppercase">
+                <Hotel className="w-3 h-3 text-blue-300" />
                 <span>Hotels Assigned</span>
               </div>
               <p className="text-base font-black text-white mt-1">
-                {selectedMonth?.propertiesCount || 0} <span className="text-xs font-normal text-emerald-200">Hotels</span>
+                {selectedMonth?.propertiesCount || 0} <span className="text-xs font-normal text-blue-200">Hotels</span>
               </p>
             </div>
           </div>
 
           {/* Invoicing Status Banner */}
-          <div className="relative z-10 flex items-center justify-between pt-2 text-[11px] text-emerald-100/90">
+          <div className="relative z-10 flex items-center justify-between pt-2 text-[11px] text-blue-100/90">
             <div className="flex items-center gap-1.5">
               {selectedMonth?.status === 'RECORDED' ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-200" />
               ) : selectedMonth?.status === 'LIVE_CURRENT' ? (
                 <Clock className="w-3.5 h-3.5 text-amber-200" />
               ) : (
-                <Info className="w-3.5 h-3.5 text-emerald-200" />
+                <Info className="w-3.5 h-3.5 text-blue-200" />
               )}
               <span className="font-semibold">
                 {selectedMonth?.status === 'RECORDED'
