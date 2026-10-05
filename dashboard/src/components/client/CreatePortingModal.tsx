@@ -184,11 +184,11 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
+    <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 animate-in zoom-in-95 duration-200 max-h-[88vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-[#222430] shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-100 dark:border-purple-900/40">
               <ArrowLeftRight className="w-4 h-4" />
@@ -212,13 +212,14 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2">
+          <div className="mx-5 mt-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="p-5 overflow-y-auto space-y-3.5 text-xs flex-1 min-h-0">
           {/* Property Name */}
           <div className="space-y-1">
             <label className="font-semibold text-slate-800 dark:text-slate-200 block">
@@ -356,37 +357,38 @@ export const CreatePortingModal: React.FC<CreatePortingModalProps> = ({
               </div>
             )}
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#282a36] hover:bg-slate-100 dark:hover:bg-[#181a24] text-slate-600 dark:text-slate-300 font-semibold cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>{uploadProgress || 'Submitting...'}</span>
-                </>
-              ) : (
-                <>
-                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                  <span>Submit Porting Request</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Action buttons */}
+        <div className="flex items-center justify-end gap-2 p-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#282a36] hover:bg-slate-100 dark:hover:bg-[#181a24] text-slate-600 dark:text-slate-300 font-semibold cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>{uploadProgress || 'Submitting...'}</span>
+              </>
+            ) : (
+              <>
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+                <span>Submit Porting Request</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
-  );
+  </div>
+);
 };

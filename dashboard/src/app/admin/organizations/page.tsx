@@ -1495,9 +1495,9 @@ export default function AdminOrganizationsPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     Assign Property to {selectedOrgForProps?.name}
                   </h3>
@@ -1509,7 +1509,7 @@ export default function AdminOrganizationsPage() {
                   </button>
                 </div>
 
-                <form onSubmit={handleAssignPropertySubmit} className="space-y-4 text-xs">
+                <form onSubmit={handleAssignPropertySubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-semibold text-slate-800 dark:text-slate-200 block">
                       Select Property to Link
@@ -1533,7 +1533,7 @@ export default function AdminOrganizationsPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowAssignPropModal(false)}
@@ -1601,7 +1601,7 @@ export default function AdminOrganizationsPage() {
               </div>
 
               {/* Body */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs min-h-0">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     Contacts &amp; Authorized Personnel
@@ -1685,7 +1685,7 @@ export default function AdminOrganizationsPage() {
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end">
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex justify-end shrink-0">
                 <button
                   onClick={() => setShowContactsDrawer(false)}
                   className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-[#1f212a] transition cursor-pointer"
@@ -1770,9 +1770,9 @@ export default function AdminOrganizationsPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     Add Organization Contact
                   </h3>
@@ -1781,7 +1781,7 @@ export default function AdminOrganizationsPage() {
                   </button>
                 </div>
 
-                <form onSubmit={handleAddContactSubmit} className="space-y-3 text-xs">
+                <form onSubmit={handleAddContactSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3 text-xs">
                   <div className="space-y-1">
                     <label className="font-semibold text-slate-800 dark:text-slate-200 block">
                       Full Name <span className="text-rose-500">*</span>
@@ -1836,7 +1836,7 @@ export default function AdminOrganizationsPage() {
                     </label>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowAddContactModal(false)}

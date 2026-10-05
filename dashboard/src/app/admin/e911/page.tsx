@@ -945,8 +945,8 @@ export default function AdminE911Page() {
       <AnimatePresence>
         {showDetailsModal && selectedRecordForDetails && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <ShieldCheck className="w-4.5 h-4.5" />
@@ -994,7 +994,7 @@ export default function AdminE911Page() {
 
               {/* Tab 1: Details */}
               {modalActiveTab === 'DETAILS' && (
-                <div className="p-5 overflow-y-auto space-y-4 text-xs">
+                <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-black dark:text-white block">Property Name</label>
@@ -1036,7 +1036,7 @@ export default function AdminE911Page() {
 
               {/* Tab 2: Correction Notes */}
               {modalActiveTab === 'NOTES' && (
-                <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+                <div className="p-5 overflow-y-auto space-y-4 flex-1 min-h-0 text-xs">
                   <div>
                     <h4 className="font-bold text-slate-900 dark:text-white mb-2">Audit History &amp; Correction Logs</h4>
                     {selectedRecordForDetails.correction_notes ? (
@@ -1075,7 +1075,7 @@ export default function AdminE911Page() {
                 </div>
               )}
 
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end shrink-0">
                 <button
                   onClick={() => setShowDetailsModal(false)}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer"
@@ -1092,8 +1092,8 @@ export default function AdminE911Page() {
       <AnimatePresence>
         {showCreateModal && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Plus className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Add Emergency Dispatch Location</h3>
@@ -1107,62 +1107,64 @@ export default function AdminE911Page() {
               </div>
 
               {createError && (
-                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
                   {createError}
                 </div>
               )}
 
-              <form onSubmit={handleCreateSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
-                {/* 1. Choose Property */}
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">
-                    Choose Property <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={createForm.property_id}
-                    onChange={(e) => handlePropertySelectInAdd(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">Select Property...</option>
-                    {propertyList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.organization_name})
-                      </option>
-                    ))}
-                  </select>
+              <form onSubmit={handleCreateSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
+                  {/* 1. Choose Property */}
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">
+                      Choose Property <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={createForm.property_id}
+                      onChange={(e) => handlePropertySelectInAdd(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">Select Property...</option>
+                      {propertyList.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.organization_name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 2. Emergency Dispatch Address */}
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">
+                      Emergency Dispatch Address <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={createForm.emergency_address}
+                      onChange={(e) => setCreateForm({ ...createForm, emergency_address: e.target.value })}
+                      placeholder="Enter full MSAG-compliant street address, suite/floor, city, state & zip..."
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* 3. Validation Status */}
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Validation Status</label>
+                    <select
+                      value={createForm.status}
+                      onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as E911Status })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="VERIFIED">Active / PSAP Verified</option>
+                      <option value="PENDING">Pending Validation</option>
+                      <option value="CORRECTION_REQUIRED">Correction Required</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* 2. Emergency Dispatch Address */}
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">
-                    Emergency Dispatch Address <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    value={createForm.emergency_address}
-                    onChange={(e) => setCreateForm({ ...createForm, emergency_address: e.target.value })}
-                    placeholder="Enter full MSAG-compliant street address, suite/floor, city, state & zip..."
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* 3. Validation Status */}
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Validation Status</label>
-                  <select
-                    value={createForm.status}
-                    onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as E911Status })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="VERIFIED">Active / PSAP Verified</option>
-                    <option value="PENDING">Pending Validation</option>
-                    <option value="CORRECTION_REQUIRED">Correction Required</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2.5 p-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
@@ -1188,8 +1190,8 @@ export default function AdminE911Page() {
       <AnimatePresence>
         {showEditModal && selectedRecordForEdit && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Edit2 className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Edit E911 Record</h3>
@@ -1203,47 +1205,49 @@ export default function AdminE911Page() {
               </div>
 
               {editError && (
-                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
                   {editError}
                 </div>
               )}
 
-              <form onSubmit={handleEditSubmit} className="p-5 overflow-y-auto space-y-4 text-xs">
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Property</label>
-                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
-                    {selectedRecordForEdit.property_name} ({selectedRecordForEdit.organization_name})
-                  </p>
+              <form onSubmit={handleEditSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Property</label>
+                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-semibold text-slate-800 dark:text-slate-200">
+                      {selectedRecordForEdit.property_name} ({selectedRecordForEdit.organization_name})
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">
+                      Emergency Dispatch Address <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={editForm.emergency_address}
+                      onChange={(e) => setEditForm({ ...editForm, emergency_address: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Validation Status</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value as E911Status })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="VERIFIED">Active / PSAP Verified</option>
+                      <option value="PENDING">Pending Validation</option>
+                      <option value="CORRECTION_REQUIRED">Correction Required</option>
+                      <option value="FAILED">Routing Failed</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">
-                    Emergency Dispatch Address <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    required
-                    value={editForm.emergency_address}
-                    onChange={(e) => setEditForm({ ...editForm, emergency_address: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Validation Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value as E911Status })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="VERIFIED">Active / PSAP Verified</option>
-                    <option value="PENDING">Pending Validation</option>
-                    <option value="CORRECTION_REQUIRED">Correction Required</option>
-                    <option value="FAILED">Routing Failed</option>
-                  </select>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2.5 p-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}

@@ -1400,7 +1400,7 @@ export default function AdminServicesPage() {
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className="relative w-full max-w-md bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10"
             >
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <PhoneCall className="w-4.5 h-4.5" />
@@ -1418,7 +1418,7 @@ export default function AdminServicesPage() {
                 </button>
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1">
+              <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
                 <div className="space-y-1">
                   <label className="font-bold text-black dark:text-white block text-xs">Service ID</label>
                   <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-mono font-bold text-slate-900 dark:text-white">
@@ -1478,7 +1478,7 @@ export default function AdminServicesPage() {
                 )}
               </div>
 
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end gap-2">
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end gap-2 shrink-0">
                 <button
                   onClick={() => setShowDetailsDrawer(false)}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer"
@@ -1495,8 +1495,8 @@ export default function AdminServicesPage() {
       <AnimatePresence>
         {showAssignModal && selectedServiceForAssign && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                 <div className="flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">Assign Service to Property</h3>
@@ -1509,7 +1509,7 @@ export default function AdminServicesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleConfirmAssignProperty} className="mt-4 space-y-4 text-xs">
+              <form onSubmit={handleConfirmAssignProperty} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">Service Identifier</label>
                   <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
@@ -1538,7 +1538,7 @@ export default function AdminServicesPage() {
                   Rule: One service can only be assigned to one property. Assigning this service will associate it with the selected property and its parent organization.
                 </div>
 
-                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowAssignModal(false)}
@@ -1587,8 +1587,8 @@ export default function AdminServicesPage() {
 
           return (
             <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+              <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     {isFire ? (
                       <Flame className="w-5 h-5 text-orange-500" />
@@ -1614,12 +1614,12 @@ export default function AdminServicesPage() {
                 </div>
 
                 {formError && (
-                  <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                  <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
                     {formError}
                   </div>
                 )}
 
-                <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto space-y-4 text-xs">
+                <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                   {/* Service Type selector when in Fire Lines mode */}
                   {isFire ? (
                     <>
@@ -1995,7 +1995,7 @@ export default function AdminServicesPage() {
                     </>
                   )}
 
-                  <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowCreateModal(false)}
@@ -2030,8 +2030,8 @@ export default function AdminServicesPage() {
       <AnimatePresence>
         {showEditModal && selectedServiceForEdit && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Edit2 className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Edit Service Details</h3>
@@ -2045,12 +2045,12 @@ export default function AdminServicesPage() {
               </div>
 
               {formError && (
-                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
                   {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 text-xs">
+              <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">
                     Service ID <span className="text-rose-500">* (Min 6 chars)</span>
@@ -2129,7 +2129,7 @@ export default function AdminServicesPage() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
@@ -2194,7 +2194,7 @@ export default function AdminServicesPage() {
         {showManageTypesModal && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600">
                     <Layers className="w-4 h-4" />
@@ -2215,7 +2215,7 @@ export default function AdminServicesPage() {
                 </button>
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-5 text-xs">
+              <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-5 text-xs">
                 {/* Form to add or edit a type */}
                 <div className="p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] bg-slate-50 dark:bg-[#111217]">
                   <h4 className="font-bold text-slate-900 dark:text-white text-xs mb-2.5">
@@ -2345,7 +2345,7 @@ export default function AdminServicesPage() {
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowManageTypesModal(false)}

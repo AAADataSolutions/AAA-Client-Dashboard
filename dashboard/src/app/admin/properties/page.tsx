@@ -1586,8 +1586,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showDetailsModal && selectedPropForDetails && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Building2 className="w-4.5 h-4.5" />
@@ -1605,7 +1605,7 @@ export default function AdminPropertiesPage() {
                 </button>
               </div>
 
-              <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 {/* 2-Column Grid with Pure Black Bold Labels */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -1709,7 +1709,7 @@ export default function AdminPropertiesPage() {
                 </div>
               </div>
 
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end shrink-0">
                 <button
                   onClick={() => setShowDetailsModal(false)}
                   className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs cursor-pointer"
@@ -1726,8 +1726,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showServicesModal && selectedPropForServices && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
                     <PhoneCall className="w-4.5 h-4.5" />
@@ -1745,7 +1745,7 @@ export default function AdminPropertiesPage() {
                 </button>
               </div>
 
-              <div className="p-5 overflow-y-auto flex-1">
+              <div className="p-5 overflow-y-auto flex-1 min-h-0">
                 {loadingServices ? (
                   <div className="p-8 text-center text-slate-400 text-xs">
                     <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
@@ -1784,7 +1784,7 @@ export default function AdminPropertiesPage() {
                 )}
               </div>
 
-              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-between">
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <button
                   onClick={() => {
                     setShowServicesModal(false);
@@ -1810,8 +1810,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showAssignServiceModal && selectedPropForAssign && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                 <div className="flex items-center gap-2">
                   <LinkIcon className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">Assign Service</h3>
@@ -1824,7 +1824,7 @@ export default function AdminPropertiesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleConfirmAssignService} className="mt-4 space-y-4 text-xs">
+              <form onSubmit={handleConfirmAssignService} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">Target Property</label>
                   <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
@@ -1853,7 +1853,7 @@ export default function AdminPropertiesPage() {
                   Rule: A service can only be assigned to one property. Assigning this service will associate it with this property.
                 </div>
 
-                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowAssignServiceModal(false)}
@@ -1972,8 +1972,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showAddContactModal && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 shadow-2xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">Add Property Contact</h3>
                 <button
                   onClick={() => setShowAddContactModal(false)}
@@ -1983,7 +1983,7 @@ export default function AdminPropertiesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleAddContactSubmit} className="mt-4 space-y-3.5 text-xs">
+              <form onSubmit={handleAddContactSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs">
                 <div>
                   <label className="font-bold text-black dark:text-white block mb-1">
                     Full Name <span className="text-rose-500">*</span>
@@ -2036,7 +2036,7 @@ export default function AdminPropertiesPage() {
                   </label>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowAddContactModal(false)}
@@ -2168,8 +2168,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showCreateModal && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Plus className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Create New Property</h3>
@@ -2183,12 +2183,12 @@ export default function AdminPropertiesPage() {
               </div>
 
               {formError && (
-                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
                   {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto space-y-4 text-xs">
+              <form onSubmit={handleSaveCreate} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block">
@@ -2199,7 +2199,7 @@ export default function AdminPropertiesPage() {
                       required
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g. Grand Horizon Resort"
+                      placeholder="e.g. Grand Horizon Hotel"
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -2344,7 +2344,7 @@ export default function AdminPropertiesPage() {
                       required
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="123 Ocean Blvd"
+                      placeholder="123 Ocean Drive"
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -2393,7 +2393,7 @@ export default function AdminPropertiesPage() {
                       type="text"
                       value={formData.general_manager_name}
                       onChange={(e) => setFormData({ ...formData, general_manager_name: e.target.value })}
-                      placeholder="e.g. Robert Smith"
+                      placeholder="Robert Vance"
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -2458,7 +2458,7 @@ export default function AdminPropertiesPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
@@ -2484,8 +2484,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showEditModal && selectedPropForEdit && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Settings className="w-4 h-4 text-blue-600" />
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Edit Property Details</h3>
@@ -2499,12 +2499,12 @@ export default function AdminPropertiesPage() {
               </div>
 
               {formError && (
-                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg">
+                <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
                   {formError}
                 </div>
               )}
 
-              <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto space-y-4 text-xs">
+              <form onSubmit={handleSaveEdit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block">
@@ -2779,7 +2779,7 @@ export default function AdminPropertiesPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430]">
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
@@ -2805,8 +2805,8 @@ export default function AdminPropertiesPage() {
       <AnimatePresence>
         {showAssignOrgModal && selectedPropForAssignOrg && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#222430] pb-3">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Building2 className="w-4 h-4" />
@@ -2821,7 +2821,7 @@ export default function AdminPropertiesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleAssignOrgSubmit} className="space-y-4 text-xs">
+              <form onSubmit={handleAssignOrgSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div className="space-y-1.5">
                   <label className="font-semibold text-slate-800 dark:text-slate-200 block">
                     Select Organization <span className="text-rose-500">*</span>
@@ -2845,7 +2845,7 @@ export default function AdminPropertiesPage() {
                   Assigning this property will set its status to <strong>ONBOARDING</strong> and initialize its 7-stage onboarding tracker at <strong>Draft Initialized</strong>.
                 </p>
 
-                <div className="pt-2 flex justify-end gap-2">
+                <div className="pt-2 flex justify-end gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowAssignOrgModal(false)}

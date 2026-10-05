@@ -140,16 +140,16 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
           />
 
           {/* Central Modal Container */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-5 max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 max-h-[88vh] flex flex-col overflow-hidden"
             >
               {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+              <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-[#222430] shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="text-black dark:text-white flex items-center justify-center">
                     <Building2 className="w-5 h-5" />
@@ -175,49 +175,51 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
               </div>
 
               {error && (
-                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2">
+                <div className="mx-5 mt-4 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2 shrink-0">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
 
               {createdInvite ? (
-                <div className="space-y-4 text-xs">
-                  <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 space-y-2 text-center">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                      {createdInvite.orgName} is Ready!
-                    </h4>
-                    <p className="text-slate-600 dark:text-slate-300 text-xs max-w-md mx-auto leading-relaxed">
-                      An invitation email has been dispatched to <strong className="text-slate-900 dark:text-white">{createdInvite.email}</strong>. The client admin can also use the secure link below to activate their account and set their password.
-                    </p>
-                  </div>
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
+                    <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 space-y-2 text-center">
+                      <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                        {createdInvite.orgName} is Ready!
+                      </h4>
+                      <p className="text-slate-600 dark:text-slate-300 text-xs max-w-md mx-auto leading-relaxed">
+                        An invitation email has been dispatched to <strong className="text-slate-900 dark:text-white">{createdInvite.email}</strong>. The client admin can also use the secure link below to activate their account and set their password.
+                      </p>
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                      Secure Invitation URL (Valid for 7 Days)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={createdInvite.inviteUrl}
-                        className="flex-1 px-3 py-2 bg-slate-100 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 text-[11px] select-all"
-                      />
-                      <motion.button
-                        type="button"
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={handleCopyInvite}
-                        className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer shrink-0"
-                      >
-                        {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copied ? 'Copied' : 'Copy URL'}</span>
-                      </motion.button>
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                        Secure Invitation URL (Valid for 7 Days)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={createdInvite.inviteUrl}
+                          className="flex-1 px-3 py-2 bg-slate-100 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 text-[11px] select-all"
+                        />
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={handleCopyInvite}
+                          className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer shrink-0"
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copied ? 'Copied' : 'Copy URL'}</span>
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end p-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <motion.button
                       type="button"
                       whileHover={{ scale: 1.03 }}
@@ -230,161 +232,163 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-                  {/* Management Group Info */}
-                  <div className="space-y-3">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                      Management Group Details
-                    </span>
+                <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
+                    {/* Management Group Info */}
+                    <div className="space-y-3">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                        Management Group Details
+                      </span>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="sm:col-span-2 space-y-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2 space-y-1.5">
+                          <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            Management Group Name <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            placeholder="e.g., Marriott Hospitality Group"
+                            required
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            Type <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            name="type"
+                            value={formData.type}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs cursor-pointer"
+                          >
+                            <option value="GROUP">Group</option>
+                            <option value="INDIVIDUAL">Individual</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            Street Address
+                          </label>
+                          <textarea
+                            rows={2}
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            placeholder="123 Main Street"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs resize-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            City, State, ZIP
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <input
+                              type="text"
+                              name="city"
+                              value={formData.city}
+                              onChange={handleChange}
+                              placeholder="City"
+                              className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                            />
+                            <input
+                              type="text"
+                              name="state"
+                              value={formData.state}
+                              onChange={handleChange}
+                              placeholder="State (IL)"
+                              className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                            />
+                            <input
+                              type="text"
+                              name="zip_code"
+                              value={formData.zip_code}
+                              onChange={handleChange}
+                              placeholder="ZIP"
+                              className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
                         <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          Management Group Name <span className="text-rose-500">*</span>
+                          Organization Main Phone
                         </label>
                         <input
                           type="text"
-                          name="name"
-                          value={formData.name}
+                          name="phone"
+                          value={formData.phone}
                           onChange={handleChange}
-                          placeholder="e.g., Marriott Hospitality Group"
-                          required
+                          placeholder="+1 (800) 555-0199"
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
                         />
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          Type <span className="text-rose-500">*</span>
-                        </label>
-                        <select
-                          name="type"
-                          value={formData.type}
-                          onChange={handleChange}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs cursor-pointer"
-                        >
-                          <option value="GROUP">Group</option>
-                          <option value="INDIVIDUAL">Individual</option>
-                        </select>
-                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          Street Address
-                        </label>
-                        <textarea
-                          rows={2}
-                          name="address"
-                          value={formData.address}
-                          onChange={handleChange}
-                          placeholder="123 Main Street"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs resize-none"
-                        />
-                      </div>
+                    {/* Primary Admin Contact Section */}
+                    <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                        Primary Administrator &amp; Invitation
+                      </span>
 
-                      <div className="space-y-1.5">
-                        <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          City, State, ZIP
-                        </label>
-                        <div className="grid grid-cols-3 gap-1.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            Admin Contact Name
+                          </label>
                           <input
                             type="text"
-                            name="city"
-                            value={formData.city}
+                            name="contact_name"
+                            value={formData.contact_name}
                             onChange={handleChange}
-                            placeholder="City"
-                            className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                            placeholder="e.g., Jane Doe"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
                           />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            Admin Email Address
+                          </label>
                           <input
-                            type="text"
-                            name="state"
-                            value={formData.state}
+                            type="email"
+                            name="contact_email"
+                            value={formData.contact_email}
                             onChange={handleChange}
-                            placeholder="State (IL)"
-                            className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
-                          />
-                          <input
-                            type="text"
-                            name="zip_code"
-                            value={formData.zip_code}
-                            onChange={handleChange}
-                            placeholder="ZIP"
-                            className="px-2.5 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
+                            placeholder="admin@hotelchain.com"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
                           />
                         </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                        Organization Main Phone
-                      </label>
-                      <input
-                        type="text"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        placeholder="+1 (800) 555-0199"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Primary Admin Contact Section */}
-                  <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-[#222430]">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                      Primary Administrator &amp; Invitation
-                    </span>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          Admin Contact Name
+                          Admin Direct Phone
                         </label>
                         <input
                           type="text"
-                          name="contact_name"
-                          value={formData.contact_name}
+                          name="contact_phone"
+                          value={formData.contact_phone}
                           onChange={handleChange}
-                          placeholder="e.g., Jane Doe"
+                          placeholder="+1 (312) 555-0123"
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
                         />
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                          Admin Email Address
-                        </label>
-                        <input
-                          type="email"
-                          name="contact_email"
-                          value={formData.contact_email}
-                          onChange={handleChange}
-                          placeholder="admin@hotelchain.com"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                        Admin Direct Phone
-                      </label>
-                      <input
-                        type="text"
-                        name="contact_phone"
-                        value={formData.contact_phone}
-                        onChange={handleChange}
-                        placeholder="+1 (312) 555-0123"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 text-xs"
-                      />
                     </div>
                   </div>
 
                   {/* Modal Actions */}
-                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2.5 p-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={onClose}

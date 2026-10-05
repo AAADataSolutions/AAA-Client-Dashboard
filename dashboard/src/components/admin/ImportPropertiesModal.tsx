@@ -342,10 +342,10 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-4xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-5 max-h-[90vh] flex flex-col overflow-hidden text-slate-900 dark:text-white"
+            className="relative w-full max-w-4xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 max-h-[88vh] flex flex-col overflow-hidden text-slate-900 dark:text-white"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-[#222430] shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200/50 dark:border-blue-900/40">
                   <TableIcon className="w-5 h-5" />
@@ -369,7 +369,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
               {importResult ? (
                 /* Success Result View */
                 <div className="space-y-4 text-center py-6">
@@ -623,7 +623,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
 
             {/* Footer Actions */}
             {!importResult && (
-              <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
+              <div className="flex items-center justify-between p-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
                 <div className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                   <HelpCircle className="w-3.5 h-3.5" />
                   <span>Missing management groups will be automatically created.</span>

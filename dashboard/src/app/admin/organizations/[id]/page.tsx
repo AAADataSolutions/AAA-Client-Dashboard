@@ -2208,16 +2208,16 @@ export default function OrganizationDetailPage({
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Edit Organization Profile</h3>
-                  <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setShowEditOrgModal(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveOrgEdit} className="space-y-3.5 text-xs">
+                <form onSubmit={handleSaveOrgEdit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
                       Organization Name <span className="text-rose-500">*</span>
@@ -2309,7 +2309,7 @@ export default function OrganizationDetailPage({
                     </select>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">
+                  <div className="pt-4 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowEditOrgModal(false)}
@@ -2459,16 +2459,16 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Property to {org.name}</h3>
-                  <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setShowAssignPropModal(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleAssignPropertySubmit} className="space-y-4 text-xs">
+                <form onSubmit={handleAssignPropertySubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
                       Select Available Property
@@ -2486,7 +2486,7 @@ export default function OrganizationDetailPage({
                     </select>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowAssignPropModal(false)}
@@ -2527,16 +2527,16 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Add Contact to {org.name}</h3>
-                  <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setShowAddContactModal(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleAddContactSubmit} className="space-y-3.5 text-xs">
+                <form onSubmit={handleAddContactSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
                       Full Name <span className="text-rose-500">*</span>
@@ -2589,7 +2589,7 @@ export default function OrganizationDetailPage({
                     </label>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setShowAddContactModal(false)}
@@ -2631,16 +2631,16 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Property Details</h3>
-                  <button onClick={() => setViewingPropDetails(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setViewingPropDetails(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="space-y-2.5 text-xs">
+                <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-2.5 text-xs">
                   <div className="flex justify-between py-1 border-b border-slate-50 dark:border-[#1f212a]">
                     <span className="font-bold text-slate-900 dark:text-white">Property Name:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">{viewingPropDetails.name}</span>
@@ -2671,7 +2671,7 @@ export default function OrganizationDetailPage({
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="p-4 flex justify-end border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     onClick={() => setViewingPropDetails(null)}
                     className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs cursor-pointer"
@@ -2701,9 +2701,9 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                       Services Assigned to {viewingPropServices.propName}
@@ -2712,39 +2712,41 @@ export default function OrganizationDetailPage({
                       Provisioned voice lines and telecom trunks.
                     </p>
                   </div>
-                  <button onClick={() => setViewingPropServices(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setViewingPropServices(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {loadingPropServices ? (
-                  <div className="py-8 flex justify-center items-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                  </div>
-                ) : viewingPropServices.services.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs">
-                    No active voice services found attached to this property.
-                  </div>
-                ) : (
-                  <div className="max-h-60 overflow-y-auto space-y-2">
-                    {viewingPropServices.services.map((s: any) => (
-                      <div
-                        key={s.id}
-                        className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <span className="font-bold text-slate-900 dark:text-white block">{s.phone_number}</span>
-                          <span className="text-slate-500 dark:text-slate-400 text-[11px]">{s.service_type}</span>
+                <div className="p-5 overflow-y-auto flex-1 min-h-0">
+                  {loadingPropServices ? (
+                    <div className="py-8 flex justify-center items-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    </div>
+                  ) : viewingPropServices.services.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      No active voice services found attached to this property.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {viewingPropServices.services.map((s: any) => (
+                        <div
+                          key={s.id}
+                          className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between text-xs"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-white block">{s.phone_number}</span>
+                            <span className="text-slate-500 dark:text-slate-400 text-[11px]">{s.service_type}</span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            {s.status}
+                          </span>
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          {s.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="p-4 flex justify-end border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     onClick={() => setViewingPropServices(null)}
                     className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs cursor-pointer"
@@ -3083,20 +3085,20 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Assign Service to Property</h3>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">Organization: {org.name}</p>
                   </div>
-                  <button onClick={() => setShowAssignServiceModal(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setShowAssignServiceModal(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-slate-200 dark:border-[#222430] gap-4 text-xs font-semibold">
+                <div className="flex border-b border-slate-200 dark:border-[#222430] gap-4 text-xs font-semibold px-5 pt-3 shrink-0">
                   <button
                     onClick={() => setAssignServiceTab('EXISTING')}
                     className={`pb-2 transition cursor-pointer border-b-2 ${
@@ -3107,68 +3109,60 @@ export default function OrganizationDetailPage({
                   >
                     Assign Existing Service
                   </button>
-                  {/* <button
-                    onClick={() => setAssignServiceTab('NEW')}
-                    className={`pb-2 transition cursor-pointer border-b-2 ${
-                      assignServiceTab === 'NEW'
-                        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-                    }`}
-                  >
-                    Create New Service
-                  </button> */}
                 </div>
 
                 {/* Tab 1: Existing Service */}
                 {assignServiceTab === 'EXISTING' ? (
-                  <form onSubmit={handleAssignExistingServiceSubmit} className="space-y-4 text-xs">
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                        Select Unassigned Service <span className="text-rose-500">*</span>
-                      </label>
-                      {loadingUnassignedServices ? (
-                        <div className="py-2 text-slate-400 flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" /> Loading unassigned catalog...
-                        </div>
-                      ) : availableUnassignedServices.length === 0 ? (
-                        <p className="text-amber-600 dark:text-amber-400 text-xs py-2">
-                          No unassigned services available. Go to Services & Lines section to create new service.
-                        </p>
-                      ) : (
+                  <form onSubmit={handleAssignExistingServiceSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-slate-900 dark:text-slate-100 block">
+                          Select Unassigned Service <span className="text-rose-500">*</span>
+                        </label>
+                        {loadingUnassignedServices ? (
+                          <div className="py-2 text-slate-400 flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Loading unassigned catalog...
+                          </div>
+                        ) : availableUnassignedServices.length === 0 ? (
+                          <p className="text-amber-600 dark:text-amber-400 text-xs py-2">
+                            No unassigned services available. Go to Services & Lines section to create new service.
+                          </p>
+                        ) : (
+                          <select
+                            required
+                            value={selectedServiceToAssign}
+                            onChange={(e) => setSelectedServiceToAssign(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                          >
+                            {availableUnassignedServices.map((srv) => (
+                              <option key={srv.id} value={srv.id}>
+                                {srv.phone_number} — {srv.service_type || 'Voice DID'} ({srv.service_name || 'Line'})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-slate-900 dark:text-slate-100 block">
+                          Assign to Property in {org.name} <span className="text-rose-500">*</span>
+                        </label>
                         <select
                           required
-                          value={selectedServiceToAssign}
-                          onChange={(e) => setSelectedServiceToAssign(e.target.value)}
+                          value={targetPropertyForService}
+                          onChange={(e) => setTargetPropertyForService(e.target.value)}
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
                         >
-                          {availableUnassignedServices.map((srv) => (
-                            <option key={srv.id} value={srv.id}>
-                              {srv.phone_number} — {srv.service_type || 'Voice DID'} ({srv.service_name || 'Line'})
+                          {(org.properties || []).map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.city || 'US'}, {p.state || 'Location'})
                             </option>
                           ))}
                         </select>
-                      )}
+                      </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                        Assign to Property in {org.name} <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={targetPropertyForService}
-                        onChange={(e) => setTargetPropertyForService(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
-                      >
-                        {(org.properties || []).map((p: any) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.city || 'US'}, {p.state || 'Location'})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0 mt-4">
                       <button
                         type="button"
                         onClick={() => setShowAssignServiceModal(false)}
@@ -3190,81 +3184,83 @@ export default function OrganizationDetailPage({
                   </form>
                 ) : (
                   /* Tab 2: Create New Service */
-                  <form onSubmit={handleCreateNewServiceSubmit} className="space-y-3.5 text-xs">
-                    <div className="grid grid-cols-2 gap-3">
+                  <form onSubmit={handleCreateNewServiceSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs flex flex-col justify-between">
+                    <div className="space-y-3.5">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-900 dark:text-slate-100 block">
+                            Service Type <span className="text-rose-500">*</span>
+                          </label>
+                          <select
+                            value={newServiceForm.service_type}
+                            onChange={(e) => setNewServiceForm({ ...newServiceForm, service_type: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                          >
+                            {serviceTypesList.map((st: any) => (
+                              <option key={st.id || st.name} value={st.name}>
+                                {st.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-900 dark:text-slate-100 block">
+                            Phone Number <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={newServiceForm.phone_number}
+                            onChange={(e) => setNewServiceForm({ ...newServiceForm, phone_number: e.target.value })}
+                            placeholder="+1 (555) 000-0000"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-900 dark:text-slate-100 block">Service Name / Label</label>
+                        <input
+                          type="text"
+                          value={newServiceForm.service_name}
+                          onChange={(e) => setNewServiceForm({ ...newServiceForm, service_name: e.target.value })}
+                          placeholder="e.g. Front Desk Direct Line"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-900 dark:text-slate-100 block">Description</label>
+                        <textarea
+                          rows={2}
+                          value={newServiceForm.description}
+                          onChange={(e) => setNewServiceForm({ ...newServiceForm, description: e.target.value })}
+                          placeholder="Circuit routing notes, equipment location, etc."
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none"
+                        />
+                      </div>
+
                       <div className="space-y-1">
                         <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                          Service Type <span className="text-rose-500">*</span>
+                          Assign to Property in {org.name} <span className="text-rose-500">*</span>
                         </label>
                         <select
-                          value={newServiceForm.service_type}
-                          onChange={(e) => setNewServiceForm({ ...newServiceForm, service_type: e.target.value })}
+                          required
+                          value={targetPropertyForService}
+                          onChange={(e) => setTargetPropertyForService(e.target.value)}
                           className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
                         >
-                          {serviceTypesList.map((st: any) => (
-                            <option key={st.id || st.name} value={st.name}>
-                              {st.name}
+                          {(org.properties || []).map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.city || 'US'}, {p.state || 'Location'})
                             </option>
                           ))}
                         </select>
                       </div>
-
-                      <div className="space-y-1">
-                        <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                          Phone Number <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={newServiceForm.phone_number}
-                          onChange={(e) => setNewServiceForm({ ...newServiceForm, phone_number: e.target.value })}
-                          placeholder="+1 (555) 000-0000"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                        />
-                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">Service Name / Label</label>
-                      <input
-                        type="text"
-                        value={newServiceForm.service_name}
-                        onChange={(e) => setNewServiceForm({ ...newServiceForm, service_name: e.target.value })}
-                        placeholder="e.g. Front Desk Direct Line"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">Description</label>
-                      <textarea
-                        rows={2}
-                        value={newServiceForm.description}
-                        onChange={(e) => setNewServiceForm({ ...newServiceForm, description: e.target.value })}
-                        placeholder="Circuit routing notes, equipment location, etc."
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                        Assign to Property in {org.name} <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={targetPropertyForService}
-                        onChange={(e) => setTargetPropertyForService(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
-                      >
-                        {(org.properties || []).map((p: any) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.city || 'US'}, {p.state || 'Location'})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0 mt-4">
                       <button
                         type="button"
                         onClick={() => setShowAssignServiceModal(false)}
@@ -3307,9 +3303,9 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                       Contacts for {propContactsTarget.name}
@@ -3318,112 +3314,114 @@ export default function OrganizationDetailPage({
                       On-site general managers and facility engineers.
                     </p>
                   </div>
-                  <button onClick={() => setPropContactsTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setPropContactsTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                {loadingPropContacts ? (
-                  <div className="py-8 flex justify-center items-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-500">Contact List ({propContactsList.length})</span>
-                      {!showAddPropContactForm && (
-                        <button
-                          onClick={() => setShowAddPropContactForm(true)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5" /> Add New
-                        </button>
-                      )}
+                <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3">
+                  {loadingPropContacts ? (
+                    <div className="py-8 flex justify-center items-center">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     </div>
-
-                    {showAddPropContactForm && (
-                      <form onSubmit={handleAddPropContact} className="p-3 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2.5 text-xs">
-                        <div className="font-bold text-slate-900 dark:text-white text-[11px]">New Property Contact</div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            required
-                            placeholder="Full Name *"
-                            value={newPropContact.name}
-                            onChange={(e) => setNewPropContact({ ...newPropContact, name: e.target.value })}
-                            className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
-                          />
-                          <input
-                            type="email"
-                            placeholder="Email"
-                            value={newPropContact.email}
-                            onChange={(e) => setNewPropContact({ ...newPropContact, email: e.target.value })}
-                            className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            placeholder="Phone Number"
-                            value={newPropContact.phone}
-                            onChange={(e) => setNewPropContact({ ...newPropContact, phone: e.target.value })}
-                            className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Role (e.g. GM, Engineer)"
-                            value={newPropContact.role}
-                            onChange={(e) => setNewPropContact({ ...newPropContact, role: e.target.value })}
-                            className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2 pt-1">
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-500">Contact List ({propContactsList.length})</span>
+                        {!showAddPropContactForm && (
                           <button
-                            type="button"
-                            onClick={() => setShowAddPropContactForm(false)}
-                            className="px-3 py-1 rounded-lg border border-slate-200 dark:border-[#222430] font-semibold cursor-pointer"
+                            onClick={() => setShowAddPropContactForm(true)}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                           >
-                            Cancel
+                            <Plus className="w-3.5 h-3.5" /> Add New
                           </button>
-                          <button
-                            type="submit"
-                            disabled={savingPropContact}
-                            className="px-3 py-1 rounded-lg bg-blue-600 text-white font-semibold cursor-pointer disabled:opacity-50"
-                          >
-                            {savingPropContact ? 'Saving...' : 'Save'}
-                          </button>
-                        </div>
-                      </form>
-                    )}
+                        )}
+                      </div>
 
-                    <div className="max-h-52 overflow-y-auto space-y-2">
-                      {propContactsList.length === 0 ? (
-                        <p className="text-center py-6 text-slate-400 text-xs">No property contacts listed yet.</p>
-                      ) : (
-                        propContactsList.map((c: any) => (
-                          <div
-                            key={c.id}
-                            className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between text-xs"
-                          >
-                            <div>
-                              <span className="font-bold text-slate-900 dark:text-white block">{c.name} ({c.role || 'Contact'})</span>
-                              <span className="text-slate-500 dark:text-slate-400 text-[11px]">{c.email || 'No email'} | {c.phone || 'No phone'}</span>
-                            </div>
+                      {showAddPropContactForm && (
+                        <form onSubmit={handleAddPropContact} className="p-3 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2.5 text-xs">
+                          <div className="font-bold text-slate-900 dark:text-white text-[11px]">New Property Contact</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Full Name *"
+                              value={newPropContact.name}
+                              onChange={(e) => setNewPropContact({ ...newPropContact, name: e.target.value })}
+                              className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
+                            />
+                            <input
+                              type="email"
+                              placeholder="Email"
+                              value={newPropContact.email}
+                              onChange={(e) => setNewPropContact({ ...newPropContact, email: e.target.value })}
+                              className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              placeholder="Phone Number"
+                              value={newPropContact.phone}
+                              onChange={(e) => setNewPropContact({ ...newPropContact, phone: e.target.value })}
+                              className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Role (e.g. GM, Engineer)"
+                              value={newPropContact.role}
+                              onChange={(e) => setNewPropContact({ ...newPropContact, role: e.target.value })}
+                              className="px-2.5 py-1.5 bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#282a36] rounded-lg"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1">
                             <button
-                              onClick={() => handleDeletePropContact(c.id)}
-                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer transition"
-                              title="Delete Contact"
+                              type="button"
+                              onClick={() => setShowAddPropContactForm(false)}
+                              className="px-3 py-1 rounded-lg border border-slate-200 dark:border-[#222430] font-semibold cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={savingPropContact}
+                              className="px-3 py-1 rounded-lg bg-blue-600 text-white font-semibold cursor-pointer disabled:opacity-50"
+                            >
+                              {savingPropContact ? 'Saving...' : 'Save'}
                             </button>
                           </div>
-                        ))
+                        </form>
                       )}
-                    </div>
-                  </div>
-                )}
 
-                <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
+                      <div className="space-y-2">
+                        {propContactsList.length === 0 ? (
+                          <p className="text-center py-6 text-slate-400 text-xs">No property contacts listed yet.</p>
+                        ) : (
+                          propContactsList.map((c: any) => (
+                            <div
+                              key={c.id}
+                              className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200/80 dark:border-[#222430] flex items-center justify-between text-xs"
+                            >
+                              <div>
+                                <span className="font-bold text-slate-900 dark:text-white block">{c.name} ({c.role || 'Contact'})</span>
+                                <span className="text-slate-500 dark:text-slate-400 text-[11px]">{c.email || 'No email'} | {c.phone || 'No phone'}</span>
+                              </div>
+                              <button
+                                onClick={() => handleDeletePropContact(c.id)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer transition"
+                                title="Delete Contact"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 flex justify-end border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     onClick={() => setPropContactsTarget(null)}
                     className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs cursor-pointer"
@@ -3453,9 +3451,9 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4 max-h-[92vh] overflow-y-auto"
+                className="relative w-full max-w-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#1a1c24] flex items-center justify-center text-slate-600 dark:text-slate-300">
                       <Settings className="w-4 h-4" />
@@ -3469,12 +3467,12 @@ export default function OrganizationDetailPage({
                       </p>
                     </div>
                   </div>
-                  <button onClick={() => setEditingPropSettingsTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setEditingPropSettingsTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleSavePropertySettings} className="space-y-3.5 text-xs">
+                <form onSubmit={handleSavePropertySettings} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block">Property Name *</label>
                     <input
@@ -3609,7 +3607,7 @@ export default function OrganizationDetailPage({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setEditingPropSettingsTarget(null)}
@@ -3703,9 +3701,9 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
                       <Edit2 className="w-4 h-4" />
@@ -3715,12 +3713,12 @@ export default function OrganizationDetailPage({
                       <p className="text-[11px] text-slate-400">{editingServiceTarget.phone_number}</p>
                     </div>
                   </div>
-                  <button onClick={() => setEditingServiceTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setEditingServiceTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveEditService} className="space-y-3.5 text-xs">
+                <form onSubmit={handleSaveEditService} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs">
                   <div className="space-y-1">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block">Phone Number *</label>
                     <input
@@ -3773,7 +3771,7 @@ export default function OrganizationDetailPage({
                     />
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setEditingServiceTarget(null)}
@@ -3815,9 +3813,9 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400">
                       <Eye className="w-4 h-4" />
@@ -3827,12 +3825,12 @@ export default function OrganizationDetailPage({
                       <p className="text-[11px] text-slate-400">{viewingServiceDetails.phone_number}</p>
                     </div>
                   </div>
-                  <button onClick={() => setViewingServiceDetails(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setViewingServiceDetails(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="space-y-2.5 text-xs">
+                <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-2.5 text-xs">
                   <div className="flex justify-between py-1.5 border-b border-slate-50 dark:border-[#1f212a]">
                     <span className="text-slate-500 font-medium">Phone Number:</span>
                     <span className="font-bold text-slate-900 dark:text-white font-mono">{viewingServiceDetails.phone_number}</span>
@@ -3869,7 +3867,7 @@ export default function OrganizationDetailPage({
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="p-4 flex justify-end border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     onClick={() => setViewingServiceDetails(null)}
                     className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs cursor-pointer"
@@ -3899,9 +3897,9 @@ export default function OrganizationDetailPage({
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl p-6 z-10 space-y-4"
+                className="relative w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl max-h-[88vh] flex flex-col overflow-hidden z-10"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430] shrink-0">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                       <Link2 className="w-4 h-4" />
@@ -3911,12 +3909,12 @@ export default function OrganizationDetailPage({
                       <p className="text-[11px] text-slate-400">{assignServiceToPropTarget.phone_number}</p>
                     </div>
                   </div>
-                  <button onClick={() => setAssignServiceToPropTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <button onClick={() => setAssignServiceToPropTarget(null)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <form onSubmit={handleSaveAssignServiceToProp} className="space-y-4 text-xs">
+                <form onSubmit={handleSaveAssignServiceToProp} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                   <div className="space-y-1.5">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block">
                       Target Property in {org.name} <span className="text-rose-500">*</span>
@@ -3936,7 +3934,7 @@ export default function OrganizationDetailPage({
                     </select>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
                     <button
                       type="button"
                       onClick={() => setAssignServiceToPropTarget(null)}
@@ -4018,9 +4016,9 @@ export default function OrganizationDetailPage({
       <AnimatePresence>
         {unifiedOnboardingRecord && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
               {/* Modal Header */}
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <ArrowLeftRight className="w-5 h-5" />
@@ -4069,7 +4067,7 @@ export default function OrganizationDetailPage({
 
               {/* Tab 1: Details */}
               {unifiedOnboardingTab === 'DETAILS' && (
-                <div className="p-6 overflow-y-auto space-y-4 text-xs">
+                <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="font-bold text-black dark:text-white block text-xs">Property Name</label>
@@ -4134,7 +4132,7 @@ export default function OrganizationDetailPage({
 
               {/* Tab 2: Stage Tracking (Curved Road with Animated Fill) */}
               {unifiedOnboardingTab === 'STAGE' && (
-                <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+                <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 text-xs">
                   {/* Stage Road Timeline */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -4294,8 +4292,8 @@ export default function OrganizationDetailPage({
       <AnimatePresence>
         {showInitOnbModal && (
           <div className="fixed inset-0 min-h-screen w-screen h-screen z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">Initialize Property Onboarding</h3>
                   <p className="text-xs text-slate-400">Scoped to organization: {org?.name}</p>
@@ -4308,115 +4306,117 @@ export default function OrganizationDetailPage({
                 </button>
               </div>
 
-              <form onSubmit={handleCreateOnbSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-                {initOnbError && (
-                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 text-xs">
-                    {initOnbError}
-                  </div>
-                )}
+              <form onSubmit={handleCreateOnbSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
+                  {initOnbError && (
+                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 text-xs">
+                      {initOnbError}
+                    </div>
+                  )}
 
-                <div className="space-y-1">
-                  <label className="font-bold text-black dark:text-white block">Property Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Hilton Garden Inn Downtown"
-                    value={initOnbForm.property_name}
-                    onChange={(e) => setInitOnbForm({ ...initOnbForm, property_name: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold text-black dark:text-white block">Street Address</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 100 Main St"
-                    value={initOnbForm.address}
-                    onChange={(e) => setInitOnbForm({ ...initOnbForm, address: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5">
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">City</label>
+                    <label className="font-bold text-black dark:text-white block">Property Name *</label>
                     <input
                       type="text"
-                      placeholder="City"
-                      value={initOnbForm.city}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, city: e.target.value })}
+                      required
+                      placeholder="e.g. Hilton Garden Inn Downtown"
+                      value={initOnbForm.property_name}
+                      onChange={(e) => setInitOnbForm({ ...initOnbForm, property_name: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
+
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">State</label>
+                    <label className="font-bold text-black dark:text-white block">Street Address</label>
                     <input
                       type="text"
-                      placeholder="State"
-                      value={initOnbForm.state}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, state: e.target.value })}
+                      placeholder="e.g. 100 Main St"
+                      value={initOnbForm.address}
+                      onChange={(e) => setInitOnbForm({ ...initOnbForm, address: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Zip Code</label>
-                    <input
-                      type="text"
-                      placeholder="Zip"
-                      value={initOnbForm.zip_code}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, zip_code: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">City</label>
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={initOnbForm.city}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, city: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">State</label>
+                      <input
+                        type="text"
+                        placeholder="State"
+                        value={initOnbForm.state}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, state: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Zip Code</label>
+                      <input
+                        type="text"
+                        placeholder="Zip"
+                        value={initOnbForm.zip_code}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, zip_code: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">GM Name</label>
+                      <input
+                        type="text"
+                        placeholder="General Manager"
+                        value={initOnbForm.general_manager_name}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, general_manager_name: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">GM Phone</label>
+                      <input
+                        type="text"
+                        placeholder="+1 (555) 000-0000"
+                        value={initOnbForm.general_manager_phone}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, general_manager_phone: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">GM Email</label>
+                      <input
+                        type="email"
+                        placeholder="gm@property.com"
+                        value={initOnbForm.general_manager_email}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, general_manager_email: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-black dark:text-white block">Target Cutover Date</label>
+                      <input
+                        type="date"
+                        value={initOnbForm.target_date}
+                        onChange={(e) => setInitOnbForm({ ...initOnbForm, target_date: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">GM Name</label>
-                    <input
-                      type="text"
-                      placeholder="General Manager"
-                      value={initOnbForm.general_manager_name}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, general_manager_name: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">GM Phone</label>
-                    <input
-                      type="text"
-                      placeholder="+1 (555) 000-0000"
-                      value={initOnbForm.general_manager_phone}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, general_manager_phone: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">GM Email</label>
-                    <input
-                      type="email"
-                      placeholder="gm@property.com"
-                      value={initOnbForm.general_manager_email}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, general_manager_email: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Target Cutover Date</label>
-                    <input
-                      type="date"
-                      value={initOnbForm.target_date}
-                      onChange={(e) => setInitOnbForm({ ...initOnbForm, target_date: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
+                <div className="p-4 flex justify-end gap-2.5 border-t border-slate-100 dark:border-[#222430] shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowInitOnbModal(false)}

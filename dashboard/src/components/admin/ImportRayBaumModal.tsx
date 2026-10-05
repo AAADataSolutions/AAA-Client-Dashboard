@@ -252,15 +252,15 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 font-sans">
+      <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 font-sans">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
         >
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between bg-slate-50/50 dark:bg-[#111217]/50">
+          <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between bg-slate-50/50 dark:bg-[#111217]/50 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900/40">
                 <ShieldCheck className="w-5 h-5 text-blue-500" />
@@ -283,7 +283,7 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
           </div>
 
           {/* Body Content */}
-          <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+          <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 text-xs">
             {importResult ? (
               /* Success State */
               <div className="text-center py-6 space-y-4">
@@ -472,7 +472,7 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
 
           {/* Footer */}
           {!importResult && (
-            <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-between">
+            <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/50 flex items-center justify-between shrink-0">
               <button
                 type="button"
                 onClick={onClose}
