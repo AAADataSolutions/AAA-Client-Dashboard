@@ -134,3 +134,60 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = createAdminClient() || (await createClient());
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get('id');
+
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = body?.id;
+      } catch {}
+    }
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Invoice ID is required for deletion.' }, { status: 400 });
+    }
+
+    // Fetch existing invoice to get details for audit logging and verification
+    const { data: existingInv, error: findErr } = await supabase
+      .from('partner_invoices')
+      .select('id, invoice_number, partner_id, commission_amount, gross_revenue, period_start, period_end')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findErr) {
+      console.error('[Admin Invoice DELETE] Error fetching invoice:', findErr);
+    }
+
+    const { error: deleteErr } = await supabase
+      .from('partner_invoices')
+      .delete()
+      .eq('id', id);
+
+    if (deleteErr) {
+      return NextResponse.json({ success: false, error: deleteErr.message }, { status: 400 });
+    }
+
+    if (existingInv) {
+      await logAuditEvent({
+        action: 'PARTNER_INVOICE_DELETED',
+        entity_type: 'PARTNER_INVOICE',
+        entity_id: id,
+        entity_name: existingInv.invoice_number || id,
+        changes: { deleted_invoice: existingInv },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Invoice ${existingInv?.invoice_number || ''} deleted successfully.`,
+    });
+  } catch (err: any) {
+    console.error('[Admin Invoice DELETE] Unexpected error:', err);
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}

@@ -139,9 +139,9 @@ export default function AdminPartnersPage() {
   const [partnerInvoicesList, setPartnerInvoicesList] = useState<PartnerInvoiceItem[]>([]);
   const [loadingModalData, setLoadingModalData] = useState(false);
 
-  // Invoice statement preview modal
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<PartnerInvoiceItem | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
   const [updatingPartnerStatusId, setUpdatingPartnerStatusId] = useState<string | null>(null);
   const [generatingMonthlyInvoices, setGeneratingMonthlyInvoices] = useState(false);
 
@@ -500,6 +500,32 @@ export default function AdminPartnersPage() {
       showToast('Error', err.message || 'Update failed', 'error');
     } finally {
       setUpdatingInvoiceId(null);
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string, invoiceNumber?: string) => {
+    if (!confirm(`Are you sure you want to permanently delete invoice ${invoiceNumber || ''}? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      setDeletingInvoiceId(invoiceId);
+      const res = await fetch(`/api/admin/partners/invoices?id=${invoiceId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to delete invoice.');
+
+      showToast('Invoice Deleted', `Invoice ${invoiceNumber || ''} has been deleted successfully.`);
+      if (selectedInvoiceForView?.id === invoiceId) {
+        setSelectedInvoiceForView(null);
+      }
+      setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceId));
+      setPartnerInvoicesList((prev) => prev.filter((inv) => inv.id !== invoiceId));
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to delete invoice', 'error');
+    } finally {
+      setDeletingInvoiceId(null);
     }
   };
 
@@ -1128,12 +1154,28 @@ export default function AdminPartnersPage() {
 
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => setSelectedInvoiceForView(inv)}
-                              className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> View &amp; Download PDF
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => setSelectedInvoiceForView(inv)}
+                                className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> View &amp; Download PDF
+                              </button>
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleDeleteInvoice(inv.id, inv.invoice_number)}
+                                  disabled={deletingInvoiceId === inv.id}
+                                  className="p-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60 rounded-lg transition cursor-pointer disabled:opacity-50"
+                                  title="Delete Invoice"
+                                >
+                                  {deletingInvoiceId === inv.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1495,17 +1537,33 @@ export default function AdminPartnersPage() {
                             </select>
                           </td>
                           <td className="py-3 px-3 text-right">
-                            <button
-                              onClick={() => {
-                                setSelectedInvoiceForView({
-                                  ...inv,
-                                  partner: selectedPartner,
-                                });
-                              }}
-                              className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition border border-blue-200/50"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> PDF
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setSelectedInvoiceForView({
+                                    ...inv,
+                                    partner: selectedPartner,
+                                  });
+                                }}
+                                className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition border border-blue-200/50"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> PDF
+                              </button>
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() => handleDeleteInvoice(inv.id, inv.invoice_number)}
+                                  disabled={deletingInvoiceId === inv.id}
+                                  className="p-1 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60 rounded-lg transition cursor-pointer disabled:opacity-50"
+                                  title="Delete Invoice"
+                                >
+                                  {deletingInvoiceId === inv.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1882,6 +1940,21 @@ export default function AdminPartnersPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => handleDeleteInvoice(selectedInvoiceForView.id, selectedInvoiceForView.invoice_number)}
+                    disabled={deletingInvoiceId === selectedInvoiceForView.id}
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                    title="Delete Invoice"
+                  >
+                    {deletingInvoiceId === selectedInvoiceForView.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>Delete</span>
+                  </button>
+                )}
                 <button
                   onClick={handlePrint}
                   className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"

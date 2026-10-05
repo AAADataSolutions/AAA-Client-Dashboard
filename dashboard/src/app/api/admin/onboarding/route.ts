@@ -414,6 +414,8 @@ export async function PUT(request: NextRequest) {
     if (body.draft_date !== undefined) updates.draft_date = body.draft_date || null;
     if (body.contract_sent_date !== undefined) updates.contract_sent_date = body.contract_sent_date || null;
     if (body.signed_date !== undefined) updates.signed_date = body.signed_date || null;
+    if (body.csr_details_date !== undefined) updates.csr_details_date = body.csr_details_date || null;
+    if (body.cut_sheet_review_date !== undefined) updates.cut_sheet_review_date = body.cut_sheet_review_date || null;
     if (body.porting_submitted_date !== undefined) updates.porting_submitted_date = body.porting_submitted_date || null;
     if (body.sof_review_date !== undefined) updates.sof_review_date = body.sof_review_date || null;
     if (body.foc_confirmed_date !== undefined) updates.foc_confirmed_date = body.foc_confirmed_date || null;

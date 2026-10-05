@@ -83,6 +83,15 @@ interface PortingRecordItem {
   carrier_details?: string;
   attachments?: any[];
   status: string;
+  draft_date?: string | null;
+  contract_sent_date?: string | null;
+  signed_date?: string | null;
+  csr_details_date?: string | null;
+  cut_sheet_review_date?: string | null;
+  porting_submitted_date?: string | null;
+  sof_review_date?: string | null;
+  foc_confirmed_date?: string | null;
+  live_cutover_date?: string | null;
   target_date: string | null;
   completed_at: string | null;
   notes: string | null;
@@ -251,6 +260,81 @@ export default function ClientPortingPage() {
       default:
         return stageKey || 'Submitted';
     }
+  };
+
+  const normalizeStageKey = (statusOrStage?: string): string => {
+    if (!statusOrStage) return 'DRAFT';
+    const s = String(statusOrStage).toUpperCase();
+    if (s.includes('CONTRACT_SENT') || s.includes('CONTRACT SENT') || s.includes('STAGE 2')) return 'CONTRACT_SENT';
+    if (s.includes('SIGNED') || s.includes('STAGE 3')) return 'SIGNED';
+    if (s.includes('CSR') || s.includes('STAGE 4')) return 'CSR_DETAILS';
+    if (s.includes('CUT_SHEET') || s.includes('CUT SHEET') || s.includes('SOF') || s.includes('STAGE 5')) return 'CUT_SHEET_REVIEW';
+    if (s.includes('PORTING_SUBMITTED') || s.includes('SUBMITTED') || s.includes('IN_PROGRESS') || s.includes('STAGE 6')) return 'PORTING_SUBMITTED';
+    if (s.includes('FOC') || s.includes('STAGE 7')) return 'FOC_RECEIVED';
+    if (s.includes('COMPLETED') || s.includes('ONBOARD') || s.includes('STAGE 8')) return 'COMPLETED';
+    return 'DRAFT';
+  };
+
+  const formatStageDate = (rawDate?: string | null): string => {
+    if (!rawDate || rawDate === '—' || rawDate === 'N/A' || rawDate === 'null' || rawDate === 'undefined' || String(rawDate).trim() === '') {
+      return '(-)';
+    }
+    try {
+      const cleanDate = String(rawDate).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(cleanDate)) {
+        const parts = cleanDate.substring(0, 10).split('-').map(Number);
+        if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+          return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+      }
+      const d = new Date(cleanDate);
+      if (isNaN(d.getTime())) return '(-)';
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      return '(-)';
+    }
+  };
+
+  const getStageDate = (rec: any, status?: string): string => {
+    if (!rec) return '(-)';
+    const currentStage = normalizeStageKey(status || rec.status || rec.stage || 'DRAFT');
+    let rawDate: string | null | undefined = null;
+
+    switch (currentStage) {
+      case 'DRAFT':
+        rawDate = rec.draft_date;
+        break;
+      case 'CONTRACT_SENT':
+        rawDate = rec.contract_sent_date;
+        break;
+      case 'SIGNED':
+        rawDate = rec.signed_date;
+        break;
+      case 'CSR_DETAILS':
+        rawDate = rec.csr_details_date;
+        break;
+      case 'CUT_SHEET_REVIEW':
+        rawDate = rec.cut_sheet_review_date || rec.sof_review_date;
+        break;
+      case 'PORTING_SUBMITTED':
+        rawDate = rec.porting_submitted_date;
+        break;
+      case 'FOC_RECEIVED':
+        rawDate = rec.foc_confirmed_date;
+        break;
+      case 'COMPLETED':
+        rawDate = rec.live_cutover_date || rec.completed_at;
+        break;
+      default:
+        rawDate = null;
+    }
+
+    return formatStageDate(rawDate);
   };
 
   return (
@@ -522,13 +606,13 @@ export default function ClientPortingPage() {
               <tr className="border-b border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-900 dark:text-white font-extrabold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY</th>
                 <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>
+                <th className="py-3 px-4 whitespace-nowrap">PROPERTY STATUS</th>
                 <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
                 <th className="py-3 px-4 whitespace-nowrap">NO. OF SERVICES</th>
                 <th className="py-3 px-4 whitespace-nowrap">E911 STATUS</th>
                 <th className="py-3 px-4 whitespace-nowrap">RAY BAUM AND KARY&apos;S LAW</th>
                 <th className="py-3 px-4 whitespace-nowrap">GM NAME</th>
                 <th className="py-3 px-4 whitespace-nowrap">GM EMAIL</th>
-                <th className="py-3 px-4 whitespace-nowrap">PROPERTY STATUS</th>
                 <th className="py-3 px-4 text-right whitespace-nowrap">ACTIONS</th>
               </tr>
             </thead>
@@ -633,7 +717,22 @@ export default function ClientPortingPage() {
                         )}
                       </td>
 
-                      {/* 3. Main Phone No. */}
+                      {/* 3. Property Status (Badge + Date underneath) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="flex flex-col items-start gap-1">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                            {badge.label}
+                          </span>
+                          <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400 pl-1">
+                            {getStageDate(item, normalizedStage)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 4. Main Phone No. */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-800 dark:text-slate-200 font-mono" onClick={(e) => e.stopPropagation()}>
                         {item.property_phone && item.property_phone !== '—' ? (
                           <div className="flex items-center gap-1.5">
@@ -660,14 +759,14 @@ export default function ClientPortingPage() {
                         )}
                       </td>
 
-                      {/* 4. No. of Services */}
+                      {/* 5. No. of Services */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#20222a] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#2c2e3c] font-semibold text-[11px]">
                           {servicesCount} {servicesCount === 1 ? 'Service' : 'Services'}
                         </span>
                       </td>
 
-                      {/* 5. E911 Status */}
+                      {/* 6. E911 Status */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {isE911Verified ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[10.5px] font-semibold">
@@ -687,7 +786,7 @@ export default function ClientPortingPage() {
                         )}
                       </td>
 
-                      {/* 6. Ray Baum and Kari's Law */}
+                      {/* 7. Ray Baum and Kari's Law */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {isRayBaumCompliant ? (
                           <button
@@ -748,16 +847,6 @@ export default function ClientPortingPage() {
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
-                      </td>
-
-                      {/* 10. Property Status */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold border ${badge.bg} ${badge.text} ${badge.border}`}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                          {badge.label}
-                        </span>
                       </td>
 
                       {/* 11. Actions */}

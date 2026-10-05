@@ -237,7 +237,7 @@ export async function GET(request: NextRequest) {
         porting_submitted_date: ob?.porting_submitted_date || null,
         sof_review_date: ob?.sof_review_date || null,
         foc_confirmed_date: ob?.foc_confirmed_date || null,
-        live_cutover_date: ob?.live_cutover_date || null,
+        live_cutover_date: ob?.live_cutover_date || item.completed_at || null,
         assigned_to: ob?.assigned_to || null,
         assigned_to_name: ob?.assigned_to_name || null,
         internal_notes: ob?.internal_notes || item.notes || null,
@@ -247,7 +247,6 @@ export async function GET(request: NextRequest) {
         stage4_assigned_to: ob?.stage4_assigned_to || null,
         stage4_assigned_to_name: ob?.stage4_assigned_to_name || null,
         stage4_notes: ob?.stage4_notes || null,
-        foc_date: item.foc_date,
         completed_at: item.completed_at,
         rejection_reason: item.rejection_reason,
         notes: item.notes || ob?.internal_notes || null,
@@ -504,6 +503,8 @@ export async function PATCH(request: NextRequest) {
       draft_date,
       contract_sent_date,
       signed_date,
+      csr_details_date,
+      cut_sheet_review_date,
       porting_submitted_date,
       sof_review_date,
       foc_confirmed_date,
@@ -541,7 +542,6 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
     if (status !== undefined) updatePayload.status = status;
-    if (foc_date !== undefined) updatePayload.foc_date = foc_date;
     if (target_date !== undefined) updatePayload.target_date = target_date;
     if (rejection_reason !== undefined) updatePayload.rejection_reason = rejection_reason;
     if (notes !== undefined || internal_notes !== undefined) {
@@ -574,7 +574,11 @@ export async function PATCH(request: NextRequest) {
 
     // If porting request doesn't have an organization_property link yet, auto-create one
     if (!orgPropId || !propId) {
-      const targetOrgId = organization_id || updated?.organization_id;
+      let targetOrgId = organization_id || updated?.organization_id;
+      if (!targetOrgId) {
+        const { data: firstOrg } = await db.from('organizations').select('id').limit(1).maybeSingle();
+        targetOrgId = firstOrg?.id;
+      }
       if (targetOrgId) {
         const isE911Initial = ray_baud_and_logs_enabled !== undefined ? Boolean(ray_baud_and_logs_enabled) : (e911_status === 'VERIFIED');
         const { data: createdProp } = await db
@@ -624,6 +628,15 @@ export async function PATCH(request: NextRequest) {
               organization_property_id: createdOp.id,
               status: status || updated.status || 'DRAFT',
               target_date: target_date || null,
+              draft_date: draft_date || null,
+              contract_sent_date: contract_sent_date || null,
+              signed_date: signed_date || null,
+              csr_details_date: csr_details_date || body.csr_details_date || null,
+              cut_sheet_review_date: cut_sheet_review_date || body.cut_sheet_review_date || null,
+              porting_submitted_date: porting_submitted_date || null,
+              sof_review_date: sof_review_date || null,
+              foc_confirmed_date: foc_confirmed_date || null,
+              live_cutover_date: live_cutover_date || null,
             });
 
             await db.from('e911_records').insert({
@@ -719,11 +732,17 @@ export async function PATCH(request: NextRequest) {
       if (draft_date !== undefined) obUpdate.draft_date = draft_date;
       if (contract_sent_date !== undefined) obUpdate.contract_sent_date = contract_sent_date;
       if (signed_date !== undefined) obUpdate.signed_date = signed_date;
-      if (body.csr_details_date !== undefined) obUpdate.csr_details_date = body.csr_details_date;
-      if (body.cut_sheet_review_date !== undefined) obUpdate.cut_sheet_review_date = body.cut_sheet_review_date;
+      if (csr_details_date !== undefined || body.csr_details_date !== undefined) {
+        obUpdate.csr_details_date = csr_details_date !== undefined ? csr_details_date : body.csr_details_date;
+      }
+      if (cut_sheet_review_date !== undefined || body.cut_sheet_review_date !== undefined) {
+        obUpdate.cut_sheet_review_date = cut_sheet_review_date !== undefined ? cut_sheet_review_date : body.cut_sheet_review_date;
+      }
       if (porting_submitted_date !== undefined) obUpdate.porting_submitted_date = porting_submitted_date;
       if (sof_review_date !== undefined) obUpdate.sof_review_date = sof_review_date;
-      if (foc_confirmed_date !== undefined) obUpdate.foc_confirmed_date = foc_confirmed_date;
+      if (foc_confirmed_date !== undefined || foc_date !== undefined) {
+        obUpdate.foc_confirmed_date = foc_confirmed_date !== undefined ? foc_confirmed_date : foc_date;
+      }
       if (live_cutover_date !== undefined) obUpdate.live_cutover_date = live_cutover_date;
       if (assigned_to !== undefined) obUpdate.assigned_to = assigned_to;
       if (assigned_to_name !== undefined) obUpdate.assigned_to_name = assigned_to_name;
@@ -737,10 +756,34 @@ export async function PATCH(request: NextRequest) {
       if (attachments !== undefined) obUpdate.attachments = attachments;
       if (status === 'COMPLETED') obUpdate.completed_at = new Date().toISOString();
 
-      await db
+      const { data: existingOb } = await db
         .from('onboardings')
-        .update(obUpdate)
-        .eq('organization_property_id', orgPropId);
+        .select('id')
+        .eq('organization_property_id', orgPropId)
+        .maybeSingle();
+
+      if (existingOb) {
+        const { error: obErr } = await db
+          .from('onboardings')
+          .update(obUpdate)
+          .eq('id', existingOb.id);
+        if (obErr) {
+          console.error('Error updating onboardings table:', obErr);
+          return NextResponse.json({ success: false, error: `Onboarding update error: ${obErr.message}` }, { status: 400 });
+        }
+      } else {
+        const { error: obErr } = await db
+          .from('onboardings')
+          .insert({
+            organization_property_id: orgPropId,
+            status: status || 'DRAFT',
+            ...obUpdate,
+          });
+        if (obErr) {
+          console.error('Error inserting onboardings table:', obErr);
+          return NextResponse.json({ success: false, error: `Onboarding insert error: ${obErr.message}` }, { status: 400 });
+        }
+      }
     }
 
     // 4. Insert new attachments into porting_attachments if provided
