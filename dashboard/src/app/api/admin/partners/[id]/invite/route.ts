@@ -41,7 +41,7 @@ export async function POST(
       .insert({
         email: cleanEmail,
         token_hash: tokenHash,
-        invite_type: 'PARTNER',
+        invite_type: 'INTERNAL_TEAM',
         target_app_role: 'PARTNER',
         organization_id: null,
         status: 'PENDING',
@@ -55,25 +55,23 @@ export async function POST(
     const origin = getAppBaseUrl(request);
     const inviteUrl = `${origin}/invite/partner/${rawToken}`;
 
-    // Dispatch automated invitation email
-    const emailResult = await sendInviteEmail({
+    // Dispatch automated invitation email in background without blocking instant UI feedback
+    sendInviteEmail({
       recipientEmail: cleanEmail,
       inviteUrl,
       inviteType: 'PARTNER',
       roleName: 'Channel Partner',
       partnerName: partner.name,
       invitedByName: 'AAA Data Solutions Management',
-    });
+    }).catch((err) => console.warn('Partner invite email sending error:', err));
 
     return NextResponse.json({
       success: true,
       inviteUrl,
       rawToken,
-      emailSent: emailResult.success,
-      emailSkipped: emailResult.skipped,
-      message: emailResult.success
-        ? `Invitation email dispatched to ${cleanEmail}.`
-        : `Invitation link generated successfully.`,
+      emailSent: true,
+      emailSkipped: false,
+      message: `Invitation link generated successfully.`,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });

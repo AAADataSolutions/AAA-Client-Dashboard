@@ -151,7 +151,8 @@ export default function AdminPartnersPage() {
   const [inviteModalData, setInviteModalData] = useState<{
     partnerName: string;
     partnerEmail: string;
-    inviteUrl: string;
+    inviteUrl: string | null;
+    loading?: boolean;
   } | null>(null);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [generatingInviteId, setGeneratingInviteId] = useState<string | null>(null);
@@ -360,8 +361,16 @@ export default function AdminPartnersPage() {
   };
 
   const handleGenerateInviteLink = async (partner: Partner) => {
+    // Instantly show popup with loading feedback
+    setInviteModalData({
+      partnerName: partner.name,
+      partnerEmail: partner.email,
+      inviteUrl: null,
+      loading: true,
+    });
+    setGeneratingInviteId(partner.id);
+
     try {
-      setGeneratingInviteId(partner.id);
       const res = await fetch(`/api/admin/partners/${partner.id}/invite`, {
         method: 'POST',
       });
@@ -372,8 +381,10 @@ export default function AdminPartnersPage() {
         partnerName: partner.name,
         partnerEmail: partner.email,
         inviteUrl: json.inviteUrl,
+        loading: false,
       });
     } catch (err: any) {
+      setInviteModalData(null);
       showToast('Error', err.message || 'Failed to generate invite link.', 'error');
     } finally {
       setGeneratingInviteId(null);
@@ -1503,7 +1514,9 @@ export default function AdminPartnersPage() {
                     Partner Invitation Link
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Invite ready for <strong className="text-slate-700 dark:text-slate-200">{inviteModalData.partnerName}</strong>
+                    {inviteModalData.loading
+                      ? 'Generating secure partner invite...'
+                      : <>Invite ready for <strong className="text-slate-700 dark:text-slate-200">{inviteModalData.partnerName}</strong></>}
                   </p>
                 </div>
               </div>
@@ -1515,47 +1528,63 @@ export default function AdminPartnersPage() {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                Share this partner-specific link with <strong>{inviteModalData.partnerEmail}</strong>. When they open the link, they will create their password and get direct access to the Partner Portal.
-              </p>
-
-              <div className="p-3 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={inviteModalData.inviteUrl}
-                  className="bg-transparent text-xs font-mono text-slate-800 dark:text-slate-200 w-full focus:outline-none select-all"
-                />
-                <button
-                  onClick={() => handleCopyInviteUrl(inviteModalData.inviteUrl)}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shrink-0 flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  {copiedInvite ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy Link</span>
-                    </>
-                  )}
-                </button>
+            {inviteModalData.loading || !inviteModalData.inviteUrl ? (
+              <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center shadow-xs">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    Generating Partner Invite Link...
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Generating cryptographic access token for {inviteModalData.partnerEmail}
+                  </p>
+                </div>
               </div>
+            ) : (
+              <div className="space-y-3 text-xs animate-in fade-in duration-150">
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Share this partner-specific link with <strong>{inviteModalData.partnerEmail}</strong>. When they open the link, they will create their password and get direct access to the Partner Portal.
+                </p>
 
-              <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 p-3 rounded-xl text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                <strong>Next Step:</strong> Send this invite URL via email, Slack, or messaging. The invitation token remains valid for 30 days.
+                <div className="p-3 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={inviteModalData.inviteUrl}
+                    className="bg-transparent text-xs font-mono text-slate-800 dark:text-slate-200 w-full focus:outline-none select-all"
+                  />
+                  <button
+                    onClick={() => handleCopyInviteUrl(inviteModalData.inviteUrl!)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shrink-0 flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    {copiedInvite ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 p-3 rounded-xl text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+                  <strong>Next Step:</strong> Send this invite URL via email, Slack, or messaging. The invitation token remains valid for 30 days.
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-[#222430]">
               <button
                 onClick={() => setInviteModalData(null)}
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg cursor-pointer transition"
               >
-                Done
+                {inviteModalData.loading ? 'Cancel' : 'Done'}
               </button>
             </div>
           </div>

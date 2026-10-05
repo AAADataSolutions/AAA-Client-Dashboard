@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const { data: invitesData } = await supabase
       .from('invitations')
       .select('id, email, token_hash, status, expires_at, target_app_role, invite_type')
-      .or('target_app_role.eq.PARTNER,invite_type.eq.PARTNER')
+      .eq('target_app_role', 'PARTNER')
       .order('created_at', { ascending: false });
 
     const allInvites = invitesData || [];
