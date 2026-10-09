@@ -73,7 +73,16 @@ const navItems: NavItem[] = [
   { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]', hideForSuperAdmin: true },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white', hideForSuperAdmin: true },
   { label: 'Partners', href: '/admin/partners', icon: Users, superAdminOnly: true },
-  { label: 'Finances', href: '/admin/finances', icon: DollarSign, superAdminOnly: true },
+  {
+    label: 'Finances',
+    icon: DollarSign,
+    superAdminOnly: true,
+    children: [
+      { label: 'Finances Overview', href: '/admin/finances', icon: DollarSign },
+      { label: 'Vendors Ledger', href: '/admin/vendors', icon: Building2 },
+      { label: 'Servers & Infra', href: '/admin/servers', icon: Radio },
+    ],
+  },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileClock, hideForSuperAdmin: true },
   { label: 'System Settings', href: '/admin/settings', icon: Settings },
 ];
@@ -88,9 +97,19 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
     return true;
   });
 
-  const [servicesExpanded, setServicesExpanded] = React.useState(true);
+  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({
+    Services: true,
+    Finances: true,
+  });
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+
+  const toggleGroup = (groupLabel: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupLabel]: prev[groupLabel] === undefined ? false : !prev[groupLabel],
+    }));
+  };
 
   const handleConfirmSignOut = async () => {
     try {
@@ -154,13 +173,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
                 const isGroupActive = item.children.some(
                   (c) => pathname === c.href || pathname.startsWith(c.href)
                 );
+                const isExpanded = expandedGroups[item.label] ?? true;
 
                 return (
                   <div key={item.label} className="space-y-1">
                     {isOpen ? (
                       <button
                         type="button"
-                        onClick={() => setServicesExpanded(!servicesExpanded)}
+                        onClick={() => toggleGroup(item.label)}
                         className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer ${
                           isGroupActive
                             ? 'bg-gradient-to-r from-[#1c367d] via-[#172b68] to-[#12204d] text-white font-semibold shadow-xs border border-white/5'
@@ -179,7 +199,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
                           className={`w-3.5 h-3.5 ${
                             isGroupActive ? 'text-white' : 'text-[#8fa3ca] group-hover:text-white'
                           } transition-transform duration-200 ${
-                            servicesExpanded ? 'rotate-0' : '-rotate-90'
+                            isExpanded ? 'rotate-0' : '-rotate-90'
                           }`}
                         />
                       </button>
@@ -201,10 +221,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
                       </Link>
                     )}
 
-                    {isOpen && servicesExpanded && (
+                    {isOpen && isExpanded && (
                       <div className="pl-4 ml-3 border-l border-[#18274f] space-y-1 my-1">
                         {item.children.map((subItem) => {
-                          const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href);
+                          const isSubActive = pathname === subItem.href || (subItem.href !== '/admin/finances' && pathname.startsWith(subItem.href));
                           const SubIcon = subItem.icon || PhoneCall;
                           return (
                             <Link

@@ -8,6 +8,7 @@ export interface ServiceRecord {
   service_type: string;
   service_type_id?: string;
   description?: string | null;
+  price?: number;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
   attached_properties?: any[];
   attached_property_name: string;

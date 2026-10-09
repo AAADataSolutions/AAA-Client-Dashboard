@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
           custom_service_id: s.custom_service_id || s.id.slice(0, 8).toUpperCase(),
           service_name: s.service_name || `Service Line ${idx + 1}`,
           service_type: 'Voice Trunk / DID',
+          price: Number(s.price || 0),
           attached_property_name: 'Unassigned',
           attached_organization_name: 'Unassigned',
         })),
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
         service_type: s.service_type?.name || 'Voice Line / DID',
         service_type_id: s.service_type_id,
         description: s.description,
+        price: Number(s.price || 0),
         status: s.status || 'ACTIVE',
         property_id: primaryProp ? primaryProp.property_id : null,
         attached_properties: attached_properties,
@@ -197,6 +199,7 @@ export async function POST(request: NextRequest) {
       service_type_name,
       property_id,
       description,
+      price,
       status,
     } = body;
 
@@ -234,6 +237,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const priceNum = (price !== undefined && price !== null && price !== '') ? Math.max(0, parseFloat(String(price))) : 0;
+
     // 1. Insert Service
     const { data: newService, error: sErr } = await supabase
       .from('services')
@@ -243,6 +248,7 @@ export async function POST(request: NextRequest) {
         phone_number: phone_number.trim(),
         service_type_id: typeId,
         description: description?.trim() || null,
+        price: priceNum,
         status: status || 'ACTIVE',
       })
       .select()
@@ -339,6 +345,7 @@ export async function PUT(request: NextRequest) {
       service_type_name,
       property_id,
       description,
+      price,
       status,
     } = body;
 
@@ -365,6 +372,7 @@ export async function PUT(request: NextRequest) {
     if (phone_number !== undefined) updates.phone_number = phone_number.trim();
     if (typeId !== undefined) updates.service_type_id = typeId;
     if (description !== undefined) updates.description = description ? description.trim() : null;
+    if (price !== undefined) updates.price = price === null || price === '' ? 0 : Math.max(0, parseFloat(String(price)));
     if (status !== undefined) updates.status = status;
     updates.updated_at = new Date().toISOString();
 

@@ -95,6 +95,7 @@ interface AssignedServiceItem {
   phone_number: string;
   service_type: string;
   description?: string;
+  price?: number;
   status: string;
 }
 
@@ -102,6 +103,7 @@ interface AvailableServiceOption {
   id: string;
   phone_number: string;
   service_type: string;
+  price?: number;
 }
 
 interface OrgOption {
@@ -233,6 +235,7 @@ export default function AdminPropertiesPage() {
     general_manager_name: '',
     general_manager_phone: '',
     general_manager_email: '',
+    base_price: '' as string | number,
     monthly_price: '' as string | number,
     ray_baud_and_logs_enabled: true,
     ray_baum_status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
@@ -519,8 +522,10 @@ export default function AdminPropertiesPage() {
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to unassign service.');
 
       // Optimistic instant update in UI
+      const removedSvc = propServicesList.find((s) => s.id === serviceId);
+      const svcPrice = Number(removedSvc?.price || 0);
       setPropServicesList((prev) => prev.filter((s) => s.id !== serviceId));
-      showToast('Service Unassigned', 'Service successfully unassigned from property.', 'success');
+      showToast('Service Unassigned', `Service unassigned. Monthly price reduced by $${svcPrice.toFixed(2)}.`, 'success');
       loadData();
     } catch (err: any) {
       showToast('Error', err.message, 'error');
@@ -543,6 +548,7 @@ export default function AdminPropertiesPage() {
             id: s.id,
             phone_number: s.phone_number,
             service_type: s.service_type || 'Voice Trunk',
+            price: Number(s.price || 0),
           }))
         );
       }
@@ -632,7 +638,8 @@ export default function AdminPropertiesPage() {
       general_manager_name: prop.general_manager_name || '',
       general_manager_phone: prop.general_manager_phone || '',
       general_manager_email: prop.general_manager_email || '',
-      monthly_price: prop.monthly_price ?? '',
+      base_price: prop.base_price !== undefined && prop.base_price !== null ? prop.base_price : (prop.monthly_price ?? ''),
+      monthly_price: prop.base_price !== undefined && prop.base_price !== null ? prop.base_price : (prop.monthly_price ?? ''),
       ray_baud_and_logs_enabled: isE911,
       ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
       e911_status: isE911 ? 'VERIFIED' : 'AUDIT_REQUIRED',
@@ -867,6 +874,7 @@ export default function AdminPropertiesPage() {
                 general_manager_name: '',
                 general_manager_phone: '',
                 general_manager_email: '',
+                base_price: '',
                 monthly_price: '',
                 ray_baud_and_logs_enabled: true,
                 ray_baum_status: 'ACTIVE',
@@ -1184,6 +1192,7 @@ export default function AdminPropertiesPage() {
                   general_manager_name: '',
                   general_manager_phone: '',
                   general_manager_email: '',
+                  base_price: '',
                   monthly_price: '',
                   ray_baud_and_logs_enabled: true,
                   ray_baum_status: 'ACTIVE',
@@ -1764,7 +1773,10 @@ export default function AdminPropertiesPage() {
                           <p className="font-bold text-slate-900 dark:text-white text-sm">{svc.phone_number}</p>
                           <p className="text-slate-400 text-[11px]">{svc.service_type} {svc.description ? `• ${svc.description}` : ''}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                            +${Number(svc.price || 0).toFixed(2)}/mo
+                          </span>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                             svc.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
                           }`}>
@@ -1780,6 +1792,24 @@ export default function AdminPropertiesPage() {
                         </div>
                       </div>
                     ))}
+
+                    {/* Summary Total Calculation */}
+                    <div className="mt-4 p-3.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between">
+                      <div>
+                        <span className="text-slate-400 text-[11px] block">
+                          Property Base Rate: ${Number(selectedPropForServices?.base_price ?? selectedPropForServices?.monthly_price ?? 0).toFixed(2)}/mo
+                        </span>
+                        <span className="text-slate-600 dark:text-slate-300 font-semibold text-[11px]">
+                          Services Add-on ({propServicesList.length}): +${propServicesList.reduce((sum, s) => sum + Number(s.price || 0), 0).toFixed(2)}/mo
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Monthly Rate</span>
+                        <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                          ${(Number(selectedPropForServices?.base_price ?? selectedPropForServices?.monthly_price ?? 0) + propServicesList.reduce((sum, s) => sum + Number(s.price || 0), 0)).toFixed(2)}/mo
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1833,7 +1863,7 @@ export default function AdminPropertiesPage() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Select Service</label>
+                  <label className="font-bold text-black dark:text-white block mb-1">Select Service to Assign</label>
                   <select
                     value={selectedServiceToAssign}
                     onChange={(e) => setSelectedServiceToAssign(e.target.value)}
@@ -1842,11 +1872,28 @@ export default function AdminPropertiesPage() {
                     <option value="">Choose a service to link...</option>
                     {availableServices.map((svc) => (
                       <option key={svc.id} value={svc.id}>
-                        {svc.phone_number} ({svc.service_type})
+                        {svc.phone_number} ({svc.service_type}) — ${Number(svc.price || 0).toFixed(2)}/mo
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {selectedServiceToAssign && (() => {
+                  const chosen = availableServices.find((s) => s.id === selectedServiceToAssign);
+                  const currentPropPrice = Number(selectedPropForAssign?.monthly_price ?? selectedPropForAssign?.base_price ?? 0);
+                  const svcPrice = Number(chosen?.price || 0);
+                  const newTotal = currentPropPrice + svcPrice;
+                  return (
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 rounded-xl text-[11px] text-emerald-800 dark:text-emerald-300">
+                      <p className="font-semibold mb-1">Pricing Update Live Preview:</p>
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span>Current: ${currentPropPrice.toFixed(2)}/mo</span>
+                        <span>+ Service: ${svcPrice.toFixed(2)}/mo</span>
+                        <span className="font-bold text-emerald-700 dark:text-emerald-400">= New Total: ${newTotal.toFixed(2)}/mo</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 rounded-xl text-[11px] text-blue-700 dark:text-blue-300">
                   <Info className="w-3.5 h-3.5 inline mr-1" />
@@ -2244,16 +2291,17 @@ export default function AdminPropertiesPage() {
 
                   {isSuperAdmin && (
                     <div className="space-y-1">
-                      <label className="font-bold text-black dark:text-white block">Monthly Price ($)</label>
+                      <label className="font-bold text-black dark:text-white block">Base Monthly Price ($)</label>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
                         value={formData.monthly_price}
-                        onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value, base_price: e.target.value })}
                         placeholder="0.00"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
                       />
+                      <p className="text-[10px] text-slate-400">Baseline rate before adding services</p>
                     </div>
                   )}
 
@@ -2559,16 +2607,17 @@ export default function AdminPropertiesPage() {
 
                   {isSuperAdmin && (
                     <div className="space-y-1">
-                      <label className="font-bold text-black dark:text-white block">Monthly Price ($)</label>
+                      <label className="font-bold text-black dark:text-white block">Base Monthly Price ($)</label>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
                         value={formData.monthly_price}
-                        onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, monthly_price: e.target.value, base_price: e.target.value })}
                         placeholder="0.00"
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
                       />
+                      <p className="text-[10px] text-slate-400">Total monthly rate will automatically include attached services</p>
                     </div>
                   )}
 

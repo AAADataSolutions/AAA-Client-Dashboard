@@ -71,6 +71,7 @@ export async function PATCH(
       }
     }
     if (body.description !== undefined) updatePayload.description = body.description ? body.description.trim() : null;
+    if (body.price !== undefined) updatePayload.price = body.price === null || body.price === '' ? 0 : Math.max(0, parseFloat(String(body.price)));
     if (body.status !== undefined) updatePayload.status = body.status;
 
     const { data: updatedService, error } = await supabase

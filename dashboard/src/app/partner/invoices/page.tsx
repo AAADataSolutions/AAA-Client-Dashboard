@@ -691,7 +691,7 @@ export default function PartnerInvoicesPage() {
                     <tr>
                       <th className="py-2.5 px-3">PROPERTY / LOCATION</th>
                       <th className="py-2.5 px-3 text-right">MONTHLY SUBSCRIPTION</th>
-                      <th className="py-2.5 px-3 text-right">COMMISSION RATE</th>
+                      <th className="py-2.5 px-3 text-right">REVENUE SHARE</th>
                       <th className="py-2.5 px-3 text-right">COMMISSION AMOUNT</th>
                     </tr>
                   </thead>

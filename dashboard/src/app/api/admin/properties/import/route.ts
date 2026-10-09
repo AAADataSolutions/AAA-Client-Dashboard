@@ -346,6 +346,7 @@ export async function POST(request: NextRequest) {
             general_manager_email: gmEmail.trim() || null,
             contact_person_name: gmName.trim() || null,
             contact_person_email: gmEmail.trim() || null,
+            base_price: monthlyPrice || 0,
             monthly_price: monthlyPrice,
             ray_baud_and_logs_enabled: isE911Verified || isRayBaumActive,
             ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',

@@ -14,6 +14,7 @@ export interface PropertyContact {
 export interface PropertyRecord {
   id: string;
   name: string;
+  base_price?: number | null;
   monthly_price?: number | null;
   partner_id?: string | null;
   partner_commission_override?: number | null;

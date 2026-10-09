@@ -164,6 +164,7 @@ export default function AdminServicesPage() {
     is_custom_type: false,
     property_id: '',
     description: '',
+    price: '',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED',
     // Fire Lines specific fields
     device_type: '',
@@ -516,6 +517,7 @@ export default function AdminServicesPage() {
           service_type_name: isFire ? 'Fire Lines' : isElevator ? 'Elevator Lines' : activeType,
           property_id: formData.property_id || null,
           description: formData.description.trim() || null,
+          price: formData.price ? Math.max(0, parseFloat(formData.price)) : 0,
           status: formData.status,
         }),
       });
@@ -595,6 +597,7 @@ export default function AdminServicesPage() {
         is_custom_type: false,
         property_id: '',
         description: '',
+        price: '',
         status: 'ACTIVE',
         device_type: '',
         serial_number: '',
@@ -622,6 +625,7 @@ export default function AdminServicesPage() {
       is_custom_type: false,
       property_id: svc.property_id || '',
       description: svc.description || '',
+      price: svc.price !== undefined && svc.price !== null ? String(svc.price) : '0.00',
       status: (svc.status as any) || 'ACTIVE',
       device_type: '',
       serial_number: '',
@@ -659,6 +663,7 @@ export default function AdminServicesPage() {
           service_type_name: typeName,
           property_id: formData.property_id || null,
           description: formData.description.trim() || null,
+          price: formData.price ? Math.max(0, parseFloat(formData.price)) : 0,
           status: formData.status,
         }),
       });
@@ -783,6 +788,7 @@ export default function AdminServicesPage() {
                 is_custom_type: false,
                 property_id: '',
                 description: '',
+                price: '',
                 status: 'ACTIVE',
                 device_type: '',
                 serial_number: '',
@@ -1056,6 +1062,7 @@ export default function AdminServicesPage() {
                   is_custom_type: false,
                   property_id: '',
                   description: '',
+                  price: '',
                   status: 'ACTIVE',
                   device_type: '',
                   serial_number: '',
@@ -1080,6 +1087,7 @@ export default function AdminServicesPage() {
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE NUMBER</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">SERVICE TYPE</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PRICE / MO</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">ORGANIZATION</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">STATUS</th>
@@ -1125,14 +1133,21 @@ export default function AdminServicesPage() {
                         </span>
                       </td>
 
-                      {/* 5. Organization (Auto-resolved via single property) */}
+                      {/* 5. Monthly Price */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                          ${Number(svc.price || 0).toFixed(2)}/mo
+                        </span>
+                      </td>
+
+                      {/* 6. Organization (Auto-resolved via single property) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="font-semibold text-slate-800 dark:text-white">
                           {svc.attached_organization_name || 'Unassigned'}
                         </span>
                       </td>
 
-                      {/* 6. Property */}
+                      {/* 7. Property */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className="text-slate-700 dark:text-slate-300">
                           {svc.attached_property_name || 'Unassigned'}
@@ -1448,6 +1463,13 @@ export default function AdminServicesPage() {
                 </div>
 
                 <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block text-xs">Monthly Price</label>
+                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    ${Number(selectedServiceForDetails.price || 0).toFixed(2)} / month
+                  </p>
+                </div>
+
+                <div className="space-y-1">
                   <label className="font-bold text-black dark:text-white block text-xs">Assigned Property</label>
                   <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
                     {selectedServiceForDetails.attached_property_name || 'Unassigned'}
@@ -1511,10 +1533,15 @@ export default function AdminServicesPage() {
 
               <form onSubmit={handleConfirmAssignProperty} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
                 <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Service Identifier</label>
-                  <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-semibold">
-                    {selectedServiceForAssign.phone_number} ({selectedServiceForAssign.service_type})
-                  </p>
+                  <label className="font-bold text-black dark:text-white block mb-1">Service Identifier & Monthly Rate</label>
+                  <div className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
+                    <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                      {selectedServiceForAssign.phone_number} ({selectedServiceForAssign.service_type})
+                    </span>
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                      +${Number(selectedServiceForAssign.price || 0).toFixed(2)}/mo
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -1689,16 +1716,33 @@ export default function AdminServicesPage() {
                         />
                       </div>
 
-                      {/* Serial Number */}
-                      <div>
-                        <label className="font-bold text-black dark:text-white block mb-1">Serial Number</label>
-                        <input
-                          type="text"
-                          value={formData.serial_number}
-                          onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-                          placeholder="e.g. SN-9812-FL-01"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                        />
+                      {/* Serial Number & Price */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Serial Number</label>
+                          <input
+                            type="text"
+                            value={formData.serial_number}
+                            onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                            placeholder="e.g. SN-9812-FL-01"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.price}
+                              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       {/* Description (Shown in Table UI) */}
@@ -1814,16 +1858,33 @@ export default function AdminServicesPage() {
                         />
                       </div>
 
-                      {/* Extension / Cab ID */}
-                      <div>
-                        <label className="font-bold text-black dark:text-white block mb-1">Extension / Cab ID</label>
-                        <input
-                          type="text"
-                          value={formData.extension}
-                          onChange={(e) => setFormData({ ...formData, extension: e.target.value })}
-                          placeholder="e.g. Cab #1 - North Tower"
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                        />
+                      {/* Extension / Cab ID & Monthly Price */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Extension / Cab ID</label>
+                          <input
+                            type="text"
+                            value={formData.extension}
+                            onChange={(e) => setFormData({ ...formData, extension: e.target.value })}
+                            placeholder="e.g. Cab #1 - North Tower"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.price}
+                              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       {/* Description (Shown in Table UI) */}
@@ -1966,20 +2027,37 @@ export default function AdminServicesPage() {
                         )}
                       </div>
 
-                      <div>
-                        <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
-                        <select
-                          value={formData.property_id}
-                          onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                        >
-                          <option value="">Unassigned</option>
-                          {propertyOptions.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} {p.organization_name ? `(${p.organization_name})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
+                          <select
+                            value={formData.property_id}
+                            onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                          >
+                            <option value="">Unassigned</option>
+                            {propertyOptions.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} {p.organization_name ? `(${p.organization_name})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.price}
+                              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <div>
@@ -2103,20 +2181,37 @@ export default function AdminServicesPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
-                  <select
-                    value={formData.property_id}
-                    onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">Unassigned</option>
-                    {propertyOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.organization_name})
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Attach to Property</label>
+                    <select
+                      value={formData.property_id}
+                      onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="">Unassigned</option>
+                      {propertyOptions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.organization_name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        placeholder="0.00"
+                        className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>

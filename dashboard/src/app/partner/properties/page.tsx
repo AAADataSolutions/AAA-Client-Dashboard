@@ -161,7 +161,7 @@ export default function PartnerPropertiesPage() {
                 <th className="py-3.5 px-4">PROPERTY</th>
                 <th className="py-3.5 px-4">MAIN PHONE</th>
                 <th className="py-3.5 px-4">MONTHLY PRICE</th>
-                <th className="py-3.5 px-4">COMMISSION RATE</th>
+                <th className="py-3.5 px-4">REVENUE SHARE</th>
                 <th className="py-3.5 px-4">YOUR MONTHLY SHARE</th>
                 <th className="py-3.5 px-4 text-right">STATUS</th>
               </tr>

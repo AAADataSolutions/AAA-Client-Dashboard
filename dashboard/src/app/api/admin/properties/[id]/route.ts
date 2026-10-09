@@ -74,8 +74,15 @@ export async function PATCH(
     if (body.general_manager_name !== undefined) updatePayload.general_manager_name = body.general_manager_name ? body.general_manager_name.trim() : null;
     if (body.general_manager_phone !== undefined) updatePayload.general_manager_phone = body.general_manager_phone ? body.general_manager_phone.trim() : null;
     if (body.general_manager_email !== undefined) updatePayload.general_manager_email = body.general_manager_email ? body.general_manager_email.trim() : null;
+    if (body.base_price !== undefined) {
+      updatePayload.base_price = body.base_price === null || body.base_price === '' ? 0 : Math.max(0, Number(body.base_price));
+    }
     if (body.monthly_price !== undefined) {
       updatePayload.monthly_price = body.monthly_price === null || body.monthly_price === '' ? null : Number(body.monthly_price);
+      if (body.base_price === undefined) {
+        // If only monthly_price is provided (e.g. from legacy form), set base_price as well
+        updatePayload.base_price = body.monthly_price === null || body.monthly_price === '' ? 0 : Math.max(0, Number(body.monthly_price));
+      }
     }
     if (body.partner_id !== undefined) {
       const cleanPId = body.partner_id && body.partner_id.trim() ? body.partner_id.trim() : null;

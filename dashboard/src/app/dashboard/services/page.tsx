@@ -51,6 +51,7 @@ interface ServiceItem {
   service_type_description: string;
   organization_name?: string;
   description: string;
+  price?: number;
   status: string;
   property_id: string | null;
   property_name: string;
@@ -435,6 +436,9 @@ export default function ClientServicesPage() {
                     SERVICE TYPE
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    MONTHLY PRICE
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     PROPERTY
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -498,7 +502,12 @@ export default function ClientServicesPage() {
                         </span>
                       </td>
 
-                      {/* Column 5: PROPERTY */}
+                      {/* Column 5: MONTHLY PRICE */}
+                      <td className="py-3.5 px-4 whitespace-nowrap font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                        ${Number(item.price || 0).toFixed(2)}/mo
+                      </td>
+
+                      {/* Column 6: PROPERTY */}
                       <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium">
                         <div className="flex items-center gap-1.5">
                           <Hotel className="w-3.5 h-3.5 text-slate-400 shrink-0" />

@@ -36,6 +36,7 @@ export async function GET(
           id,
           phone_number,
           description,
+          price,
           status,
           service_name,
           custom_service_id,
@@ -59,6 +60,7 @@ export async function GET(
         custom_service_id: s.custom_service_id || '',
         service_type: s.service_type?.name || 'Voice Trunk / DID',
         description: s.description || '',
+        price: Number(s.price || 0),
         status: s.status || 'ACTIVE',
         created_at: s.created_at,
       }));
@@ -73,6 +75,7 @@ export async function GET(
             id,
             phone_number,
             description,
+            price,
             status,
             service_name,
             custom_service_id,
@@ -89,6 +92,7 @@ export async function GET(
             custom_service_id: s.custom_service_id || '',
             service_type: s.service_type?.name || 'Voice Trunk / DID',
             description: s.description || '',
+            price: Number(s.price || 0),
             status: s.status || 'ACTIVE',
             created_at: s.created_at,
           }));
