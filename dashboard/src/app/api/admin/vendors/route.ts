@@ -42,10 +42,28 @@ export async function GET(request: NextRequest) {
 
     const allocations = dbAllocations || [];
 
+    // Fetch devices belonging to vendors
+    const { data: dbDevices } = await supabase
+      .from('vendor_devices')
+      .select('*')
+      .order('created_at', { ascending: true });
+    const allDevices = dbDevices || [];
+
     const enriched = vendors.map((v: any) => {
       const vAllocations = allocations.filter((a: any) => a.vendor_id === v.id);
-      const totalDevices = vAllocations.reduce((sum: number, a: any) => sum + Number(a.devices_count || 0), 0);
-      const paid = Number(v.monthly_cost || 0);
+      const vDevices = allDevices.filter((d: any) => d.vendor_id === v.id);
+      const devicesTotalCost = vDevices.reduce((s: number, d: any) => s + Number(d.cost || 0), 0);
+      const hasDevices = vDevices.length > 0;
+      const allocDevices = vAllocations.reduce((sum: number, a: any) => sum + Number(a.devices_count || 0), 0);
+      const totalDevices = hasDevices ? vDevices.length : allocDevices;
+      // Source of truth: if devices are listed, what you pay = sum of device costs
+      const paid = hasDevices ? devicesTotalCost : Number(v.monthly_cost || 0);
+
+      // Auto-heal DB row if monthly_cost in table was out of sync with actual devices
+      if (hasDevices && Math.abs(Number(v.monthly_cost || 0) - devicesTotalCost) > 0.001) {
+        supabase.from('vendors').update({ monthly_cost: devicesTotalCost }).eq('id', v.id).then();
+      }
+
       const earned = Number(v.monthly_billed || 0);
       const netMargin = earned - paid;
       const marginPct = earned > 0 ? Math.round((netMargin / earned) * 1000) / 10 : earned === 0 && paid > 0 ? -100.0 : 0.0;
@@ -59,6 +77,8 @@ export async function GET(request: NextRequest) {
         name: v.name,
         category: v.category,
         monthly_cost: paid,
+        monthly_cost_manual: Number(v.monthly_cost || 0),
+        pay_source: hasDevices ? 'DEVICES' : 'MANUAL',
         monthly_billed: earned,
         net_margin: netMargin,
         margin_pct: marginPct,
@@ -71,6 +91,9 @@ export async function GET(request: NextRequest) {
         contact_email: v.contact_email,
         contact_phone: v.contact_phone,
         notes: v.notes,
+        devices: vDevices,
+        devices_list_count: vDevices.length,
+        devices_total_cost: devicesTotalCost,
         allocations: vAllocations.map((a: any) => {
           const count = Number(a.devices_count || 1);
           const uCost = a.unit_cost_monthly !== undefined && a.unit_cost_monthly !== null ? Number(a.unit_cost_monthly) : costPerDevice;

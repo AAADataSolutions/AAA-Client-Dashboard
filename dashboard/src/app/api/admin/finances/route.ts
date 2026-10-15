@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       servicesRes,
       partnersRes,
       vendorsRes,
+      vendorDevicesRes,
       serversRes,
       invoicesRes,
     ] = await Promise.all([
@@ -68,6 +69,9 @@ export async function GET(request: NextRequest) {
       // Vendors
       db.from('vendors').select('*').order('created_at', { ascending: false }),
 
+      // Vendor Devices
+      db.from('vendor_devices').select('*').order('created_at', { ascending: false }),
+
       // Servers
       db.from('servers').select('*').order('created_at', { ascending: false }),
 
@@ -79,9 +83,29 @@ export async function GET(request: NextRequest) {
     const orgProps = orgPropsRes.data || [];
     const allServices = servicesRes.data || [];
     const allPartners = partnersRes.data || [];
-    const allVendors = vendorsRes.data || [];
+    const rawVendors = vendorsRes.data || [];
+    const allVendorDevices = vendorDevicesRes.data || [];
     const allServers = serversRes.data || [];
     const allInvoices = invoicesRes.data || [];
+
+    // Map vendor devices by vendor_id to accurately sum device costs
+    const devicesByVendorId = new Map<string, number>();
+    allVendorDevices.forEach((d: any) => {
+      if (d.vendor_id) {
+        const current = devicesByVendorId.get(d.vendor_id) || 0;
+        devicesByVendorId.set(d.vendor_id, current + Number(d.cost || 0));
+      }
+    });
+
+    // Ensure vendor cost reflects devices total if devices exist, else fallback to monthly_cost
+    const allVendors = rawVendors.map((v: any) => {
+      const hasDevs = devicesByVendorId.has(v.id);
+      const effectiveCost = hasDevs ? (devicesByVendorId.get(v.id) || 0) : Number(v.monthly_cost || 0);
+      return {
+        ...v,
+        monthly_cost: effectiveCost,
+      };
+    });
 
     // Map organization assignment to properties
     const assignedPropertyMap = new Map<string, { orgId: string; orgName: string; orgStatus: string }>();

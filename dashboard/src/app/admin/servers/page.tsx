@@ -344,7 +344,6 @@ export default function AdminServersPage() {
             <thead>
               <tr className="border-b border-slate-100 dark:border-[#222430] text-slate-400 font-semibold">
                 <th className="py-2.5 px-3">Server Name</th>
-                <th className="py-2.5 px-3">Provider</th>
                 <th className="py-2.5 px-3">Purpose / Host</th>
                 <th className="py-2.5 px-3 text-right">Monthly Cost</th>
                 <th className="py-2.5 px-3 text-center">Status</th>
@@ -364,11 +363,6 @@ export default function AdminServersPage() {
                           <Server className="w-4 h-4 text-blue-500" />
                           <span>{s.name}</span>
                         </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${getProviderPill(s.provider)}`}>
-                          {s.provider}
-                        </span>
                       </td>
                       <td className="py-3 px-3 text-slate-500 dark:text-slate-400">
                         <span className="block truncate max-w-xs">{s.purpose || '—'}</span>

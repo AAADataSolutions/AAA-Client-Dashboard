@@ -25,6 +25,8 @@ import {
   X,
   Edit2,
   Trash2,
+  ChevronDown,
+  Cpu,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -46,6 +48,12 @@ export default function AdminVendorsPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [marginFilter, setMarginFilter] = useState('');
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+
+  // Expandable vendor rows + device drafts
+  const [expandedVendorIds, setExpandedVendorIds] = useState<Set<string>>(new Set());
+  const emptyDevice = () => ({ serial_number: '', device_name: '', cost: '' });
+  const [deviceDrafts, setDeviceDrafts] = useState<Record<string, { serial_number: string; device_name: string; cost: string }[]>>({});
+  const [savingDevicesFor, setSavingDevicesFor] = useState<string | null>(null);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -145,7 +153,69 @@ export default function AdminVendorsPage() {
     }
   };
 
-  const selectedVendor = vendors.find((v) => v.id === selectedVendorId) || vendors[0];
+  const toggleVendorExpand = (id: string) => {
+    setSelectedVendorId((prev) => (prev === id ? null : id));
+    setExpandedVendorIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const updateDraft = (vendorId: string, idx: number, field: string, value: string) => {
+    setDeviceDrafts((prev) => {
+      const rows = [...(prev[vendorId] || [])];
+      rows[idx] = { ...rows[idx], [field]: value };
+      return { ...prev, [vendorId]: rows };
+    });
+  };
+
+  const addDraftRow = (vendorId: string) => {
+    setDeviceDrafts((prev) => ({ ...prev, [vendorId]: [...(prev[vendorId] || []), emptyDevice()] }));
+  };
+
+  const removeDraftRow = (vendorId: string, idx: number) => {
+    setDeviceDrafts((prev) => ({ ...prev, [vendorId]: (prev[vendorId] || []).filter((_, i) => i !== idx) }));
+  };
+
+  const saveDevices = async (vendorId: string) => {
+    const rows = (deviceDrafts[vendorId] || []).filter((d) => d.device_name.trim());
+    if (rows.length === 0) {
+      alert('Enter at least one device name.');
+      return;
+    }
+    try {
+      setSavingDevicesFor(vendorId);
+      const res = await fetch('/api/admin/vendors/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendorId, devices: rows }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        alert(json.error || 'Failed to add devices');
+        return;
+      }
+      setDeviceDrafts((prev) => ({ ...prev, [vendorId]: [] }));
+      await fetchVendors();
+    } catch (err: any) {
+      alert(err.message || 'An error occurred');
+    } finally {
+      setSavingDevicesFor(null);
+    }
+  };
+
+  const deleteDevice = async (deviceId: string) => {
+    if (!confirm('Remove this device?')) return;
+    const res = await fetch(`/api/admin/vendors/devices?id=${deviceId}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (!json.success) {
+      alert(json.error || 'Failed to delete device');
+      return;
+    }
+    await fetchVendors();
+  };
 
   const filteredVendors = vendors.filter((v) => {
     const matchesSearch =
@@ -206,11 +276,12 @@ export default function AdminVendorsPage() {
         <div className="flex items-center gap-2.5">
           <Link
             href="/admin/finances"
-            className="px-3 py-2 bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1c1e27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#222430] rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
+            className="px-3 py-2 bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1c1e27] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#222430] rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Finances
           </Link>
           <button
+            type="button"
             onClick={() => {
               setEditingVendor(null);
               setVendorForm({
@@ -226,7 +297,7 @@ export default function AdminVendorsPage() {
               });
               setShowAddModal(true);
             }}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" /> Add Vendor
           </button>
@@ -348,9 +419,9 @@ export default function AdminVendorsPage() {
                   const isPureExpense = v.monthly_billed === 0;
 
                   return (
+                    <React.Fragment key={v.id}>
                     <tr
-                      key={v.id}
-                      onClick={() => setSelectedVendorId(v.id)}
+                      onClick={() => toggleVendorExpand(v.id)}
                       className={`cursor-pointer transition-colors ${
                         isSelected
                           ? 'bg-blue-50/70 dark:bg-blue-900/20 font-medium'
@@ -359,9 +430,9 @@ export default function AdminVendorsPage() {
                     >
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              isSelected ? 'bg-blue-600' : 'bg-transparent'
+                          <ChevronDown
+                            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                              expandedVendorIds.has(v.id) ? 'rotate-180 text-blue-600' : ''
                             }`}
                           />
                           <span className="font-bold text-slate-900 dark:text-white">{v.name}</span>
@@ -369,7 +440,7 @@ export default function AdminVendorsPage() {
                       </td>
                       <td className="py-3 px-3 text-slate-500 dark:text-slate-400">{v.category}</td>
                       <td className="py-3 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
-                        {v.devices_count || 0}
+                        {v.devices_list_count || v.devices_count || 0}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-semibold text-slate-900 dark:text-white">
                         {formatCurrency(v.monthly_cost)}
@@ -398,6 +469,7 @@ export default function AdminVendorsPage() {
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
+                            type="button"
                             onClick={() => {
                               setEditingVendor(v);
                               setVendorForm({
@@ -413,13 +485,141 @@ export default function AdminVendorsPage() {
                               });
                               setShowAddModal(true);
                             }}
-                            className="p-1 text-slate-400 hover:text-blue-600 rounded-md transition"
+                            className="p-1 text-slate-400 hover:text-blue-600 rounded-md transition cursor-pointer"
+                            title="Edit vendor"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
                     </tr>
+
+                    {/* Expanded devices dropdown */}
+                    {expandedVendorIds.has(v.id) && (
+                      <tr className="bg-slate-50/60 dark:bg-[#12131a]">
+                        <td colSpan={8} className="px-4 py-4">
+                          <div className="rounded-xl border border-slate-200 dark:border-[#242634] bg-white dark:bg-[#15161c] p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <Cpu className="w-3.5 h-3.5 text-blue-500" /> Devices under {v.name}
+                                <span className="ml-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px]">
+                                  {(v.devices || []).length}
+                                </span>
+                              </h4>
+                              <span className="text-[11px] text-slate-500">
+                                Total device cost:{' '}
+                                <b className="font-mono text-slate-900 dark:text-white">{formatCurrency(v.devices_total_cost || 0)}</b>
+                              </span>
+                            </div>
+
+                            <table className="w-full text-xs text-left">
+                              <thead>
+                                <tr className="border-b border-slate-100 dark:border-[#222430] text-slate-400 font-semibold">
+                                  <th className="py-2 px-2 w-10">#</th>
+                                  <th className="py-2 px-2">Serial Number</th>
+                                  <th className="py-2 px-2">Device Name</th>
+                                  <th className="py-2 px-2 text-right">Cost</th>
+                                  <th className="py-2 px-2 w-10"></th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-[#20222c]">
+                                {(v.devices || []).length > 0 ? (
+                                  v.devices.map((d: any, i: number) => (
+                                    <tr key={d.id}>
+                                      <td className="py-2 px-2 text-slate-400">{i + 1}</td>
+                                      <td className="py-2 px-2 font-mono text-slate-700 dark:text-slate-300">{d.serial_number || '—'}</td>
+                                      <td className="py-2 px-2 font-semibold text-slate-900 dark:text-white">{d.device_name}</td>
+                                      <td className="py-2 px-2 text-right font-mono text-slate-900 dark:text-white">{formatCurrency(Number(d.cost || 0))}</td>
+                                      <td className="py-2 px-2 text-right">
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteDevice(d.id)}
+                                          className="p-1 text-slate-400 hover:text-rose-600 rounded-md transition cursor-pointer"
+                                          title="Remove device"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td colSpan={5} className="py-4 text-center text-slate-400">
+                                      No devices yet. Add devices below.
+                                    </td>
+                                  </tr>
+                                )}
+
+                                {/* Draft rows for adding new devices */}
+                                {(deviceDrafts[v.id] || []).map((draft, idx) => (
+                                  <tr key={`draft-${idx}`} className="bg-blue-50/40 dark:bg-blue-950/10">
+                                    <td className="py-2 px-2 text-blue-500 font-bold">+</td>
+                                    <td className="py-1.5 px-2">
+                                      <input
+                                        value={draft.serial_number}
+                                        onChange={(e) => updateDraft(v.id, idx, 'serial_number', e.target.value)}
+                                        placeholder="SN-0001"
+                                        className="w-full p-1.5 bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-lg text-slate-900 dark:text-white font-mono"
+                                      />
+                                    </td>
+                                    <td className="py-1.5 px-2">
+                                      <input
+                                        value={draft.device_name}
+                                        onChange={(e) => updateDraft(v.id, idx, 'device_name', e.target.value)}
+                                        placeholder="Device name *"
+                                        className="w-full p-1.5 bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-lg text-slate-900 dark:text-white"
+                                      />
+                                    </td>
+                                    <td className="py-1.5 px-2">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={draft.cost}
+                                        onChange={(e) => updateDraft(v.id, idx, 'cost', e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-full p-1.5 bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-lg text-right text-slate-900 dark:text-white font-mono"
+                                      />
+                                    </td>
+                                    <td className="py-1.5 px-2 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => removeDraftRow(v.id, idx)}
+                                        className="p-1 text-slate-400 hover:text-rose-600 rounded-md transition cursor-pointer"
+                                        title="Remove draft"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+
+                            <div className="flex items-center justify-between pt-1">
+                              <button
+                                type="button"
+                                onClick={() => addDraftRow(v.id)}
+                                className="px-3 py-1.5 bg-slate-100 dark:bg-[#1f212c] hover:bg-slate-200 dark:hover:bg-[#262836] text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" /> Add Device Row
+                              </button>
+                              {(deviceDrafts[v.id] || []).length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => saveDevices(v.id)}
+                                  disabled={savingDevicesFor === v.id}
+                                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                                >
+                                  {savingDevicesFor === v.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                  Save {(deviceDrafts[v.id] || []).length} Device{(deviceDrafts[v.id] || []).length > 1 ? 's' : ''}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })
               ) : (
@@ -433,123 +633,6 @@ export default function AdminVendorsPage() {
           </table>
         </div>
       </div>
-
-      {/* Selected Vendor Drill-Down (The VOLA Fireline & Location Case) */}
-      {selectedVendor && (
-        <motion.div
-          key={selectedVendor.id}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-[#15161c] border border-blue-200/80 dark:border-blue-900/40 rounded-2xl p-6 shadow-xs space-y-5"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#222430] pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg text-slate-900 dark:text-white">
-                  {selectedVendor.name} — {selectedVendor.category}
-                </h3>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  {selectedVendor.status}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-[#71717a] mt-0.5">
-                Equipment installed and profit breakdown at each property location.
-              </p>
-            </div>
-            {selectedVendor.contact_email && (
-              <div className="text-xs text-slate-400 flex items-center gap-3">
-                <span>{selectedVendor.contact_person}</span>
-                <span>{selectedVendor.contact_email}</span>
-                <span>{selectedVendor.contact_phone}</span>
-              </div>
-            )}
-          </div>
-
-          {/* 5 Metrics Tiles */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1b24] border border-slate-100 dark:border-[#242634]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">You Pay Monthly</span>
-              <span className="text-lg font-black text-slate-900 dark:text-white font-mono mt-1 block">
-                {formatCurrency(selectedVendor.monthly_cost)}
-              </span>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1b24] border border-slate-100 dark:border-[#242634]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Devices Installed</span>
-              <span className="text-lg font-black text-slate-900 dark:text-white font-mono mt-1 block">
-                {selectedVendor.devices_count || 0}
-              </span>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1b24] border border-slate-100 dark:border-[#242634]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Cost Per Device</span>
-              <span className="text-lg font-black text-slate-900 dark:text-white font-mono mt-1 block">
-                {formatCurrency(selectedVendor.cost_per_device || 0)}
-              </span>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1b24] border border-slate-100 dark:border-[#242634]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Billed Per Device</span>
-              <span className="text-lg font-black text-slate-900 dark:text-white font-mono mt-1 block">
-                {formatCurrency(selectedVendor.billed_per_device || 0)}
-              </span>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#1a1b24] border border-slate-100 dark:border-[#242634]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Profit Per Device</span>
-              <span
-                className={`text-lg font-black font-mono mt-1 block ${
-                  (selectedVendor.profit_per_device || 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'
-                }`}
-              >
-                {formatCurrency(selectedVendor.profit_per_device || 0)}
-              </span>
-            </div>
-          </div>
-
-          {/* Location Allocations Table */}
-          <div className="overflow-x-auto pt-2">
-            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-500" /> Property Deployment & Margin Breakdown
-            </h4>
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-[#222430] text-slate-400 font-semibold">
-                  <th className="py-2 px-3">Location / Property</th>
-                  <th className="py-2 px-3 text-right">Devices</th>
-                  <th className="py-2 px-3 text-right">Monthly Cost</th>
-                  <th className="py-2 px-3 text-right">Billed to Client</th>
-                  <th className="py-2 px-3 text-right">Net Profit</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#20222c]">
-                {selectedVendor.allocations?.map((alloc: any, idx: number) => {
-                  const isPos = alloc.net_profit >= 0;
-                  return (
-                    <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-[#1a1b24]/40">
-                      <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">{alloc.location_name}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600 dark:text-slate-400">{alloc.devices_count}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-800 dark:text-slate-200">
-                        {formatCurrency(alloc.total_cost)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-800 dark:text-slate-200">
-                        {formatCurrency(alloc.total_billed)}
-                      </td>
-                      <td
-                        className={`py-2.5 px-3 text-right font-mono font-bold ${
-                          isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'
-                        }`}
-                      >
-                        {formatCurrency(alloc.net_profit)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      )}
 
       {/* Add / Edit Vendor Modal */}
       <AnimatePresence>
@@ -566,8 +649,10 @@ export default function AdminVendorsPage() {
                   {editingVendor ? 'Edit Vendor' : 'Add New Vendor'}
                 </h3>
                 <button
+                  type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="p-1 rounded-md text-slate-400 hover:text-slate-600"
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
+                  title="Close modal"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -592,7 +677,7 @@ export default function AdminVendorsPage() {
                     <select
                       value={vendorForm.category}
                       onChange={(e) => setVendorForm({ ...vendorForm, category: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white cursor-pointer"
                     >
                       <option value="Telecom">Telecom</option>
                       <option value="Software">Software</option>
@@ -606,7 +691,7 @@ export default function AdminVendorsPage() {
                     <select
                       value={vendorForm.status}
                       onChange={(e) => setVendorForm({ ...vendorForm, status: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white cursor-pointer"
                     >
                       <option value="ACTIVE">ACTIVE</option>
                       <option value="INACTIVE">INACTIVE</option>
@@ -688,14 +773,14 @@ export default function AdminVendorsPage() {
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 bg-slate-100 dark:bg-[#1f212c] text-slate-700 dark:text-slate-300 rounded-xl font-bold"
+                    className="px-4 py-2 bg-slate-100 dark:bg-[#1f212c] text-slate-700 dark:text-slate-300 rounded-xl font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={formSubmitting}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-1.5"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl font-bold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     {formSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Save Vendor

@@ -1191,7 +1191,7 @@ export default function AdminFinancesPage() {
       {/* Row 5: Partner Outflow Donut & Partner Invoices */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Partner Outflow Donut */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-2xl p-6 shadow-xs space-y-4">
+        {/* <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-2xl p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
@@ -1275,7 +1275,7 @@ export default function AdminFinancesPage() {
               No active partner commission outflows recorded for {donutDataObj.monthName || donutMonth}.
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Partner Invoices Table */}
         <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-2xl p-6 shadow-xs space-y-4">
