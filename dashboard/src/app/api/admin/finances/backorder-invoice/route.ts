@@ -4,6 +4,49 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 import crypto from 'crypto';
 
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createAdminClient() || (await createClient());
+    const { searchParams } = new URL(request.url);
+    const partnerId = searchParams.get('partner_id');
+    const periodMonth = searchParams.get('period_month'); // YYYY-MM
+
+    if (!partnerId) {
+      return NextResponse.json({ success: true, properties: [] });
+    }
+
+    const { data: props, error } = await supabase
+      .from('properties')
+      .select('id, name, address, city, state, monthly_price, partner_id, partner_commission_override, created_at, status')
+      .eq('partner_id', partnerId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    const allProps = props || [];
+
+    // Filter candidate properties: properties created on or before the period_month
+    const filtered = allProps.filter((p: any) => {
+      if (periodMonth) {
+        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
+        return pCreatedMonth <= periodMonth;
+      }
+      return true;
+    });
+
+    return NextResponse.json({
+      success: true,
+      properties: filtered,
+      total_partner_properties: allProps.length,
+      eligible_count: filtered.length,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createAdminClient() || (await createClient());
@@ -41,7 +84,7 @@ export async function POST(request: NextRequest) {
     const monthCode = `${year}${String(month + 1).padStart(2, '0')}`;
 
     // 3. Fetch properties
-    let query = supabase.from('properties').select('id, name, address, city, state, monthly_price, partner_commission_override');
+    let query = supabase.from('properties').select('id, name, address, city, state, monthly_price, partner_commission_override, created_at');
     if (property_ids && Array.isArray(property_ids) && property_ids.length > 0) {
       query = query.in('id', property_ids);
     } else {
@@ -49,7 +92,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: propsData, error: propsErr } = await query;
-    const properties = propsData || [];
+    let properties = propsData || [];
+
+    // If explicit property_ids were NOT provided, automatically filter out properties created AFTER period_month
+    if (!property_ids || !Array.isArray(property_ids) || property_ids.length === 0) {
+      properties = properties.filter((p: any) => {
+        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
+        return pCreatedMonth <= period_month;
+      });
+    }
 
     const defaultRate = custom_commission_rate !== undefined ? Number(custom_commission_rate) : Number(partner.default_commission_rate || 10);
     let grossRevenue = 0;

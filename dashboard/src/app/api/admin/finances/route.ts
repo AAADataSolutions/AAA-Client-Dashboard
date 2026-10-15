@@ -260,15 +260,25 @@ export async function GET(request: NextRequest) {
       let newPropsRev = 0;
       let newServicesRev = 0;
 
+      const assignedPropIdsForMonth = new Set(assignedForMonth.map((p: any) => p.id));
+
       assignedForMonth.forEach((p: any) => {
         if (p.created_at && p.created_at.startsWith(mKey)) {
           newPropsRev += Number(p.monthly_price || 0);
         }
       });
 
+      // Calculate newly provisioned services for properties that were assigned in this month
       allServices.forEach((s: any) => {
-        if (s.created_at && s.created_at.startsWith(mKey)) {
-          newServicesRev += Number(s.price || s.monthly_price || 0);
+        if (s.created_at && s.created_at.startsWith(mKey) && s.status !== 'DISCONNECTED' && s.status !== 'INACTIVE') {
+          const links = Array.isArray(s.property_links) ? s.property_links : s.property_links ? [s.property_links] : [];
+          const isLinkedToAssignedProp = links.some((l: any) => {
+            const pId = l?.org_property?.property_id;
+            return pId && assignedPropIdsForMonth.has(pId);
+          });
+          if (isLinkedToAssignedProp) {
+            newServicesRev += Number(s.price || s.monthly_price || 0);
+          }
         }
       });
 

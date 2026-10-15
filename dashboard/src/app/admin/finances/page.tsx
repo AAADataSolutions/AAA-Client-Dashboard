@@ -109,6 +109,9 @@ export default function AdminFinancesPage() {
     custom_commission_rate: '',
     notes: '',
   });
+  const [candidateProperties, setCandidateProperties] = useState<any[]>([]);
+  const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [backorderSubmitting, setBackorderSubmitting] = useState(false);
 
   // Strict route protection
@@ -152,14 +155,52 @@ export default function AdminFinancesPage() {
     }
   }, [isSuperAdmin]);
 
+  // Fetch candidate properties for the selected partner and month
+  useEffect(() => {
+    if (!showBackorderModal || !backorderForm.partner_id) {
+      setCandidateProperties([]);
+      setSelectedPropertyIds([]);
+      return;
+    }
+
+    const fetchCandidates = async () => {
+      try {
+        setLoadingCandidates(true);
+        const res = await fetch(
+          `/api/admin/finances/backorder-invoice?partner_id=${backorderForm.partner_id}&period_month=${backorderForm.period_month}`
+        );
+        const json = await res.json();
+        if (json.success) {
+          const props = json.properties || [];
+          setCandidateProperties(props);
+          // Default: select all properties that existed on or before this month
+          setSelectedPropertyIds(props.map((p: any) => p.id));
+        }
+      } catch (err) {
+        console.error('Failed to load candidate properties:', err);
+      } finally {
+        setLoadingCandidates(false);
+      }
+    };
+
+    fetchCandidates();
+  }, [showBackorderModal, backorderForm.partner_id, backorderForm.period_month]);
+
   const handleCreateBackorder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedPropertyIds.length === 0) {
+      alert('Please select at least one property to generate the commission invoice.');
+      return;
+    }
     try {
       setBackorderSubmitting(true);
       const res = await fetch('/api/admin/finances/backorder-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(backorderForm),
+        body: JSON.stringify({
+          ...backorderForm,
+          property_ids: selectedPropertyIds,
+        }),
       });
       const json = await res.json();
       if (json.success) {
@@ -170,6 +211,8 @@ export default function AdminFinancesPage() {
           custom_commission_rate: '',
           notes: '',
         });
+        setSelectedPropertyIds([]);
+        setCandidateProperties([]);
         await fetchFinances();
       } else {
         alert(json.error || 'Failed to generate back-order invoice');
@@ -1778,6 +1821,119 @@ export default function AdminFinancesPage() {
                   </div>
                 </div>
 
+                {/* Candidate properties checklist with live preview */}
+                {backorderForm.partner_id && (
+                  <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-[#222430]">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-bold text-slate-700 dark:text-slate-300">
+                        Properties on record as of {backorderForm.period_month} ({selectedPropertyIds.length}/{candidateProperties.length})
+                      </label>
+                      {candidateProperties.length > 0 && (
+                        <div className="flex items-center gap-2 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPropertyIds(candidateProperties.map((p) => p.id))}
+                            className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPropertyIds([])}
+                            className="text-slate-400 hover:underline cursor-pointer"
+                          >
+                            Deselect All
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {loadingCandidates ? (
+                      <div className="p-4 text-center text-slate-400 bg-slate-50 dark:bg-[#1a1b24] rounded-xl flex items-center justify-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                        <span>Finding eligible properties...</span>
+                      </div>
+                    ) : candidateProperties.length === 0 ? (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-[11px]">
+                        No properties found for this partner created on or before {backorderForm.period_month}.
+                      </div>
+                    ) : (
+                      <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-slate-50 dark:bg-[#1a1b24] rounded-xl border border-slate-200 dark:border-[#282a36]">
+                        {candidateProperties.map((prop) => {
+                          const isChecked = selectedPropertyIds.includes(prop.id);
+                          const propRate =
+                            backorderForm.custom_commission_rate !== ''
+                              ? Number(backorderForm.custom_commission_rate)
+                              : prop.partner_commission_override !== null && prop.partner_commission_override !== undefined
+                              ? Number(prop.partner_commission_override)
+                              : Number(
+                                  partnersList.find((p) => p.id === backorderForm.partner_id)?.default_commission_rate || 10
+                                );
+                          const propComm = Number(prop.monthly_price || 0) * (propRate / 100);
+
+                          return (
+                            <label
+                              key={prop.id}
+                              className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${
+                                isChecked
+                                  ? 'bg-blue-500/10 border border-blue-500/20 text-slate-900 dark:text-white'
+                                  : 'hover:bg-slate-100 dark:hover:bg-[#20222e] text-slate-500'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedPropertyIds([...selectedPropertyIds, prop.id]);
+                                    } else {
+                                      setSelectedPropertyIds(selectedPropertyIds.filter((id) => id !== prop.id));
+                                    }
+                                  }}
+                                  className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="font-semibold text-xs">{prop.name}</span>
+                              </div>
+                              <div className="text-right font-mono text-[11px]">
+                                <span>{formatCurrency(Number(prop.monthly_price || 0))}</span>
+                                <span className="text-slate-400 text-[10px] ml-1.5">({propRate}% = {formatCurrency(propComm)})</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Summary preview */}
+                    {candidateProperties.length > 0 && selectedPropertyIds.length > 0 && (
+                      <div className="p-2.5 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-xl flex items-center justify-between font-mono text-xs text-blue-900 dark:text-blue-300">
+                        <span>
+                          Total Invoice ({selectedPropertyIds.length} propert{selectedPropertyIds.length > 1 ? 'ies' : 'y'}):
+                        </span>
+                        <span className="font-bold">
+                          {formatCurrency(
+                            candidateProperties
+                              .filter((p) => selectedPropertyIds.includes(p.id))
+                              .reduce((sum, p) => {
+                                const rate =
+                                  backorderForm.custom_commission_rate !== ''
+                                    ? Number(backorderForm.custom_commission_rate)
+                                    : p.partner_commission_override !== null && p.partner_commission_override !== undefined
+                                    ? Number(p.partner_commission_override)
+                                    : Number(
+                                        partnersList.find((ptr) => ptr.id === backorderForm.partner_id)?.default_commission_rate || 10
+                                      );
+                                return sum + Number(p.monthly_price || 0) * (rate / 100);
+                              }, 0)
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Notes / Reason</label>
                   <textarea
@@ -1793,14 +1949,14 @@ export default function AdminFinancesPage() {
                   <button
                     type="button"
                     onClick={() => setShowBackorderModal(false)}
-                    className="px-4 py-2 bg-slate-100 dark:bg-[#1f212c] text-slate-700 dark:text-slate-300 rounded-xl font-bold"
+                    className="px-4 py-2 bg-slate-100 dark:bg-[#1f212c] text-slate-700 dark:text-slate-300 rounded-xl font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={backorderSubmitting}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-1.5"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-xl font-bold flex items-center gap-1.5 cursor-pointer"
                   >
                     {backorderSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Generate Invoice

@@ -1,0 +1,107 @@
+﻿{
+    "success":  true,
+    "data":  [
+                 {
+                     "id":  "32c1a4f7-3398-454f-b8db-f64a46d150f4",
+                     "user_id":  "882a89b5-290c-4e58-8348-f13301417d93",
+                     "name":  "Emma",
+                     "email":  "emma@gmail.com",
+                     "phone":  "123456789",
+                     "company_name":  null,
+                     "default_commission_rate":  10,
+                     "status":  "ACTIVE",
+                     "payment_info":  {
+
+                                      },
+                     "notes":  null,
+                     "created_at":  "2026-10-14T02:18:19.354989+00:00",
+                     "updated_at":  "2026-10-14T02:19:06.459795+00:00",
+                     "total_properties_count":  0,
+                     "active_properties_count":  0,
+                     "monthly_gross_revenue":  0,
+                     "monthly_commission_estimated":  0,
+                     "effective_share_rate":  10,
+                     "share_display":  "10%",
+                     "has_custom_override":  false,
+                     "has_pending_invite":  false
+                 },
+                 {
+                     "id":  "eb075687-0633-4194-bdfc-6b8034fd7d9d",
+                     "user_id":  "7caf0fc3-b244-4f6d-a533-487100da8a6d",
+                     "name":  "Sample Partner 001",
+                     "email":  "partner@gmail.com",
+                     "phone":  "4454545546",
+                     "company_name":  null,
+                     "default_commission_rate":  20,
+                     "status":  "ACTIVE",
+                     "payment_info":  {
+
+                                      },
+                     "notes":  null,
+                     "created_at":  "2026-10-09T18:03:41.745326+00:00",
+                     "updated_at":  "2026-10-09T18:04:21.668318+00:00",
+                     "total_properties_count":  1,
+                     "active_properties_count":  1,
+                     "monthly_gross_revenue":  205,
+                     "monthly_commission_estimated":  41,
+                     "effective_share_rate":  20,
+                     "share_display":  "20%",
+                     "has_custom_override":  false,
+                     "has_pending_invite":  false
+                 },
+                 {
+                     "id":  "5149f5f4-fc19-4383-a6a3-68bd58fc6e99",
+                     "user_id":  "c2987952-5f8a-42c9-be4c-5a9d31a4c8e3",
+                     "name":  "Hetal Patel",
+                     "email":  "hetal.patel@htinfotech.com",
+                     "phone":  "614-832-7900",
+                     "company_name":  "HT Infotech",
+                     "default_commission_rate":  25,
+                     "status":  "ACTIVE",
+                     "payment_info":  {
+
+                                      },
+                     "notes":  null,
+                     "created_at":  "2026-10-05T20:19:26.146347+00:00",
+                     "updated_at":  "2026-10-05T20:22:42.116176+00:00",
+                     "total_properties_count":  0,
+                     "active_properties_count":  0,
+                     "monthly_gross_revenue":  0,
+                     "monthly_commission_estimated":  0,
+                     "effective_share_rate":  25,
+                     "share_display":  "25%",
+                     "has_custom_override":  false,
+                     "has_pending_invite":  false
+                 },
+                 {
+                     "id":  "57ed58a6-a011-4153-8e2d-5a97370f85cd",
+                     "user_id":  "6179dac3-15b2-4904-b6c7-a52d702a1fa0",
+                     "name":  "Joe Catizone",
+                     "email":  "hyper_pulse@hotmail.com",
+                     "phone":  "8452067264",
+                     "company_name":  "Hyper Pulse",
+                     "default_commission_rate":  25,
+                     "status":  "ACTIVE",
+                     "payment_info":  {
+
+                                      },
+                     "notes":  null,
+                     "created_at":  "2026-10-05T15:17:57.134748+00:00",
+                     "updated_at":  "2026-10-06T17:21:33.580893+00:00",
+                     "total_properties_count":  22,
+                     "active_properties_count":  22,
+                     "monthly_gross_revenue":  3345,
+                     "monthly_commission_estimated":  836.25,
+                     "effective_share_rate":  25,
+                     "share_display":  "25%",
+                     "has_custom_override":  true,
+                     "has_pending_invite":  true
+                 }
+             ],
+    "metrics":  {
+                    "totalPartners":  4,
+                    "activePartners":  4,
+                    "totalCommissionPayout":  877.25,
+                    "assignedPropertiesCount":  23
+                }
+}
