@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -16,6 +16,8 @@ import {
   AlertCircle,
   Loader2,
   Send,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface CreateOrgModalProps {
@@ -43,6 +45,10 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
     contact_phone: '',
   });
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +60,25 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
     expires_at: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo file size must be 5MB or less.');
+        return;
+      }
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+      setError(null);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -70,12 +95,27 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
     setError(null);
 
     try {
+      let uploadedLogoUrl: string | null = null;
+      if (logoFile) {
+        const logoFormData = new FormData();
+        logoFormData.append('logo', logoFile);
+        const logoRes = await fetch('/api/admin/organizations/logo', {
+          method: 'POST',
+          body: logoFormData,
+        });
+        const logoJson = await logoRes.json();
+        if (logoJson.success && logoJson.logo_url) {
+          uploadedLogoUrl = logoJson.logo_url;
+        }
+      }
+
       const res = await fetch('/api/admin/organizations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name.trim(),
           type: formData.type,
+          logo_url: uploadedLogoUrl,
           address: formData.address.trim() || null,
           city: formData.city.trim() || null,
           state: formData.state.trim() || null,
@@ -103,7 +143,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
           expires_at: json.invitation.expires_at,
         });
       } else {
-        onClose();
+        handleFinish();
       }
     } catch (err: any) {
       console.error('Create organization error:', err);
@@ -122,6 +162,7 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
 
   const handleFinish = () => {
     setCreatedInvite(null);
+    handleRemoveLogo();
     onClose();
   };
 
@@ -234,6 +275,51 @@ export const CreateOrgModal: React.FC<CreateOrgModalProps> = ({
               ) : (
                 <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <div className="p-5 overflow-y-auto space-y-4 text-xs flex-1 min-h-0">
+                    {/* Management Group Logo Upload */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                        Management Group Logo (Optional)
+                      </label>
+                      <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/60">
+                        {logoPreview ? (
+                          <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-[#282a36] overflow-hidden bg-white dark:bg-[#1a1b24] shrink-0">
+                            <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={handleRemoveLogo}
+                              className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] hover:bg-rose-700 cursor-pointer shadow-xs"
+                              title="Remove logo"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl border border-dashed border-slate-300 dark:border-[#2f3242] flex items-center justify-center text-slate-400 dark:text-slate-500 bg-white dark:bg-[#15161c] shrink-0">
+                            <Building2 className="w-5 h-5 text-slate-400" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 space-y-1">
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            className="hidden"
+                            onChange={handleLogoSelect}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => logoInputRef.current?.click()}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#252733] hover:bg-slate-100 dark:hover:bg-[#1d1f28] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-blue-500" />
+                            <span>{logoFile ? 'Change Logo' : 'Upload Logo'}</span>
+                          </button>
+                          <p className="text-[10px] text-slate-400">PNG, JPG, SVG, WebP up to 5MB.</p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Management Group Info */}
                     <div className="space-y-3">
                       <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">

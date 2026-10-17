@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Once onboarded/completed, automatically remove from default active porting list
-      filtered = filtered.filter((p) => p.status !== 'COMPLETED');
+      filtered = filtered.filter((p) => p.status !== 'COMPLETED' && p.status !== 'ONBOARDED');
     }
 
     if (search) {
@@ -210,10 +210,10 @@ export async function GET(request: NextRequest) {
       data: paginated,
       total,
       metrics: {
-        total: allPortings.filter((p) => p.status !== 'COMPLETED').length,
+        total: allPortings.filter((p) => p.status !== 'COMPLETED' && p.status !== 'ONBOARDED').length,
         inProgress: allPortings.filter((p) => ['IN_PROGRESS', 'SUBMITTED', 'DRAFT', 'CONTRACT_SENT', 'SIGNED', 'CSR_DETAILS', 'CUT_SHEET_REVIEW', 'PORTING_SUBMITTED'].includes(p.status)).length,
         focReceived: allPortings.filter((p) => ['FOC_RECEIVED', 'FOC_CONFIRMED'].includes(p.status)).length,
-        completed: allPortings.filter((p) => p.status === 'COMPLETED').length,
+        completed: allPortings.filter((p) => p.status === 'COMPLETED' || p.status === 'ONBOARDED').length,
         actionRequired: allPortings.filter((p) => ['REJECTED', 'CANCELLED', 'PENDING'].includes(p.status)).length,
       },
       filters: { properties: [] },

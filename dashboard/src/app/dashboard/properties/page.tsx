@@ -66,6 +66,7 @@ interface PropertyRecord {
   zip_code: string;
   country: string;
   organization_name?: string;
+  organization_type?: string;
   main_phone: string | null;
   fax: string | null;
   contact_person_name: string | null;

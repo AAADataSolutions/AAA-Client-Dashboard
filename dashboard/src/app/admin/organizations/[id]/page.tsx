@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, useRef, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -45,6 +45,8 @@ import {
   Download,
   ArrowLeftRight,
   Sparkles,
+  UploadCloud,
+  ImageIcon,
 } from 'lucide-react';
 
 const containerVariants: Variants = {
@@ -68,6 +70,7 @@ interface OrgDetail {
   id: string;
   name: string;
   type?: string;
+  logo_url?: string;
   address: string;
   street_address: string;
   city: string;
@@ -184,8 +187,12 @@ export default function OrganizationDetailPage({
     phone: '',
     email: '',
     status: 'ACTIVE',
+    logo_url: '',
   });
   const [editSaving, setEditSaving] = useState(false);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
+  const editLogoInputRef = useRef<HTMLInputElement>(null);
 
   // Add Contact Modal
   const [showAddContactModal, setShowAddContactModal] = useState(false);
@@ -376,7 +383,10 @@ export default function OrganizationDetailPage({
           phone: json.data.phone !== '—' ? json.data.phone : '',
           email: json.data.email !== '—' ? json.data.email : '',
           status: json.data.status || 'ACTIVE',
+          logo_url: json.data.logo_url || '',
         });
+        setEditLogoPreview(json.data.logo_url || null);
+        setEditLogoFile(null);
       } else {
         setError(json.error || 'Failed to load organization details');
       }
@@ -418,10 +428,33 @@ export default function OrganizationDetailPage({
     e.preventDefault();
     setEditSaving(true);
     try {
+      let finalLogoUrl = editFormData.logo_url;
+
+      if (editLogoFile) {
+        const logoData = new FormData();
+        logoData.append('file', editLogoFile);
+        logoData.append('organization_id', orgId);
+
+        const uploadRes = await fetch('/api/admin/organizations/logo', {
+          method: 'POST',
+          body: logoData,
+        });
+        const uploadJson = await uploadRes.json();
+        if (!uploadRes.ok || !uploadJson.success) {
+          throw new Error(uploadJson.error || 'Failed to upload organization logo');
+        }
+        finalLogoUrl = uploadJson.url;
+      } else if (!editLogoPreview) {
+        finalLogoUrl = '';
+      }
+
       const res = await fetch(`/api/admin/organizations/${orgId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editFormData),
+        body: JSON.stringify({
+          ...editFormData,
+          logo_url: finalLogoUrl,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update organization');
@@ -1131,9 +1164,17 @@ export default function OrganizationDetailPage({
         className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] p-6 rounded-2xl shadow-xs"
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-lg shrink-0">
-            <Building2 className="w-6 h-6" />
-          </div>
+          {org.logo_url ? (
+            <img
+              src={org.logo_url}
+              alt={org.name}
+              className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-[#222430] shrink-0 shadow-xs"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-lg shrink-0">
+              <Building2 className="w-6 h-6" />
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{org.name}</h1>
@@ -1165,7 +1206,25 @@ export default function OrganizationDetailPage({
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => setShowEditOrgModal(true)}
+            onClick={() => {
+              if (org) {
+                setEditFormData({
+                  name: org.name || '',
+                  address: org.street_address || '',
+                  city: org.city || '',
+                  state: org.state || '',
+                  zip_code: org.zip_code || '',
+                  country: org.country || 'USA',
+                  phone: org.phone !== '—' ? org.phone : '',
+                  email: org.email !== '—' ? org.email : '',
+                  status: org.status || 'ACTIVE',
+                  logo_url: org.logo_url || '',
+                });
+                setEditLogoPreview(org.logo_url || null);
+                setEditLogoFile(null);
+              }
+              setShowEditOrgModal(true);
+            }}
             className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#181920] border border-slate-200 dark:border-[#252733] hover:bg-slate-50 dark:hover:bg-[#1f212a] text-slate-700 dark:text-slate-300 font-semibold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
           >
             <Edit2 className="w-3.5 h-3.5" />
@@ -1369,7 +1428,25 @@ export default function OrganizationDetailPage({
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#222430]">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">Organization Profile</h3>
                 <button
-                  onClick={() => setShowEditOrgModal(true)}
+                  onClick={() => {
+                    if (org) {
+                      setEditFormData({
+                        name: org.name || '',
+                        address: org.street_address || '',
+                        city: org.city || '',
+                        state: org.state || '',
+                        zip_code: org.zip_code || '',
+                        country: org.country || 'USA',
+                        phone: org.phone !== '—' ? org.phone : '',
+                        email: org.email !== '—' ? org.email : '',
+                        status: org.status || 'ACTIVE',
+                        logo_url: org.logo_url || '',
+                      });
+                      setEditLogoPreview(org.logo_url || null);
+                      setEditLogoFile(null);
+                    }
+                    setShowEditOrgModal(true);
+                  }}
                   className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-semibold cursor-pointer"
                 >
                   Edit Profile
@@ -1377,6 +1454,16 @@ export default function OrganizationDetailPage({
               </div>
 
               <div className="space-y-2.5 text-xs">
+                {org.logo_url && (
+                  <div className="flex justify-between items-center pb-1">
+                    <span className="text-slate-400">Logo:</span>
+                    <img
+                      src={org.logo_url}
+                      alt={org.name}
+                      className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-[#2a2d3d]"
+                    />
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-400">Full Name:</span>
                   <span className="font-semibold text-slate-900 dark:text-white">{org.name}</span>
@@ -2218,6 +2305,72 @@ export default function OrganizationDetailPage({
                 </div>
 
                 <form onSubmit={handleSaveOrgEdit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-3.5 text-xs">
+                  {/* Organization Logo */}
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
+                      Organization Logo
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl border border-slate-200 dark:border-[#2a2d3d] bg-slate-50 dark:bg-[#111217] flex items-center justify-center overflow-hidden shrink-0">
+                        {editLogoPreview ? (
+                          <img src={editLogoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Building2 className="w-6 h-6 text-slate-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={editLogoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 5 * 1024 * 1024) {
+                                  showToast('Image size should be less than 5MB', 'error');
+                                  return;
+                                }
+                                setEditLogoFile(file);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setEditLogoPreview(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => editLogoInputRef.current?.click()}
+                            className="px-3 py-1.5 text-xs font-semibold bg-white dark:bg-[#1e2029] border border-slate-200 dark:border-[#2a2d3d] hover:bg-slate-50 dark:hover:bg-[#252836] text-slate-700 dark:text-slate-300 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            <span>{editLogoPreview ? 'Change Logo' : 'Upload Logo'}</span>
+                          </button>
+                          {editLogoPreview && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditLogoFile(null);
+                                setEditLogoPreview(null);
+                                setEditFormData((prev) => ({ ...prev, logo_url: '' }));
+                                if (editLogoInputRef.current) editLogoInputRef.current.value = '';
+                              }}
+                              className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40 rounded-lg transition cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          PNG, JPG, SVG, WebP up to 5MB.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
                     <label className="font-bold text-slate-900 dark:text-slate-100 block text-xs">
                       Organization Name <span className="text-rose-500">*</span>

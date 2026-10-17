@@ -42,7 +42,7 @@ export default function AdminServersPage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [providerFilter, setProviderFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ACTIVE');
+  const [statusFilter, setStatusFilter] = useState('');
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -52,7 +52,7 @@ export default function AdminServersPage() {
   // Form states
   const [serverForm, setServerForm] = useState({
     name: '',
-    provider: 'AWS',
+    provider: 'Cloud',
     purpose: '',
     ip_address: '',
     monthly_cost: '',
@@ -96,7 +96,9 @@ export default function AdminServersPage() {
       setFormSubmitting(true);
       const url = '/api/admin/servers';
       const method = editingServer ? 'PATCH' : 'POST';
-      const payload = editingServer ? { id: editingServer.id, ...serverForm } : serverForm;
+      const payload = editingServer
+        ? { id: editingServer.id, ...serverForm, provider: serverForm.provider || 'Cloud' }
+        : { ...serverForm, provider: serverForm.provider || 'Cloud' };
 
       const res = await fetch(url, {
         method,
@@ -110,7 +112,7 @@ export default function AdminServersPage() {
         setEditingServer(null);
         setServerForm({
           name: '',
-          provider: 'AWS',
+          provider: 'Cloud',
           purpose: '',
           ip_address: '',
           monthly_cost: '',
@@ -118,6 +120,7 @@ export default function AdminServersPage() {
           renewal_date: '',
           notes: '',
         });
+        setStatusFilter('');
         await fetchServers();
       } else {
         alert(json.error || 'Failed to save server');
@@ -209,7 +212,7 @@ export default function AdminServersPage() {
               setEditingServer(null);
               setServerForm({
                 name: '',
-                provider: 'AWS',
+                provider: 'Cloud',
                 purpose: '',
                 ip_address: '',
                 monthly_cost: '',
@@ -331,8 +334,8 @@ export default function AdminServersPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="py-1.5 px-3 text-xs bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
             >
-              <option value="ACTIVE">Active only</option>
               <option value="">All statuses</option>
+              <option value="ACTIVE">Active only</option>
               <option value="DECOMMISSIONED">Decommissioned</option>
             </select>
           </div>
@@ -428,7 +431,7 @@ export default function AdminServersPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-xs text-slate-400">
+                  <td colSpan={6} className="py-10 text-center text-xs text-slate-400">
                     No servers found. Click "Add Server" above to configure your infrastructure instances.
                   </td>
                 </tr>
@@ -475,21 +478,6 @@ export default function AdminServersPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Provider *</label>
-                    <select
-                      value={serverForm.provider}
-                      onChange={(e) => setServerForm({ ...serverForm, provider: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
-                    >
-                      <option value="AWS">AWS</option>
-                      <option value="DigitalOcean">DigitalOcean</option>
-                      <option value="Twilio">Twilio</option>
-                      <option value="Bare Metal">Bare Metal</option>
-                      <option value="Azure">Azure</option>
-                      <option value="GCP">GCP</option>
-                    </select>
-                  </div>
-                  <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Status</label>
                     <select
                       value={serverForm.status}
@@ -501,9 +489,6 @@ export default function AdminServersPage() {
                       <option value="MAINTENANCE">MAINTENANCE</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Monthly Cost ($) *</label>
                     <input
@@ -516,25 +501,15 @@ export default function AdminServersPage() {
                       className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Renewal Date</label>
                     <input
                       type="date"
                       value={serverForm.renewal_date}
                       onChange={(e) => setServerForm({ ...serverForm, renewal_date: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Purpose / Role</label>
-                    <input
-                      type="text"
-                      placeholder="Core PBX router, Postgres DB, etc."
-                      value={serverForm.purpose}
-                      onChange={(e) => setServerForm({ ...serverForm, purpose: e.target.value })}
                       className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
                     />
                   </div>
@@ -548,6 +523,17 @@ export default function AdminServersPage() {
                       className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Purpose / Role</label>
+                  <input
+                    type="text"
+                    placeholder="Core PBX router, Postgres DB, etc."
+                    value={serverForm.purpose}
+                    onChange={(e) => setServerForm({ ...serverForm, purpose: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
+                  />
                 </div>
 
                 <div>

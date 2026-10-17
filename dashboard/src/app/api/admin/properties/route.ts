@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
           id,
           property_id,
           status,
-          organization:organizations(id, name, email, phone),
+          organization:organizations(id, name, email, phone, type),
           onboardings(id, status, target_date)
         `)
         .in('property_id', propIds);
@@ -173,6 +173,7 @@ export async function GET(request: NextRequest) {
         organizations: orgs,
         primary_organization: primaryOrg,
         organization_name: primaryOrg?.name || 'Unassigned',
+        organization_type: primaryOrg?.type || (orgs[0]?.type ?? 'GROUP'),
         org_property_id: matchingOps[0]?.id || null,
         org_links: matchingOps,
         services_count: dynamicServiceCount,

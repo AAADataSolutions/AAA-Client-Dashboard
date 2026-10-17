@@ -338,10 +338,10 @@ export default function AdminOverviewPage() {
               </div>
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-700/60 text-[11px]">
                 <span className="text-blue-200">
-                  Avg <strong className="text-white font-bold">${Number(superAdminKPIs.averagePropertyMRR).toFixed(0)}</strong> / property
+                  Across <strong className="text-white font-bold">{superAdminKPIs.activePropertiesCount}</strong> Active Properties
                 </span>
                 <span className="text-emerald-300 font-semibold">
-                  ${Number(superAdminKPIs.activeMRR).toLocaleString('en-US', { minimumFractionDigits: 0 })} Active
+                  Avg ${Number(superAdminKPIs.averagePropertyMRR).toFixed(0)} / prop
                 </span>
               </div>
             </div>

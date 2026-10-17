@@ -267,6 +267,7 @@ export async function POST(request: NextRequest) {
       contact_phone,
       type = 'GROUP',
       status = 'ACTIVE',
+      logo_url,
     } = body;
 
     if (!name || !name.trim()) {
@@ -293,6 +294,7 @@ export async function POST(request: NextRequest) {
         email: adminContactEmail || null,
         type: orgType,
         status: status || 'ACTIVE',
+        logo_url: logo_url && typeof logo_url === 'string' && logo_url.trim() ? logo_url.trim() : null,
       })
       .select()
       .single();

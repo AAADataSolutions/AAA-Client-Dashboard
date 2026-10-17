@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         id,
         status,
         created_at,
-        organization:organizations(id, name),
+        organization:organizations(id, name, type),
         property:properties(
           id,
           name,
@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
           main_phone: prop.main_phone,
           fax: prop.fax,
           organization_name: op.organization?.name || 'Organization',
+          organization_type: op.organization?.type || 'GROUP',
           contact_person_name: prop.contact_person_name || prop.general_manager_name || null,
           contact_person_email: prop.contact_person_email || prop.general_manager_email || null,
           general_manager_name: gmName,

@@ -28,6 +28,7 @@ interface RayBaumRecord {
   phone_number: string;
   assigned_to_room: string | null;
   location: string | null;
+  price?: number;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +63,7 @@ export default function AdminRayBaumPropertyPage({
     phone_number: '',
     assigned_to_room: '',
     location: '',
+    price: '',
   });
 
   const [editingRecord, setEditingRecord] = useState<RayBaumRecord | null>(null);
@@ -70,6 +72,7 @@ export default function AdminRayBaumPropertyPage({
     phone_number: '',
     assigned_to_room: '',
     location: '',
+    price: '',
   });
 
   const [deletingRecord, setDeletingRecord] = useState<RayBaumRecord | null>(null);
@@ -82,18 +85,19 @@ export default function AdminRayBaumPropertyPage({
     setTimeout(() => setToastMsg(null), 4000);
   };
 
-  // Export CSV Function (Headers: PHONE NO., ASSIGNED TO ROOM, LOCATION)
+  // Export CSV Function (Headers: PHONE NO., ASSIGNED TO ROOM, LOCATION, PRICE)
   const handleExportCSV = () => {
     if (records.length === 0) {
       showToast('No dispatch records available to export.', 'error');
       return;
     }
 
-    const headers = ['PHONE NO.', 'ASSIGNED TO ROOM', 'LOCATION'];
+    const headers = ['PHONE NO.', 'ASSIGNED TO ROOM', 'LOCATION', 'PRICE'];
     const rows = records.map((rec) => [
       `"${(rec.phone_number || '').replace(/"/g, '""')}"`,
       `"${(rec.assigned_to_room || '').replace(/"/g, '""')}"`,
-      `"${(rec.location || '').replace(/"/g, '""')}"`
+      `"${(rec.location || '').replace(/"/g, '""')}"`,
+      `"${Number(rec.price || 0).toFixed(2)}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -157,6 +161,7 @@ export default function AdminRayBaumPropertyPage({
     }
     setSubmittingAdd(true);
     try {
+      const parsedPrice = addForm.price !== '' ? parseFloat(addForm.price) || 0 : 0;
       const res = await fetch('/api/admin/ray-baum', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -165,6 +170,7 @@ export default function AdminRayBaumPropertyPage({
           phone_number: addForm.phone_number.trim(),
           assigned_to_room: addForm.assigned_to_room.trim() || null,
           location: addForm.location.trim() || null,
+          price: parsedPrice,
         }),
       });
       const json = await res.json();
@@ -173,7 +179,7 @@ export default function AdminRayBaumPropertyPage({
       }
       showToast('Dispatch record added successfully.');
       setShowAddModal(false);
-      setAddForm({ phone_number: '', assigned_to_room: '', location: '' });
+      setAddForm({ phone_number: '', assigned_to_room: '', location: '', price: '' });
       await fetchData();
     } catch (err: any) {
       showToast(err.message || 'Error creating record', 'error');
@@ -189,6 +195,7 @@ export default function AdminRayBaumPropertyPage({
       phone_number: rec.phone_number || '',
       assigned_to_room: rec.assigned_to_room || '',
       location: rec.location || '',
+      price: rec.price !== undefined && rec.price !== null ? String(rec.price) : '0.00',
     });
   };
 
@@ -201,6 +208,7 @@ export default function AdminRayBaumPropertyPage({
     }
     setSubmittingEdit(true);
     try {
+      const parsedPrice = editForm.price !== '' ? parseFloat(editForm.price) || 0 : 0;
       const res = await fetch('/api/admin/ray-baum', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -209,6 +217,7 @@ export default function AdminRayBaumPropertyPage({
           phone_number: editForm.phone_number.trim(),
           assigned_to_room: editForm.assigned_to_room.trim() || null,
           location: editForm.location.trim() || null,
+          price: parsedPrice,
         }),
       });
       const json = await res.json();
@@ -357,9 +366,16 @@ export default function AdminRayBaumPropertyPage({
               </button>
             )}
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            Total Records: <strong className="text-slate-900 dark:text-white">{records.length}</strong>
-          </span>
+          <div className="flex items-center gap-4 text-xs flex-wrap">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">
+              Total Records: <strong className="text-slate-900 dark:text-white">{records.length}</strong>
+            </span>
+            <span className="text-slate-500 dark:text-slate-400 font-medium">
+              Total Ray Baum Monthly Price: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">
+                ${records.reduce((sum, r) => sum + (Number(r.price) || 0), 0).toFixed(2)}/mo
+              </strong>
+            </span>
+          </div>
         </div>
 
         {/* Table View */}
@@ -371,13 +387,14 @@ export default function AdminRayBaumPropertyPage({
                   <th className="py-3.5 px-5 whitespace-nowrap">PHONE NO.</th>
                   <th className="py-3.5 px-5 whitespace-nowrap">ASSIGNED TO ROOM</th>
                   <th className="py-3.5 px-5 whitespace-nowrap">LOCATION</th>
+                  <th className="py-3.5 px-5 text-right whitespace-nowrap">MONTHLY PRICE</th>
                   <th className="py-3.5 px-5 text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-400">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
                         <span>Loading dispatch records...</span>
@@ -386,7 +403,7 @@ export default function AdminRayBaumPropertyPage({
                   </tr>
                 ) : filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center text-slate-400">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                         <p className="font-semibold text-slate-600 dark:text-slate-400">
@@ -434,7 +451,12 @@ export default function AdminRayBaumPropertyPage({
                         </div>
                       </td>
 
-                      {/* 4. Actions */}
+                      {/* 4. Monthly Price */}
+                      <td className="py-3.5 px-5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
+                        ${Number(rec.price || 0).toFixed(2)}
+                      </td>
+
+                      {/* 5. Actions */}
                       <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
@@ -528,6 +550,24 @@ export default function AdminRayBaumPropertyPage({
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Monthly Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={addForm.price}
+                    onChange={(e) => setAddForm({ ...addForm, price: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
+                  />
+                  <p className="text-[10.5px] text-slate-400">
+                    This price will be automatically added to the property's total monthly billing price.
+                  </p>
+                </div>
+
                 <div className="pt-3 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">
                   <button
                     type="button"
@@ -612,6 +652,24 @@ export default function AdminRayBaumPropertyPage({
                     onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Monthly Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.price}
+                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
+                  />
+                  <p className="text-[10.5px] text-slate-400">
+                    This price will be automatically added to the property's total monthly billing price.
+                  </p>
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">

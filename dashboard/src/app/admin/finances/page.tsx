@@ -607,13 +607,8 @@ export default function AdminFinancesPage() {
                 <polyline fill="none" stroke="#86efac" strokeWidth="2" points={sparklinePoints} />
               </svg>
             </div>
-          </div>
-
-          <p className="text-[11px] text-blue-200 mt-2 pt-2 border-t border-white/10">
-            From {gmrData.activePropertiesCount || 0} active properties ({formatCurrency(gmrData.basePropertyRevenue || 0)} base + {formatCurrency(gmrData.servicesRevenue || 0)} services)
-          </p>
         </div>
-
+</div>
         {/* Partner Commission Outflow Card */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>

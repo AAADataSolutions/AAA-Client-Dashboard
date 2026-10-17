@@ -951,9 +951,12 @@ export default function AdminPortingPage() {
         throw new Error(json.error || 'Failed to update stage.');
       }
 
+      const isNowCompleted = editStageStatus === 'COMPLETED';
       showToast(
-        'Lifecycle Stage Updated',
-        `${selectedRecord.property_name} updated to ${getStageBadge(editStageStatus).label}.`,
+        isNowCompleted ? 'Property Onboarded & Activated' : 'Lifecycle Stage Updated',
+        isNowCompleted
+          ? `${selectedRecord.property_name} is now onboarded and has moved to the Properties section.`
+          : `${selectedRecord.property_name} updated to ${getStageBadge(editStageStatus).label}.`,
         'success'
       );
       setShowUnifiedModal(false);

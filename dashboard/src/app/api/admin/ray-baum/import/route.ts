@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
       const room = (row.assigned_to_room || row['ASSIGNED TO ROOM'] || row['Room'] || row['room'] || '').trim();
       const location = (row.location || row['LOCATION'] || row['Location'] || '').trim();
 
+      const rawPrice =
+        row.price !== undefined
+          ? row.price
+          : row['PRICE'] || row['Price'] || row['MONTHLY PRICE'] || row['Monthly Price'] || row['price'] || 0;
+      const parsedNum =
+        typeof rawPrice === 'string'
+          ? parseFloat(rawPrice.replace(/[$,]/g, '').trim()) || 0
+          : Number(rawPrice) || 0;
+      const price = Math.max(0, isNaN(parsedNum) ? 0 : parsedNum);
+
       if (!phone) {
         failedRows.push({
           row: rowNumber,
@@ -84,6 +95,7 @@ export async function POST(request: NextRequest) {
             .update({
               assigned_to_room: room || null,
               location: location || null,
+              price,
               updated_at: new Date().toISOString(),
             })
             .eq('id', existing.id)
@@ -103,6 +115,7 @@ export async function POST(request: NextRequest) {
               phone_number: phone,
               assigned_to_room: room || null,
               location: location || null,
+              price,
             })
             .select()
             .single();
@@ -122,7 +135,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Ensure property has ray_baud_and_logs_enabled = true if records are present
+    // Ensure property has ray_baud_and_logs_enabled = true if records are present and sync monthly price
     if (successfulRows.length > 0) {
       await db
         .from('properties')
@@ -132,6 +145,8 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', property_id);
+
+      await syncPropertyMonthlyPrice(db, property_id);
     }
 
     // Central Audit Log

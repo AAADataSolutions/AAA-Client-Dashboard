@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     // 1. KPI Counts
     const { count: totalCount } = await db
       .from('porting_requests')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .not('status', 'in', '("COMPLETED","ONBOARDED")');
 
     const { count: completedCount } = await db
       .from('porting_requests')
@@ -99,6 +100,9 @@ export async function GET(request: NextRequest) {
       } else {
         query = query.eq('status', statusFilter);
       }
+    } else {
+      // By default (All Statuses), completed/onboarded properties are removed from active porting list
+      query = query.not('status', 'in', '("COMPLETED","ONBOARDED")');
     }
 
     const { data: rawPortings, error } = await query;
@@ -114,8 +118,15 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: fErr.message }, { status: 400 });
       }
 
-      const totalSimple = fallbackList?.length || 0;
-      const paginated = (fallbackList || []).slice((page - 1) * limit, page * limit);
+      let filteredFallback = fallbackList || [];
+      if (statusFilter !== 'ALL') {
+        filteredFallback = filteredFallback.filter((item: any) => item.status === statusFilter);
+      } else {
+        filteredFallback = filteredFallback.filter((item: any) => item.status !== 'COMPLETED' && item.status !== 'ONBOARDED');
+      }
+
+      const totalSimple = filteredFallback.length;
+      const paginated = filteredFallback.slice((page - 1) * limit, page * limit);
 
       return NextResponse.json({
         success: true,
@@ -552,8 +563,9 @@ export async function PATCH(request: NextRequest) {
     if (property_phone !== undefined) updatePayload.property_phone = property_phone.trim();
     if (fax !== undefined) updatePayload.fax = fax ? fax.trim() : null;
     if (carrier_details !== undefined) updatePayload.carrier_details = carrier_details ? carrier_details.trim() : null;
-    if (organization_id !== undefined) updatePayload.organization_id = organization_id || null;
-    if (status === 'COMPLETED') {
+    const isCompletedOrOnboarded = status === 'COMPLETED' || status === 'ONBOARDED';
+    if (isCompletedOrOnboarded) {
+      updatePayload.status = 'COMPLETED';
       updatePayload.completed_at = new Date().toISOString();
       updatePayload.is_activated = true;
     }
@@ -689,7 +701,7 @@ export async function PATCH(request: NextRequest) {
         propUpdate.ray_baum_status = isE911 ? 'ACTIVE' : 'INACTIVE';
       }
 
-      if (status === 'COMPLETED') propUpdate.status = 'ACTIVE';
+      if (isCompletedOrOnboarded) propUpdate.status = 'ACTIVE';
 
       await db.from('properties').update(propUpdate).eq('id', propId);
 
@@ -712,7 +724,7 @@ export async function PATCH(request: NextRequest) {
         updated_at: new Date().toISOString(),
       };
       if (organization_id !== undefined) orgPropUpdate.organization_id = organization_id || null;
-      if (status === 'COMPLETED') orgPropUpdate.status = 'ACTIVE';
+      if (isCompletedOrOnboarded) orgPropUpdate.status = 'ACTIVE';
 
       if (Object.keys(orgPropUpdate).length > 1) {
         await db
@@ -727,7 +739,7 @@ export async function PATCH(request: NextRequest) {
       const obUpdate: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
-      if (status !== undefined) obUpdate.status = status;
+      if (status !== undefined) obUpdate.status = isCompletedOrOnboarded ? 'COMPLETED' : status;
       if (target_date !== undefined) obUpdate.target_date = target_date;
       if (draft_date !== undefined) obUpdate.draft_date = draft_date;
       if (contract_sent_date !== undefined) obUpdate.contract_sent_date = contract_sent_date;
@@ -754,7 +766,7 @@ export async function PATCH(request: NextRequest) {
       if (body.stage4_assigned_to_name !== undefined) obUpdate.stage4_assigned_to_name = body.stage4_assigned_to_name;
       if (body.stage4_notes !== undefined) obUpdate.stage4_notes = body.stage4_notes;
       if (attachments !== undefined) obUpdate.attachments = attachments;
-      if (status === 'COMPLETED') obUpdate.completed_at = new Date().toISOString();
+      if (isCompletedOrOnboarded) obUpdate.completed_at = new Date().toISOString();
 
       const { data: existingOb } = await db
         .from('onboardings')

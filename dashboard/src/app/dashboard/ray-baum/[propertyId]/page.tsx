@@ -19,6 +19,7 @@ interface RayBaumRecord {
   phone_number: string;
   assigned_to_room: string | null;
   location: string | null;
+  price?: number;
   created_at: string;
   updated_at: string;
 }
@@ -157,9 +158,18 @@ export default function ClientRayBaumPropertyPage({
               </button>
             )}
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            Total Dispatch Records: <strong className="text-slate-900 dark:text-white">{records.length}</strong>
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              Total Dispatch Records: <strong className="text-slate-900 dark:text-white">{records.length}</strong>
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              Total Price:{' '}
+              <strong className="text-emerald-600 dark:text-emerald-400 font-mono">
+                ${records.reduce((acc, r) => acc + Number(r.price || 0), 0).toFixed(2)}/mo
+              </strong>
+            </span>
+          </div>
         </div>
 
         {/* Read-Only Table View */}
@@ -171,12 +181,13 @@ export default function ClientRayBaumPropertyPage({
                   <th className="py-3.5 px-5 whitespace-nowrap">PHONE NO.</th>
                   <th className="py-3.5 px-5 whitespace-nowrap">ASSIGNED TO ROOM</th>
                   <th className="py-3.5 px-5 whitespace-nowrap">LOCATION</th>
+                  <th className="py-3.5 px-5 text-right whitespace-nowrap">PRICE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
                 {loading ? (
                   <tr>
-                    <td colSpan={3} className="py-12 text-center text-slate-400">
+                    <td colSpan={4} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
                         <span>Loading dispatchable locations...</span>
@@ -185,7 +196,7 @@ export default function ClientRayBaumPropertyPage({
                   </tr>
                 ) : filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-12 text-center text-slate-400">
+                    <td colSpan={4} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                         <p className="font-semibold text-slate-600 dark:text-slate-400">
@@ -229,6 +240,11 @@ export default function ClientRayBaumPropertyPage({
                             {rec.location || <span className="text-slate-400 italic">Not specified</span>}
                           </span>
                         </div>
+                      </td>
+
+                      {/* 4. Monthly Price */}
+                      <td className="py-3.5 px-5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
+                        ${Number(rec.price || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))

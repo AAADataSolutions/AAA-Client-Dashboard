@@ -128,15 +128,13 @@ export async function POST(request: NextRequest) {
     if (!name || !name.trim()) {
       return NextResponse.json({ success: false, error: 'Server name is required.' }, { status: 400 });
     }
-    if (!provider || !provider.trim()) {
-      return NextResponse.json({ success: false, error: 'Provider is required.' }, { status: 400 });
-    }
+    const cleanProvider = provider && provider.trim() ? provider.trim() : 'Cloud';
 
     const { data: newServer, error: insertErr } = await supabase
       .from('servers')
       .insert({
         name: name.trim(),
-        provider: provider.trim(),
+        provider: cleanProvider,
         purpose: purpose?.trim() || null,
         ip_address: ip_address?.trim() || null,
         monthly_cost: monthly_cost !== undefined && monthly_cost !== '' ? Number(monthly_cost) : 0,
@@ -177,6 +175,9 @@ export async function PATCH(request: NextRequest) {
 
     if (updates.monthly_cost !== undefined) {
       updates.monthly_cost = updates.monthly_cost === '' ? 0 : Number(updates.monthly_cost);
+    }
+    if (updates.provider !== undefined) {
+      updates.provider = updates.provider && updates.provider.trim() ? updates.provider.trim() : 'Cloud';
     }
 
     const { data: updated, error: updateErr } = await supabase

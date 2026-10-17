@@ -362,6 +362,7 @@ export async function GET(
       data: {
         id: org.id,
         name: org.name,
+        logo_url: org.logo_url || null,
         type: org.type === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GROUP',
         address: formattedAddress,
         street_address: org.address || '',

@@ -102,17 +102,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const defaultRate = custom_commission_rate !== undefined ? Number(custom_commission_rate) : Number(partner.default_commission_rate || 10);
+    const hasCustomRate =
+      custom_commission_rate !== undefined &&
+      custom_commission_rate !== null &&
+      String(custom_commission_rate).trim() !== '';
+
+    const defaultRate = hasCustomRate
+      ? Number(custom_commission_rate)
+      : Number(partner.default_commission_rate || 10);
     let grossRevenue = 0;
     let totalCommission = 0;
 
     const lineItems = properties.map((p: any) => {
-      const rate =
-        custom_commission_rate !== undefined
-          ? Number(custom_commission_rate)
-          : p.partner_commission_override !== null && p.partner_commission_override !== undefined
-          ? Number(p.partner_commission_override)
-          : defaultRate;
+      const rate = hasCustomRate
+        ? Number(custom_commission_rate)
+        : p.partner_commission_override !== null &&
+          p.partner_commission_override !== undefined &&
+          String(p.partner_commission_override).trim() !== ''
+        ? Number(p.partner_commission_override)
+        : defaultRate;
 
       const price = Number(p.monthly_price || 0);
       const commission = price * (rate / 100);

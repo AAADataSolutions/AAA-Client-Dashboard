@@ -32,6 +32,7 @@ import {
   Building,
   UserPlus,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -131,8 +132,12 @@ export default function AdminOrganizationsPage() {
   // Edit Organization Drawer
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<OrgRecord | null>(null);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
+  const editLogoInputRef = React.useRef<HTMLInputElement>(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
+    logo_url: '',
     type: 'GROUP' as 'GROUP' | 'INDIVIDUAL',
     address: '',
     city: '',
@@ -311,8 +316,11 @@ export default function AdminOrganizationsPage() {
   // Open Edit Drawer
   const handleOpenEditDrawer = (org: OrgRecord) => {
     setSelectedOrgForEdit(org);
+    setEditLogoFile(null);
+    setEditLogoPreview(org.logo_url || null);
     setEditFormData({
       name: org.name || '',
+      logo_url: org.logo_url || '',
       type: (org.type === 'INDIVIDUAL' ? 'INDIVIDUAL' : 'GROUP') as 'GROUP' | 'INDIVIDUAL',
       address: org.street_address || org.address || '',
       city: org.city || '',
@@ -332,30 +340,49 @@ export default function AdminOrganizationsPage() {
     if (!selectedOrgForEdit) return;
     setEditSaving(true);
 
-    const updates = {
-      name: editFormData.name.trim(),
-      type: editFormData.type,
-      address: editFormData.address.trim(),
-      street_address: editFormData.address.trim(),
-      city: editFormData.city.trim(),
-      state: editFormData.state.trim(),
-      zip_code: editFormData.zip_code.trim(),
-      phone: editFormData.phone.trim() || '—',
-      email: editFormData.email.trim() || '—',
-      contact_name: editFormData.contact_name.trim(),
-      primary_contact_name: editFormData.contact_name.trim(),
-      status: editFormData.status as any,
-    };
-
-    dispatch(updateOrganizationOptimistic({ id: selectedOrgForEdit.id, updates }));
-    setShowEditDrawer(false);
-    showToast('Organization details updated successfully.');
-
     try {
+      let finalLogoUrl: string | null = editFormData.logo_url || null;
+      if (editLogoFile) {
+        const logoFormData = new FormData();
+        logoFormData.append('logo', editLogoFile);
+        logoFormData.append('organization_id', selectedOrgForEdit.id);
+        const logoRes = await fetch('/api/admin/organizations/logo', {
+          method: 'POST',
+          body: logoFormData,
+        });
+        const logoJson = await logoRes.json();
+        if (logoJson.success && logoJson.logo_url) {
+          finalLogoUrl = logoJson.logo_url;
+        }
+      }
+
+      const updates = {
+        name: editFormData.name.trim(),
+        logo_url: finalLogoUrl,
+        type: editFormData.type,
+        address: editFormData.address.trim(),
+        street_address: editFormData.address.trim(),
+        city: editFormData.city.trim(),
+        state: editFormData.state.trim(),
+        zip_code: editFormData.zip_code.trim(),
+        phone: editFormData.phone.trim() || '—',
+        email: editFormData.email.trim() || '—',
+        contact_name: editFormData.contact_name.trim(),
+        primary_contact_name: editFormData.contact_name.trim(),
+        status: editFormData.status as any,
+      };
+
+      dispatch(updateOrganizationOptimistic({ id: selectedOrgForEdit.id, updates }));
+      setShowEditDrawer(false);
+      showToast('Organization details updated successfully.');
+
       const res = await fetch(`/api/admin/organizations/${selectedOrgForEdit.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editFormData),
+        body: JSON.stringify({
+          ...editFormData,
+          logo_url: finalLogoUrl,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update organization');
@@ -1230,6 +1257,66 @@ export default function AdminOrganizationsPage() {
               </div>
 
               <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                {/* Organization Logo */}
+                <div className="space-y-1.5">
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
+                    Organization Logo
+                  </label>
+                  <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-[#222430] bg-slate-50/50 dark:bg-[#111217]/60">
+                    {editLogoPreview ? (
+                      <div className="relative w-12 h-12 rounded-xl border border-slate-200 dark:border-[#282a36] overflow-hidden bg-white dark:bg-[#1a1b24] shrink-0">
+                        <img src={editLogoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditLogoFile(null);
+                            setEditLogoPreview(null);
+                            setEditFormData((prev) => ({ ...prev, logo_url: '' }));
+                            if (editLogoInputRef.current) editLogoInputRef.current.value = '';
+                          }}
+                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] hover:bg-rose-700 cursor-pointer shadow-xs"
+                          title="Remove logo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl border border-dashed border-slate-300 dark:border-[#2f3242] flex items-center justify-center text-slate-400 dark:text-slate-500 bg-white dark:bg-[#15161c] shrink-0">
+                        <Building2 className="w-5 h-5 text-slate-400" />
+                      </div>
+                    )}
+
+                    <div className="flex-1 space-y-1">
+                      <input
+                        ref={editLogoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            if (file.size > 5 * 1024 * 1024) {
+                              showToast('Logo file size must be 5MB or less.', 'error');
+                              return;
+                            }
+                            setEditLogoFile(file);
+                            setEditLogoPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => editLogoInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#252733] hover:bg-slate-100 dark:hover:bg-[#1d1f28] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-blue-500" />
+                        <span>{editLogoFile || editLogoPreview ? 'Change Logo' : 'Upload Logo'}</span>
+                      </button>
+                      <p className="text-[10px] text-slate-400">PNG, JPG, SVG, WebP up to 5MB.</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="font-semibold text-slate-800 dark:text-slate-200 block">
                     Organization Name <span className="text-rose-500">*</span>

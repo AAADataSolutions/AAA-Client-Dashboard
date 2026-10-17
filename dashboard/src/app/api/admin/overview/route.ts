@@ -24,6 +24,7 @@ export async function GET() {
       propsRes,
       partnersRes,
       servicesRes,
+      orgPropsRes,
       onboardingsRes,
       portingsRes,
       ticketsRes,
@@ -57,12 +58,30 @@ export async function GET() {
         .select('*')
         .order('created_at', { ascending: false }),
 
-      // 4. Total provisioned services
+      // 4. Provisioned services with property links (same as Finances)
       db
         .from('services')
-        .select('id', { count: 'exact', head: true }),
+        .select(`
+          id,
+          status,
+          price,
+          monthly_price,
+          created_at,
+          property_links:organization_property_services(
+            id,
+            org_property:organization_properties(
+              id,
+              property_id
+            )
+          )
+        `),
 
-      // 5. Onboardings with property & org
+      // 5. Organization Properties (Junction for assigned status)
+      db
+        .from('organization_properties')
+        .select('id, organization_id, property_id, status'),
+
+      // 6. Onboardings with property & org
       db
         .from('onboardings')
         .select(`
@@ -136,6 +155,8 @@ export async function GET() {
     let orgs = orgsRes.data || [];
     let props = propsRes.data || [];
     let partners = partnersRes.data || [];
+    let services = servicesRes.data || [];
+    let orgProps = orgPropsRes.data || [];
     let onboardings = onboardingsRes.data || [];
     let portings = portingsRes.data || [];
     let tickets = ticketsRes.data || [];
@@ -154,19 +175,55 @@ export async function GET() {
     }
 
     // ==========================================
-    // REAL FINANCIAL & SUPER ADMIN COMPUTATIONS
+    // REAL FINANCIAL & SUPER ADMIN COMPUTATIONS (Synced with Finances Logic)
     // ==========================================
 
-    // 1. Gross Monthly Revenue (MRR) across all properties
-    const grossMRR = props.reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
-    const activeProps = props.filter((p) => p.status === 'ACTIVE' || p.status === 'COMPLETED' || p.status === 'ONBOARDED');
-    const activeMRR = activeProps.reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
-    const pendingProps = props.filter((p) => p.status !== 'ACTIVE' && p.status !== 'COMPLETED' && p.status !== 'ONBOARDED');
-    const pendingMRR = pendingProps.reduce((sum, p) => sum + Number(p.monthly_price || 0), 0);
+    // Map organization assignment (Assigned properties generating real revenue)
+    const assignedPropIds = new Set<string>();
+    orgProps.forEach((op: any) => {
+      if (op.property_id) {
+        assignedPropIds.add(op.property_id);
+      }
+    });
 
-    const averagePropertyMRR = props.length > 0 ? grossMRR / props.length : 0;
+    // Map active services to properties
+    const servicesByPropId = new Map<string, number>();
+    services.forEach((s: any) => {
+      if (s.status !== 'DISCONNECTED' && s.status !== 'INACTIVE') {
+        const links = Array.isArray(s.property_links) ? s.property_links : s.property_links ? [s.property_links] : [];
+        const unitPrice = Number(s.price || s.monthly_price || 0);
+        links.forEach((link: any) => {
+          const pId = link?.org_property?.property_id;
+          if (pId) {
+            servicesByPropId.set(pId, (servicesByPropId.get(pId) || 0) + unitPrice);
+          }
+        });
+      }
+    });
 
-    // 2. Partner Commission Outflow calculation
+    // Active assigned properties (Generating real realized revenue)
+    const activeAssignedProps = props.filter((p: any) => {
+      const isAssigned = assignedPropIds.has(p.id);
+      const isActive = p.status === 'ACTIVE' || p.status === 'COMPLETED' || p.status === 'ONBOARDED';
+      return isAssigned && isActive;
+    });
+
+    // Real Gross Monthly Revenue (GMR) matching Finances page
+    let activeBaseMRR = 0;
+    let activeServicesMRR = 0;
+    activeAssignedProps.forEach((p: any) => {
+      activeBaseMRR += Number(p.monthly_price || 0);
+      activeServicesMRR += servicesByPropId.get(p.id) || 0;
+    });
+
+    const grossMRR = activeBaseMRR + activeServicesMRR;
+    const activeMRR = grossMRR;
+    const unassignedProps = props.filter((p: any) => !assignedPropIds.has(p.id) || (p.status !== 'ACTIVE' && p.status !== 'COMPLETED' && p.status !== 'ONBOARDED'));
+    const pendingMRR = unassignedProps.reduce((sum: number, p: any) => sum + Number(p.monthly_price || 0), 0);
+
+    const averagePropertyMRR = activeAssignedProps.length > 0 ? grossMRR / activeAssignedProps.length : 0;
+
+    // 2. Real Partner Commission Outflow calculation (only on active assigned revenue)
     const partnersMap = new Map<string, any>();
     partners.forEach((partner: any) => {
       partnersMap.set(partner.id, partner);
@@ -191,16 +248,17 @@ export async function GET() {
       };
     });
 
-    props.forEach((prop: any) => {
-      if (prop.partner_id) {
+    // Compute partner outflow strictly on revenue-generating active assigned properties
+    activeAssignedProps.forEach((prop: any) => {
+      if (prop.partner_id && partnersMap.has(prop.partner_id)) {
         partnerAssignedPropsCount++;
         const partner = partnersMap.get(prop.partner_id);
         const rate =
-          prop.partner_commission_override !== null && prop.partner_commission_override !== undefined
+          prop.partner_commission_override !== null && prop.partner_commission_override !== undefined && prop.partner_commission_override !== ''
             ? Number(prop.partner_commission_override)
             : Number(partner?.default_commission_rate || 10);
 
-        const propMonthly = Number(prop.monthly_price || 0);
+        const propMonthly = Number(prop.monthly_price || 0) + (servicesByPropId.get(prop.id) || 0);
         const propCommission = propMonthly * (rate / 100);
         totalPartnerCommissionOutflow += propCommission;
 
@@ -212,9 +270,10 @@ export async function GET() {
       }
     });
 
+    totalPartnerCommissionOutflow = Math.round(totalPartnerCommissionOutflow * 100) / 100;
     const netRetainedMRR = Math.max(0, grossMRR - totalPartnerCommissionOutflow);
-    const retainedPct = grossMRR > 0 ? Math.round((netRetainedMRR / grossMRR) * 100) : 100;
-    const outflowPct = grossMRR > 0 ? Math.round((totalPartnerCommissionOutflow / grossMRR) * 100) : 0;
+    const retainedPct = grossMRR > 0 ? Math.round((netRetainedMRR / grossMRR) * 1000) / 10 : 100;
+    const outflowPct = grossMRR > 0 ? Math.round((totalPartnerCommissionOutflow / grossMRR) * 1000) / 10 : 0;
 
     // 3. Management Groups (Organizations) Detailed Stats
     const managementGroups = orgs.map((org: any) => {
@@ -550,8 +609,8 @@ export async function GET() {
           managementGroupsCount: orgs.length,
           activeManagementGroupsCount: orgs.filter((o: any) => o.status === 'ACTIVE').length,
           propertiesCount: props.length,
-          activePropertiesCount: activeProps.length,
-          pendingPropertiesCount: pendingProps.length,
+          activePropertiesCount: activeAssignedProps.length,
+          pendingPropertiesCount: unassignedProps.length,
           grossMRR,
           activeMRR,
           pendingMRR,

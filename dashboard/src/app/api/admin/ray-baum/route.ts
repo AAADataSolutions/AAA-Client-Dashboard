@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    const { property_id, phone_number, assigned_to_room, location } = body;
+    const { property_id, phone_number, assigned_to_room, location, price } = body;
 
     if (!property_id || !phone_number) {
       return NextResponse.json(
@@ -51,6 +52,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const cleanPrice = price !== undefined && price !== '' && !isNaN(Number(price)) ? Math.max(0, Number(price)) : 0;
+
     const { data: newRecord, error } = await supabase
       .from('ray_baum_records')
       .insert({
@@ -58,6 +61,7 @@ export async function POST(request: NextRequest) {
         phone_number: phone_number.trim(),
         assigned_to_room: assigned_to_room?.trim() || null,
         location: location?.trim() || null,
+        price: cleanPrice,
       })
       .select(`
         *,
@@ -68,6 +72,9 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
+
+    // Automatically synchronize the property's total monthly price
+    await syncPropertyMonthlyPrice(supabase, property_id);
 
     await logAuditEvent({
       action: 'RAY_BAUM_RECORD_CREATED',
@@ -87,7 +94,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
     const body = await request.json();
-    const { id, property_id, phone_number, assigned_to_room, location } = body;
+    const { id, property_id, phone_number, assigned_to_room, location, price } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 });
@@ -100,6 +107,9 @@ export async function PATCH(request: NextRequest) {
     if (phone_number !== undefined) updatePayload.phone_number = phone_number.trim();
     if (assigned_to_room !== undefined) updatePayload.assigned_to_room = assigned_to_room ? assigned_to_room.trim() : null;
     if (location !== undefined) updatePayload.location = location ? location.trim() : null;
+    if (price !== undefined) {
+      updatePayload.price = price === '' || isNaN(Number(price)) ? 0 : Math.max(0, Number(price));
+    }
 
     const { data: updatedRecord, error } = await supabase
       .from('ray_baum_records')
@@ -110,6 +120,11 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Automatically synchronize the property's total monthly price
+    if (updatedRecord?.property_id) {
+      await syncPropertyMonthlyPrice(supabase, updatedRecord.property_id);
     }
 
     return NextResponse.json({ success: true, data: updatedRecord });
@@ -128,10 +143,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Record ID is required.' }, { status: 400 });
     }
 
+    // Get property_id before deletion to sync price
+    const { data: existingRec } = await supabase
+      .from('ray_baum_records')
+      .select('property_id')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await supabase.from('ray_baum_records').delete().eq('id', id);
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Automatically synchronize the property's total monthly price
+    if (existingRec?.property_id) {
+      await syncPropertyMonthlyPrice(supabase, existingRec.property_id);
     }
 
     return NextResponse.json({ success: true, message: 'Record deleted successfully.' });

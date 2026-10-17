@@ -32,6 +32,7 @@ interface ParsedRayBaumRow {
   phone: string;
   assignedRoom: string;
   location: string;
+  price: number;
   isValid: boolean;
   validationError?: string;
   rawObj: Record<string, string>;
@@ -41,6 +42,7 @@ const REQUIRED_HEADERS = [
   'PHONE NO.',
   'ASSIGNED TO ROOM',
   'LOCATION',
+  'PRICE',
 ];
 
 export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
@@ -67,11 +69,11 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
   // 1. Download CSV Template
   const handleDownloadTemplate = () => {
     const csvContent = `${REQUIRED_HEADERS.join(',')}\n` +
-      `"+1 (312) 555-0101","Room 101","Building A - 1st Floor"\n` +
-      `"+1 (312) 555-0102","Room 102","Building A - 1st Floor"\n` +
-      `"+1 (312) 555-0201","Room 201","Building A - 2nd Floor"\n` +
-      `"+1 (312) 555-0901","Elevator Lobby 1","West Wing - Ground Floor"\n` +
-      `"+1 (312) 555-0902","Front Desk Reception","Main Entrance Lobby"`;
+      `"+1 (312) 555-0101","Room 101","Building A - 1st Floor","5.00"\n` +
+      `"+1 (312) 555-0102","Room 102","Building A - 1st Floor","5.00"\n` +
+      `"+1 (312) 555-0201","Room 201","Building A - 2nd Floor","5.00"\n` +
+      `"+1 (312) 555-0901","Elevator Lobby 1","West Wing - Ground Floor","0.00"\n` +
+      `"+1 (312) 555-0902","Front Desk Reception","Main Entrance Lobby","0.00"`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -148,6 +150,9 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
       const phone = getVal(rowObj, ['PHONE NO.', 'Phone No', 'Phone number', 'Phone', 'phone', 'PHONE']);
       const assignedRoom = getVal(rowObj, ['ASSIGNED TO ROOM', 'Assigned To Room', 'Room', 'room', 'ROOM', 'Assigned Room']);
       const location = getVal(rowObj, ['LOCATION', 'Location', 'location', 'Address']);
+      const priceRaw = getVal(rowObj, ['PRICE', 'Price', 'price', 'MONTHLY PRICE', 'Monthly Price', 'RATE', 'Rate']);
+      const parsedPrice = priceRaw ? parseFloat(priceRaw.replace(/[$,]/g, '').trim()) : 0;
+      const price = isNaN(parsedPrice) ? 0 : Math.max(0, parsedPrice);
 
       let isValid = true;
       let validationError: string | undefined;
@@ -161,6 +166,7 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
         phone,
         assignedRoom,
         location,
+        price,
         isValid,
         validationError,
         rawObj: rowObj,
@@ -207,6 +213,7 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
           phone_number: r.phone,
           assigned_to_room: r.assignedRoom,
           location: r.location,
+          price: r.price,
         })),
       };
 
@@ -432,6 +439,7 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
                             <th className="py-2.5 px-3">PHONE NO.</th>
                             <th className="py-2.5 px-3">ASSIGNED TO ROOM</th>
                             <th className="py-2.5 px-3">LOCATION</th>
+                            <th className="py-2.5 px-3 text-right">PRICE</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-[11px]">
@@ -453,6 +461,9 @@ export const ImportRayBaumModal: React.FC<ImportRayBaumModalProps> = ({
                               </td>
                               <td className="py-2 px-3 text-slate-700 dark:text-slate-300">
                                 {row.location || <span className="text-slate-400">—</span>}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">
+                                ${row.price.toFixed(2)}
                               </td>
                             </tr>
                           ))}

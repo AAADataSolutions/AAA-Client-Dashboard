@@ -40,6 +40,7 @@ export interface PropertyRecord {
   ray_baud_and_logs_enabled?: boolean;
   organization_id?: string | null;
   organization_name?: string | null;
+  organization_type?: 'GROUP' | 'INDIVIDUAL' | string;
   organization_property_id?: string | null;
   is_assigned?: boolean;
   primary_organization?: any;

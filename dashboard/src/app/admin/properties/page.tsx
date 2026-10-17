@@ -1024,7 +1024,7 @@ export default function AdminPropertiesPage() {
               aria-label="Filter by organization"
               className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="ALL">Org: All Organizations</option>
+              <option value="ALL">Client: All Clients</option>
               {orgOptions.map((org) => (
                 <option key={org.id} value={org.id}>
                   {org.name}
@@ -1218,7 +1218,7 @@ export default function AdminPropertiesPage() {
                     <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MONTHLY PRICE</th>
                   )}
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MAIN PHONE NO.</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MANAGEMENT GROUP</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">CLIENT</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">NO. OF SERVICES</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">E911 STATUS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY'S LAW</th>
@@ -1280,19 +1280,32 @@ export default function AdminPropertiesPage() {
                         )}
                       </td>
 
-                      {/* 4. Management Group */}
+                      {/* 4. Client (formerly Management Group) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {(prop.organization_name && prop.organization_name !== 'Unassigned') || prop.primary_organization || (prop.organizations && prop.organizations.length > 0) ? (
-                          <a
-                            href={`/admin/organizations/${prop.primary_organization?.id || prop.organizations?.[0]?.id || ''}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-                          >
-                            <span>{prop.organization_name && prop.organization_name !== 'Unassigned' ? prop.organization_name : (prop.primary_organization?.name || prop.organizations?.[0]?.name)}</span>
-                            <ExternalLink className="w-3 h-3 opacity-60" />
-                          </a>
+                          <div className="inline-flex items-center gap-2">
+                            <a
+                              href={`/admin/organizations/${prop.primary_organization?.id || prop.organizations?.[0]?.id || ''}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                            >
+                              <span>{prop.organization_name && prop.organization_name !== 'Unassigned' ? prop.organization_name : (prop.primary_organization?.name || prop.organizations?.[0]?.name)}</span>
+                              <ExternalLink className="w-3 h-3 opacity-60" />
+                            </a>
+                            {((prop as any).organization_type === 'INDIVIDUAL' || prop.primary_organization?.type === 'INDIVIDUAL' || prop.organizations?.[0]?.type === 'INDIVIDUAL') ? (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shrink-0 shadow-2xs ring-2 ring-blue-500/20"
+                                title="Individual Client"
+                              />
+                            ) : (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0 shadow-2xs ring-2 ring-emerald-500/20"
+                                title="Group Client"
+                              />
+                            )}
+                          </div>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 bg-slate-50 dark:bg-slate-900/40">
                             Unassigned
@@ -1634,10 +1647,25 @@ export default function AdminPropertiesPage() {
                     </div>
                   )}
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block text-xs">Parent Management Group</label>
-                    <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
-                      {selectedPropForDetails.organization_name || (selectedPropForDetails as any).primary_organization?.name || (selectedPropForDetails as any).organizations?.[0]?.name || 'Unassigned'}
-                    </p>
+                    <label className="font-bold text-black dark:text-white block text-xs">Client</label>
+                    <div className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                      <span>
+                        {selectedPropForDetails.organization_name || (selectedPropForDetails as any).primary_organization?.name || (selectedPropForDetails as any).organizations?.[0]?.name || 'Unassigned'}
+                      </span>
+                      {selectedPropForDetails.organization_name && selectedPropForDetails.organization_name !== 'Unassigned' && (
+                        ((selectedPropForDetails as any).organization_type === 'INDIVIDUAL' || (selectedPropForDetails as any).primary_organization?.type === 'INDIVIDUAL') ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            Individual
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            Group
+                          </span>
+                        )
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block text-xs">Channel Partner</label>
@@ -2252,13 +2280,13 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Management Group</label>
+                    <label className="font-bold text-black dark:text-white block">Client</label>
                     <select
                       value={formData.organization_id}
                       onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="">Select Management Group (Optional)</option>
+                      <option value="">Select Client (Optional)</option>
                       {orgOptions.map((org) => (
                         <option key={org.id} value={org.id}>
                           {org.name}
@@ -2568,13 +2596,13 @@ export default function AdminPropertiesPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block">Management Group</label>
+                    <label className="font-bold text-black dark:text-white block">Client</label>
                     <select
                       value={formData.organization_id}
                       onChange={(e) => setFormData({ ...formData, organization_id: e.target.value })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                     >
-                      <option value="">Select Management Group (Optional)</option>
+                      <option value="">Select Client (Optional)</option>
                       {orgOptions.map((org) => (
                         <option key={org.id} value={org.id}>
                           {org.name}
