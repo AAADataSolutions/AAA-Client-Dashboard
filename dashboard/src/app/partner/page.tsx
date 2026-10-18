@@ -91,7 +91,7 @@ export default function PartnerOverviewPage() {
             Welcome, {partner.name}
           </h1>
           <p className="text-xs text-blue-200 max-w-xl">
-            {partner.company_name ? `${partner.company_name} — ` : ''}Your default commission rate is{' '}
+            {partner.company_name ? `${partner.company_name} — ` : ''}Your default revenue share rate is{' '}
             <strong className="text-white font-bold">{partner.default_commission_rate}%</strong>. Track active hotel accounts and submit payout invoices directly below.
           </p>
         </div>
@@ -118,7 +118,7 @@ export default function PartnerOverviewPage() {
               ${metrics.totalEarned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Lifetime cleared commission payouts</p>
+          <p className="text-[11px] text-slate-400 mt-1">Lifetime cleared revenue share payouts</p>
         </div>
 
         {/* Card 2: Monthly Recurring Commission */}
@@ -183,10 +183,10 @@ export default function PartnerOverviewPage() {
         >
           <div className="space-y-1">
             <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-blue-600 transition flex items-center gap-2">
-              <Hotel className="w-4 h-4 text-blue-500" /> View Properties & Commission Breakdown
+              <Hotel className="w-4 h-4 text-blue-500" /> View Properties & Revenue Share Breakdown
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Inspect all assigned hotel locations, monthly prices, and your specific commission percentages.
+              Inspect all assigned hotel locations, monthly prices, and your specific revenue share percentages.
             </p>
           </div>
           <ArrowUpRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -228,7 +228,7 @@ export default function PartnerOverviewPage() {
                   <th className="py-2.5 px-3">INVOICE #</th>
                   <th className="py-2.5 px-3">PERIOD</th>
                   <th className="py-2.5 px-3">PROPERTIES</th>
-                  <th className="py-2.5 px-3">COMMISSION AMOUNT</th>
+                  <th className="py-2.5 px-3">REVENUE SHARE AMOUNT</th>
                   <th className="py-2.5 px-3">STATUS</th>
                 </tr>
               </thead>

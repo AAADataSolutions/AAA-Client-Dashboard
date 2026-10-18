@@ -120,7 +120,7 @@ export default function PartnerPersonalMonthlyAnalytics({
               <PiggyBank className="w-4 h-4" />
             </span>
             <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
-              Personal Commission Analytics &amp; Monthly Breakdown
+              Personal Revenue Share Analytics &amp; Monthly Breakdown
             </h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -145,7 +145,7 @@ export default function PartnerPersonalMonthlyAnalytics({
 
           <div className="px-3 py-1 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span>YTD Commission: ${totalYearCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span>YTD Revenue Share: ${totalYearCommission.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
       </div>
@@ -158,7 +158,7 @@ export default function PartnerPersonalMonthlyAnalytics({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                Monthly Commission Earnings ({selectedYear})
+                Monthly Revenue Share Earnings ({selectedYear})
               </span>
             </div>
             <span className="text-[11px] text-slate-400">
@@ -191,7 +191,7 @@ export default function PartnerPersonalMonthlyAnalytics({
                       {(isHovered || (isSelected && !hoveredMonth)) && (
                         <div className="absolute -top-12 z-30 bg-slate-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap pointer-events-none transform -translate-y-1 font-mono transition-all animate-in fade-in zoom-in-95">
                           <p className="font-bold text-[11px] text-blue-300 font-sans">{d.monthName}</p>
-                          <p className="text-blue-400 font-bold">${d.commissionAmount.toFixed(2)} Commission</p>
+                          <p className="text-blue-400 font-bold">${d.commissionAmount.toFixed(2)} Revenue Share</p>
                           <p className="text-slate-400 text-[9px]">${d.grossRevenue.toFixed(2)} Portfolio Gross</p>
                         </div>
                       )}
@@ -321,11 +321,11 @@ export default function PartnerPersonalMonthlyAnalytics({
             </div>
           </div>
 
-          {/* MAIN SELECTED MONTH COMMISSION RATE KPI */}
+          {/* MAIN SELECTED MONTH REVENUE SHARE RATE KPI */}
           <div className="relative z-10 my-4 space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-200">
-                {selectedMonth?.shortMonth.toUpperCase()} COMMISSION EARNINGS
+                {selectedMonth?.shortMonth.toUpperCase()} REVENUE SHARE EARNINGS
               </span>
               {selectedMonth?.growthPct !== null && selectedMonth?.growthPct !== undefined && (
                 <div
@@ -351,7 +351,7 @@ export default function PartnerPersonalMonthlyAnalytics({
             </div>
 
             <p className="text-[11px] text-blue-100/80">
-              Your calculated commission earnings for {selectedMonth?.monthName}
+              Your calculated revenue share earnings for {selectedMonth?.monthName}
             </p>
           </div>
 
@@ -366,30 +366,18 @@ export default function PartnerPersonalMonthlyAnalytics({
               </span>
             </div>
             <p className="text-[10.5px] text-blue-100/70 leading-tight">
-              Expected recurring commission from your active assigned hotel accounts.
+              Expected recurring revenue share from your active assigned hotel accounts.
             </p>
           </div>
 
-          {/* BREAKDOWN METRICS GRID */}
-          <div className="relative z-10 grid grid-cols-2 gap-2 pt-3 border-t border-white/15">
-            {/* Portfolio Gross Volume */}
-            <div className="p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-1.5 text-blue-200 text-[10px] font-bold uppercase">
-                <DollarSign className="w-3 h-3 text-blue-300" />
-                <span>Hotel Billing</span>
-              </div>
-              <p className="text-base font-black text-white mt-1">
-                ${(selectedMonth?.grossRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            {/* Contributing Hotels */}
-            <div className="p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-1.5 text-blue-200 text-[10px] font-bold uppercase">
-                <Hotel className="w-3 h-3 text-blue-300" />
+          {/* BREAKDOWN METRICS: ASSIGNED HOTELS ONLY (HOTEL BILLING REMOVED) */}
+          <div className="relative z-10 pt-3 border-t border-white/15">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-blue-200 text-xs font-bold uppercase tracking-wider">
+                <Hotel className="w-4 h-4 text-blue-300" />
                 <span>Hotels Assigned</span>
               </div>
-              <p className="text-base font-black text-white mt-1">
+              <p className="text-base font-black text-white font-mono">
                 {selectedMonth?.propertiesCount || 0} <span className="text-xs font-normal text-blue-200">Hotels</span>
               </p>
             </div>

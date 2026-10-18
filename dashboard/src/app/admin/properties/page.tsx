@@ -1674,7 +1674,7 @@ export default function AdminPropertiesPage() {
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <label className="font-bold text-black dark:text-white block text-xs">Partner Revenue Share / Commission</label>
+                    <label className="font-bold text-black dark:text-white block text-xs">Partner Revenue Share</label>
                     <p className="p-2.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 font-medium">
                       {(selectedPropForDetails as any).partner_commission_override !== null && (selectedPropForDetails as any).partner_commission_override !== undefined && (selectedPropForDetails as any).partner_commission_override !== ''
                         ? `${(selectedPropForDetails as any).partner_commission_override}% (Custom Override)`
@@ -2359,7 +2359,7 @@ export default function AdminPropertiesPage() {
 
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                      <label className="font-bold text-black dark:text-white block">Partner Revenue Share (%)</label>
                       {formData.partner_id && (
                         <span className="text-[10px] text-slate-500 font-normal">
                           Partner Base: {partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 10}%
@@ -2675,7 +2675,7 @@ export default function AdminPropertiesPage() {
 
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-black dark:text-white block">Partner Revenue Share (% Commission)</label>
+                      <label className="font-bold text-black dark:text-white block">Partner Revenue Share (%)</label>
                       {formData.partner_id && (
                         <span className="text-[10px] text-slate-500 font-normal">
                           Partner Base: {partnerOptions.find((p) => p.id === formData.partner_id)?.default_commission_rate ?? 10}%

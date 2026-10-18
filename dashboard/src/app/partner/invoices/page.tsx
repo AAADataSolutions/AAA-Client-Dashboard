@@ -302,7 +302,7 @@ export default function PartnerInvoicesPage() {
             </span>
           </div>
           <p className="text-[11px] text-blue-200/90 font-medium">
-            Lifetime cleared commission payouts
+            Lifetime cleared revenue share payouts
           </p>
         </div>
       </div>
@@ -320,7 +320,7 @@ export default function PartnerInvoicesPage() {
                 <th className="py-3.5 px-4">PERIOD</th>
                 <th className="py-3.5 px-4">PROPERTIES</th>
                 <th className="py-3.5 px-4">GROSS REVENUE</th>
-                <th className="py-3.5 px-4">COMMISSION DUE</th>
+                <th className="py-3.5 px-4">REVENUE SHARE DUE</th>
                 <th className="py-3.5 px-4">STATUS</th>
                 <th className="py-3.5 px-4 text-right">ACTIONS</th>
               </tr>
@@ -692,7 +692,7 @@ export default function PartnerInvoicesPage() {
                       <th className="py-2.5 px-3">PROPERTY / LOCATION</th>
                       <th className="py-2.5 px-3 text-right">MONTHLY SUBSCRIPTION</th>
                       <th className="py-2.5 px-3 text-right">REVENUE SHARE</th>
-                      <th className="py-2.5 px-3 text-right">COMMISSION AMOUNT</th>
+                      <th className="py-2.5 px-3 text-right">REVENUE SHARE AMOUNT</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[#20222c]">

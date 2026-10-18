@@ -609,7 +609,7 @@ export default function AdminPartnersPage() {
             <Users className="w-6 h-6 text-blue-600" /> Partners &amp; Revenue Share
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Manage channel partners, affiliate properties, recurring commissions, and partner payout invoices.
+            Manage channel partners, affiliate properties, recurring revenue share, and partner payout invoices.
           </p>
         </div>
 
@@ -1063,7 +1063,7 @@ export default function AdminPartnersPage() {
                     <th className="py-3.5 px-4">PERIOD</th>
                     <th className="py-3.5 px-4">PROPERTIES</th>
                     <th className="py-3.5 px-4">GROSS REVENUE</th>
-                    <th className="py-3.5 px-4">COMMISSION DUE</th>
+                    <th className="py-3.5 px-4">REVENUE SHARE DUE</th>
                     <th className="py-3.5 px-4">STATUS</th>
                     <th className="py-3.5 px-4 text-right">ACTIONS</th>
                   </tr>
@@ -1381,7 +1381,7 @@ export default function AdminPartnersPage() {
                           <th className="py-2.5 px-3">PROPERTY</th>
                           {isSuperAdmin && <th className="py-2.5 px-3">MONTHLY PRICE</th>}
                           <th className="py-2.5 px-3">PARTNER SHARE</th>
-                          {isSuperAdmin && <th className="py-2.5 px-3">MONTHLY COMMISSION</th>}
+                          {isSuperAdmin && <th className="py-2.5 px-3">MONTHLY REVENUE SHARE</th>}
                           <th className="py-2.5 px-3 text-right">ACTION</th>
                         </tr>
                       </thead>
@@ -1500,7 +1500,7 @@ export default function AdminPartnersPage() {
                         <th className="py-2.5 px-3">PERIOD</th>
                         <th className="py-2.5 px-3">PROPERTIES</th>
                         <th className="py-2.5 px-3">GROSS AMOUNT</th>
-                        <th className="py-2.5 px-3">COMMISSION DUE</th>
+                        <th className="py-2.5 px-3">REVENUE SHARE DUE</th>
                         <th className="py-2.5 px-3">STATUS</th>
                         <th className="py-2.5 px-3 text-right">ACTION</th>
                       </tr>
@@ -1852,7 +1852,7 @@ export default function AdminPartnersPage() {
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   Assign Property to {selectedPartner.name}
                 </h3>
-                <p className="text-xs text-slate-400">Default Commission Rate: {selectedPartner.default_commission_rate}%</p>
+                <p className="text-xs text-slate-400">Default Revenue Share Rate: {selectedPartner.default_commission_rate}%</p>
               </div>
               <button onClick={() => setShowAssignModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-4 h-4" />
@@ -1885,7 +1885,7 @@ export default function AdminPartnersPage() {
 
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Commission Rate Override (% optional)
+                  Revenue Share Override (% optional)
                 </label>
                 <input
                   type="number"
@@ -2039,7 +2039,7 @@ export default function AdminPartnersPage() {
                       <th className="py-2.5 px-3">PROPERTY / LOCATION</th>
                       <th className="py-2.5 px-3 text-right">MONTHLY SUBSCRIPTION</th>
                       <th className="py-2.5 px-3 text-right">Revenue Share</th>
-                      <th className="py-2.5 px-3 text-right">COMMISSION AMOUNT</th>
+                      <th className="py-2.5 px-3 text-right">REVENUE SHARE AMOUNT</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[#20222c]">

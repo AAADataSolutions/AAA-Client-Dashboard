@@ -352,7 +352,7 @@ export default function AdminOverviewPage() {
             <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white border border-blue-700/50 shadow-md hover:shadow-lg hover:border-blue-500/80 transition-all flex flex-col justify-between h-full">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-blue-100">
-                  Partner Commission Outflow
+                  Partner Revenue Share Outflow
                 </span>
                 <div className="w-9 h-9 rounded-xl bg-white/10 text-white flex items-center justify-center border border-white/20 group-hover:scale-105 transition-transform backdrop-blur-xs">
                   <HandCoins className="w-4 h-4" />
@@ -446,7 +446,7 @@ export default function AdminOverviewPage() {
                 <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 space-y-1">
                   <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-bold">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                    <span>Partner Commissions</span>
+                    <span>Partner Revenue Share</span>
                   </div>
                   <div className="text-xl font-extrabold text-amber-950 dark:text-amber-100">
                     ${Number(superAdminKPIs.partnerCommissionOutflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -584,7 +584,7 @@ export default function AdminOverviewPage() {
                     <th className="pb-2">Partner</th>
                     <th className="pb-2">Props</th>
                     <th className="pb-2">Rate</th>
-                    <th className="pb-2 text-right">Commission</th>
+                    <th className="pb-2 text-right">Revenue Share</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#20222c]">

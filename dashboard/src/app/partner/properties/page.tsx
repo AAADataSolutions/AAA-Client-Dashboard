@@ -70,7 +70,7 @@ export default function PartnerPropertiesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-            <Hotel className="w-6 h-6 text-blue-600" /> Assigned Properties &amp; Commission
+            <Hotel className="w-6 h-6 text-blue-600" /> Assigned Properties &amp; Revenue Share
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Properties affiliated with your partner account and itemized revenue shares.
@@ -119,11 +119,11 @@ export default function PartnerPropertiesPage() {
           </p>
         </div>
 
-        {/* Card 3: Your Monthly Commission */}
+        {/* Card 3: Your Monthly Revenue Share */}
         <div className="p-5 rounded-2xl bg-[#0f3496] text-white flex flex-col justify-between shadow-md border border-[#1740ab]/50 min-h-[130px]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              YOUR MONTHLY COMMISSION
+              YOUR MONTHLY REVENUE SHARE
             </span>
             <TrendingUp className="w-4 h-4 text-emerald-300" />
           </div>
@@ -133,7 +133,7 @@ export default function PartnerPropertiesPage() {
             </span>
           </div>
           <p className="text-[11px] text-blue-200/90 font-medium">
-            Estimated monthly commission payout
+            Estimated monthly revenue share payout
           </p>
         </div>
       </div>

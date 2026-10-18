@@ -1759,7 +1759,7 @@ export default function AdminFinancesPage() {
             >
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#222430] pb-3">
                 <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                  Generate Back-Order Commission Invoice
+                  Generate Back-Order Revenue Share Invoice
                 </h3>
                 <button
                   onClick={() => setShowBackorderModal(false)}

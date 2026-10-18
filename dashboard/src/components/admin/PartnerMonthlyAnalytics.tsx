@@ -50,6 +50,9 @@ export default function PartnerMonthlyAnalytics({
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
   const [hoveredMonth, setHoveredMonth] = useState<MonthlyDataPoint | null>(null);
   const [apiCurrentRunRate, setApiCurrentRunRate] = useState<number>(0);
+  const [currentMonthlyCommissionRate, setCurrentMonthlyCommissionRate] = useState<number>(0);
+  const [totalPartnersCount, setTotalPartnersCount] = useState<number>(0);
+  const [totalInvoicesCount, setTotalInvoicesCount] = useState<number>(0);
   const [totalYearGross, setTotalYearGross] = useState<number>(0);
 
   const fetchMonthlyAnalytics = async (year: number) => {
@@ -60,6 +63,9 @@ export default function PartnerMonthlyAnalytics({
       if (json.success && json.monthlyData) {
         setMonthlyData(json.monthlyData);
         setApiCurrentRunRate(json.currentMonthlyRunRate || 0);
+        setCurrentMonthlyCommissionRate(json.currentMonthlyCommissionRate || 0);
+        setTotalPartnersCount(json.totalPartnersCount || 0);
+        setTotalInvoicesCount(json.totalInvoicesCount || 0);
         setTotalYearGross(json.totalYearGross || 0);
 
         // Auto-select current month or default to latest month with data or current month
@@ -198,7 +204,7 @@ export default function PartnerMonthlyAnalytics({
                         <div className="absolute -top-12 z-30 bg-slate-900 text-white text-[10px] rounded-lg px-2.5 py-1.5 shadow-xl whitespace-nowrap pointer-events-none transform -translate-y-1 font-mono transition-all animate-in fade-in zoom-in-95">
                           <p className="font-bold text-[11px] text-blue-300 font-sans">{d.monthName}</p>
                           <p className="text-emerald-300 font-bold">${d.grossRevenue.toFixed(2)} Gross</p>
-                          <p className="text-slate-400 text-[9px]">${d.commissionAmount.toFixed(2)} Commission</p>
+                          <p className="text-slate-400 text-[9px]">${d.commissionAmount.toFixed(2)} Revenue Share</p>
                         </div>
                       )}
 
@@ -267,158 +273,94 @@ export default function PartnerMonthlyAnalytics({
           </div>
         </div>
 
-        {/* RIGHT SIDE: SELECTED MONTH KPI & RATE CARD (5 cols) */}
+        {/* RIGHT SIDE: 3 KEY PARTNER METRICS (5 cols) */}
         <div className="lg:col-span-5 flex flex-col justify-between bg-gradient-to-br from-[#0c2872] via-[#0f3496] to-[#1442bb] text-white rounded-2xl p-5 md:p-6 shadow-md border border-[#1e4ad4]/40 relative overflow-hidden">
           
           {/* Subtle background glow */}
           <div className="absolute -top-16 -right-16 w-40 h-40 bg-blue-400/10 rounded-full blur-2xl pointer-events-none" />
           <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-indigo-400/10 rounded-full blur-2xl pointer-events-none" />
 
-          {/* Header & Month Selector */}
-          <div className="relative z-10 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-white/15 text-slate-100 text-[10.5px] font-extrabold uppercase tracking-wider">
-                  Month Detail KPI
-                </span>
-                {selectedMonth?.isCurrentMonth && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-bold">
-                    Active Month
-                  </span>
-                )}
-              </div>
-
-              {/* Month navigation arrows */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handlePrevMonth}
-                  className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Previous Month"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleNextMonth}
-                  className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Next Month"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Dropdown Selector for Month */}
-            <div className="flex items-center justify-between gap-2 bg-white/10 backdrop-blur-xs border border-white/15 rounded-xl p-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-200" />
-                <span className="text-xs font-semibold text-blue-100">Selected Month:</span>
-              </div>
-              <select
-                value={selectedMonthKey}
-                onChange={(e) => setSelectedMonthKey(e.target.value)}
-                className="bg-white text-slate-900 font-bold text-xs px-3 py-1 rounded-lg border border-slate-200 shadow-xs focus:outline-none cursor-pointer"
-              >
-                {monthlyData.map((d) => (
-                  <option key={d.monthKey} value={d.monthKey} className="bg-white text-slate-900 font-medium">
-                    {d.monthName} {d.isCurrentMonth ? '(Current)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Header */}
+          <div className="relative z-10 flex items-center justify-between">
+            <span className="px-2.5 py-1 rounded-full bg-white/15 text-slate-100 text-[10.5px] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-emerald-300" />
+              Partner Overview KPI
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-bold">
+              Active Baseline
+            </span>
           </div>
 
-          {/* MAIN SELECTED MONTH REVENUE RATE KPI */}
-          <div className="relative z-10 my-4 space-y-1">
+          {/* 1. HAR MAHINE KITNA PARTNERS KO DE RAHE HAI (NO INVOICE FILTER) */}
+          <div className="relative z-10 my-4 p-4 rounded-xl bg-white/10 border border-white/15 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-200">
-                {selectedMonth?.shortMonth.toUpperCase()} REVENUE RATE
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-200 flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-300" />
+                Monthly Partner Revenue Share
               </span>
-              {selectedMonth?.growthPct !== null && selectedMonth?.growthPct !== undefined && (
-                <div
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    selectedMonth.growthPct >= 0
-                      ? 'bg-emerald-400/20 text-emerald-300'
-                      : 'bg-rose-400/20 text-rose-300'
-                  }`}
-                >
-                  {selectedMonth.growthPct >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  <span>{selectedMonth.growthPct > 0 ? `+${selectedMonth.growthPct}%` : `${selectedMonth.growthPct}%`} MoM</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black text-white tracking-tight">
-                ${(selectedMonth?.grossRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className="text-sm font-semibold text-blue-200">
-                for {selectedMonth?.shortMonth}
+              <span className="px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 text-[10px] font-bold font-mono">
+                Recurring
               </span>
             </div>
 
-            <p className="text-[11px] text-blue-100/80">
-              Total gross revenue for {selectedMonth?.monthName}
+            <div className="flex items-baseline gap-2 pt-1">
+              <span className="text-4xl font-black text-emerald-300 tracking-tight font-mono">
+                ${(currentMonthlyCommissionRate || currentMonthlyRunRate || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-sm font-semibold text-white/90">
+                / Month
+              </span>
+            </div>
+
+            <p className="text-[11px] text-blue-100/80 leading-relaxed pt-1">
+              Total monthly recurring revenue share payout to partners across all active properties.
             </p>
           </div>
 
-          {/* CURRENT MONTHLY RUN RATE COMPARISON */}
-          <div className="relative z-10 p-3 rounded-xl bg-white/10 border border-white/15 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-[11px] font-bold text-blue-200 uppercase tracking-wide">
-                CURRENT MONTHLY RUN RATE
-              </span>
-              <span className="font-mono font-black text-emerald-300 text-sm">
-                ${effectiveCurrentRunRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-normal text-white">/ Mo</span>
-              </span>
-            </div>
-            <p className="text-[10.5px] text-blue-100/70 leading-tight">
-              Combined recurring baseline from all active assigned partner properties.
-            </p>
-          </div>
-
-          {/* BREAKDOWN METRICS GRID */}
-          <div className="relative z-10 grid grid-cols-2 gap-2 pt-3 border-t border-white/15">
-            {/* Commission Due */}
-            <div className="p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-1.5 text-blue-200 text-[10px] font-bold uppercase">
-                <DollarSign className="w-3 h-3 text-emerald-300" />
-                <span>Partner Commission</span>
+          {/* 2 & 3: GRID FOR TOTAL PARTNERS & TOTAL INVOICES */}
+          <div className="relative z-10 grid grid-cols-2 gap-3 pt-1">
+            {/* 2. KITNE PARTNERS BAN CHUKE HAI */}
+            <div className="p-3.5 rounded-xl bg-white/10 border border-white/15 flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-blue-200 text-[10.5px] font-bold uppercase tracking-wide">
+                <Users className="w-3.5 h-3.5 text-blue-300" />
+                <span>Total Partners</span>
               </div>
-              <p className="text-base font-black text-emerald-300 mt-1">
-                ${(selectedMonth?.commissionAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
+              <div className="mt-2">
+                <p className="text-2xl font-black text-white font-mono">
+                  {totalPartnersCount}
+                </p>
+                <p className="text-[10px] text-blue-200/80 mt-0.5">
+                  Channel Partners
+                </p>
+              </div>
             </div>
 
-            {/* Contributing Properties */}
-            <div className="p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-1.5 text-blue-200 text-[10px] font-bold uppercase">
-                <Hotel className="w-3 h-3 text-blue-300" />
-                <span>Active Properties</span>
+            {/* 3. KITNE INVOICES PADE HAI TOTAL */}
+            <div className="p-3.5 rounded-xl bg-white/10 border border-white/15 flex flex-col justify-between">
+              <div className="flex items-center gap-1.5 text-blue-200 text-[10.5px] font-bold uppercase tracking-wide">
+                <FileText className="w-3.5 h-3.5 text-blue-300" />
+                <span>Total Invoices</span>
               </div>
-              <p className="text-base font-black text-white mt-1">
-                {selectedMonth?.propertiesCount || 0} <span className="text-xs font-normal text-blue-200">Props</span>
-              </p>
+              <div className="mt-2">
+                <p className="text-2xl font-black text-white font-mono">
+                  {totalInvoicesCount}
+                </p>
+                <p className="text-[10px] text-blue-200/80 mt-0.5">
+                  All-time Invoices
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Invoicing Status Banner */}
-          <div className="relative z-10 flex items-center justify-between pt-2 text-[11px] text-blue-100/90">
-            <div className="flex items-center gap-1.5">
-              {selectedMonth?.status === 'RECORDED' ? (
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-              ) : selectedMonth?.status === 'LIVE_CURRENT' ? (
-                <Clock className="w-3.5 h-3.5 text-amber-300" />
-              ) : (
-                <Info className="w-3.5 h-3.5 text-blue-300" />
-              )}
-              <span className="font-semibold">
-                {selectedMonth?.status === 'RECORDED'
-                  ? `${selectedMonth.invoicesCount} Invoices Invoiced & Recorded`
-                  : selectedMonth?.status === 'LIVE_CURRENT'
-                  ? 'Live Ongoing Month (Invoices on 1st)'
-                  : 'Historical / Projected'}
-              </span>
-            </div>
+          {/* Bottom Trust Tag */}
+          <div className="relative z-10 flex items-center justify-between pt-3 text-[11px] text-blue-100/80 border-t border-white/10 mt-3">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+              Live System Status
+            </span>
+            <span className="text-[10.5px] text-blue-200 font-mono">
+              Unfiltered Live Baseline
+            </span>
           </div>
         </div>
 

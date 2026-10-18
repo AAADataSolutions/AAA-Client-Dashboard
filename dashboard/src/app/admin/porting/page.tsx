@@ -1932,7 +1932,7 @@ export default function AdminPortingPage() {
 
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Partner Revenue Share (% Commission Override)
+                        Partner Revenue Share (% Override)
                       </label>
                       <div className="relative">
                         <input
@@ -2882,7 +2882,7 @@ export default function AdminPortingPage() {
 
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Partner Revenue Share (% Commission Override)
+                        Partner Revenue Share (% Override)
                       </label>
                       <div className="relative">
                         <input

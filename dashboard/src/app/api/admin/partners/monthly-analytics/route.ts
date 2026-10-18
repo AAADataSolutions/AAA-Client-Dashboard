@@ -166,6 +166,8 @@ export async function GET(request: NextRequest) {
       currentMonthlyCommissionRate: Math.round(currentLiveCommission * 100) / 100,
       totalYearGross: Math.round(totalYearGross * 100) / 100,
       totalYearCommission: Math.round(totalYearCommission * 100) / 100,
+      totalPartnersCount: partners.length,
+      totalInvoicesCount: allInvoices.length,
       currentMonthKey: `${currentYear}-${String(currentMonthIdx + 1).padStart(2, '0')}`,
       monthlyData,
     });
