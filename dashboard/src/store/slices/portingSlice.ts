@@ -11,6 +11,7 @@ export interface PortingRecord {
   property_phone: string;
   organization_id: string;
   organization_name: string;
+  organization_type?: 'GROUP' | 'INDIVIDUAL' | string;
   status: string;
   target_date: string | null;
   completed_at?: string | null;

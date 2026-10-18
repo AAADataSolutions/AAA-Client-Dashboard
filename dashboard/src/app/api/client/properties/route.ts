@@ -86,12 +86,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
+    // Fetch active (incomplete) porting requests to exclude from Properties until onboarded/completed
+    const { data: activePortings } = await supabase
+      .from('porting_requests')
+      .select('organization_property_id')
+      .not('status', 'in', '("COMPLETED","ONBOARDED")')
+      .not('organization_property_id', 'is', null);
+
+    const activeOpIds = new Set((activePortings || []).map((p: any) => p.organization_property_id).filter(Boolean));
+
     // Transform and calculate metrics
     let totalServicesCount = 0;
     let attentionServicesCount = 0;
     let totalOpenTicketsCount = 0;
 
     const allRecords = (orgProps || [])
+      .filter((op: any) => !activeOpIds.has(op.id))
       .map((op: any) => {
         const prop: any = op.property;
         if (!prop) return null;

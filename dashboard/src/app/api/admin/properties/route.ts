@@ -101,6 +101,23 @@ export async function GET(request: NextRequest) {
       .select('id, name, default_commission_rate, company_name');
     const allPartners = partnersData || [];
 
+    // 5b. Fetch active (incomplete) porting requests to exclude from Properties until onboarded/completed
+    const { data: activePortings } = await db
+      .from('porting_requests')
+      .select('organization_property_id, property_name')
+      .not('status', 'in', '("COMPLETED","ONBOARDED")');
+
+    const activeOpIds = new Set(
+      (activePortings || [])
+        .map((p: any) => p.organization_property_id)
+        .filter(Boolean)
+    );
+    const activePortingNames = new Set(
+      (activePortings || [])
+        .map((p: any) => (p.property_name || '').toLowerCase().trim())
+        .filter(Boolean)
+    );
+
     // 6. Map and combine
     let processed = propList.map((prop: any, idx: number) => {
       const matchingOps = allOrgProps.filter((op: any) => op.property_id === prop.id);
@@ -185,6 +202,17 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Exclude properties that are currently in an active porting pipeline (until they become Onboarding / Completed)
+    processed = processed.filter((p: any) => {
+      const isLinkedToActivePorting = p.org_links?.some((op: any) => activeOpIds.has(op.id));
+      if (isLinkedToActivePorting) return false;
+
+      if (!p.is_assigned && activePortingNames.has((p.name || '').toLowerCase().trim())) {
+        return false;
+      }
+      return true;
+    });
+
     // Filter by Ray Baum status if requested
     if (rayBaumFilter === 'ACTIVE') {
       processed = processed.filter((p: any) => p.ray_baum_status === 'Active');
@@ -236,10 +264,10 @@ export async function GET(request: NextRequest) {
         limit,
       },
       metrics: {
-        totalProperties: totalPropertiesCount || processed.length,
-        e911VerifiedCount: verifiedE911Count || processed.filter((p: any) => p.ray_baud_and_logs_enabled).length,
-        totalServicesCount: totalServicesCount || processed.reduce((acc: number, p: any) => acc + (p.services_count || 0), 0),
-        pendingOrInactiveCount: pendingOrInactiveCount || processed.filter((p: any) => p.status !== 'ACTIVE').length,
+        totalProperties: processed.length,
+        e911VerifiedCount: processed.filter((p: any) => p.ray_baud_and_logs_enabled).length,
+        totalServicesCount: processed.reduce((acc: number, p: any) => acc + (p.services_count || 0), 0),
+        pendingOrInactiveCount: processed.filter((p: any) => p.status !== 'ACTIVE').length,
       },
     });
   } catch (err: any) {

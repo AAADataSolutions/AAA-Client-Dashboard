@@ -921,12 +921,12 @@ export default function AdminOrganizationsPage() {
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border ${
                             (org.type || 'GROUP') === 'INDIVIDUAL'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-                              : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25'
+                              ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25'
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
                           }`}
                         >
                           {(org.type || 'GROUP') === 'INDIVIDUAL' ? 'Individual' : 'Group'}
-                        </span>
+                        </span> 
                       </td>
 
                       {/* Column 4: Primary Contact Name */}

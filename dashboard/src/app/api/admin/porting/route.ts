@@ -52,12 +52,12 @@ export async function GET(request: NextRequest) {
       .from('porting_requests')
       .select(`
         *,
-        organization:organizations(id, name),
+        organization:organizations(id, name, type),
         organization_property:organization_properties(
           id,
           status,
           property:properties(*),
-          organization:organizations(id, name),
+          organization:organizations(id, name, type),
           onboardings(
             id,
             status,
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         ),
         services:porting_request_services(
           id,
-          service:services(id, phone_number, status, description, service_type:service_types(name))
+          service:services(id, phone_number, price, status, description, service_type:service_types(name))
         )
       `, { count: 'exact' });
 
@@ -135,7 +135,8 @@ export async function GET(request: NextRequest) {
           property_name: item.property_name || 'Property',
           property_address: item.property_address || '',
           property_phone: item.property_phone || '',
-          organization_name: 'Organization',
+          organization_name: 'Unassigned',
+          organization_type: 'GROUP',
           is_activated: item.is_activated || false,
           attachments: [],
           services: [],
@@ -158,10 +159,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // 2b. Collect all property names to ensure fallback lookup for unassigned portings
+    const missingPropNames = (rawPortings || [])
+      .filter((item: any) => !item.organization_property?.property)
+      .map((item: any) => item.property_name)
+      .filter(Boolean);
+
+    let fallbackPropsMap: Record<string, any> = {};
+    if (missingPropNames.length > 0) {
+      const { data: fbProps } = await db
+        .from('properties')
+        .select('*')
+        .in('name', missingPropNames);
+      (fbProps || []).forEach((p: any) => {
+        fallbackPropsMap[p.name.toLowerCase().trim()] = p;
+      });
+    }
+
     // 3. Map and format records
     let formatted = (rawPortings || []).map((item: any) => {
       const orgProp = item.organization_property;
-      const prop = Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property;
+      const matchedFb = item.property_name ? fallbackPropsMap[item.property_name.toLowerCase().trim()] : null;
+      const prop = (Array.isArray(orgProp?.property) ? orgProp?.property[0] : orgProp?.property) || matchedFb;
       const directOrg = Array.isArray(item.organization) ? item.organization[0] : item.organization;
       const org = directOrg || (Array.isArray(orgProp?.organization) ? orgProp?.organization[0] : orgProp?.organization);
       const ob = Array.isArray(orgProp?.onboardings) ? orgProp?.onboardings[0] : orgProp?.onboardings;
@@ -172,10 +191,18 @@ export async function GET(request: NextRequest) {
           id: svc?.id || s.id,
           phone_number: svc?.phone_number || '—',
           status: svc?.status || 'ACTIVE',
+          price: Number(svc?.price || 0),
           description: svc?.description || '',
           service_type: svc?.service_type?.name || svc?.service_type || 'Voice Line',
         };
       });
+
+      const servicesTotal = services.reduce((acc: number, s: any) => acc + (Number(s.price) || 0), 0);
+      const rawBase = prop?.base_price !== null && prop?.base_price !== undefined
+        ? Number(prop.base_price)
+        : (prop?.monthly_price !== null && prop?.monthly_price !== undefined ? Number(prop.monthly_price) : null);
+
+      const computedMonthly = rawBase !== null ? rawBase + servicesTotal : (servicesTotal > 0 ? servicesTotal : null);
 
       const effectiveStatus = item.status || ob?.status || 'DRAFT';
       let progressPct = 12.5;
@@ -222,7 +249,8 @@ export async function GET(request: NextRequest) {
         partner_commission_override: prop?.partner_commission_override ?? null,
         property_phone: item.property_phone || prop?.main_phone || '—',
         fax: item.fax || prop?.fax || '—',
-        monthly_price: prop?.monthly_price || null,
+        monthly_price: computedMonthly,
+        base_price: rawBase,
         general_manager_name: prop?.general_manager_name || prop?.contact_person_name || 'N/A',
         general_manager_phone: prop?.general_manager_phone || prop?.main_phone || 'N/A',
         general_manager_email: prop?.general_manager_email || prop?.contact_person_email || 'N/A',
@@ -235,7 +263,8 @@ export async function GET(request: NextRequest) {
         ray_baum_status: prop?.ray_baum_status || (prop?.ray_baud_and_logs_enabled ? 'ACTIVE' : 'INACTIVE'),
         carrier_details: item.carrier_details || '',
         organization_id: org?.id || item.organization_id || '',
-        organization_name: org?.name || 'Organization',
+        organization_name: (org?.name && org.name !== 'Organization' && org.name !== 'Unassigned Organization' && org.name !== 'Direct Portfolio') ? org.name : 'Unassigned',
+        organization_type: org?.type || 'GROUP',
         status: effectiveStatus,
         stage: effectiveStatus,
         progress_pct: progressPct,
@@ -368,81 +397,87 @@ export async function POST(request: NextRequest) {
     const finalState = state?.trim() || 'Pending';
     const finalZip = zip_code?.trim() || '00000';
 
-    // 1. Create property record in properties table with all details
-    const { data: newProp, error: propErr } = await db
-      .from('properties')
-      .insert({
-        name: property_name.trim(),
-        address: fullAddress,
-        city: finalCity,
-        state: finalState,
-        zip_code: finalZip,
-        country: country?.trim() || 'USA',
-        main_phone: property_phone.trim(),
-        fax: fax ? fax.trim() : null,
-        monthly_price: monthly_price ? Number(monthly_price) : null,
-        partner_id: partner_id || null,
-        partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
-        general_manager_name: general_manager_name ? general_manager_name.trim() : null,
-        general_manager_phone: general_manager_phone ? general_manager_phone.trim() : null,
-        general_manager_email: general_manager_email ? general_manager_email.trim() : null,
-        ray_baud_and_logs_enabled: isE911,
-        ray_baum_status: ray_baum_status || (isE911 ? 'ACTIVE' : 'INACTIVE'),
-        status: 'ONBOARDING',
-      })
-      .select()
-      .single();
-
     let createdOpId: string | null = null;
-    if (newProp && organization_id) {
-      // 2. Link in organization_properties
-      const { data: newOp } = await db
-        .from('organization_properties')
+    let newProp: any = null;
+
+    if (organization_id) {
+      // 1. Create property record in properties table with all details
+      const { data: propData, error: propErr } = await db
+        .from('properties')
         .insert({
-          organization_id,
-          property_id: newProp.id,
-          status: 'ACTIVE',
+          name: property_name.trim(),
+          address: fullAddress,
+          city: finalCity,
+          state: finalState,
+          zip_code: finalZip,
+          country: country?.trim() || 'USA',
+          main_phone: property_phone.trim(),
+          fax: fax ? fax.trim() : null,
+          monthly_price: monthly_price ? Number(monthly_price) : null,
+          partner_id: partner_id || null,
+          partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
+          general_manager_name: general_manager_name ? general_manager_name.trim() : null,
+          general_manager_phone: general_manager_phone ? general_manager_phone.trim() : null,
+          general_manager_email: general_manager_email ? general_manager_email.trim() : null,
+          ray_baud_and_logs_enabled: isE911,
+          ray_baum_status: ray_baum_status || (isE911 ? 'ACTIVE' : 'INACTIVE'),
+          status: 'ONBOARDING',
         })
-        .select('id')
+        .select()
         .single();
 
-      if (newOp) {
-        createdOpId = newOp.id;
+      newProp = propData;
 
-    // 3. Create initial onboarding record with initial stage and dates
-        const onboardingData: Record<string, any> = {
-          organization_property_id: newOp.id,
-          status: status || 'DRAFT',
-          target_date: target_date || null,
-        };
-        if (body.draft_date) onboardingData.draft_date = body.draft_date;
-        if (body.contract_sent_date) onboardingData.contract_sent_date = body.contract_sent_date;
-        if (body.signed_date) onboardingData.signed_date = body.signed_date;
-        if (body.csr_details_date) onboardingData.csr_details_date = body.csr_details_date;
-        if (body.cut_sheet_review_date) onboardingData.cut_sheet_review_date = body.cut_sheet_review_date;
-        if (body.porting_submitted_date) onboardingData.porting_submitted_date = body.porting_submitted_date;
-        if (body.sof_review_date) onboardingData.sof_review_date = body.sof_review_date;
-        if (body.foc_confirmed_date) onboardingData.foc_confirmed_date = body.foc_confirmed_date;
-        if (body.live_cutover_date) onboardingData.live_cutover_date = body.live_cutover_date;
-        if (body.assigned_to) onboardingData.assigned_to = body.assigned_to;
-        if (body.assigned_to_name) onboardingData.assigned_to_name = body.assigned_to_name;
-        if (body.internal_notes) onboardingData.internal_notes = body.internal_notes;
-        if (body.stage3_assigned_to) onboardingData.stage3_assigned_to = body.stage3_assigned_to;
-        if (body.stage3_assigned_to_name) onboardingData.stage3_assigned_to_name = body.stage3_assigned_to_name;
-        if (body.stage3_notes) onboardingData.stage3_notes = body.stage3_notes;
-        if (body.stage4_assigned_to) onboardingData.stage4_assigned_to = body.stage4_assigned_to;
-        if (body.stage4_assigned_to_name) onboardingData.stage4_assigned_to_name = body.stage4_assigned_to_name;
-        if (body.stage4_notes) onboardingData.stage4_notes = body.stage4_notes;
+      if (newProp) {
+        // 2. Link in organization_properties
+        const { data: newOp } = await db
+          .from('organization_properties')
+          .insert({
+            organization_id,
+            property_id: newProp.id,
+            status: 'ACTIVE',
+          })
+          .select('id')
+          .single();
 
-        await db.from('onboardings').insert(onboardingData);
+        if (newOp) {
+          createdOpId = newOp.id;
 
-        // 4. Create e911 record
-        await db.from('e911_records').insert({
-          organization_property_id: newOp.id,
-          emergency_address: `${fullAddress}, ${finalCity}, ${finalState} ${finalZip}`,
-          status: isE911 ? 'VERIFIED' : 'PENDING',
-          verified_at: isE911 ? new Date().toISOString() : null,
-        });
+          // 3. Create initial onboarding record with initial stage and dates
+          const onboardingData: Record<string, any> = {
+            organization_property_id: newOp.id,
+            status: status || 'DRAFT',
+            target_date: target_date || null,
+          };
+          if (body.draft_date) onboardingData.draft_date = body.draft_date;
+          if (body.contract_sent_date) onboardingData.contract_sent_date = body.contract_sent_date;
+          if (body.signed_date) onboardingData.signed_date = body.signed_date;
+          if (body.csr_details_date) onboardingData.csr_details_date = body.csr_details_date;
+          if (body.cut_sheet_review_date) onboardingData.cut_sheet_review_date = body.cut_sheet_review_date;
+          if (body.porting_submitted_date) onboardingData.porting_submitted_date = body.porting_submitted_date;
+          if (body.sof_review_date) onboardingData.sof_review_date = body.sof_review_date;
+          if (body.foc_confirmed_date) onboardingData.foc_confirmed_date = body.foc_confirmed_date;
+          if (body.live_cutover_date) onboardingData.live_cutover_date = body.live_cutover_date;
+          if (body.assigned_to) onboardingData.assigned_to = body.assigned_to;
+          if (body.assigned_to_name) onboardingData.assigned_to_name = body.assigned_to_name;
+          if (body.internal_notes) onboardingData.internal_notes = body.internal_notes;
+          if (body.stage3_assigned_to) onboardingData.stage3_assigned_to = body.stage3_assigned_to;
+          if (body.stage3_assigned_to_name) onboardingData.stage3_assigned_to_name = body.stage3_assigned_to_name;
+          if (body.stage3_notes) onboardingData.stage3_notes = body.stage3_notes;
+          if (body.stage4_assigned_to) onboardingData.stage4_assigned_to = body.stage4_assigned_to;
+          if (body.stage4_assigned_to_name) onboardingData.stage4_assigned_to_name = body.stage4_assigned_to_name;
+          if (body.stage4_notes) onboardingData.stage4_notes = body.stage4_notes;
+
+          await db.from('onboardings').insert(onboardingData);
+
+          // 4. Create e911 record
+          await db.from('e911_records').insert({
+            organization_property_id: newOp.id,
+            emergency_address: `${fullAddress}, ${finalCity}, ${finalState} ${finalZip}`,
+            status: isE911 ? 'VERIFIED' : 'PENDING',
+            verified_at: isE911 ? new Date().toISOString() : null,
+          });
+        }
       }
     }
 
@@ -563,6 +598,12 @@ export async function PATCH(request: NextRequest) {
     if (property_phone !== undefined) updatePayload.property_phone = property_phone.trim();
     if (fax !== undefined) updatePayload.fax = fax ? fax.trim() : null;
     if (carrier_details !== undefined) updatePayload.carrier_details = carrier_details ? carrier_details.trim() : null;
+    if (organization_id !== undefined) {
+      updatePayload.organization_id = organization_id || null;
+      if (!organization_id) {
+        updatePayload.organization_property_id = null;
+      }
+    }
     const isCompletedOrOnboarded = status === 'COMPLETED' || status === 'ONBOARDED';
     if (isCompletedOrOnboarded) {
       updatePayload.status = 'COMPLETED';
@@ -584,46 +625,63 @@ export async function PATCH(request: NextRequest) {
     let orgPropId = updated?.organization_property_id;
     let propId = updated?.organization_property?.property_id;
 
-    // If porting request doesn't have an organization_property link yet, auto-create one
-    if (!orgPropId || !propId) {
-      let targetOrgId = organization_id || updated?.organization_id;
-      if (!targetOrgId) {
-        const { data: firstOrg } = await db.from('organizations').select('id').limit(1).maybeSingle();
-        targetOrgId = firstOrg?.id;
+    // Fallback: If propId is not found via organization_property, look up property by name
+    if (!propId) {
+      const pName = (property_name?.trim() || updated?.property_name || '').trim();
+      if (pName) {
+        const { data: matchedProp } = await db
+          .from('properties')
+          .select('id')
+          .ilike('name', pName)
+          .maybeSingle();
+        if (matchedProp) {
+          propId = matchedProp.id;
+        }
       }
+    }
+
+    // If porting request doesn't have an organization_property link yet, auto-create one ONLY when organization is assigned
+    if (organization_id && (!orgPropId || !propId)) {
+      let targetOrgId = organization_id;
       if (targetOrgId) {
         const isE911Initial = ray_baud_and_logs_enabled !== undefined ? Boolean(ray_baud_and_logs_enabled) : (e911_status === 'VERIFIED');
-        const { data: createdProp } = await db
-          .from('properties')
-          .insert({
-            name: property_name?.trim() || updated.property_name || 'Property',
-            address: property_address?.trim() || updated.property_address || 'Address pending',
-            city: city?.trim() || 'City',
-            state: state?.trim() || 'IL',
-            zip_code: zip_code?.trim() || '00000',
-            country: country?.trim() || 'USA',
-            main_phone: property_phone?.trim() || updated.property_phone || null,
-            fax: fax ? fax.trim() : null,
-            monthly_price: monthly_price ? Number(monthly_price) : null,
-            partner_id: partner_id || null,
-            partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
-            general_manager_name: general_manager_name ? general_manager_name.trim() : null,
-            general_manager_phone: general_manager_phone ? general_manager_phone.trim() : null,
-            general_manager_email: general_manager_email ? general_manager_email.trim() : null,
-            ray_baud_and_logs_enabled: isE911Initial,
-            ray_baum_status: ray_baum_status || (isE911Initial ? 'ACTIVE' : 'INACTIVE'),
-            status: status === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
-          })
-          .select('id')
-          .single();
+        if (!propId) {
+          const { data: createdProp } = await db
+            .from('properties')
+            .insert({
+              name: property_name?.trim() || updated.property_name || 'Property',
+              address: property_address?.trim() || updated.property_address || 'Address pending',
+              city: city?.trim() || 'City',
+              state: state?.trim() || 'IL',
+              zip_code: zip_code?.trim() || '00000',
+              country: country?.trim() || 'USA',
+              main_phone: property_phone?.trim() || updated.property_phone || null,
+              fax: fax ? fax.trim() : null,
+              base_price: monthly_price ? Number(monthly_price) : null,
+              monthly_price: monthly_price ? Number(monthly_price) : null,
+              partner_id: partner_id || null,
+              partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
+              general_manager_name: general_manager_name ? general_manager_name.trim() : null,
+              general_manager_phone: general_manager_phone ? general_manager_phone.trim() : null,
+              general_manager_email: general_manager_email ? general_manager_email.trim() : null,
+              ray_baud_and_logs_enabled: isE911Initial,
+              ray_baum_status: ray_baum_status || (isE911Initial ? 'ACTIVE' : 'INACTIVE'),
+              status: status === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
+            })
+            .select('id')
+            .single();
 
-        if (createdProp) {
-          propId = createdProp.id;
+          if (createdProp) {
+            propId = createdProp.id;
+          }
+        }
+
+        if (propId) {
           const { data: createdOp } = await db
             .from('organization_properties')
             .insert({
               organization_id: targetOrgId,
-              property_id: createdProp.id,
+              property_id: propId,
               status: 'ACTIVE',
             })
             .select('id')
@@ -662,6 +720,48 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // If propId is STILL missing (e.g. unassigned porting with no properties row yet), create it in properties table!
+    if (!propId) {
+      const isE911Initial = ray_baud_and_logs_enabled !== undefined ? Boolean(ray_baud_and_logs_enabled) : (e911_status === 'VERIFIED');
+      const { data: createdProp } = await db
+        .from('properties')
+        .insert({
+          name: property_name?.trim() || updated.property_name || 'Property',
+          address: property_address?.trim() || updated.property_address || 'Address pending',
+          city: city?.trim() || 'City',
+          state: state?.trim() || 'IL',
+          zip_code: zip_code?.trim() || '00000',
+          country: country?.trim() || 'USA',
+          main_phone: property_phone?.trim() || updated.property_phone || null,
+          fax: fax ? fax.trim() : null,
+          base_price: monthly_price ? Number(monthly_price) : null,
+          monthly_price: monthly_price ? Number(monthly_price) : null,
+          partner_id: partner_id || null,
+          partner_commission_override: partner_commission_override !== null && partner_commission_override !== '' && partner_commission_override !== undefined ? Number(partner_commission_override) : null,
+          general_manager_name: general_manager_name ? general_manager_name.trim() : null,
+          general_manager_phone: general_manager_phone ? general_manager_phone.trim() : null,
+          general_manager_email: general_manager_email ? general_manager_email.trim() : null,
+          ray_baud_and_logs_enabled: isE911Initial,
+          ray_baum_status: ray_baum_status || (isE911Initial ? 'ACTIVE' : 'INACTIVE'),
+          status: status === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
+        })
+        .select('id')
+        .single();
+      if (createdProp) {
+        propId = createdProp.id;
+      }
+    }
+
+    // Calculate total services price currently assigned to this porting request
+    const { data: prServices } = await db
+      .from('porting_request_services')
+      .select('service:services(price)')
+      .eq('porting_request_id', id);
+    const servicesTotal = (prServices || []).reduce((acc: number, item: any) => {
+      const p = Number((item.service as any)?.price || 0);
+      return acc + p;
+    }, 0);
+
     // 1. Update Property table if property fields were passed
     if (propId) {
       const propUpdate: Record<string, any> = {
@@ -676,7 +776,13 @@ export async function PATCH(request: NextRequest) {
       if (property_phone !== undefined) propUpdate.main_phone = property_phone.trim();
       if (fax !== undefined) propUpdate.fax = fax ? fax.trim() : null;
       if (monthly_price !== undefined) {
-        propUpdate.monthly_price = (monthly_price !== null && monthly_price !== '' && monthly_price !== undefined) ? Number(monthly_price) : null;
+        const rawBase = (monthly_price !== null && monthly_price !== '' && monthly_price !== undefined) ? Number(monthly_price) : null;
+        propUpdate.base_price = rawBase;
+        propUpdate.monthly_price = rawBase !== null ? (rawBase + servicesTotal) : (servicesTotal > 0 ? servicesTotal : null);
+      } else if (servicesTotal > 0) {
+        const { data: curProp } = await db.from('properties').select('base_price, monthly_price').eq('id', propId).maybeSingle();
+        const base = Number(curProp?.base_price ?? curProp?.monthly_price ?? 0);
+        propUpdate.monthly_price = base + servicesTotal;
       }
       if (partner_id !== undefined) propUpdate.partner_id = partner_id || null;
       if (partner_commission_override !== undefined) {
@@ -723,7 +829,7 @@ export async function PATCH(request: NextRequest) {
       const orgPropUpdate: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
-      if (organization_id !== undefined) orgPropUpdate.organization_id = organization_id || null;
+      if (organization_id) orgPropUpdate.organization_id = organization_id;
       if (isCompletedOrOnboarded) orgPropUpdate.status = 'ACTIVE';
 
       if (Object.keys(orgPropUpdate).length > 1) {

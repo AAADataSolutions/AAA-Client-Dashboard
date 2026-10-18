@@ -25,6 +25,8 @@ import {
   Copy,
   Mail,
   Phone,
+  PhoneCall,
+  Link as LinkIcon,
   MapPin,
   Eye,
   GitBranch,
@@ -429,6 +431,15 @@ export default function AdminPortingPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<PortingItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Assign Services Modal
+  const [showAssignServiceModal, setShowAssignServiceModal] = useState(false);
+  const [selectedRecordForAssign, setSelectedRecordForAssign] = useState<PortingItem | null>(null);
+  const [assignedServices, setAssignedServices] = useState<any[]>([]);
+  const [availableServices, setAvailableServices] = useState<any[]>([]);
+  const [selectedServiceToAssign, setSelectedServiceToAssign] = useState('');
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [assigningService, setAssigningService] = useState(false);
 
   // Toast Notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -882,6 +893,92 @@ export default function AdminPortingPage() {
     }
   };
 
+  // --- Handlers: Assign Services to Porting Property ---
+  const handleOpenAssignServices = async (record: PortingItem) => {
+    setSelectedRecordForAssign(record);
+    setShowAssignServiceModal(true);
+    setSelectedServiceToAssign('');
+    setLoadingServices(true);
+    try {
+      const [resAssigned, resAll] = await Promise.all([
+        fetch(`/api/admin/porting/${record.id}/services`),
+        fetch(`/api/admin/services?limit=100`),
+      ]);
+      const jsonAssigned = await resAssigned.json();
+      const jsonAll = await resAll.json();
+      if (jsonAssigned.success && Array.isArray(jsonAssigned.data)) {
+        setAssignedServices(jsonAssigned.data);
+      } else {
+        setAssignedServices([]);
+      }
+      if (jsonAll.services || jsonAll.data) {
+        const list = jsonAll.services || jsonAll.data || [];
+        setAvailableServices(
+          list.map((s: any) => ({
+            id: s.id,
+            phone_number: s.phone_number,
+            service_type: s.service_type || 'Voice Trunk',
+            price: Number(s.price || 0),
+          }))
+        );
+      }
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to load services', 'error');
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
+  const handleConfirmAssignService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecordForAssign || !selectedServiceToAssign) {
+      showToast('Validation', 'Please select a service to assign.', 'error');
+      return;
+    }
+    try {
+      setAssigningService(true);
+      const res = await fetch(`/api/admin/porting/${selectedRecordForAssign.id}/services`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service_id: selectedServiceToAssign }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to assign service.');
+
+      showToast('Service Assigned', 'Service linked to porting property successfully.', 'success');
+      setSelectedServiceToAssign('');
+
+      // Refresh assigned services list
+      const resAssigned = await fetch(`/api/admin/porting/${selectedRecordForAssign.id}/services`);
+      const jsonAssigned = await resAssigned.json();
+      if (jsonAssigned.success && Array.isArray(jsonAssigned.data)) {
+        setAssignedServices(jsonAssigned.data);
+      }
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to assign service', 'error');
+    } finally {
+      setAssigningService(false);
+    }
+  };
+
+  const handleUnassignService = async (serviceId: string) => {
+    if (!selectedRecordForAssign) return;
+    try {
+      const res = await fetch(`/api/admin/porting/${selectedRecordForAssign.id}/services?serviceId=${serviceId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to unassign service.');
+
+      showToast('Service Removed', 'Service unassigned successfully.', 'success');
+      setAssignedServices((prev) => prev.filter((s) => s.id !== serviceId && s.service_id !== serviceId));
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to unassign service', 'error');
+    }
+  };
+
   // Handle Update Stage Submit (Unified Modal)
   const handleUpdateStageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1284,7 +1381,7 @@ export default function AdminPortingPage() {
                 {isSuperAdmin && <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>}
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY STATUS</th>
                 <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
-                <th className="py-3 px-4 whitespace-nowrap">MANAGEMENT GROUP</th>
+                <th className="py-3 px-4 whitespace-nowrap">CLIENT</th>
                 <th className="py-3 px-4 whitespace-nowrap">NO. OF SERVICES</th>
                 <th className="py-3 px-4 whitespace-nowrap">E911 STATUS</th>
                 <th className="py-3 px-4 whitespace-nowrap">RAY BAUM AND KARY&apos;S LAW</th>
@@ -1384,12 +1481,37 @@ export default function AdminPortingPage() {
                         )}
                       </td>
 
-                      {/* 5. Management Group (Organization Name or -) */}
-                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium">
-                        {rec.organization_name && rec.organization_name !== 'Unassigned Organization' && rec.organization_name !== 'Direct Portfolio' ? (
-                          rec.organization_name
+                      {/* 5. Client (formerly Management Group) with Green / Blue dot */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium" onClick={(e) => e.stopPropagation()}>
+                        {rec.organization_name && rec.organization_name !== 'Unassigned' && rec.organization_name !== 'Unassigned Organization' && rec.organization_name !== 'Direct Portfolio' && rec.organization_name !== 'Organization' ? (
+                          <div className="inline-flex items-center gap-2">
+                            {rec.organization_id ? (
+                              <a
+                                href={`/admin/organizations/${rec.organization_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>{rec.organization_name}</span>
+                                <ExternalLink className="w-3 h-3 opacity-60" />
+                              </a>
+                            ) : (
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">{rec.organization_name}</span>
+                            )}
+                            {rec.organization_type === 'INDIVIDUAL' ? (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block shrink-0 shadow-2xs ring-2 ring-blue-500/20"
+                                title="Individual Client"
+                              />
+                            ) : (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0 shadow-2xs ring-2 ring-emerald-500/20"
+                                title="Group Client"
+                              />
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-slate-400 font-semibold">—</span>
+                          <span className="text-slate-400 font-semibold">Unassigned</span>
                         )}
                       </td>
 
@@ -1602,6 +1724,17 @@ export default function AdminPortingPage() {
 
             <button
               onClick={() => {
+                handleOpenAssignServices(menuPosition.record);
+                setMenuPosition(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
+            >
+              <PhoneCall className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Assign Services</span>
+            </button>
+
+            <button
+              onClick={() => {
                 setRecordToDelete(menuPosition.record);
                 setShowDeleteModal(true);
                 setMenuPosition(null);
@@ -1713,14 +1846,14 @@ export default function AdminPortingPage() {
 
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Management Group / Organization
+                        Client
                       </label>
                       <select
                         value={detailForm.organization_id}
                         onChange={(e) => setDetailForm((p) => ({ ...p, organization_id: e.target.value }))}
                         className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                       >
-                        <option value="">-- Direct Portfolio (Unassigned) --</option>
+                        <option value="">-- Unassigned (None) --</option>
                         {orgOptions.map((org) => (
                           <option key={org.id} value={org.id}>
                             {org.name}
@@ -2637,7 +2770,7 @@ export default function AdminPortingPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                        Management Group / Organization
+                        Client
                       </label>
                       <select
                         value={createForm.organization_id}
@@ -2646,7 +2779,7 @@ export default function AdminPortingPage() {
                         }
                         className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
                       >
-                        <option value="">-- Direct Portfolio (None) --</option>
+                        <option value="">-- Unassigned (None) --</option>
                         {orgOptions.map((org) => (
                           <option key={org.id} value={org.id}>
                             {org.name}
@@ -3157,6 +3290,158 @@ export default function AdminPortingPage() {
                   ) : (
                     'Confirm Delete'
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ASSIGN SERVICES MODAL */}
+      <AnimatePresence>
+        {showAssignServiceModal && selectedRecordForAssign && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="p-5 flex items-center justify-between border-b border-slate-100 dark:border-[#222430] shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <PhoneCall className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">Assign Services</h3>
+                    <p className="text-xs text-slate-400">{selectedRecordForAssign.property_name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAssignServiceModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-5 text-xs">
+                {/* Section 1: Assigned Services */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[10.5px]">
+                      Currently Assigned Services ({assignedServices.length})
+                    </label>
+                  </div>
+
+                  {loadingServices ? (
+                    <div className="p-6 text-center text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1.5" />
+                      Loading assigned services...
+                    </div>
+                  ) : assignedServices.length === 0 ? (
+                    <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-[#222430] text-center text-slate-400 bg-slate-50/50 dark:bg-[#111217]/50">
+                      No services currently assigned to this porting request.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {assignedServices.map((svc: any) => {
+                        const sid = svc.service_id || svc.id;
+                        const sNum = svc.phone_number || svc.service?.phone_number || 'No Number';
+                        const sType = svc.service_type || svc.service?.service_type || 'Voice Trunk';
+                        const sPrice = Number(svc.price ?? svc.service?.price ?? 0);
+
+                        return (
+                          <div
+                            key={svc.id || sid}
+                            className="p-3 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between gap-3"
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-slate-900 dark:text-white font-mono text-xs">
+                                  {sNum}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
+                                  {sType}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                ${sPrice.toFixed(2)}/mo
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleUnassignService(sid)}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                              title="Unassign Service"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Assign New Service Form */}
+                <form onSubmit={handleConfirmAssignService} className="pt-4 border-t border-slate-100 dark:border-[#222430] space-y-3">
+                  <div>
+                    <label className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                      Assign New Service
+                    </label>
+                    <select
+                      value={selectedServiceToAssign}
+                      onChange={(e) => setSelectedServiceToAssign(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="">Select a service to link...</option>
+                      {availableServices
+                        .filter((s) => !assignedServices.some((as) => (as.service_id || as.id) === s.id))
+                        .map((svc) => (
+                          <option key={svc.id} value={svc.id}>
+                            {svc.phone_number} ({svc.service_type}) — ${Number(svc.price || 0).toFixed(2)}/mo
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {selectedServiceToAssign && (() => {
+                    const chosen = availableServices.find((s) => s.id === selectedServiceToAssign);
+                    const currentPrice = Number(selectedRecordForAssign?.monthly_price || 0);
+                    const svcPrice = Number(chosen?.price || 0);
+                    return (
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/40 rounded-xl text-[11px] text-emerald-800 dark:text-emerald-300">
+                        <p className="font-semibold mb-1">Pricing Update Preview:</p>
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span>Base: ${currentPrice.toFixed(2)}/mo</span>
+                          <span>+ Service: ${svcPrice.toFixed(2)}/mo</span>
+                          <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                            = ${(currentPrice + svcPrice).toFixed(2)}/mo
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      disabled={assigningService || !selectedServiceToAssign}
+                      className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      {assigningService ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>Assign Service</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignServiceModal(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#1f212c] dark:hover:bg-[#2a2c3a] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </div>
