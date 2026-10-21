@@ -342,15 +342,45 @@ export async function GET(request: NextRequest) {
         { label: 'Net profit', value: netProfit, isTotal: true, color: netProfit >= 0 ? '#10b981' : '#ef4444' },
       ];
 
-      // Previous month calculation for bridge
+      // Previous month calculation for bridge and Net Revenue Added This Month
       const prevMonthIdx = mIdx === 0 ? 11 : mIdx - 1;
       const prevYear = mIdx === 0 ? y - 1 : y;
       const prevMKey = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}`;
-      const prevData = monthlyDataMap[prevMKey];
-      const prevGmr = prevData ? prevData.grossMonthlyRevenue : Math.max(0, gmr - revenueIncrease);
+
+      // Calculate exact previous month GMR based on properties & services active on/before prevMKey
+      const assignedForPrevMonth = enrichedProps.filter((p: any) => {
+        if (!p.is_assigned) return false;
+        if (propStatusParam === 'ACTIVE') {
+          if (p.status !== 'ACTIVE' && p.status !== 'COMPLETED' && p.status !== 'ONBOARDED') return false;
+        } else {
+          if (p.status === 'ARCHIVED') return false;
+        }
+        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
+        return pCreatedMonth <= prevMKey;
+      });
+
+      let prevBaseGmr = 0;
+      let prevServicesGmr = 0;
+      assignedForPrevMonth.forEach((p: any) => {
+        prevBaseGmr += Number(p.monthly_price || 0);
+        const servData = servicesByPropId.get(p.id);
+        if (servData?.items) {
+          servData.items.forEach((s: any) => {
+            const sCreatedMonth = s.created_at ? s.created_at.substring(0, 7) : '9999-99';
+            if (sCreatedMonth <= prevMKey) {
+              prevServicesGmr += Number(s.price || s.monthly_price || 0);
+            }
+          });
+        }
+      });
+      const exactPrevGmr = Math.round((prevBaseGmr + prevServicesGmr) * 100) / 100;
+      const revenueAddedThisMonth = Math.round((gmr - exactPrevGmr) * 100) / 100;
+      const revenueAddedGrowthPct = exactPrevGmr > 0
+        ? Math.round(((gmr - exactPrevGmr) / exactPrevGmr) * 1000) / 10
+        : (gmr > 0 ? 100 : 0);
 
       const revenueBridgeData = [
-        { label: `${monthShort[prevMonthIdx]} GMR`, value: prevGmr, isTotal: true, color: '#2563eb' },
+        { label: `${monthShort[prevMonthIdx]} GMR`, value: exactPrevGmr, isTotal: true, color: '#2563eb' },
         { label: 'New listings', value: newPropsRev, isTotal: false, color: '#10b981' },
         { label: 'Service add-ons', value: newServicesRev, isTotal: false, color: '#10b981' },
         { label: `${monthShort[mIdx]} GMR`, value: gmr, isTotal: true, color: '#2563eb' },
@@ -366,6 +396,11 @@ export async function GET(request: NextRequest) {
         basePropertyRevenue: Math.round(baseGmr * 100) / 100,
         servicesRevenue: Math.round(servicesGmr * 100) / 100,
         revenueIncreaseMonthly: Math.round(revenueIncrease * 100) / 100,
+        revenueAddedThisMonth,
+        revenueAddedGrowthPct,
+        previousMonthGmr: exactPrevGmr,
+        previousMonthName: `${monthNames[prevMonthIdx]} ${prevYear}`,
+        previousMonthShort: monthShort[prevMonthIdx],
         partnerCommissionOutflow: Math.round(partnerOutflow * 100) / 100,
         partnerOutflowPctOfGMR: gmr > 0 ? Math.round((partnerOutflow / gmr) * 1000) / 10 : 0.0,
         netRetainedValue: Math.round(netRetainedValue * 100) / 100,

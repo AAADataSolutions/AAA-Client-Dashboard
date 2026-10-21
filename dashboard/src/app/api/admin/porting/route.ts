@@ -236,6 +236,24 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      // Extract metadata from item.notes if present (used for unassigned porting records)
+      let metaStageDates: Record<string, string | null> = {};
+      let metaStageAssignments: Record<string, any> = {};
+      let metaProp: Record<string, any> = {};
+      let cleanNotes = item.notes || '';
+      if (item.notes && typeof item.notes === 'string' && item.notes.includes('<!--METADATA:')) {
+        const match = item.notes.match(/<!--METADATA:([\s\S]*?)-->/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            if (parsed.stage_dates) metaStageDates = parsed.stage_dates;
+            if (parsed.stage_assignments) metaStageAssignments = parsed.stage_assignments;
+            if (parsed.property_details) metaProp = parsed.property_details;
+          } catch {}
+        }
+        cleanNotes = item.notes.replace(/<!--METADATA:[\s\S]*?-->/, '').trim();
+      }
+
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
@@ -244,23 +262,23 @@ export async function GET(request: NextRequest) {
         property_name: item.property_name || prop?.name || 'New Property',
         property_address: item.property_address || (prop?.address
           ? `${prop.address}, ${prop.city || ''}, ${prop.state || ''} ${prop.zip_code || ''}`.trim()
-          : 'Address pending'),
-        partner_id: prop?.partner_id || null,
-        partner_commission_override: prop?.partner_commission_override ?? null,
-        property_phone: item.property_phone || prop?.main_phone || '—',
-        fax: item.fax || prop?.fax || '—',
-        monthly_price: computedMonthly,
-        base_price: rawBase,
-        general_manager_name: prop?.general_manager_name || prop?.contact_person_name || 'N/A',
-        general_manager_phone: prop?.general_manager_phone || prop?.main_phone || 'N/A',
-        general_manager_email: prop?.general_manager_email || prop?.contact_person_email || 'N/A',
-        city: prop?.city || '',
-        state: prop?.state || '',
-        zip_code: prop?.zip_code || '',
+          : (metaProp.street_address ? `${metaProp.street_address}, ${metaProp.city || ''}, ${metaProp.state || ''} ${metaProp.zip_code || ''}`.trim() : 'Address pending')),
+        partner_id: prop?.partner_id || metaProp.partner_id || null,
+        partner_commission_override: prop?.partner_commission_override ?? metaProp.partner_commission_override ?? null,
+        property_phone: item.property_phone || prop?.main_phone || metaProp.property_phone || '—',
+        fax: item.fax || prop?.fax || metaProp.fax || '—',
+        monthly_price: computedMonthly ?? (metaProp.monthly_price !== undefined ? metaProp.monthly_price : null),
+        base_price: rawBase ?? (metaProp.monthly_price !== undefined ? metaProp.monthly_price : null),
+        general_manager_name: prop?.general_manager_name || prop?.contact_person_name || metaProp.general_manager_name || 'N/A',
+        general_manager_phone: prop?.general_manager_phone || prop?.main_phone || metaProp.general_manager_phone || 'N/A',
+        general_manager_email: prop?.general_manager_email || prop?.contact_person_email || metaProp.general_manager_email || 'N/A',
+        city: prop?.city || metaProp.city || '',
+        state: prop?.state || metaProp.state || '',
+        zip_code: prop?.zip_code || metaProp.zip_code || '',
         country: prop?.country || 'USA',
-        e911_status: (prop?.ray_baud_and_logs_enabled || prop?.status === 'ACTIVE') ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        ray_baud_and_logs_enabled: prop?.ray_baud_and_logs_enabled ?? false,
-        ray_baum_status: prop?.ray_baum_status || (prop?.ray_baud_and_logs_enabled ? 'ACTIVE' : 'INACTIVE'),
+        e911_status: (prop?.ray_baud_and_logs_enabled || prop?.status === 'ACTIVE' || metaProp.e911_status === 'VERIFIED') ? 'VERIFIED' : (metaProp.e911_status || 'AUDIT_REQUIRED'),
+        ray_baud_and_logs_enabled: prop?.ray_baud_and_logs_enabled ?? (metaProp.ray_baum_status === 'ACTIVE' ? true : false),
+        ray_baum_status: prop?.ray_baum_status || metaProp.ray_baum_status || (prop?.ray_baud_and_logs_enabled ? 'ACTIVE' : 'INACTIVE'),
         carrier_details: item.carrier_details || '',
         organization_id: org?.id || item.organization_id || '',
         organization_name: (org?.name && org.name !== 'Organization' && org.name !== 'Unassigned Organization' && org.name !== 'Direct Portfolio') ? org.name : 'Unassigned',
@@ -268,28 +286,28 @@ export async function GET(request: NextRequest) {
         status: effectiveStatus,
         stage: effectiveStatus,
         progress_pct: progressPct,
-        target_date: item.target_date || ob?.target_date || null,
-        draft_date: ob?.draft_date || null,
-        contract_sent_date: ob?.contract_sent_date || null,
-        signed_date: ob?.signed_date || null,
-        csr_details_date: ob?.csr_details_date || null,
-        cut_sheet_review_date: ob?.cut_sheet_review_date || ob?.sof_review_date || null,
-        porting_submitted_date: ob?.porting_submitted_date || null,
-        sof_review_date: ob?.sof_review_date || null,
-        foc_confirmed_date: ob?.foc_confirmed_date || null,
-        live_cutover_date: ob?.live_cutover_date || item.completed_at || null,
-        assigned_to: ob?.assigned_to || null,
-        assigned_to_name: ob?.assigned_to_name || null,
-        internal_notes: ob?.internal_notes || item.notes || null,
-        stage3_assigned_to: ob?.stage3_assigned_to || ob?.assigned_to || null,
-        stage3_assigned_to_name: ob?.stage3_assigned_to_name || ob?.assigned_to_name || null,
-        stage3_notes: ob?.stage3_notes || ob?.internal_notes || null,
-        stage4_assigned_to: ob?.stage4_assigned_to || null,
-        stage4_assigned_to_name: ob?.stage4_assigned_to_name || null,
-        stage4_notes: ob?.stage4_notes || null,
+        target_date: item.target_date || ob?.target_date || metaStageDates.target_date || null,
+        draft_date: ob?.draft_date || metaStageDates.draft_date || null,
+        contract_sent_date: ob?.contract_sent_date || metaStageDates.contract_sent_date || null,
+        signed_date: ob?.signed_date || metaStageDates.signed_date || null,
+        csr_details_date: ob?.csr_details_date || metaStageDates.csr_details_date || null,
+        cut_sheet_review_date: ob?.cut_sheet_review_date || ob?.sof_review_date || metaStageDates.cut_sheet_review_date || null,
+        porting_submitted_date: ob?.porting_submitted_date || metaStageDates.porting_submitted_date || null,
+        sof_review_date: ob?.sof_review_date || metaStageDates.sof_review_date || null,
+        foc_confirmed_date: ob?.foc_confirmed_date || metaStageDates.foc_confirmed_date || null,
+        live_cutover_date: ob?.live_cutover_date || item.completed_at || metaStageDates.live_cutover_date || null,
+        assigned_to: ob?.assigned_to || metaStageAssignments.assigned_to || null,
+        assigned_to_name: ob?.assigned_to_name || metaStageAssignments.assigned_to_name || null,
+        internal_notes: ob?.internal_notes || cleanNotes || null,
+        stage3_assigned_to: ob?.stage3_assigned_to || ob?.assigned_to || metaStageAssignments.stage3_assigned_to || null,
+        stage3_assigned_to_name: ob?.stage3_assigned_to_name || ob?.assigned_to_name || metaStageAssignments.stage3_assigned_to_name || null,
+        stage3_notes: ob?.stage3_notes || ob?.internal_notes || metaStageAssignments.stage3_notes || null,
+        stage4_assigned_to: ob?.stage4_assigned_to || metaStageAssignments.stage4_assigned_to || null,
+        stage4_assigned_to_name: ob?.stage4_assigned_to_name || metaStageAssignments.stage4_assigned_to_name || null,
+        stage4_notes: ob?.stage4_notes || metaStageAssignments.stage4_notes || null,
         completed_at: item.completed_at,
         rejection_reason: item.rejection_reason,
-        notes: item.notes || ob?.internal_notes || null,
+        notes: cleanNotes || ob?.internal_notes || null,
         is_activated: item.is_activated || false,
         attachments: mergedAtts,
         services_count: services.length,
@@ -694,19 +712,31 @@ export async function PATCH(request: NextRequest) {
               .update({ organization_property_id: createdOp.id })
               .eq('id', id);
 
+            // Extract any existing metadata stage dates saved while unassigned
+            let priorMetaDates: Record<string, any> = {};
+            if (updated?.notes && typeof updated.notes === 'string' && updated.notes.includes('<!--METADATA:')) {
+              const m = updated.notes.match(/<!--METADATA:([\s\S]*?)-->/);
+              if (m) {
+                try {
+                  const p = JSON.parse(m[1]);
+                  if (p.stage_dates) priorMetaDates = p.stage_dates;
+                } catch {}
+              }
+            }
+
             await db.from('onboardings').insert({
               organization_property_id: createdOp.id,
               status: status || updated.status || 'DRAFT',
-              target_date: target_date || null,
-              draft_date: draft_date || null,
-              contract_sent_date: contract_sent_date || null,
-              signed_date: signed_date || null,
-              csr_details_date: csr_details_date || body.csr_details_date || null,
-              cut_sheet_review_date: cut_sheet_review_date || body.cut_sheet_review_date || null,
-              porting_submitted_date: porting_submitted_date || null,
-              sof_review_date: sof_review_date || null,
-              foc_confirmed_date: foc_confirmed_date || null,
-              live_cutover_date: live_cutover_date || null,
+              target_date: target_date || priorMetaDates.target_date || null,
+              draft_date: draft_date || priorMetaDates.draft_date || null,
+              contract_sent_date: contract_sent_date || priorMetaDates.contract_sent_date || null,
+              signed_date: signed_date || priorMetaDates.signed_date || null,
+              csr_details_date: csr_details_date || body.csr_details_date || priorMetaDates.csr_details_date || null,
+              cut_sheet_review_date: cut_sheet_review_date || body.cut_sheet_review_date || priorMetaDates.cut_sheet_review_date || null,
+              porting_submitted_date: porting_submitted_date || priorMetaDates.porting_submitted_date || null,
+              sof_review_date: sof_review_date || priorMetaDates.sof_review_date || null,
+              foc_confirmed_date: foc_confirmed_date || priorMetaDates.foc_confirmed_date || null,
+              live_cutover_date: live_cutover_date || priorMetaDates.live_cutover_date || null,
             });
 
             await db.from('e911_records').insert({
@@ -901,6 +931,88 @@ export async function PATCH(request: NextRequest) {
           console.error('Error inserting onboardings table:', obErr);
           return NextResponse.json({ success: false, error: `Onboarding insert error: ${obErr.message}` }, { status: 400 });
         }
+      }
+    } else {
+      // 3b. When orgPropId does NOT exist (property is unassigned), persist all stage dates into porting_requests.notes metadata
+      const hasStageDateUpdate =
+        draft_date !== undefined ||
+        contract_sent_date !== undefined ||
+        signed_date !== undefined ||
+        csr_details_date !== undefined ||
+        body.csr_details_date !== undefined ||
+        cut_sheet_review_date !== undefined ||
+        body.cut_sheet_review_date !== undefined ||
+        porting_submitted_date !== undefined ||
+        sof_review_date !== undefined ||
+        foc_confirmed_date !== undefined ||
+        foc_date !== undefined ||
+        live_cutover_date !== undefined ||
+        target_date !== undefined ||
+        assigned_to !== undefined ||
+        assigned_to_name !== undefined ||
+        internal_notes !== undefined ||
+        body.stage3_assigned_to !== undefined ||
+        body.stage3_assigned_to_name !== undefined ||
+        body.stage3_notes !== undefined ||
+        body.stage4_assigned_to !== undefined ||
+        body.stage4_assigned_to_name !== undefined ||
+        body.stage4_notes !== undefined;
+
+      if (hasStageDateUpdate || notes !== undefined || internal_notes !== undefined) {
+        const { data: curPr } = await db.from('porting_requests').select('notes').eq('id', id).single();
+        let existingMeta: any = { stage_dates: {}, stage_assignments: {} };
+        let userNotes = notes !== undefined || internal_notes !== undefined ? (internal_notes || notes || '') : '';
+        if (curPr?.notes && typeof curPr.notes === 'string' && curPr.notes.includes('<!--METADATA:')) {
+          const match = curPr.notes.match(/<!--METADATA:([\s\S]*?)-->/);
+          if (match) {
+            try {
+              const parsed = JSON.parse(match[1]);
+              if (parsed.stage_dates) existingMeta.stage_dates = parsed.stage_dates;
+              if (parsed.stage_assignments) existingMeta.stage_assignments = parsed.stage_assignments;
+            } catch {}
+          }
+          if (notes === undefined && internal_notes === undefined) {
+            userNotes = curPr.notes.replace(/<!--METADATA:[\s\S]*?-->/, '').trim();
+          }
+        } else if (notes === undefined && internal_notes === undefined) {
+          userNotes = (curPr?.notes || '').trim();
+        }
+
+        const mergedDates = {
+          ...existingMeta.stage_dates,
+          ...(target_date !== undefined ? { target_date } : {}),
+          ...(draft_date !== undefined ? { draft_date } : {}),
+          ...(contract_sent_date !== undefined ? { contract_sent_date } : {}),
+          ...(signed_date !== undefined ? { signed_date } : {}),
+          ...(csr_details_date !== undefined || body.csr_details_date !== undefined
+            ? { csr_details_date: csr_details_date !== undefined ? csr_details_date : body.csr_details_date }
+            : {}),
+          ...(cut_sheet_review_date !== undefined || body.cut_sheet_review_date !== undefined
+            ? { cut_sheet_review_date: cut_sheet_review_date !== undefined ? cut_sheet_review_date : body.cut_sheet_review_date }
+            : {}),
+          ...(porting_submitted_date !== undefined ? { porting_submitted_date } : {}),
+          ...(sof_review_date !== undefined ? { sof_review_date } : {}),
+          ...(foc_confirmed_date !== undefined || foc_date !== undefined
+            ? { foc_confirmed_date: foc_confirmed_date !== undefined ? foc_confirmed_date : foc_date }
+            : {}),
+          ...(live_cutover_date !== undefined ? { live_cutover_date } : {}),
+        };
+
+        const mergedAssignments = {
+          ...existingMeta.stage_assignments,
+          ...(assigned_to !== undefined ? { assigned_to } : {}),
+          ...(assigned_to_name !== undefined ? { assigned_to_name } : {}),
+          ...(body.stage3_assigned_to !== undefined ? { stage3_assigned_to: body.stage3_assigned_to } : {}),
+          ...(body.stage3_assigned_to_name !== undefined ? { stage3_assigned_to_name: body.stage3_assigned_to_name } : {}),
+          ...(body.stage3_notes !== undefined ? { stage3_notes: body.stage3_notes } : {}),
+          ...(body.stage4_assigned_to !== undefined ? { stage4_assigned_to: body.stage4_assigned_to } : {}),
+          ...(body.stage4_assigned_to_name !== undefined ? { stage4_assigned_to_name: body.stage4_assigned_to_name } : {}),
+          ...(body.stage4_notes !== undefined ? { stage4_notes: body.stage4_notes } : {}),
+        };
+
+        const metaString = `<!--METADATA:${JSON.stringify({ stage_dates: mergedDates, stage_assignments: mergedAssignments })}-->`;
+        const finalNotes = `${metaString}${userNotes ? `\n${userNotes}` : ''}`;
+        await db.from('porting_requests').update({ notes: finalNotes }).eq('id', id);
       }
     }
 

@@ -268,6 +268,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Vendor ID is required for deletion.' }, { status: 400 });
     }
 
+    // Cascade delete any child devices and property allocations
+    await supabase.from('vendor_devices').delete().eq('vendor_id', id);
+    await supabase.from('vendor_property_allocations').delete().eq('vendor_id', id);
+
     const { error: delErr } = await supabase.from('vendors').delete().eq('id', id);
 
     if (delErr) {

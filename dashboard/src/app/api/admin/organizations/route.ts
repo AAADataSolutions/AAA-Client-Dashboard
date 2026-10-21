@@ -150,6 +150,8 @@ export async function GET(request: NextRequest) {
     // 3. Compute 5 KPI Cards per Task.md:
     // Total Organizations, Active Organizations, Pending / Invited, Total Properties, Organizations with No Properties
     const totalOrganizations = allProcessed.length;
+    const totalGroups = allProcessed.filter((o: any) => (o.type || 'GROUP') === 'GROUP').length;
+    const totalIndividuals = allProcessed.filter((o: any) => o.type === 'INDIVIDUAL').length;
     const activeOrganizations = allProcessed.filter((o: any) => o.status === 'ACTIVE').length;
     const pendingOrInvited = allProcessed.filter(
       (o: any) =>
@@ -223,6 +225,8 @@ export async function GET(request: NextRequest) {
       },
       metrics: {
         totalOrganizations,
+        totalGroups,
+        totalIndividuals,
         activeOrganizations,
         pendingOrInvited,
         totalProperties,

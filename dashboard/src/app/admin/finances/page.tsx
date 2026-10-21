@@ -68,6 +68,7 @@ export default function AdminFinancesPage() {
 
   // Independent working filters for each and every component on the page
   const [gmrMonth, setGmrMonth] = useState(defaultMonthKey);
+  const [revAddedMonth, setRevAddedMonth] = useState(defaultMonthKey);
   const [partnerOutflowMonth, setPartnerOutflowMonth] = useState(defaultMonthKey);
   const [nrvMonth, setNrvMonth] = useState(defaultMonthKey);
   const [netProfitMonth, setNetProfitMonth] = useState(defaultMonthKey);
@@ -107,6 +108,7 @@ export default function AdminFinancesPage() {
     partner_id: '',
     period_month: defaultMonthKey,
     custom_commission_rate: '',
+    status: 'SUBMITTED',
     notes: '',
   });
   const [candidateProperties, setCandidateProperties] = useState<any[]>([]);
@@ -209,6 +211,7 @@ export default function AdminFinancesPage() {
           partner_id: '',
           period_month: defaultMonthKey,
           custom_commission_rate: '',
+          status: 'SUBMITTED',
           notes: '',
         });
         setSelectedPropertyIds([]);
@@ -238,6 +241,7 @@ export default function AdminFinancesPage() {
 
   // Data resolvers for each individual card & component
   const gmrData = monthlyDataMap[gmrMonth] || data?.defaultMonthData || {};
+  const revAddedData = monthlyDataMap[revAddedMonth] || data?.defaultMonthData || {};
   const partnerOutflowData = monthlyDataMap[partnerOutflowMonth] || data?.defaultMonthData || {};
   const nrvData = monthlyDataMap[nrvMonth] || data?.defaultMonthData || {};
   const netProfitData = monthlyDataMap[netProfitMonth] || data?.defaultMonthData || {};
@@ -569,7 +573,7 @@ export default function AdminFinancesPage() {
       </motion.div>
 
       {/* Row 1: Core Revenue & Partner Outflows (Each with its own working month filter) */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Monthly Revenue (GMR) Card */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
@@ -607,8 +611,60 @@ export default function AdminFinancesPage() {
                 <polyline fill="none" stroke="#86efac" strokeWidth="2" points={sparklinePoints} />
               </svg>
             </div>
+          </div>
+
+          <p className="text-[11px] text-blue-200 mt-2 pt-2 border-t border-white/10">
+            Across {gmrData.activePropertiesCount || 0} active billed hotel properties
+          </p>
         </div>
-</div>
+
+        {/* Revenue Added This Month Card (Pure Number, No Graph) */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#047857] via-[#065f46] to-[#064e3b] text-white border border-emerald-600/50 shadow-md relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200">
+                Revenue Added This Month
+              </span>
+              <select
+                value={revAddedMonth}
+                onChange={(e) => setRevAddedMonth(e.target.value)}
+                className="bg-black/25 text-white text-[10px] font-bold rounded-lg px-2 py-0.5 border border-white/20 focus:outline-hidden cursor-pointer hover:bg-black/40 transition"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m.key} value={m.key} className="bg-[#0f172a] text-white">
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-2.5 flex items-baseline justify-between gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-black ${
+                  (revAddedData.revenueAddedThisMonth ?? 0) >= 0 ? 'text-white' : 'text-rose-300'
+                }`}>
+                  {(revAddedData.revenueAddedThisMonth ?? 0) >= 0 ? '' : ''}
+                  {formatCurrency(revAddedData.revenueAddedThisMonth ?? 0)}
+                </span>
+                {revAddedData.revenueAddedGrowthPct !== undefined && revAddedData.previousMonthGmr > 0 && (
+                  <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    revAddedData.revenueAddedThisMonth >= 0
+                      ? 'bg-emerald-400/20 text-emerald-200'
+                      : 'bg-rose-500/20 text-rose-200'
+                  }`}>
+                    {revAddedData.revenueAddedThisMonth >= 0 ? '+' : ''}{revAddedData.revenueAddedGrowthPct}%
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-emerald-200 mt-2 pt-2 border-t border-white/10">
+            {revAddedData.previousMonthName
+              ? `From ${formatCurrency(revAddedData.previousMonthGmr || 0)} (${revAddedData.previousMonthShort || 'prev'}) to ${formatCurrency(revAddedData.grossMonthlyRevenue || 0)}`
+              : 'Net new recurring revenue addition'}
+          </p>
+        </div>
         {/* Partner Commission Outflow Card */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
@@ -1787,7 +1843,7 @@ export default function AdminFinancesPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Period Month *</label>
                     <input
@@ -1797,6 +1853,20 @@ export default function AdminFinancesPage() {
                       onChange={(e) => setBackorderForm({ ...backorderForm, period_month: e.target.value })}
                       className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Invoice Status *</label>
+                    <select
+                      value={backorderForm.status}
+                      onChange={(e) => setBackorderForm({ ...backorderForm, status: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white cursor-pointer"
+                    >
+                      <option value="SUBMITTED">Submitted</option>
+                      <option value="APPROVED">Approved</option>
+                      <option value="PAID">Paid</option>
+                      <option value="DRAFT">Draft</option>
+                    </select>
                   </div>
 
                   <div>
@@ -1821,7 +1891,7 @@ export default function AdminFinancesPage() {
                   <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-[#222430]">
                     <div className="flex items-center justify-between">
                       <label className="block font-bold text-slate-700 dark:text-slate-300">
-                        Properties on record as of {backorderForm.period_month} ({selectedPropertyIds.length}/{candidateProperties.length})
+                        Assigned Partner Properties ({selectedPropertyIds.length}/{candidateProperties.length})
                       </label>
                       {candidateProperties.length > 0 && (
                         <div className="flex items-center gap-2 text-[10px]">
@@ -1851,7 +1921,7 @@ export default function AdminFinancesPage() {
                       </div>
                     ) : candidateProperties.length === 0 ? (
                       <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-[11px]">
-                        No properties found for this partner created on or before {backorderForm.period_month}.
+                        No properties currently assigned to this partner.
                       </div>
                     ) : (
                       <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-slate-50 dark:bg-[#1a1b24] rounded-xl border border-slate-200 dark:border-[#282a36]">

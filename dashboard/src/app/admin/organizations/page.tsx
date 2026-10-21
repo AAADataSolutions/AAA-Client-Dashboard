@@ -33,6 +33,7 @@ import {
   UserPlus,
   Trash2,
   Upload,
+  Download,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -53,6 +54,7 @@ import {
 } from '@/store/slices/organizationsSlice';
 import { CreateOrgModal } from '@/components/admin/CreateOrgModal';
 import { InviteManagerModal } from '@/components/admin/InviteManagerModal';
+import { ImportOrganizationsModal } from '@/components/admin/ImportOrganizationsModal';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -128,6 +130,8 @@ export default function AdminOrganizationsPage() {
 
   // Invite Modal State
   const [inviteModalOrg, setInviteModalOrg] = useState<{ id: string; name: string } | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Edit Organization Drawer
   const [showEditDrawer, setShowEditDrawer] = useState(false);
@@ -244,6 +248,65 @@ export default function AdminOrganizationsPage() {
     }
     return result;
   }, [organizations, searchQuery, selectedTypeFilter]);
+
+  // Export CSV handler
+  const handleExportCSV = async () => {
+    try {
+      setExporting(true);
+      const res = await fetch('/api/admin/organizations?limit=1000');
+      const json = await res.json();
+      const list: OrgRecord[] = json.success && json.data ? json.data : organizations;
+
+      const headers = [
+        'Management Group Name',
+        'Type',
+        'Primary Contact',
+        'Email',
+        'Phone',
+        'Status',
+        'Created At',
+        'Street Address',
+        'City',
+        'State',
+        'Zip Code',
+      ];
+
+      const escapeCSV = (val: any) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      const rows = list.map((org: OrgRecord) => [
+        escapeCSV(org.name),
+        escapeCSV(org.type || 'GROUP'),
+        escapeCSV(org.primary_contact_name || org.contact_name || ''),
+        escapeCSV(org.email || ''),
+        escapeCSV(org.phone || ''),
+        escapeCSV(org.status || 'ACTIVE'),
+        escapeCSV(org.created_at ? new Date(org.created_at).toISOString().split('T')[0] : ''),
+        escapeCSV(org.street_address || org.address || ''),
+        escapeCSV(org.city || ''),
+        escapeCSV(org.state || ''),
+        escapeCSV(org.zip_code || ''),
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `management_groups_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Open 3-Dots Action Menu (Upside detection)
   const handleOpenMenu = (e: React.MouseEvent<HTMLButtonElement>, org: OrgRecord) => {
@@ -605,7 +668,24 @@ export default function AdminOrganizationsPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={handleExportCSV}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1a1b24] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#282a36] font-semibold text-xs transition shadow-2xs cursor-pointer disabled:opacity-50"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 text-slate-500" />}
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1a1b24] text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 font-semibold text-xs transition shadow-2xs cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import CSV</span>
+          </button>
+
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
@@ -623,7 +703,7 @@ export default function AdminOrganizationsPage() {
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"
       >
-        {/* Card 1: Total Management Groups */}
+        {/* Card 1: Total Clients */}
         <motion.div
           variants={itemVariants}
           whileHover={{ y: -4, scale: 1.02 }}
@@ -632,7 +712,7 @@ export default function AdminOrganizationsPage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Total Management Groups
+              Total Clients
             </span>
             <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
               <Building2 size={18} />
@@ -642,9 +722,11 @@ export default function AdminOrganizationsPage() {
             <span className="text-2xl font-bold text-slate-100 dark:text-white">
               {metrics.totalOrganizations}
             </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Groups</span>
+            <span className="text-xs text-slate-100 ml-1.5 font-medium">Clients</span>
           </div>
-          <p className="text-[11px] text-slate-100 mt-2">All provisioned tenant accounts</p>
+          <p className="text-[11px] text-slate-100 mt-2">
+            {(metrics as any).totalGroups ?? organizations.filter((o) => (o.type || 'GROUP') === 'GROUP').length} groups and {(metrics as any).totalIndividuals ?? organizations.filter((o) => o.type === 'INDIVIDUAL').length} individuals
+          </p>
         </motion.div>
 
         {/* Card 2: Active Management Groups */}
@@ -1998,6 +2080,15 @@ export default function AdminOrganizationsPage() {
           onSuccess={fetchOrganizations}
         />
       )}
+
+      {/* Import Organizations Modal */}
+      <ImportOrganizationsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          fetchOrganizations();
+        }}
+      />
     </motion.div>
   );
 }

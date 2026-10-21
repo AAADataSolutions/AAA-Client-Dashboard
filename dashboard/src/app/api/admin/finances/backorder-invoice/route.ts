@@ -27,20 +27,11 @@ export async function GET(request: NextRequest) {
 
     const allProps = props || [];
 
-    // Filter candidate properties: properties created on or before the period_month
-    const filtered = allProps.filter((p: any) => {
-      if (periodMonth) {
-        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
-        return pCreatedMonth <= periodMonth;
-      }
-      return true;
-    });
-
     return NextResponse.json({
       success: true,
-      properties: filtered,
+      properties: allProps,
       total_partner_properties: allProps.length,
-      eligible_count: filtered.length,
+      eligible_count: allProps.length,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
@@ -52,7 +43,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient() || (await createClient());
     const body = await request.json();
 
-    const { partner_id, period_month, property_ids, custom_commission_rate, notes } = body;
+    const { partner_id, period_month, property_ids, custom_commission_rate, status, notes } = body;
 
     if (!partner_id) {
       return NextResponse.json({ success: false, error: 'Partner ID is required.' }, { status: 400 });
@@ -83,7 +74,7 @@ export async function POST(request: NextRequest) {
     const periodEnd = endDate.toISOString().split('T')[0];
     const monthCode = `${year}${String(month + 1).padStart(2, '0')}`;
 
-    // 3. Fetch properties
+    // 3. Fetch properties (selected properties irrespective of month)
     let query = supabase.from('properties').select('id, name, address, city, state, monthly_price, partner_commission_override, created_at');
     if (property_ids && Array.isArray(property_ids) && property_ids.length > 0) {
       query = query.in('id', property_ids);
@@ -93,14 +84,6 @@ export async function POST(request: NextRequest) {
 
     const { data: propsData, error: propsErr } = await query;
     let properties = propsData || [];
-
-    // If explicit property_ids were NOT provided, automatically filter out properties created AFTER period_month
-    if (!property_ids || !Array.isArray(property_ids) || property_ids.length === 0) {
-      properties = properties.filter((p: any) => {
-        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
-        return pCreatedMonth <= period_month;
-      });
-    }
 
     const hasCustomRate =
       custom_commission_rate !== undefined &&
@@ -145,6 +128,10 @@ export async function POST(request: NextRequest) {
     const randHex = crypto.randomBytes(2).toString('hex').toUpperCase();
     const invoiceNumber = `INV-${rawSlug || 'PTR'}-${monthCode}-BACK-${randHex}`;
 
+    const validStatus = status && ['PAID', 'APPROVED', 'SUBMITTED', 'DRAFT'].includes(String(status).toUpperCase())
+      ? String(status).toUpperCase()
+      : 'SUBMITTED';
+
     const newInvoicePayload = {
       partner_id: partner.id,
       invoice_number: invoiceNumber,
@@ -153,9 +140,9 @@ export async function POST(request: NextRequest) {
       total_properties: properties.length,
       gross_revenue: Math.round(grossRevenue * 100) / 100,
       commission_amount: Math.round(totalCommission * 100) / 100,
-      status: 'SUBMITTED',
+      status: validStatus,
       line_items: lineItems,
-      notes: notes || `Historical back-ordered commission invoice for ${period_month}. Generated on-demand.`,
+      notes: notes || `Historical back-ordered revenue share invoice for ${period_month}. Generated on-demand.`,
     };
 
     const { data: createdInv, error: insertErr } = await supabase

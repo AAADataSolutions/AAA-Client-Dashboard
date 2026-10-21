@@ -39,6 +39,8 @@ export interface OrgRecord {
 
 export interface OrgMetrics {
   totalOrganizations: number;
+  totalGroups?: number;
+  totalIndividuals?: number;
   activeOrganizations: number;
   pendingOrInvited: number;
   totalProperties: number;
@@ -69,6 +71,8 @@ const initialState: OrganizationsState = {
   orgProperties: {},
   metrics: {
     totalOrganizations: 0,
+    totalGroups: 0,
+    totalIndividuals: 0,
     activeOrganizations: 0,
     pendingOrInvited: 0,
     totalProperties: 0,

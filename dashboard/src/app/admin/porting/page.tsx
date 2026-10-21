@@ -55,6 +55,7 @@ import {
   setPagination,
   PortingItem,
 } from '@/store/slices/portingSlice';
+import { ImportPortingModal } from '@/components/admin/ImportPortingModal';
 
 export type LifecycleStage =
   | 'DRAFT'
@@ -360,6 +361,8 @@ export default function AdminPortingPage() {
 
   // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'DETAILS' | 'STAGE' | 'MEDIA'>('STAGE');
   const [selectedRecord, setSelectedRecord] = useState<PortingItem | null>(null);
@@ -566,6 +569,120 @@ export default function AdminPortingPage() {
     setCopiedField(label);
     showToast('Copied', `${text} copied to clipboard.`, 'info');
     setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  // Export CSV handler
+  const handleExportCSV = async () => {
+    try {
+      setExportingCSV(true);
+      const res = await fetch('/api/admin/porting?limit=1000');
+      const json = await res.json();
+      const list: PortingItem[] = json.success && json.data ? json.data : portings;
+
+      const headers = [
+        'Client',
+        'Property Name',
+        'Main Phone Number',
+        'Fax Number',
+        'Monthly Price ($)',
+        'Channel Partner',
+        'Partner Revenue Share (%)',
+        'Target Cutover Date',
+        'Street Address',
+        'City',
+        'State',
+        'ZIP Code',
+        'GM Full Name',
+        'GM Phone Number',
+        'GM Email Address',
+        'Initial Lifecycle Stage',
+        'E911 Compliance Status',
+        "Ray Baum & Kari's Law",
+        'Losing Carrier & Porting Notes',
+      ];
+
+      const escapeCSV = (val: any) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      const rows = list.map((item: any) => {
+        const partner = partnerOptions.find((p) => p.id === item.partner_id);
+        const partnerName = partner
+          ? partner.company_name
+            ? `${partner.name} (${partner.company_name})`
+            : partner.name
+          : 'No Partner Assigned';
+        const revShare =
+          item.partner_commission_override !== null && item.partner_commission_override !== undefined
+            ? item.partner_commission_override
+            : partner?.default_commission_rate ?? '';
+        const stageBadge = getStageBadge(item.status || item.stage || 'DRAFT');
+
+        return [
+          escapeCSV(
+            item.organization_name && item.organization_name !== 'Unassigned'
+              ? item.organization_name
+              : '-- Unassigned (None) --'
+          ),
+          escapeCSV(item.property_name || ''),
+          escapeCSV(item.property_phone || ''),
+          escapeCSV(item.fax && item.fax !== '—' ? item.fax : ''),
+          escapeCSV(
+            item.monthly_price !== null && item.monthly_price !== undefined
+              ? Number(item.monthly_price).toFixed(2)
+              : ''
+          ),
+          escapeCSV(partnerName),
+          escapeCSV(revShare !== '' ? `${revShare}%` : ''),
+          escapeCSV(item.target_date || ''),
+          escapeCSV(item.property_address || ''),
+          escapeCSV(item.city || ''),
+          escapeCSV(item.state || ''),
+          escapeCSV(item.zip_code || ''),
+          escapeCSV(
+            item.general_manager_name && item.general_manager_name !== 'N/A'
+              ? item.general_manager_name
+              : ''
+          ),
+          escapeCSV(
+            item.general_manager_phone && item.general_manager_phone !== 'N/A'
+              ? item.general_manager_phone
+              : ''
+          ),
+          escapeCSV(
+            item.general_manager_email && item.general_manager_email !== 'N/A'
+              ? item.general_manager_email
+              : ''
+          ),
+          escapeCSV(stageBadge.label),
+          escapeCSV(item.e911_status === 'VERIFIED' ? 'PSAP Verified (Compliant)' : 'Audit Required'),
+          escapeCSV(
+            item.ray_baud_and_logs_enabled || item.ray_baum_status === 'ACTIVE'
+              ? 'Active (Compliant)'
+              : 'Inactive'
+          ),
+          escapeCSV(item.carrier_details || item.notes || ''),
+        ];
+      });
+
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `porting_records_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Export porting failed:', err);
+      showToast('Export Error', err.message || 'Could not export porting records', 'error');
+    } finally {
+      setExportingCSV(false);
+    }
   };
 
   // Open 3-Dots Menu (opens ABOVE the row)
@@ -1130,42 +1247,7 @@ export default function AdminPortingPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Export CSV Button */}
-          <button
-            onClick={() => {
-              if (portings.length === 0) {
-                showToast('No Data', 'No porting records to export.', 'info');
-                return;
-              }
-              const headers = ['Property Name', 'Location', 'Organization', 'Stage', 'GM Name', 'GM Email', 'Phone', 'Fax', 'Target Date'];
-              const rows = portings.map((p) => [
-                `"${p.property_name || ''}"`,
-                `"${p.city || p.property_address || ''}"`,
-                `"${p.organization_name || '—'}"`,
-                `"${getStageBadge(p.status || p.stage || 'DRAFT').label}"`,
-                `"${p.general_manager_name || '—'}"`,
-                `"${p.general_manager_email || '—'}"`,
-                `"${p.property_phone || '—'}"`,
-                `"${p.fax || '—'}"`,
-                `"${p.target_date || '—'}"`,
-              ]);
-              const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-              const encodedUri = encodeURI(csvContent);
-              const link = document.createElement('a');
-              link.setAttribute('href', encodedUri);
-              link.setAttribute('download', `porting_management_${Date.now()}.csv`);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              showToast('Export Successful', 'Porting records downloaded as CSV.', 'success');
-            }}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1f212c] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
-
-          {/* Reset Filters Button */}
+          {/* Reset Filters */}
           <button
             onClick={() => {
               setSearchInput('');
@@ -1176,8 +1258,30 @@ export default function AdminPortingPage() {
             }}
             className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1f212c] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
           >
-            {/* <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" /> */}
             <span>Reset Filters</span>
+          </button>
+
+          {/* Export CSV Button (All 19 Fields) */}
+          <button
+            onClick={handleExportCSV}
+            disabled={exportingCSV}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] hover:bg-slate-50 dark:hover:bg-[#1f212c] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs disabled:opacity-50"
+          >
+            {exportingCSV ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+            )}
+            <span>Export CSV</span>
+          </button>
+
+          {/* Import CSV Button */}
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-3.5 py-2 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 hover:bg-blue-100/70 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Import CSV</span>
           </button>
 
           {/* Create Porting Request Button */}
@@ -3448,6 +3552,16 @@ export default function AdminPortingPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* IMPORT PORTING CSV MODAL */}
+      <ImportPortingModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          loadData();
+          showToast('Success', 'Porting records imported successfully.', 'success');
+        }}
+      />
     </div>
   );
 }
