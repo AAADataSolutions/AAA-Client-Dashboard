@@ -23,14 +23,22 @@ interface PropertyDetailDrawerProps {
   property: any;
   onClose: () => void;
   onCreateTicket?: (propertyId: string) => void;
+  defaultTab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS';
 }
 
 export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
   property,
   onClose,
   onCreateTicket,
+  defaultTab = 'OVERVIEW',
 }) => {
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS'>(defaultTab);
+
+  React.useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab, property?.id]);
 
   if (!property) return null;
 

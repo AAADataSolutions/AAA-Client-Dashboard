@@ -95,6 +95,18 @@ export async function GET(request: NextRequest) {
 
     const activeOpIds = new Set((activePortings || []).map((p: any) => p.organization_property_id).filter(Boolean));
 
+    // Fetch direct services linked to these properties (direct property_id)
+    const propIds = (orgProps || []).map((op: any) => op.property?.id).filter(Boolean);
+    let directServices: any[] = [];
+    if (propIds.length > 0) {
+      const { data: directData } = await supabase
+        .from('services')
+        .select('id, property_id, phone_number, status, service_type_id, service_type:service_types(name)')
+        .in('property_id', propIds)
+        .neq('status', 'DISCONNECTED');
+      directServices = directData || [];
+    }
+
     // Transform and calculate metrics
     let totalServicesCount = 0;
     let attentionServicesCount = 0;
@@ -106,7 +118,12 @@ export async function GET(request: NextRequest) {
         const prop: any = op.property;
         if (!prop) return null;
 
-        const servicesList = (op.services || []).map((s: any) => s.service).filter(Boolean);
+        const opsServices = (op.services || []).map((s: any) => s.service).filter(Boolean);
+        const directForProp = directServices.filter((ds: any) => ds.property_id === prop.id);
+        const serviceMap = new Map<string, any>();
+        opsServices.forEach((s: any) => { if (s?.id) serviceMap.set(s.id, s); });
+        directForProp.forEach((s: any) => { if (s?.id && !serviceMap.has(s.id)) serviceMap.set(s.id, s); });
+        const servicesList = Array.from(serviceMap.values());
         const e911Record = Array.isArray(op.e911) && op.e911.length > 0 ? op.e911[0] : null;
         const onboardingRecord = Array.isArray(op.onboardings) && op.onboardings.length > 0 ? op.onboardings[0] : null;
         const ticketsList = op.tickets || [];

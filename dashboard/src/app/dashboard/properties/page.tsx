@@ -640,10 +640,22 @@ export default function ClientPropertiesPage() {
 
                       {/* Column 4: NO. OF SERVICES */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          <PhoneCall className="w-3 h-3 text-blue-500" />
-                          <span>{prop.services_count} {prop.services_count === 1 ? 'Line' : 'Lines'}</span>
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPropertyDetails(prop, 'SERVICES');
+                          }}
+                          className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-blue-50 dark:bg-[#1a1c26] dark:hover:bg-blue-950/40 text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 border border-slate-200 hover:border-blue-300 dark:border-[#282a36] dark:hover:border-blue-800/60 transition cursor-pointer"
+                          title="Click to view assigned services"
+                        >
+                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                            {prop.services_count || 0}
+                          </span>
+                          <span className="font-normal text-[11px] text-slate-400 group-hover:text-blue-500">
+                            Services
+                          </span>
+                        </button>
                       </td>
 
                       {/* Column 5: E911 STATUS */}
@@ -974,6 +986,7 @@ export default function ClientPropertiesPage() {
       {showDrawer && selectedPropForDrawer && (
         <PropertyDetailDrawer
           property={selectedPropForDrawer}
+          defaultTab={drawerDefaultTab}
           onClose={() => {
             setShowDrawer(false);
             setSelectedPropForDrawer(null);
