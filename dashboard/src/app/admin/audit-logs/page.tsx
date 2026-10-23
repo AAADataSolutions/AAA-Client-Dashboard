@@ -395,14 +395,14 @@ export default function AdminAuditLogsPage() {
                 </div>
 
                 {/* State Modifications JSON */}
-                <div>
+                {/* <div>
                   <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1.5">
                     Modifications &amp; Parameters (JSON)
                   </span>
                   <pre className="p-3.5 rounded-xl bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto border border-slate-800">
                     {JSON.stringify(selectedLog.changes || {}, null, 2)}
                   </pre>
-                </div>
+                </div> */}
               </div>
 
               <div className="p-4 border-t border-slate-100 dark:border-[#222430] flex justify-end">
