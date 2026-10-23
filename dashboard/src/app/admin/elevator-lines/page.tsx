@@ -21,13 +21,14 @@ interface ElevatorLineItem {
   phone_number: string;
   extension?: string | null;
   description?: string | null;
+  price?: number | null;
   status: string;
   property_id?: string | null;
   service_id?: string | null;
   created_at: string;
   updated_at: string;
   property?: { id: string; name: string; city?: string; state?: string } | null;
-  service?: { id: string; service_name?: string; phone_number: string } | null;
+  service?: { id: string; service_name?: string; phone_number: string; price?: number | null } | null;
 }
 
 interface PropertyOption {
@@ -56,6 +57,7 @@ export default function AdminElevatorLinesPage() {
     phone_number: '',
     extension: '',
     description: '',
+    price: '',
     status: 'ACTIVE',
     property_id: '',
   });
@@ -107,6 +109,7 @@ export default function AdminElevatorLinesPage() {
       phone_number: '',
       extension: '',
       description: '',
+      price: '',
       status: 'ACTIVE',
       property_id: propertyOptions[0]?.id || '',
     });
@@ -116,10 +119,12 @@ export default function AdminElevatorLinesPage() {
 
   const handleOpenEdit = (item: ElevatorLineItem) => {
     setSelectedItem(item);
+    const existingPrice = item.price ?? item.service?.price ?? 0;
     setFormData({
       phone_number: item.phone_number,
       extension: item.extension || '',
       description: item.description || '',
+      price: existingPrice ? String(existingPrice) : '',
       status: item.status || 'ACTIVE',
       property_id: item.property_id || '',
     });
@@ -312,6 +317,7 @@ export default function AdminElevatorLinesPage() {
                   <th className="py-3 px-4">EXTENSION</th>
                   <th className="py-3 px-4">DESCRIPTION</th>
                   <th className="py-3 px-4">PROPERTY</th>
+                  <th className="py-3 px-4">PRICE</th>
                   <th className="py-3 px-4">STATUS</th>
                   <th className="py-3 px-4 text-right">ACTIONS</th>
                 </tr>
@@ -340,6 +346,9 @@ export default function AdminElevatorLinesPage() {
                       ) : (
                         <span className="text-slate-400 italic">Unassigned</span>
                       )}
+                    </td>
+                    <td className="py-3 px-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                      ${Number(line.price ?? line.service?.price ?? 0).toFixed(2)}/mo
                     </td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
@@ -422,6 +431,20 @@ export default function AdminElevatorLinesPage() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1">
+                  Monthly Price ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 40.00"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                 />
               </div>
               <div>
@@ -508,6 +531,20 @@ export default function AdminElevatorLinesPage() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 dark:text-slate-300 font-semibold mb-1">
+                  Monthly Price ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 40.00"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                 />
               </div>
               <div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function GET(request: NextRequest) {
   try {
@@ -238,8 +239,9 @@ export async function POST(request: NextRequest) {
     }
 
     const priceNum = (price !== undefined && price !== null && price !== '') ? Math.max(0, parseFloat(String(price))) : 0;
+    const propId = property_id && property_id !== 'UNASSIGNED' ? property_id : null;
 
-    // 1. Insert Service
+    // 1. Insert Service (with direct property_id assignment)
     const { data: newService, error: sErr } = await supabase
       .from('services')
       .insert({
@@ -247,6 +249,7 @@ export async function POST(request: NextRequest) {
         service_name: service_name?.trim() || `Service ${phone_number.trim()}`,
         phone_number: phone_number.trim(),
         service_type_id: typeId,
+        property_id: propId,
         description: description?.trim() || null,
         price: priceNum,
         status: status || 'ACTIVE',
@@ -295,6 +298,7 @@ export async function POST(request: NextRequest) {
           property_id: property_id,
           service_id: newService.id,
           phone_number: newService.phone_number,
+          price: priceNum,
           device_type: service_type_name?.trim() || 'Fire Alarm Communicator',
           description: description?.trim() || service_name?.trim() || null,
         });
@@ -303,10 +307,13 @@ export async function POST(request: NextRequest) {
           property_id: property_id,
           service_id: newService.id,
           phone_number: newService.phone_number,
+          price: priceNum,
           status: status || 'ACTIVE',
           description: description?.trim() || service_name?.trim() || null,
         });
       }
+      // Sync property monthly price immediately
+      await syncPropertyMonthlyPrice(supabase, property_id);
     }
 
     // Central Audit Log
@@ -389,10 +396,13 @@ export async function PUT(request: NextRequest) {
 
     // Reassign property if specified
     if (property_id !== undefined) {
+      const cleanPropId = property_id && property_id !== 'UNASSIGNED' ? property_id : null;
+      await supabase.from('services').update({ property_id: cleanPropId }).eq('id', id);
+
       // Remove old property links
       await supabase.from('organization_property_services').delete().eq('service_id', id);
 
-      if (property_id && property_id !== 'UNASSIGNED') {
+      if (cleanPropId) {
         const { data: orgProp } = await supabase
           .from('organization_properties')
           .select('id')
@@ -415,12 +425,17 @@ export async function PUT(request: NextRequest) {
         if (isFireSvc) {
           const { data: existingFl } = await supabase.from('fire_lines').select('id').eq('service_id', id).maybeSingle();
           if (existingFl) {
-            await supabase.from('fire_lines').update({ property_id, phone_number: updatedService.phone_number }).eq('id', existingFl.id);
+            await supabase.from('fire_lines').update({
+              property_id,
+              phone_number: updatedService.phone_number,
+              price: updatedService.price,
+            }).eq('id', existingFl.id);
           } else {
             await supabase.from('fire_lines').insert({
               property_id,
               service_id: id,
               phone_number: updatedService.phone_number,
+              price: updatedService.price,
               device_type: service_type_name || 'Fire Alarm Communicator',
               description: updatedService.description,
             });
@@ -428,17 +443,35 @@ export async function PUT(request: NextRequest) {
         } else if (isElevatorSvc) {
           const { data: existingEl } = await supabase.from('elevator_lines').select('id').eq('service_id', id).maybeSingle();
           if (existingEl) {
-            await supabase.from('elevator_lines').update({ property_id, phone_number: updatedService.phone_number }).eq('id', existingEl.id);
+            await supabase.from('elevator_lines').update({
+              property_id,
+              phone_number: updatedService.phone_number,
+              price: updatedService.price,
+            }).eq('id', existingEl.id);
           } else {
             await supabase.from('elevator_lines').insert({
               property_id,
               service_id: id,
               phone_number: updatedService.phone_number,
+              price: updatedService.price,
               status: updatedService.status || 'ACTIVE',
               description: updatedService.description,
             });
           }
         }
+      }
+
+      if (cleanPropId) {
+        await syncPropertyMonthlyPrice(supabase, cleanPropId);
+      }
+    } else {
+      // If property was not explicitly reassigned but price was updated, sync mirrored line prices
+      if (price !== undefined) {
+        await supabase.from('fire_lines').update({ price: updatedService.price }).eq('service_id', id);
+        await supabase.from('elevator_lines').update({ price: updatedService.price }).eq('service_id', id);
+      }
+      if (price !== undefined && updatedService.property_id) {
+        await syncPropertyMonthlyPrice(supabase, updatedService.property_id);
       }
     }
 

@@ -540,6 +540,7 @@ export default function AdminServicesPage() {
               description: formData.description.trim() || null,
               property_id: formData.property_id || null,
               service_id: createdService?.id || null,
+              price: formData.price ? Math.max(0, parseFloat(formData.price)) : 0,
             }),
           });
           const fireJson = await fireRes.json();
@@ -564,6 +565,7 @@ export default function AdminServicesPage() {
               status: 'ACTIVE',
               property_id: formData.property_id || null,
               service_id: createdService?.id || null,
+              price: formData.price ? Math.max(0, parseFloat(formData.price)) : 0,
             }),
           });
           const eleJson = await eleRes.json();

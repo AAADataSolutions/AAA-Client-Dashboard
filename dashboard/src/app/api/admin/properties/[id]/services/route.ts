@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function GET(
   request: NextRequest,
@@ -10,68 +11,23 @@ export async function GET(
     const { id: propertyId } = await params;
     const supabase = await createClient();
 
-    // Find organization_property record for this property
-    const { data: orgProps, error: opErr } = await supabase
+    // 1. Find organization_property record for this property (if one exists)
+    const { data: orgProps } = await supabase
       .from('organization_properties')
       .select('id, organization_id, organization:organizations(id, name)')
       .eq('property_id', propertyId);
 
-    if (opErr) {
-      return NextResponse.json({ success: false, error: opErr.message }, { status: 400 });
-    }
-
     const orgPropIds = (orgProps || []).map((op: any) => op.id);
 
-    if (orgPropIds.length === 0) {
-      return NextResponse.json({ success: true, data: [] });
-    }
-
-    // Get services linked to these org_property records
-    const { data: linkedServices, error: lsErr } = await supabase
-      .from('organization_property_services')
-      .select(`
-        id,
-        service_id,
-        service:services(
+    // 2. Fetch services linked via organization_property_services
+    let orgLinkedServices: any[] = [];
+    if (orgPropIds.length > 0) {
+      const { data: linkedServices } = await supabase
+        .from('organization_property_services')
+        .select(`
           id,
-          phone_number,
-          description,
-          price,
-          status,
-          service_name,
-          custom_service_id,
-          service_type:service_types(id, name),
-          created_at
-        )
-      `)
-      .in('organization_property_id', orgPropIds);
-
-    if (lsErr) {
-      return NextResponse.json({ success: false, error: lsErr.message }, { status: 400 });
-    }
-
-    let services = (linkedServices || [])
-      .map((item: any) => item.service)
-      .filter(Boolean)
-      .map((s: any) => ({
-        id: s.id,
-        phone_number: s.phone_number,
-        service_name: s.service_name || '',
-        custom_service_id: s.custom_service_id || '',
-        service_type: s.service_type?.name || 'Voice Trunk / DID',
-        description: s.description || '',
-        price: Number(s.price || 0),
-        status: s.status || 'ACTIVE',
-        created_at: s.created_at,
-      }));
-
-    // If nested join returned empty but links exist, fetch directly
-    if (services.length === 0 && (linkedServices || []).length > 0) {
-      const sIds = (linkedServices || []).map((ls: any) => ls.service_id).filter(Boolean);
-      if (sIds.length > 0) {
-        const { data: directSvcs } = await supabase
-          .from('services')
-          .select(`
+          service_id,
+          service:services(
             id,
             phone_number,
             description,
@@ -81,25 +37,64 @@ export async function GET(
             custom_service_id,
             service_type:service_types(id, name),
             created_at
-          `)
-          .in('id', sIds);
-
-        if (directSvcs && directSvcs.length > 0) {
-          services = directSvcs.map((s: any) => ({
-            id: s.id,
-            phone_number: s.phone_number,
-            service_name: s.service_name || '',
-            custom_service_id: s.custom_service_id || '',
-            service_type: s.service_type?.name || 'Voice Trunk / DID',
-            description: s.description || '',
-            price: Number(s.price || 0),
-            status: s.status || 'ACTIVE',
-            created_at: s.created_at,
-          }));
-        }
-      }
+          )
+        `)
+        .in('organization_property_id', orgPropIds);
+      orgLinkedServices = linkedServices || [];
     }
 
+    // 3. Fetch services linked directly via services.property_id (supports unassigned properties)
+    const { data: directServices } = await supabase
+      .from('services')
+      .select(`
+        id,
+        phone_number,
+        description,
+        price,
+        status,
+        service_name,
+        custom_service_id,
+        service_type:service_types(id, name),
+        created_at
+      `)
+      .eq('property_id', propertyId)
+      .neq('status', 'DISCONNECTED');
+
+    // Combine and deduplicate by service id
+    const serviceMap = new Map<string, any>();
+
+    (directServices || []).forEach((s: any) => {
+      serviceMap.set(s.id, {
+        id: s.id,
+        phone_number: s.phone_number,
+        service_name: s.service_name || '',
+        custom_service_id: s.custom_service_id || '',
+        service_type: s.service_type?.name || 'Voice Trunk / DID',
+        description: s.description || '',
+        price: Number(s.price || 0),
+        status: s.status || 'ACTIVE',
+        created_at: s.created_at,
+      });
+    });
+
+    orgLinkedServices.forEach((item: any) => {
+      const s = item.service;
+      if (s && !serviceMap.has(s.id)) {
+        serviceMap.set(s.id, {
+          id: s.id,
+          phone_number: s.phone_number,
+          service_name: s.service_name || '',
+          custom_service_id: s.custom_service_id || '',
+          service_type: s.service_type?.name || 'Voice Trunk / DID',
+          description: s.description || '',
+          price: Number(s.price || 0),
+          status: s.status || 'ACTIVE',
+          created_at: s.created_at,
+        });
+      }
+    });
+
+    const services = Array.from(serviceMap.values());
     return NextResponse.json({ success: true, data: services });
   } catch (err: any) {
     return NextResponse.json(
@@ -123,41 +118,34 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Service ID is required.' }, { status: 400 });
     }
 
-    // 1. Find or verify organization_property link for this property
+    // 1. Direct assignment on service row (works whether assigned to org or not)
+    await supabase.from('services').update({ property_id: propertyId }).eq('id', service_id);
+
+    // 2. Remove any prior org-property link
+    await supabase.from('organization_property_services').delete().eq('service_id', service_id);
+
+    // 3. Find if organization_property exists for this property
     const { data: orgProp } = await supabase
       .from('organization_properties')
       .select('id, organization_id, property:properties(name)')
       .eq('property_id', propertyId)
       .maybeSingle();
 
-    if (!orgProp) {
-      return NextResponse.json({
-        success: false,
-        error: 'Property is not assigned to any organization yet. Please assign the property to an organization before assigning services.',
-      }, { status: 400 });
-    }
-
-    // 2. Enforce Rule 2: One service can only be assigned to one property. Remove any prior assignments!
-    await supabase.from('organization_property_services').delete().eq('service_id', service_id);
-
-    // 3. Link service to this property
-    const { data: newLink, error: linkErr } = await supabase
-      .from('organization_property_services')
-      .insert({
+    if (orgProp) {
+      const { error: linkErr } = await supabase.from('organization_property_services').insert({
         organization_property_id: orgProp.id,
         service_id: service_id,
-      })
-      .select()
-      .single();
+      });
 
-    if (linkErr) {
-      return NextResponse.json({ success: false, error: linkErr.message }, { status: 400 });
+      if (linkErr) {
+        console.warn('Could not insert organization_property_services link:', linkErr.message);
+      }
     }
 
     // Fetch service info for audit log and sync
     const { data: svc } = await supabase
       .from('services')
-      .select('id, phone_number, service_name, description, status, service_type:service_types(name)')
+      .select('id, phone_number, service_name, description, status, price, service_type:service_types(name)')
       .eq('id', service_id)
       .maybeSingle();
 
@@ -166,11 +154,16 @@ export async function POST(
       const sName = (svc.service_name || '').toLowerCase();
       const isFire = typeName.includes('fire') || sName.includes('fire');
       const isElevator = typeName.includes('elevator') || sName.includes('elevator');
+      const svcPrice = svc.price ? Number(svc.price) : 0;
 
       if (isFire) {
         const { data: existingFl } = await supabase.from('fire_lines').select('id').eq('service_id', service_id).maybeSingle();
         if (existingFl) {
-          await supabase.from('fire_lines').update({ property_id: propertyId, phone_number: svc.phone_number }).eq('id', existingFl.id);
+          await supabase.from('fire_lines').update({
+            property_id: propertyId,
+            phone_number: svc.phone_number,
+            price: svcPrice,
+          }).eq('id', existingFl.id);
         } else {
           await supabase.from('fire_lines').insert({
             property_id: propertyId,
@@ -178,12 +171,17 @@ export async function POST(
             phone_number: svc.phone_number,
             device_type: (svc.service_type as any)?.name || 'Fire Alarm Communicator',
             description: svc.description || svc.service_name,
+            price: svcPrice,
           });
         }
       } else if (isElevator) {
         const { data: existingEl } = await supabase.from('elevator_lines').select('id').eq('service_id', service_id).maybeSingle();
         if (existingEl) {
-          await supabase.from('elevator_lines').update({ property_id: propertyId, phone_number: svc.phone_number }).eq('id', existingEl.id);
+          await supabase.from('elevator_lines').update({
+            property_id: propertyId,
+            phone_number: svc.phone_number,
+            price: svcPrice,
+          }).eq('id', existingEl.id);
         } else {
           await supabase.from('elevator_lines').insert({
             property_id: propertyId,
@@ -191,6 +189,7 @@ export async function POST(
             phone_number: svc.phone_number,
             status: svc.status || 'ACTIVE',
             description: svc.description || svc.service_name,
+            price: svcPrice,
           });
         }
       }
@@ -213,10 +212,13 @@ export async function POST(
       },
     });
 
+    // 5. Synchronize property monthly price immediately
+    const updatedPrice = await syncPropertyMonthlyPrice(supabase, propertyId);
+
     return NextResponse.json({
       success: true,
       message: 'Service assigned to property successfully.',
-      data: newLink,
+      data: { service_id, property_id: propertyId, monthly_price: updatedPrice },
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -256,9 +258,15 @@ export async function DELETE(
         .in('organization_property_id', orgPropIds);
     }
 
+    // Clear services.property_id if it pointed to this property
+    await supabase.from('services').update({ property_id: null }).eq('id', serviceId).eq('property_id', propertyId);
+
     // Clean up or unlink from fire_lines / elevator_lines
     await supabase.from('fire_lines').delete().eq('service_id', serviceId).eq('property_id', propertyId);
     await supabase.from('elevator_lines').delete().eq('service_id', serviceId).eq('property_id', propertyId);
+
+    // Synchronize property monthly price immediately
+    await syncPropertyMonthlyPrice(supabase, propertyId);
 
     // Audit Log
     await logAuditEvent({

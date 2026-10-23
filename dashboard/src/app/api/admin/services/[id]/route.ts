@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAdminAction } from '@/lib/audit/logger';
+import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function GET(
   request: NextRequest,
@@ -88,30 +89,53 @@ export async function PATCH(
     // Reassign organization_property / property if provided
     const targetPropertyId = body.property_id;
     let targetOrgPropId = body.organization_property_id;
+    const affectedPropIds = new Set<string>();
 
-    if (targetPropertyId && !targetOrgPropId) {
-      // Look up organization_property record for this property
-      const { data: op } = await supabase
-        .from('organization_properties')
-        .select('id')
-        .eq('property_id', targetPropertyId)
-        .maybeSingle();
+    // Check existing service property link
+    const { data: currentSvcData } = await supabase
+      .from('services')
+      .select('property_id')
+      .eq('id', id)
+      .maybeSingle();
 
-      if (op) {
-        targetOrgPropId = op.id;
+    if (currentSvcData?.property_id) {
+      affectedPropIds.add(currentSvcData.property_id);
+    }
+
+    if (targetPropertyId !== undefined) {
+      const cleanPropId = targetPropertyId && targetPropertyId !== 'UNASSIGNED' ? targetPropertyId : null;
+      if (cleanPropId) affectedPropIds.add(cleanPropId);
+
+      // Direct assignment on service row
+      await supabase.from('services').update({ property_id: cleanPropId }).eq('id', id);
+
+      if (cleanPropId && !targetOrgPropId) {
+        // Look up organization_property record for this property if one exists
+        const { data: op } = await supabase
+          .from('organization_properties')
+          .select('id')
+          .eq('property_id', cleanPropId)
+          .maybeSingle();
+
+        if (op) {
+          targetOrgPropId = op.id;
+        }
+      }
+
+      if (targetOrgPropId) {
+        await supabase.from('organization_property_services').delete().eq('service_id', id);
+        await supabase.from('organization_property_services').insert({
+          organization_property_id: targetOrgPropId,
+          service_id: id,
+        });
+      } else if (!cleanPropId || body.unassign === true) {
+        await supabase.from('organization_property_services').delete().eq('service_id', id);
       }
     }
 
-    if (targetOrgPropId) {
-      // Enforce Rule 2: One service can only be assigned to one property
-      await supabase.from('organization_property_services').delete().eq('service_id', id);
-      await supabase.from('organization_property_services').insert({
-        organization_property_id: targetOrgPropId,
-        service_id: id,
-      });
-    } else if (targetPropertyId === '' || targetPropertyId === null || body.unassign === true) {
-      // Explicitly unassigned from property
-      await supabase.from('organization_property_services').delete().eq('service_id', id);
+    // Sync affected property pricing
+    for (const pId of affectedPropIds) {
+      await syncPropertyMonthlyPrice(supabase, pId);
     }
 
     // Audit Log
@@ -142,7 +166,7 @@ export async function DELETE(
 
     const { data: existingSvc } = await supabase
       .from('services')
-      .select('phone_number, service_name')
+      .select('phone_number, service_name, property_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -150,10 +174,42 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: 'Service not found' }, { status: 404 });
     }
 
-    // Unlink any property assignments
+    // Collect affected properties for pricing recalculation
+    const affectedPropIds = new Set<string>();
+    if (existingSvc.property_id) {
+      affectedPropIds.add(existingSvc.property_id);
+    }
+
+    const { data: opsLinks } = await supabase
+      .from('organization_property_services')
+      .select('organization_property:organization_properties(property_id)')
+      .eq('service_id', id);
+
+    (opsLinks || []).forEach((link: any) => {
+      const pId = link.organization_property?.property_id;
+      if (pId) affectedPropIds.add(pId);
+    });
+
+    // 1. Unlink from fire_lines and elevator_lines
+    if (existingSvc.phone_number) {
+      await supabase
+        .from('fire_lines')
+        .delete()
+        .or(`service_id.eq.${id},phone_number.eq.${existingSvc.phone_number.trim()}`);
+
+      await supabase
+        .from('elevator_lines')
+        .delete()
+        .or(`service_id.eq.${id},phone_number.eq.${existingSvc.phone_number.trim()}`);
+    } else {
+      await supabase.from('fire_lines').delete().eq('service_id', id);
+      await supabase.from('elevator_lines').delete().eq('service_id', id);
+    }
+
+    // 2. Unlink any property assignments
     await supabase.from('organization_property_services').delete().eq('service_id', id);
 
-    // Delete service
+    // 3. Delete service
     const { error } = await supabase.from('services').delete().eq('id', id);
 
     if (error) {
@@ -166,6 +222,11 @@ export async function DELETE(
       if (updateErr) {
         return NextResponse.json({ success: false, error: updateErr.message }, { status: 400 });
       }
+    }
+
+    // Sync monthly price for affected properties
+    for (const pId of affectedPropIds) {
+      await syncPropertyMonthlyPrice(supabase, pId);
     }
 
     // Audit Log

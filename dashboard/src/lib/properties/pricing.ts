@@ -46,13 +46,14 @@ export async function syncPropertyMonthlyPrice(
         : prop.monthly_price || 0
     );
 
-    // B. Services Total
+    // B. Services Total (supports both legacy org links and direct property_id assignments)
     const { data: opData } = await supabaseOrAdmin
       .from('organization_properties')
       .select(`
         id,
         organization_property_services (
           service:services (
+            id,
             price,
             status
           )
@@ -60,17 +61,37 @@ export async function syncPropertyMonthlyPrice(
       `)
       .eq('property_id', propertyId);
 
-    let servicesTotal = 0;
+    const { data: directServices } = await supabaseOrAdmin
+      .from('services')
+      .select('id, price, status')
+      .eq('property_id', propertyId)
+      .neq('status', 'DISCONNECTED');
+
+    const servicePriceMap = new Map<string, number>();
+
+    if (directServices && Array.isArray(directServices)) {
+      for (const ds of directServices) {
+        if (ds.id && ds.status !== 'DISCONNECTED') {
+          servicePriceMap.set(ds.id, Number(ds.price || 0));
+        }
+      }
+    }
+
     if (opData && Array.isArray(opData)) {
       for (const op of opData) {
         const ops = op.organization_property_services || [];
         for (const item of ops) {
           const srv = item.service;
-          if (srv && srv.status !== 'DISCONNECTED') {
-            servicesTotal += Number(srv.price || 0);
+          if (srv && srv.id && srv.status !== 'DISCONNECTED' && !servicePriceMap.has(srv.id)) {
+            servicePriceMap.set(srv.id, Number(srv.price || 0));
           }
         }
       }
+    }
+
+    let servicesTotal = 0;
+    for (const p of servicePriceMap.values()) {
+      servicesTotal += p;
     }
 
     // C. Ray Baum Records Total

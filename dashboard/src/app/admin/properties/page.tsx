@@ -1315,10 +1315,19 @@ export default function AdminPropertiesPage() {
 
                       {/* 5. No. of Associated Services (Dynamic) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-semibold text-slate-800 dark:text-white">
-                          {prop.services_count || 0}{' '}
-                          <span className="font-normal text-[11px] text-slate-400">Services</span>
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenServicesModal(prop)}
+                          className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-blue-50 dark:bg-[#1a1c26] dark:hover:bg-blue-950/40 text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 border border-slate-200 hover:border-blue-300 dark:border-[#282a36] dark:hover:border-blue-800/60 transition cursor-pointer"
+                          title="Click to view & manage assigned services"
+                        >
+                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                            {prop.services_count || 0}
+                          </span>
+                          <span className="font-normal text-[11px] text-slate-400 group-hover:text-blue-500">
+                            Services
+                          </span>
+                        </button>
                       </td>
 
                       {/* 6. E911 Status */}
@@ -1511,19 +1520,17 @@ export default function AdminPropertiesPage() {
               <span>View Services</span>
             </button>
 
-            {/* If assigned to an org, show Assign Service */}
-            {(menuPosition.prop.primary_organization || (menuPosition.prop.organizations && menuPosition.prop.organizations.length > 0)) && (
-              <button
-                onClick={() => {
-                  handleOpenAssignServiceModal(menuPosition.prop);
-                  setMenuPosition(null);
-                }}
-                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
-              >
-                <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Assign Service</span>
-              </button>
-            )}
+            {/* Assign Service (Works for both assigned and unassigned properties) */}
+            <button
+              onClick={() => {
+                handleOpenAssignServiceModal(menuPosition.prop);
+                setMenuPosition(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Assign Service</span>
+            </button>
 
             {/* If UNASSIGNED, show Assign to Organization */}
             {!menuPosition.prop.primary_organization && (!menuPosition.prop.organizations || menuPosition.prop.organizations.length === 0) && (

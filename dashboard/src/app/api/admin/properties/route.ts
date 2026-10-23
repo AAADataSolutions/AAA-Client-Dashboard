@@ -95,6 +95,17 @@ export async function GET(request: NextRequest) {
       allServicesLinks = opsData || [];
     }
 
+    // 4b. Fetch Services linked directly via services.property_id (supports unassigned properties)
+    let directServices: any[] = [];
+    if (propIds.length > 0) {
+      const { data: directData } = await supabase
+        .from('services')
+        .select('id, property_id')
+        .in('property_id', propIds)
+        .neq('status', 'DISCONNECTED');
+      directServices = directData || [];
+    }
+
     // 5. Fetch Partners
     const { data: partnersData } = await supabase
       .from('partners')
@@ -125,10 +136,19 @@ export async function GET(request: NextRequest) {
       const orgs = matchingOps.map((op: any) => op.organization).filter(Boolean);
       const primaryOrg = orgs[0] || null;
 
-      // Count actual services linked to this property
-      const dynamicServiceCount = allServicesLinks.filter((sl: any) =>
-        matchingOpIds.includes(sl.organization_property_id)
-      ).length;
+      // Count actual services linked to this property (both legacy via org and direct)
+      const serviceIdSet = new Set<string>();
+      allServicesLinks
+        .filter((sl: any) => matchingOpIds.includes(sl.organization_property_id))
+        .forEach((sl: any) => {
+          if (sl.service_id) serviceIdSet.add(sl.service_id);
+        });
+      directServices
+        .filter((ds: any) => ds.property_id === prop.id)
+        .forEach((ds: any) => {
+          if (ds.id) serviceIdSet.add(ds.id);
+        });
+      const dynamicServiceCount = serviceIdSet.size;
 
       const partnerObj = allPartners.find((pt: any) => pt.id === prop.partner_id) || null;
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function GET(request: NextRequest) {
   try {
@@ -155,7 +156,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    const { phone_number, extension, description, status, property_id, service_id } = body;
+    const { phone_number, extension, description, status, property_id, service_id, price } = body;
 
     if (!phone_number) {
       return NextResponse.json(
@@ -166,6 +167,7 @@ export async function POST(request: NextRequest) {
 
     const propId = property_id && property_id !== 'UNASSIGNED' ? property_id : null;
     let linkedServiceId = service_id && service_id !== 'UNASSIGNED' ? service_id : null;
+    const priceNum = (price !== undefined && price !== null && price !== '') ? Math.max(0, parseFloat(String(price))) : 0;
 
     // If no service_id was provided, automatically mirror/create this as a service in services table
     if (!linkedServiceId) {
@@ -203,7 +205,9 @@ export async function POST(request: NextRequest) {
           service_name: serviceName,
           phone_number: phone_number.trim(),
           service_type_id: typeId,
+          property_id: propId,
           description: serviceDesc,
+          price: priceNum,
           status: status || 'ACTIVE',
         })
         .select('id')
@@ -228,6 +232,9 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+    } else {
+      // If linkedServiceId provided, ensure price and property_id update on service
+      await supabase.from('services').update({ price: priceNum, property_id: propId }).eq('id', linkedServiceId);
     }
 
     const { data: newElevatorLine, error } = await supabase
@@ -239,11 +246,12 @@ export async function POST(request: NextRequest) {
         status: status || 'ACTIVE',
         property_id: propId,
         service_id: linkedServiceId,
+        price: priceNum,
       })
       .select(`
         *,
         property:properties(id, name),
-        service:services(id, service_name, phone_number)
+        service:services(id, service_name, phone_number, price)
       `)
       .single();
 
@@ -258,6 +266,10 @@ export async function POST(request: NextRequest) {
       entity_name: `Elevator Line - ${newElevatorLine.phone_number}`,
       changes: body,
     });
+
+    if (propId) {
+      await syncPropertyMonthlyPrice(supabase, propId);
+    }
 
     return NextResponse.json({ success: true, data: newElevatorLine });
   } catch (err: any) {
@@ -291,6 +303,9 @@ export async function PATCH(request: NextRequest) {
     if (status !== undefined) updatePayload.status = status;
     if (property_id !== undefined) updatePayload.property_id = property_id && property_id !== 'UNASSIGNED' ? property_id : null;
     if (service_id !== undefined) updatePayload.service_id = service_id && service_id !== 'UNASSIGNED' ? service_id : null;
+    if (body.price !== undefined) {
+      updatePayload.price = body.price === null || body.price === '' ? 0 : Math.max(0, parseFloat(String(body.price)));
+    }
 
     const currentServiceId = existingLine?.service_id || updatePayload.service_id;
     const targetPropId = updatePayload.property_id !== undefined ? updatePayload.property_id : existingLine?.property_id;
@@ -305,6 +320,8 @@ export async function PATCH(request: NextRequest) {
       }
       if (description !== undefined) srvUpdate.description = description ? description.trim() : null;
       if (status !== undefined) srvUpdate.status = status;
+      if (updatePayload.price !== undefined) srvUpdate.price = updatePayload.price;
+      if (updatePayload.property_id !== undefined) srvUpdate.property_id = updatePayload.property_id;
 
       await supabase.from('services').update(srvUpdate).eq('id', currentServiceId);
 
@@ -347,6 +364,10 @@ export async function PATCH(request: NextRequest) {
       changes: body,
     });
 
+    if (targetPropId) {
+      await syncPropertyMonthlyPrice(supabase, targetPropId);
+    }
+
     return NextResponse.json({ success: true, data: updatedElevatorLine });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
@@ -366,7 +387,7 @@ export async function DELETE(request: NextRequest) {
     // Fetch elevator line to check linked service
     const { data: existingLine } = await supabase
       .from('elevator_lines')
-      .select('id, service_id, phone_number')
+      .select('id, service_id, property_id, phone_number')
       .eq('id', id)
       .maybeSingle();
 
@@ -389,6 +410,10 @@ export async function DELETE(request: NextRequest) {
       entity_name: `Elevator Line ${existingLine?.phone_number || id}`,
       changes: { id },
     });
+
+    if (existingLine?.property_id) {
+      await syncPropertyMonthlyPrice(supabase, existingLine.property_id);
+    }
 
     return NextResponse.json({ success: true, message: 'Elevator line deleted successfully.' });
   } catch (err: any) {
