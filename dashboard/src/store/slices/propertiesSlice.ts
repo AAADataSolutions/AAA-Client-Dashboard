@@ -47,6 +47,7 @@ export interface PropertyRecord {
   organizations?: any;
   created_at: string;
   updated_at?: string;
+  onboarding_date?: string | null;
 }
 
 export type PropertyItem = PropertyRecord;
@@ -318,6 +319,7 @@ export const propertiesSlice = createSlice({
     setOrgFilter: (state, action: PayloadAction<string>) => {
       state.selectedOrgFilter = action.payload;
       state.filters.orgId = action.payload;
+      state.filters.selectedOrg = action.payload;
       state.filters.selectedOrgFilter = action.payload;
       state.currentPage = 1;
       state.pagination.page = 1;
@@ -407,6 +409,7 @@ export const propertiesSlice = createSlice({
       if (action.payload.selectedOrgFilter !== undefined) {
         state.selectedOrgFilter = action.payload.selectedOrgFilter;
         state.filters.orgId = action.payload.selectedOrgFilter;
+        state.filters.selectedOrg = action.payload.selectedOrgFilter;
         state.filters.selectedOrgFilter = action.payload.selectedOrgFilter;
       }
       if (action.payload.currentPage !== undefined) {

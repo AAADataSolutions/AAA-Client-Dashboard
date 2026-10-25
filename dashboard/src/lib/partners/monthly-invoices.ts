@@ -64,7 +64,7 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
     // 2. Fetch all properties assigned to partners
     const { data: properties, error: propsErr } = await supabase
       .from('properties')
-      .select('id, name, address, city, state, monthly_price, partner_id, partner_commission_override, status');
+      .select('id, name, address, city, state, monthly_price, partner_id, partner_commission_override, status, onboarding_date, created_at');
 
     if (propsErr) {
       result.errors.push(`Failed to fetch properties: ${propsErr.message}`);
@@ -84,6 +84,7 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
     }
 
     const existingMap = new Set((existingInvoices || []).map((inv: any) => inv.partner_id));
+    const periodStartMonth = periodStart.substring(0, 7);
 
     // 4. Process each active partner
     for (const partner of partners) {
@@ -93,8 +94,14 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
           continue;
         }
 
-        // Find assigned properties for this partner
-        const assignedProps = allProps.filter((p: any) => p.partner_id === partner.id);
+        // Find assigned properties for this partner active on or before this billing period
+        const assignedProps = allProps.filter((p: any) => {
+          if (p.partner_id !== partner.id) return false;
+          if (p.status !== 'ACTIVE' && p.status !== 'COMPLETED' && p.status !== 'ONBOARDED') return false;
+          const effDate = p.onboarding_date || p.created_at;
+          const effMonth = effDate ? String(effDate).substring(0, 7) : '9999-99';
+          return effMonth <= periodStartMonth;
+        });
 
         // If partner has no assigned properties, skip invoice generation
         if (assignedProps.length === 0) {

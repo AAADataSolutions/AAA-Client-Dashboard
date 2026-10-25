@@ -194,9 +194,10 @@ export async function GET(request: NextRequest) {
         } else {
           if (p.status === 'ARCHIVED') return false;
         }
-        // Strict real-date check: property only exists if its created_at <= this month
-        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
-        return pCreatedMonth <= mKey;
+        // Strict real-date check: property contributes to GMR if its onboarding_date (or created_at) <= this month
+        const propEffectiveDate = p.onboarding_date || p.created_at;
+        const propEffectiveMonth = propEffectiveDate ? String(propEffectiveDate).substring(0, 7) : '9999-99';
+        return propEffectiveMonth <= mKey;
       });
 
       let baseGmr = 0;
@@ -263,7 +264,8 @@ export async function GET(request: NextRequest) {
       const assignedPropIdsForMonth = new Set(assignedForMonth.map((p: any) => p.id));
 
       assignedForMonth.forEach((p: any) => {
-        if (p.created_at && p.created_at.startsWith(mKey)) {
+        const propEffectiveDate = p.onboarding_date || p.created_at;
+        if (propEffectiveDate && String(propEffectiveDate).startsWith(mKey)) {
           newPropsRev += Number(p.monthly_price || 0);
         }
       });
@@ -355,8 +357,9 @@ export async function GET(request: NextRequest) {
         } else {
           if (p.status === 'ARCHIVED') return false;
         }
-        const pCreatedMonth = p.created_at ? p.created_at.substring(0, 7) : '9999-99';
-        return pCreatedMonth <= prevMKey;
+        const propEffectiveDate = p.onboarding_date || p.created_at;
+        const propEffectiveMonth = propEffectiveDate ? String(propEffectiveDate).substring(0, 7) : '9999-99';
+        return propEffectiveMonth <= prevMKey;
       });
 
       let prevBaseGmr = 0;

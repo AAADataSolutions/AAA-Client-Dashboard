@@ -1697,10 +1697,17 @@ export default function OrganizationDetailPage({
 
                       {/* Monthly Price */}
                       {isSuperAdmin && (
-                        <td className="py-3.5 px-3.5 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                          {prop.monthly_price !== null && prop.monthly_price !== undefined
-                            ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : '—'}
+                        <td className="py-3.5 px-3.5 whitespace-nowrap">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            {prop.monthly_price !== null && prop.monthly_price !== undefined
+                              ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '—'}
+                          </span>
+                          {prop.onboarding_date && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono block mt-0.5" title="Onboarding Date">
+                              Onboarded: {prop.onboarding_date}
+                            </span>
+                          )}
                         </td>
                       )}
 

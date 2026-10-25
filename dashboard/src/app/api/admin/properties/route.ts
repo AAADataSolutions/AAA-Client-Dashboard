@@ -45,13 +45,7 @@ export async function GET(request: NextRequest) {
       query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%,address.ilike.%${search}%,general_manager_name.ilike.%${search}%,contact_person_name.ilike.%${search}%,general_manager_email.ilike.%${search}%`);
     }
 
-    if (status !== 'ALL') {
-      if (status === 'UNASSIGNED') {
-        // Will be filtered in memory
-      } else {
-        query = query.eq('status', status);
-      }
-    }
+    // Note: status is filtered in-memory below after post-processing and organization assignment checks
 
     if (e911Filter === 'VERIFIED') {
       query = query.eq('ray_baud_and_logs_enabled', true);
@@ -217,6 +211,7 @@ export async function GET(request: NextRequest) {
         onboarding_stage: stage,
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
         ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
+        onboarding_date: prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null),
         created_at: prop.created_at,
         updated_at: prop.updated_at || prop.created_at,
       };
@@ -241,14 +236,22 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by Organization if requested
-    if (orgId !== 'ALL') {
+    if (orgId && orgId !== 'ALL') {
       processed = processed.filter((p: any) =>
-        p.organizations.some((o: any) => o.id === orgId)
+        p.organizations.some((o: any) => o.id === orgId) ||
+        p.org_links?.some((ol: any) => ol.organization_id === orgId) ||
+        p.primary_organization?.id === orgId
       );
     }
 
-    if (status === 'UNASSIGNED') {
-      processed = processed.filter((p: any) => !p.is_assigned);
+    // Filter by Status if requested
+    if (status && status !== 'ALL') {
+      const sUpper = status.toUpperCase();
+      if (sUpper === 'UNASSIGNED') {
+        processed = processed.filter((p: any) => !p.is_assigned || p.status === 'UNASSIGNED');
+      } else {
+        processed = processed.filter((p: any) => (p.status || '').toUpperCase() === sUpper);
+      }
     }
 
     // Sorting
@@ -324,6 +327,7 @@ export async function POST(request: NextRequest) {
       general_manager_email,
       base_price,
       monthly_price,
+      onboarding_date,
       ray_baud_and_logs_enabled,
       ray_baum_status,
       e911_status,
@@ -360,6 +364,11 @@ export async function POST(request: NextRequest) {
         ? Number(partner_commission_override)
         : null;
 
+    const resolvedOnboardingDate =
+      onboarding_date && String(onboarding_date).trim()
+        ? String(onboarding_date).trim()
+        : new Date().toISOString().slice(0, 10);
+
     const { data: newProp, error: propErr } = await db
       .from('properties')
       .insert({
@@ -378,6 +387,7 @@ export async function POST(request: NextRequest) {
         general_manager_email: general_manager_email?.trim() || null,
         base_price: base_price !== null && base_price !== '' && base_price !== undefined ? Number(base_price) : (monthly_price !== null && monthly_price !== '' && monthly_price !== undefined ? Number(monthly_price) : 0),
         monthly_price: monthly_price === null || monthly_price === '' || monthly_price === undefined ? (base_price !== null && base_price !== '' && base_price !== undefined ? Number(base_price) : 0) : Number(monthly_price),
+        onboarding_date: resolvedOnboardingDate,
         partner_id: cleanPartnerId,
         partner_commission_override: cleanOverride,
         ray_baud_and_logs_enabled: isE911Verified,
@@ -413,6 +423,8 @@ export async function POST(request: NextRequest) {
         await db.from('onboardings').insert({
           organization_property_id: newOp.id,
           status: 'COMPLETED',
+          completed_at: `${resolvedOnboardingDate}T12:00:00.000Z`,
+          target_date: resolvedOnboardingDate,
         });
 
         // Auto-create e911 record

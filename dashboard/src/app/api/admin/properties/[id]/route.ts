@@ -107,6 +107,9 @@ export async function PATCH(
       updatePayload.ray_baud_and_logs_enabled = body.e911_status === 'VERIFIED' || body.e911_status === 'ACTIVE';
     }
     if (body.ray_baum_status !== undefined) updatePayload.ray_baum_status = body.ray_baum_status;
+    if (body.onboarding_date !== undefined) {
+      updatePayload.onboarding_date = body.onboarding_date && String(body.onboarding_date).trim() ? String(body.onboarding_date).trim() : null;
+    }
     if (body.status !== undefined && body.status !== 'UNASSIGNED') updatePayload.status = body.status;
 
     const { data: updatedProp, error: propErr } = await db

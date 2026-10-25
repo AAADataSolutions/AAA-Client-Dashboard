@@ -150,6 +150,34 @@ function getHeaderValue(row: Record<string, string>, possibleKeys: string[]): st
   return '';
 }
 
+// Helper to parse date string into standard YYYY-MM-DD format
+function parseDateString(dateStr: string): string {
+  if (!dateStr || !dateStr.trim()) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  const clean = dateStr.trim();
+  // If already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+    return clean;
+  }
+  // If YYYY/MM/DD
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(clean)) {
+    const [y, m, d] = clean.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // If MM/DD/YYYY or M/D/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(clean)) {
+    const [m, d, y] = clean.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // Try generic Date.parse
+  const parsed = new Date(clean);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -252,6 +280,19 @@ export async function POST(request: NextRequest) {
       const cleanPrice = priceRaw ? parseFloat(priceRaw.replace(/[^0-9.]/g, '')) : null;
       const monthlyPrice = cleanPrice && !isNaN(cleanPrice) ? cleanPrice : null;
 
+      // 3b. Onboarding Date
+      const onboardingDateRaw = getHeaderValue(row, [
+        'Onboarding Date',
+        'OnboardingDate',
+        'onboarding_date',
+        'Onboarding date',
+        'Onboard Date',
+        'Onboarded Date',
+        'Date',
+        'date',
+      ]);
+      const onboardingDate = parseDateString(onboardingDateRaw);
+
       // 4. Main Phone no
       const mainPhone = getHeaderValue(row, [
         'Main Phone no',
@@ -348,6 +389,7 @@ export async function POST(request: NextRequest) {
             contact_person_email: gmEmail.trim() || null,
             base_price: monthlyPrice || 0,
             monthly_price: monthlyPrice,
+            onboarding_date: onboardingDate,
             ray_baud_and_logs_enabled: isE911Verified || isRayBaumActive,
             ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
             status: 'ACTIVE',
@@ -403,6 +445,8 @@ export async function POST(request: NextRequest) {
             await dbClient.from('onboardings').insert({
               organization_property_id: newOp.id,
               status: 'COMPLETED',
+              completed_at: `${onboardingDate}T12:00:00.000Z`,
+              target_date: onboardingDate,
             });
 
             // Insert E911 dispatch record
@@ -423,6 +467,7 @@ export async function POST(request: NextRequest) {
           state: newProp.state,
           zip_code: newProp.zip_code,
           monthly_price: newProp.monthly_price,
+          onboarding_date: newProp.onboarding_date || onboardingDate,
           main_phone: newProp.main_phone,
           organization_name: orgName || 'Unassigned',
           onboarding_stage: 'Onboarded',

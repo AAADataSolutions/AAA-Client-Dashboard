@@ -84,6 +84,7 @@ interface PropertyRecord {
   e911_record: any | null;
   onboarding_status: string | null;
   onboarding_target_date: string | null;
+  onboarding_date?: string | null;
   open_tickets_count: number;
   tickets: any[];
   created_at: string;

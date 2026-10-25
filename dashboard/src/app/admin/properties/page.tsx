@@ -237,6 +237,7 @@ export default function AdminPropertiesPage() {
     general_manager_email: '',
     base_price: '' as string | number,
     monthly_price: '' as string | number,
+    onboarding_date: new Date().toISOString().slice(0, 10),
     ray_baud_and_logs_enabled: true,
     ray_baum_status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     e911_status: 'VERIFIED' as 'VERIFIED' | 'AUDIT_REQUIRED',
@@ -640,6 +641,7 @@ export default function AdminPropertiesPage() {
       general_manager_email: prop.general_manager_email || '',
       base_price: prop.base_price !== undefined && prop.base_price !== null ? prop.base_price : (prop.monthly_price ?? ''),
       monthly_price: prop.base_price !== undefined && prop.base_price !== null ? prop.base_price : (prop.monthly_price ?? ''),
+      onboarding_date: prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)),
       ray_baud_and_logs_enabled: isE911,
       ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
       e911_status: isE911 ? 'VERIFIED' : 'AUDIT_REQUIRED',
@@ -763,9 +765,11 @@ export default function AdminPropertiesPage() {
 
   const hasActiveFilters =
     filters.searchQuery.trim() !== '' ||
-    filters.selectedOrg !== 'ALL' ||
+    (filters.selectedOrg && filters.selectedOrg !== 'ALL') ||
+    (filters.orgId && filters.orgId !== 'ALL') ||
     filters.selectedStatus !== 'ALL' ||
     filters.selectedE911 !== 'ALL' ||
+    (filters.rayBaum && filters.rayBaum !== 'ALL') ||
     filters.sortBy !== 'NAME_ASC';
 
   return (
@@ -876,6 +880,7 @@ export default function AdminPropertiesPage() {
                 general_manager_email: '',
                 base_price: '',
                 monthly_price: '',
+                onboarding_date: new Date().toISOString().slice(0, 10),
                 ray_baud_and_logs_enabled: true,
                 ray_baum_status: 'ACTIVE',
                 e911_status: 'VERIFIED',
@@ -892,7 +897,7 @@ export default function AdminPropertiesPage() {
       </motion.div>
 
       {/* KPI Cards - ONLY Variant 1 (Deep Blue) */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Total Properties */}
         <motion.div
           variants={itemVariants}
@@ -964,30 +969,6 @@ export default function AdminPropertiesPage() {
           </div>
           <p className="text-[11px] text-slate-100 mt-2">Voice trunks &amp; DIDs</p>
         </motion.div>
-
-        {/* Card 4: Pending / Inactive */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="bg-gradient-to-r from-blue-900 to-blue-800 dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100 dark:text-slate-400">
-              Pending / Inactive
-            </span>
-            <div className="w-7 h-7 rounded-lg text-white dark:text-blue-400 flex items-center justify-center">
-              <AlertCircle size={18} />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {metrics.pendingOrInactiveCount}
-            </span>
-            <span className="text-xs text-slate-100 ml-1.5 font-medium">Action</span>
-          </div>
-          <p className="text-[11px] text-slate-100 mt-2">Requires configuration setup</p>
-        </motion.div>
       </motion.div>
 
       {/* Search & Filter Toolbar */}
@@ -1016,7 +997,7 @@ export default function AdminPropertiesPage() {
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
             <select
-              value={filters.selectedOrg}
+              value={filters.selectedOrg || filters.orgId || 'ALL'}
               onChange={(e) => {
                 dispatch(setOrgFilter(e.target.value));
                 dispatch(setPagination({ currentPage: 1 }));
@@ -1033,7 +1014,7 @@ export default function AdminPropertiesPage() {
             </select>
 
             <select
-              value={filters.selectedStatus}
+              value={filters.selectedStatus || filters.status || 'ALL'}
               onChange={(e) => {
                 dispatch(setStatusFilter(e.target.value));
                 dispatch(setPagination({ currentPage: 1 }));
@@ -1043,7 +1024,9 @@ export default function AdminPropertiesPage() {
             >
               <option value="ALL">Status: All Statuses</option>
               <option value="ACTIVE">Active</option>
+              <option value="ONBOARDING">Onboarding</option>
               <option value="INACTIVE">Inactive</option>
+              <option value="UNASSIGNED">Unassigned</option>
               <option value="ARCHIVED">Archived</option>
             </select>
 
@@ -1105,6 +1088,14 @@ export default function AdminPropertiesPage() {
                 </button>
               </span>
             )}
+            {((filters.selectedOrg && filters.selectedOrg !== 'ALL') || (filters.orgId && filters.orgId !== 'ALL')) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
+                Client: {orgOptions.find((o) => o.id === (filters.selectedOrg || filters.orgId))?.name || 'Client'}
+                <button onClick={() => dispatch(setOrgFilter('ALL'))} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             {filters.selectedStatus !== 'ALL' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 Status: {filters.selectedStatus}
@@ -1117,6 +1108,14 @@ export default function AdminPropertiesPage() {
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
                 E911: {filters.selectedE911}
                 <button onClick={() => dispatch(setE911Filter('ALL'))} className="cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filters.rayBaum && filters.rayBaum !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
+                Ray Baum: {filters.rayBaum}
+                <button onClick={() => dispatch(setRayBaumFilter('ALL'))} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -1194,6 +1193,7 @@ export default function AdminPropertiesPage() {
                   general_manager_email: '',
                   base_price: '',
                   monthly_price: '',
+                  onboarding_date: new Date().toISOString().slice(0, 10),
                   ray_baud_and_logs_enabled: true,
                   ray_baum_status: 'ACTIVE',
                   e911_status: 'VERIFIED',
@@ -1249,10 +1249,17 @@ export default function AdminPropertiesPage() {
 
                       {/* 2. Monthly Price (Super Admin Only) */}
                       {isSuperAdmin && (
-                        <td className="py-3.5 px-4 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-200">
-                          {prop.monthly_price !== null && prop.monthly_price !== undefined
-                            ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : '—'}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 block">
+                            {prop.monthly_price !== null && prop.monthly_price !== undefined
+                              ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '—'}
+                          </span>
+                          {prop.onboarding_date && (
+                            <span className="text-[10.5px] text-slate-400 dark:text-slate-500 font-mono block mt-0.5" title="Onboarding Date">
+                              Onboarded: {prop.onboarding_date}
+                            </span>
+                          )}
                         </td>
                       )}
 
@@ -2341,6 +2348,17 @@ export default function AdminPropertiesPage() {
                   )}
 
                   <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Onboarding Date</label>
+                    <input
+                      type="date"
+                      value={formData.onboarding_date}
+                      onChange={(e) => setFormData({ ...formData, onboarding_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-slate-400">Date from which monthly revenue begins</p>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block">Channel Partner</label>
                     <select
                       value={formData.partner_id}
@@ -2655,6 +2673,17 @@ export default function AdminPropertiesPage() {
                       <p className="text-[10px] text-slate-400">Total monthly rate will automatically include attached services</p>
                     </div>
                   )}
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Onboarding Date</label>
+                    <input
+                      type="date"
+                      value={formData.onboarding_date}
+                      onChange={(e) => setFormData({ ...formData, onboarding_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-slate-400">Date from which monthly revenue begins</p>
+                  </div>
 
                   <div className="space-y-1">
                     <label className="font-bold text-black dark:text-white block">Channel Partner</label>

@@ -28,6 +28,7 @@ interface ParsedPropertyRow {
   name: string;
   location: string;
   monthlyPrice: string;
+  onboardingDate: string;
   mainPhone: string;
   managementGroup: string;
   e911Status: string;
@@ -43,6 +44,7 @@ const REQUIRED_HEADERS = [
   'Property Name',
   'Property Location',
   'Monthly price',
+  'Onboarding Date',
   'Main Phone no',
   'Management group',
   'E911 Status',
@@ -74,9 +76,9 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
   // 1. Download CSV Template
   const handleDownloadTemplate = () => {
     const csvContent = `${REQUIRED_HEADERS.join(',')}\n` +
-      `"Grand Hyatt Downtown","123 Michigan Ave, Chicago, IL 60601",1450.00,"+1 (312) 555-0199","Marriott Hospitality Group","Verified","Active","John Doe","jdoe@hotelchain.com"\n` +
-      `"Hilton Garden Inn Airport","456 Airport Way, Miami, FL 33142",1200.00,"+1 (305) 555-0188","Hilton Worldwide","Verified","Active","Sarah Smith","ssmith@hilton.com"\n` +
-      `"Marriott Resort & Spa","789 Ocean Blvd, San Diego, CA 92109",1850.00,"+1 (619) 555-0177","Marriott Hospitality Group","Verified","Active","Robert Taylor","rtaylor@marriott.com"`;
+      `"Grand Hyatt Downtown","123 Michigan Ave, Chicago, IL 60601",1450.00,"2026-03-01","+1 (312) 555-0199","Marriott Hospitality Group","Verified","Active","John Doe","jdoe@hotelchain.com"\n` +
+      `"Hilton Garden Inn Airport","456 Airport Way, Miami, FL 33142",1200.00,"2026-06-15","+1 (305) 555-0188","Hilton Worldwide","Verified","Active","Sarah Smith","ssmith@hilton.com"\n` +
+      `"Marriott Resort & Spa","789 Ocean Blvd, San Diego, CA 92109",1850.00,"2026-04-10","+1 (619) 555-0177","Marriott Hospitality Group","Verified","Active","Robert Taylor","rtaylor@marriott.com"`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -187,6 +189,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
         const name = getVal(rowObj, ['Property Name', 'PropertyName', 'property_name', 'Name', 'name']);
         const location = getVal(rowObj, ['Property Location', 'PropertyLocation', 'property_location', 'Location', 'location', 'Address', 'address']);
         const monthlyPrice = getVal(rowObj, ['Monthly price', 'MonthlyPrice', 'monthly_price', 'Price', 'price', 'MRR']);
+        const onboardingDate = getVal(rowObj, ['Onboarding Date', 'OnboardingDate', 'onboarding_date', 'Onboarding date', 'Onboard Date', 'Date', 'date']);
         const mainPhone = getVal(rowObj, ['Main Phone no', 'Main Phone No', 'MainPhoneNo', 'main_phone_no', 'Main Phone', 'Phone']);
         const managementGroup = getVal(rowObj, ['Management group', 'Management Group', 'ManagementGroup', 'management_group', 'Organization', 'Group']);
         const e911Status = getVal(rowObj, ['E911 Status', 'E911Status', 'e911_status', 'E911']);
@@ -201,6 +204,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
           name,
           location: location || 'Address pending',
           monthlyPrice: monthlyPrice || '—',
+          onboardingDate: onboardingDate || '—',
           mainPhone: mainPhone || '—',
           managementGroup: managementGroup || 'Unassigned',
           e911Status: e911Status || 'Verified',
@@ -342,7 +346,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 16 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-4xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 max-h-[88vh] flex flex-col overflow-hidden text-slate-900 dark:text-white"
+            className="relative w-full max-w-5xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl shadow-2xl z-10 max-h-[90vh] flex flex-col overflow-hidden text-slate-900 dark:text-white"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-[#222430] shrink-0">
@@ -417,7 +421,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : parsedRows.length === 0 ? (
                 <>
                   {/* Two Options Section: Download Template & Upload CSV */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -535,89 +539,145 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                       ))}
                     </div>
                   </div>
-
-                  {/* Parsed Preview Table */}
-                  {parsedRows.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                </>
+              ) : (
+                /* Parsed Preview View */
+                <div className="space-y-3.5">
+                  {/* File Details Bar */}
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-bold text-slate-900 dark:text-white">
-                            Parsed Properties Preview
+                            {selectedFile?.name || 'Uploaded CSV'}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
                             {validRowCount} Ready to Import
                           </span>
+                          {parsedRows.length - validRowCount > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
+                              {parsedRows.length - validRowCount} Warnings
+                            </span>
+                          )}
                         </div>
-                        <button
-                          onClick={handleReset}
-                          className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
-                        >
-                          <RefreshCw className="w-3 h-3" /> Clear
-                        </button>
-                      </div>
-
-                      <div className="border border-slate-200 dark:border-[#222430] rounded-xl overflow-hidden max-h-56 overflow-y-auto">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead className="bg-slate-100 dark:bg-[#181920] text-slate-600 dark:text-slate-400 text-[10.5px] font-bold uppercase sticky top-0 border-b border-slate-200 dark:border-[#222430]">
-                            <tr>
-                              <th className="px-3 py-2">#</th>
-                              <th className="px-3 py-2">Property Name</th>
-                              <th className="px-3 py-2">Location</th>
-                              <th className="px-3 py-2">Monthly Price</th>
-                              <th className="px-3 py-2">Main Phone</th>
-                              <th className="px-3 py-2">Management Group</th>
-                              <th className="px-3 py-2">E911 / Ray Baum</th>
-                              <th className="px-3 py-2">General Manager</th>
-                              <th className="px-3 py-2">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-[11.5px]">
-                            {parsedRows.map((row, idx) => (
-                              <tr
-                                key={idx}
-                                className={`hover:bg-slate-50/50 dark:hover:bg-[#181a24] ${
-                                  !row.isValid ? 'bg-rose-50/30 dark:bg-rose-950/20' : ''
-                                }`}
-                              >
-                                <td className="px-3 py-2 text-slate-400 font-mono text-[10px]">{idx + 1}</td>
-                                <td className="px-3 py-2 font-semibold text-slate-900 dark:text-white">
-                                  {row.name || (
-                                    <span className="text-rose-500 font-normal italic">Missing Name</span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2 text-slate-600 dark:text-slate-300 max-w-[140px] truncate" title={row.location}>
-                                  {row.location}
-                                </td>
-                                <td className="px-3 py-2 text-slate-700 dark:text-slate-200 font-mono">
-                                  {row.monthlyPrice !== '—' ? `$${row.monthlyPrice}` : '—'}
-                                </td>
-                                <td className="px-3 py-2 text-slate-600 dark:text-slate-400 font-mono">
-                                  {row.mainPhone}
-                                </td>
-                                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-medium">
-                                  {row.managementGroup}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                                    {row.e911Status} / {row.rayBaumStatus}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
-                                  {row.gmName} {row.gmEmail !== '—' ? `<${row.gmEmail}>` : ''}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                                    Onboarded
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB • ` : ''}
+                          {parsedRows.length} total rows detected
+                        </p>
                       </div>
                     </div>
-                  )}
-                </>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleDownloadTemplate}
+                        className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg border border-slate-200 dark:border-[#282a36] hover:bg-slate-100 dark:hover:bg-[#20222a] flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Download className="w-3 h-3 text-blue-500" /> Template
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2.5 py-1.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Upload className="w-3 h-3" /> Change CSV
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        className="px-2.5 py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-[#20222a] flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preview Table Header with Scroll Hint */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
+                      Parsed Properties Preview
+                    </span>
+                    <span className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-0.5 rounded-md border border-blue-200 dark:border-blue-900/50 flex items-center gap-1.5 font-medium">
+                      <span className="font-bold">↔</span>
+                      <span>Scroll horizontally to view all 10 columns</span>
+                    </span>
+                  </div>
+
+                  {/* Table Container with prominent horizontal scrollbar */}
+                  <div className="border border-slate-200 dark:border-[#222430] rounded-xl overflow-x-auto overflow-y-auto max-h-[380px] shadow-2xs [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-thumb]:bg-slate-400/80 dark:[&::-webkit-scrollbar-thumb]:bg-slate-500 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-[#181920]">
+                    <table className="w-full min-w-[1250px] text-left text-xs border-collapse">
+                      <thead className="bg-slate-100 dark:bg-[#181920] text-slate-600 dark:text-slate-400 text-[10.5px] font-bold uppercase sticky top-0 border-b border-slate-200 dark:border-[#222430] z-10">
+                        <tr>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">#</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Property Name</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Location</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Monthly Price</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Onboarding Date</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Main Phone</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Management Group</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">E911 / Ray Baum</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">General Manager</th>
+                          <th className="px-3.5 py-2.5 whitespace-nowrap">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-[11.5px]">
+                        {parsedRows.map((row, idx) => (
+                          <tr
+                            key={idx}
+                            className={`hover:bg-slate-50/50 dark:hover:bg-[#181a24] ${
+                              !row.isValid ? 'bg-rose-50/30 dark:bg-rose-950/20' : ''
+                            }`}
+                          >
+                            <td className="px-3.5 py-2.5 text-slate-400 font-mono text-[10px] whitespace-nowrap">{idx + 1}</td>
+                            <td className="px-3.5 py-2.5 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                              {row.name || (
+                                <span className="text-rose-500 font-normal italic">Missing Name</span>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-300 whitespace-nowrap" title={row.location}>
+                              {row.location}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-200 font-mono whitespace-nowrap">
+                              {row.monthlyPrice !== '—' ? `$${row.monthlyPrice}` : '—'}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-200 font-mono text-[11px] whitespace-nowrap font-medium">
+                              {row.onboardingDate}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-400 font-mono whitespace-nowrap">
+                              {row.mainPhone}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                              {row.managementGroup}
+                            </td>
+                            <td className="px-3.5 py-2.5 whitespace-nowrap">
+                              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                                {row.e911Status} / {row.rayBaumStatus}
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                              {row.gmName} {row.gmEmail !== '—' ? `<${row.gmEmail}>` : ''}
+                            </td>
+                            <td className="px-3.5 py-2.5 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                                Onboarded
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </div>
 

@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
           ray_baum_status,
           ray_baud_and_logs_enabled,
           status,
+          onboarding_date,
           created_at
         ),
         services:organization_property_services(
@@ -182,6 +183,7 @@ export async function GET(request: NextRequest) {
           onboarding_target_date: onboardingRecord?.target_date || null,
           open_tickets_count: openTix.length,
           tickets: ticketsList,
+          onboarding_date: prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null),
           created_at: prop.created_at,
         };
       })
@@ -211,7 +213,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (statusFilter !== 'ALL') {
-      filtered = filtered.filter((p) => p.status === statusFilter);
+      const sUpper = statusFilter.toUpperCase();
+      filtered = filtered.filter((p) => (p.status || '').toUpperCase() === sUpper);
     }
 
     if (onboardingFilter !== 'ALL') {

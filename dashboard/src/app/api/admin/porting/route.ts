@@ -573,6 +573,7 @@ export async function PATCH(request: NextRequest) {
       sof_review_date,
       foc_confirmed_date,
       live_cutover_date,
+      completed_at,
       assigned_to,
       assigned_to_name,
       internal_notes,
@@ -685,6 +686,9 @@ export async function PATCH(request: NextRequest) {
               ray_baud_and_logs_enabled: isE911Initial,
               ray_baum_status: ray_baum_status || (isE911Initial ? 'ACTIVE' : 'INACTIVE'),
               status: status === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
+              onboarding_date: isCompletedOrOnboarded
+                ? (live_cutover_date || completed_at || updated.completed_at || new Date().toISOString().slice(0, 10)).slice(0, 10)
+                : null,
             })
             .select('id')
             .single();
@@ -774,6 +778,9 @@ export async function PATCH(request: NextRequest) {
           ray_baud_and_logs_enabled: isE911Initial,
           ray_baum_status: ray_baum_status || (isE911Initial ? 'ACTIVE' : 'INACTIVE'),
           status: status === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
+          onboarding_date: isCompletedOrOnboarded
+            ? (live_cutover_date || completed_at || updated.completed_at || new Date().toISOString().slice(0, 10)).slice(0, 10)
+            : null,
         })
         .select('id')
         .single();
@@ -837,7 +844,14 @@ export async function PATCH(request: NextRequest) {
         propUpdate.ray_baum_status = isE911 ? 'ACTIVE' : 'INACTIVE';
       }
 
-      if (isCompletedOrOnboarded) propUpdate.status = 'ACTIVE';
+      if (body.onboarding_date !== undefined) {
+        propUpdate.onboarding_date = body.onboarding_date ? String(body.onboarding_date).trim() : null;
+        if (isCompletedOrOnboarded) propUpdate.status = 'ACTIVE';
+      } else if (isCompletedOrOnboarded) {
+        propUpdate.status = 'ACTIVE';
+        const effectiveOnbDate = live_cutover_date || completed_at || updated.completed_at || new Date().toISOString().slice(0, 10);
+        propUpdate.onboarding_date = effectiveOnbDate.slice(0, 10);
+      }
 
       await db.from('properties').update(propUpdate).eq('id', propId);
 
