@@ -28,6 +28,7 @@ import {
   MapPin,
   ChevronDown,
   ArrowUpDown,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { LogoutConfirmModal } from '@/components/common/LogoutConfirmModal';
@@ -59,6 +60,7 @@ const navItems: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Management Groups', href: '/admin/organizations', icon: Building2 },
   { label: 'Properties', href: '/admin/properties', icon: Hotel },
+  { label: 'Technicians', href: '/admin/technicians', icon: Wrench },
   {
     label: 'Services',
     icon: PhoneCall,
