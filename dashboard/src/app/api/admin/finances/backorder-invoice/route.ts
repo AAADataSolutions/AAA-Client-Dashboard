@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { enqueuePartnerInvoiceEmails } from '@/lib/email/email-queue';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient() || (await createClient());
     const body = await request.json();
 
-    const { partner_id, period_month, property_ids, custom_commission_rate, status, notes } = body;
+    const { partner_id, period_month, property_ids, custom_commission_rate, status, notes, send_email } = body;
 
     if (!partner_id) {
       return NextResponse.json({ success: false, error: 'Partner ID is required.' }, { status: 400 });
@@ -163,9 +164,36 @@ export async function POST(request: NextRequest) {
       changes: newInvoicePayload,
     });
 
+    let emailQueued = false;
+    if (send_email && partner.email) {
+      const qRes = enqueuePartnerInvoiceEmails([
+        {
+          invoiceId: createdInv.id,
+          invoiceNumber: createdInv.invoice_number,
+          periodStart: createdInv.period_start,
+          periodEnd: createdInv.period_end,
+          status: createdInv.status,
+          totalProperties: createdInv.total_properties,
+          grossRevenue: Number(createdInv.gross_revenue || 0),
+          commissionAmount: Number(createdInv.commission_amount || 0),
+          notes: createdInv.notes,
+          createdAt: createdInv.created_at,
+          partnerId: partner.id,
+          partnerName: partner.name,
+          partnerEmail: partner.email,
+          partnerPhone: partner.phone,
+          partnerCompanyName: partner.company_name,
+          lineItems: createdInv.line_items || lineItems,
+          triggerSource: 'BACKORDER',
+        },
+      ]);
+      emailQueued = qRes.queuedCount > 0 || qRes.alreadyQueuedCount > 0;
+    }
+
     return NextResponse.json({
       success: true,
       data: createdInv,
+      emailQueued,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });

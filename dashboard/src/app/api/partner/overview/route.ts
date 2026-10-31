@@ -83,11 +83,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Ensure this partner's monthly gross revenue invoice for the current month exists
-    try {
-      await generateMonthlyPartnerInvoices();
-    } catch (genErr) {
-      console.warn('[Partner Overview] Monthly invoice generation notice:', genErr);
+    // Only auto-generate monthly partner invoices on the 1st day of the month in UTC
+    if (new Date().getUTCDate() === 1) {
+      try {
+        await generateMonthlyPartnerInvoices();
+      } catch (genErr) {
+        console.warn('[Partner Overview] 1st-of-month invoice generation notice:', genErr);
+      }
     }
 
     // Fetch STRICTLY properties assigned to THIS partner

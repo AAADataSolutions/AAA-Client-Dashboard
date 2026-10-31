@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
     try {
       const body = await request.json();
       if (body?.month && body?.year) {
-        targetDate = new Date(body.year, body.month - 1, 1);
+        targetDate = new Date(Date.UTC(Number(body.year), Number(body.month) - 1, 1));
       }
     } catch {
-      // no body or malformed, default to current date
+      // no body or malformed, default to current UTC date
     }
 
     const result = await generateMonthlyPartnerInvoices(targetDate);
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: result,
-      message: `Monthly invoicing executed. Generated: ${result.generated}, Skipped (Already existed): ${result.skipped}.`,
+      message: `Monthly invoicing executed. Generated: ${result.generated}, Skipped (Already existed): ${result.skipped}, Emails Queued: ${result.emailsQueued}.`,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });

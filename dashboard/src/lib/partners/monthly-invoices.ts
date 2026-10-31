@@ -1,10 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { enqueuePartnerInvoiceEmails, PartnerInvoiceQueuePayload } from '@/lib/email/email-queue';
 import crypto from 'crypto';
 
 export interface MonthlyInvoiceResult {
   generated: number;
   skipped: number;
+  emailsQueued: number;
   totalPartners: number;
   periodStart: string;
   periodEnd: string;
@@ -15,14 +17,19 @@ export interface MonthlyInvoiceResult {
 /**
  * Automatically computes monthly gross value and generates SUBMITTED partner invoices
  * for all active partners based on their assigned active properties and commission rates.
- * Runs seamlessly on the 1st of each month or on-demand without duplicating existing invoices.
+ * Runs seamlessly on the 1st of each month or on-demand without duplicating existing invoices,
+ * and automatically queues invoice emails (with attached PDF) one by one for newly generated invoices.
  */
-export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise<MonthlyInvoiceResult> {
+export async function generateMonthlyPartnerInvoices(
+  targetDate?: Date,
+  options?: { sendEmails?: boolean; waitForEmails?: boolean }
+): Promise<MonthlyInvoiceResult> {
+  const shouldSendEmails = options?.sendEmails !== false; // default true
   const date = targetDate || new Date();
-  const year = date.getFullYear();
-  const month = date.getMonth(); // 0-indexed
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth(); // 0-indexed (strictly UTC)
 
-  // Format period_start (YYYY-MM-01) and period_end (Last day of month)
+  // Format period_start (YYYY-MM-01) and period_end (Last day of month) in UTC
   const startDate = new Date(Date.UTC(year, month, 1));
   const endDate = new Date(Date.UTC(year, month + 1, 0));
 
@@ -36,6 +43,7 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
   const result: MonthlyInvoiceResult = {
     generated: 0,
     skipped: 0,
+    emailsQueued: 0,
     totalPartners: 0,
     periodStart,
     periodEnd,
@@ -85,6 +93,7 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
 
     const existingMap = new Set((existingInvoices || []).map((inv: any) => inv.partner_id));
     const periodStartMonth = periodStart.substring(0, 7);
+    const emailJobsToQueue: PartnerInvoiceQueuePayload[] = [];
 
     // 4. Process each active partner
     for (const partner of partners) {
@@ -94,14 +103,8 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
           continue;
         }
 
-        // Find assigned properties for this partner active on or before this billing period
-        const assignedProps = allProps.filter((p: any) => {
-          if (p.partner_id !== partner.id) return false;
-          if (p.status !== 'ACTIVE' && p.status !== 'COMPLETED' && p.status !== 'ONBOARDED') return false;
-          const effDate = p.onboarding_date || p.created_at;
-          const effMonth = effDate ? String(effDate).substring(0, 7) : '9999-99';
-          return effMonth <= periodStartMonth;
-        });
+        // Find all properties assigned to this partner
+        const assignedProps = allProps.filter((p: any) => p.partner_id === partner.id);
 
         // If partner has no assigned properties, skip invoice generation
         if (assignedProps.length === 0) {
@@ -156,7 +159,7 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
           commission_amount: Math.round(totalCommission * 100) / 100,
           status: 'SUBMITTED',
           line_items: lineItems,
-          notes: `Automated monthly gross revenue & commission invoice for ${date.toLocaleString('default', { month: 'long', year: 'numeric' })}.`,
+          notes: `Automated monthly gross revenue & commission invoice for ${startDate.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}.`,
         };
 
         const { data: createdInv, error: insertErr } = await supabase
@@ -170,9 +173,41 @@ export async function generateMonthlyPartnerInvoices(targetDate?: Date): Promise
         } else if (createdInv) {
           result.generated++;
           result.invoices.push(createdInv);
+
+          if (shouldSendEmails && partner.email) {
+            emailJobsToQueue.push({
+              invoiceId: createdInv.id,
+              invoiceNumber: createdInv.invoice_number,
+              periodStart: createdInv.period_start,
+              periodEnd: createdInv.period_end,
+              status: createdInv.status,
+              totalProperties: createdInv.total_properties,
+              grossRevenue: Number(createdInv.gross_revenue || 0),
+              commissionAmount: Number(createdInv.commission_amount || 0),
+              notes: createdInv.notes,
+              createdAt: createdInv.created_at,
+              partnerId: partner.id,
+              partnerName: partner.name,
+              partnerEmail: partner.email,
+              partnerPhone: partner.phone,
+              partnerCompanyName: partner.company_name,
+              lineItems: createdInv.line_items || lineItems,
+              triggerSource: 'MONTHLY_AUTO',
+            });
+          }
         }
       } catch (partnerErr: any) {
         result.errors.push(`Error processing partner ${partner.id}: ${partnerErr.message}`);
+      }
+    }
+
+    // 5. Enqueue newly generated monthly invoices for one-by-one email delivery with PDF
+    if (emailJobsToQueue.length > 0) {
+      const queueRes = enqueuePartnerInvoiceEmails(emailJobsToQueue);
+      result.emailsQueued = queueRes.queuedCount;
+
+      if (options?.waitForEmails) {
+        await queueRes.completionPromise;
       }
     }
 

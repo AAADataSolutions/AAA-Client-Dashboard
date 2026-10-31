@@ -32,6 +32,8 @@ import {
   BarChart3,
   PieChart as PieChartIcon,
   Info,
+  Send,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -110,7 +112,18 @@ export default function AdminFinancesPage() {
     custom_commission_rate: '',
     status: 'SUBMITTED',
     notes: '',
+    send_email: false,
   });
+  const [finEmailQueueStates, setFinEmailQueueStates] = useState<Record<string, {
+    status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
+    queuePosition?: number;
+    error?: string;
+  }>>({});
+  const [finEmailQueueMeta, setFinEmailQueueMeta] = useState<{ isProcessing: boolean; pendingCount: number }>({
+    isProcessing: false,
+    pendingCount: 0,
+  });
+  const [finDispatchingIds, setFinDispatchingIds] = useState<Record<string, boolean>>({});
   const [candidateProperties, setCandidateProperties] = useState<any[]>([]);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
@@ -213,7 +226,11 @@ export default function AdminFinancesPage() {
           custom_commission_rate: '',
           status: 'SUBMITTED',
           notes: '',
+          send_email: false,
         });
+        if (json.emailQueued) {
+          fetchFinEmailQueue();
+        }
         setSelectedPropertyIds([]);
         setCandidateProperties([]);
         await fetchFinances();
@@ -224,6 +241,64 @@ export default function AdminFinancesPage() {
       alert(err.message || 'An error occurred');
     } finally {
       setBackorderSubmitting(false);
+    }
+  };
+
+  const fetchFinEmailQueue = async () => {
+    try {
+      const res = await fetch('/api/admin/partners/invoices/send-email');
+      const json = await res.json();
+      if (json.success) {
+        setFinEmailQueueStates(json.states || {});
+        setFinEmailQueueMeta({
+          isProcessing: Boolean(json.isProcessing),
+          pendingCount: Number(json.pendingCount || 0),
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    if (!finEmailQueueMeta.isProcessing && finEmailQueueMeta.pendingCount === 0) return;
+    const timer = setInterval(() => {
+      fetchFinEmailQueue();
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [finEmailQueueMeta.isProcessing, finEmailQueueMeta.pendingCount]);
+
+  const handleSendFinInvoiceEmail = async (invoiceIds: string[]) => {
+    if (!invoiceIds || invoiceIds.length === 0) return;
+    try {
+      setFinDispatchingIds((prev) => {
+        const next = { ...prev };
+        invoiceIds.forEach((id) => (next[id] = true));
+        return next;
+      });
+      const res = await fetch('/api/admin/partners/invoices/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_ids: invoiceIds }),
+      });
+      const json = await res.json();
+      if (json.snapshot) {
+        setFinEmailQueueStates(json.snapshot.states || {});
+        setFinEmailQueueMeta({
+          isProcessing: Boolean(json.snapshot.isProcessing),
+          pendingCount: Number(json.snapshot.pendingCount || 0),
+        });
+      } else {
+        fetchFinEmailQueue();
+      }
+    } catch (e) {
+      console.error('Failed to queue invoice email:', e);
+    } finally {
+      setFinDispatchingIds((prev) => {
+        const next = { ...prev };
+        invoiceIds.forEach((id) => delete next[id]);
+        return next;
+      });
     }
   };
 
@@ -1405,31 +1480,65 @@ export default function AdminFinancesPage() {
                     <th className="py-2 px-2">Invoice #</th>
                     <th className="py-2 px-2 text-right">Amount</th>
                     <th className="py-2 px-2 text-center">Status</th>
+                    <th className="py-2 px-2 text-right">Email PDF</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#20222c]">
-                  {invoicesItems.map((inv: any) => (
-                    <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-[#1a1b24]/40">
-                      <td className="py-2.5 px-2 font-bold text-slate-800 dark:text-slate-200">
-                        {inv.partner_name}
-                      </td>
-                      <td className="py-2.5 px-2 font-mono text-slate-500">{inv.invoice_number}</td>
-                      <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(Number(inv.commission_amount || 0))}
-                      </td>
-                      <td className="py-2.5 px-2 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            inv.status === 'PAID'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                          }`}
-                        >
-                          {inv.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {invoicesItems.map((inv: any) => {
+                    const qSt = finEmailQueueStates[inv.id];
+                    const isClicking = Boolean(finDispatchingIds[inv.id]);
+                    return (
+                      <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-[#1a1b24]/40">
+                        <td className="py-2.5 px-2 font-bold text-slate-800 dark:text-slate-200">
+                          {inv.partner_name}
+                        </td>
+                        <td className="py-2.5 px-2 font-mono text-slate-500">{inv.invoice_number}</td>
+                        <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-900 dark:text-white">
+                          {formatCurrency(Number(inv.commission_amount || 0))}
+                        </td>
+                        <td className="py-2.5 px-2 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              inv.status === 'PAID'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            }`}
+                          >
+                            {inv.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-2 text-right">
+                          {isClicking || qSt?.status === 'SENDING' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 text-[10.5px] font-bold">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Sending...
+                            </span>
+                          ) : qSt?.status === 'QUEUED' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-[10.5px] font-bold">
+                              <Clock className="w-3 h-3 animate-pulse" /> Queued #{qSt.queuePosition || 1}
+                            </span>
+                          ) : qSt?.status === 'SENT' ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSendFinInvoiceEmail([inv.id])}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10.5px] font-bold cursor-pointer transition"
+                              title="Email with PDF sent. Click to resend."
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Sent
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSendFinInvoiceEmail([inv.id])}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 text-[10.5px] font-bold cursor-pointer transition"
+                              title="Queue email with PDF attachment to partner"
+                            >
+                              <Send className="w-3 h-3" /> Send Email
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2009,6 +2118,23 @@ export default function AdminFinancesPage() {
                     className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
                   />
                 </div>
+
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-800/50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(backorderForm.send_email)}
+                    onChange={(e) => setBackorderForm({ ...backorderForm, send_email: e.target.checked })}
+                    className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">
+                      Automatically queue &amp; send Partner Invoice Email with PDF Attachment
+                    </span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Leave unchecked if you prefer to manually click &quot;Send Email&quot; from the invoice table later.
+                    </span>
+                  </div>
+                </label>
 
                 <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430]">
                   <button

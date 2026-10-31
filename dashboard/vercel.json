@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/monthly-partner-invoices",
+      "schedule": "0 0 1 * *"
+    }
+  ]
+}
+

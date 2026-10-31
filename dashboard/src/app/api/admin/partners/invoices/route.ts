@@ -13,11 +13,13 @@ export async function GET(request: NextRequest) {
     const partnerId = searchParams.get('partner_id');
     const search = searchParams.get('search')?.trim().toLowerCase() || '';
 
-    // Automatically ensure monthly gross revenue partner invoices are up to date
-    try {
-      await generateMonthlyPartnerInvoices();
-    } catch (autoGenErr) {
-      console.warn('[Admin Invoices GET] Background invoice auto-gen notice:', autoGenErr);
+    // Only auto-generate monthly partner invoices on the 1st day of the month in UTC
+    if (new Date().getUTCDate() === 1) {
+      try {
+        await generateMonthlyPartnerInvoices();
+      } catch (autoGenErr) {
+        console.warn('[Admin Invoices GET] 1st-of-month auto-gen notice:', autoGenErr);
+      }
     }
 
     let query = supabase

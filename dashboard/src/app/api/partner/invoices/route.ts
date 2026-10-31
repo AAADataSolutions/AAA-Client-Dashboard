@@ -59,11 +59,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-    // Automatically ensure this partner's monthly gross revenue invoice exists
-    try {
-      await generateMonthlyPartnerInvoices();
-    } catch (genErr) {
-      console.warn('[Partner Invoices] Auto invoice generation notice:', genErr);
+    // Only auto-generate monthly partner invoices on the 1st day of the month in UTC
+    if (new Date().getUTCDate() === 1) {
+      try {
+        await generateMonthlyPartnerInvoices();
+      } catch (genErr) {
+        console.warn('[Partner Invoices] 1st-of-month invoice generation notice:', genErr);
+      }
     }
 
     // Fetch STRICTLY this partner's invoices

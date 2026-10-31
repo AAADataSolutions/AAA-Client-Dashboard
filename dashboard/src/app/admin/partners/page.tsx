@@ -144,6 +144,17 @@ export default function AdminPartnersPage() {
   const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
   const [updatingPartnerStatusId, setUpdatingPartnerStatusId] = useState<string | null>(null);
   const [generatingMonthlyInvoices, setGeneratingMonthlyInvoices] = useState(false);
+  const [emailQueueStates, setEmailQueueStates] = useState<Record<string, {
+    status: 'QUEUED' | 'SENDING' | 'SENT' | 'FAILED';
+    queuePosition?: number;
+    error?: string;
+    sentAt?: string;
+  }>>({});
+  const [emailQueueMeta, setEmailQueueMeta] = useState<{ isProcessing: boolean; pendingCount: number }>({
+    isProcessing: false,
+    pendingCount: 0,
+  });
+  const [dispatchingEmailIds, setDispatchingEmailIds] = useState<Record<string, boolean>>({});
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -545,6 +556,159 @@ export default function AdminPartnersPage() {
     } finally {
       setGeneratingMonthlyInvoices(false);
     }
+  };
+
+  const fetchEmailQueueStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/partners/invoices/send-email');
+      const json = await res.json();
+      if (json.success) {
+        setEmailQueueStates(json.states || {});
+        setEmailQueueMeta({
+          isProcessing: Boolean(json.isProcessing),
+          pendingCount: Number(json.pendingCount || 0),
+        });
+      }
+    } catch {
+      // ignore background poll error
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'INVOICES' || showViewInvoicesModal || selectedInvoiceForView) {
+      fetchEmailQueueStatus();
+    }
+  }, [activeTab, showViewInvoicesModal, selectedInvoiceForView, fetchEmailQueueStatus]);
+
+  useEffect(() => {
+    if (!emailQueueMeta.isProcessing && emailQueueMeta.pendingCount === 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      fetchEmailQueueStatus();
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [emailQueueMeta.isProcessing, emailQueueMeta.pendingCount, fetchEmailQueueStatus]);
+
+  const handleSendInvoiceEmail = async (invoiceIds: string[], contextLabel?: string) => {
+    if (!invoiceIds || invoiceIds.length === 0) return;
+    try {
+      setDispatchingEmailIds((prev) => {
+        const next = { ...prev };
+        invoiceIds.forEach((id) => {
+          next[id] = true;
+        });
+        return next;
+      });
+
+      const res = await fetch('/api/admin/partners/invoices/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_ids: invoiceIds }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to queue invoice email.');
+      }
+
+      if (json.snapshot) {
+        setEmailQueueStates(json.snapshot.states || {});
+        setEmailQueueMeta({
+          isProcessing: Boolean(json.snapshot.isProcessing),
+          pendingCount: Number(json.snapshot.pendingCount || 0),
+        });
+      } else {
+        fetchEmailQueueStatus();
+      }
+
+      showToast(
+        invoiceIds.length > 1 ? 'Invoices Added to Email Queue' : 'Invoice Email Queued',
+        json.message || (contextLabel ? `Queued email with PDF for ${contextLabel}.` : 'Email with PDF attachment will be dispatched sequentially.'),
+        'success'
+      );
+    } catch (err: any) {
+      showToast('Email Error', err.message || 'Could not queue invoice email.', 'error');
+    } finally {
+      setDispatchingEmailIds((prev) => {
+        const next = { ...prev };
+        invoiceIds.forEach((id) => {
+          delete next[id];
+        });
+        return next;
+      });
+    }
+  };
+
+  const renderInvoiceEmailButton = (inv: PartnerInvoiceItem, compact = false) => {
+    const qState = emailQueueStates[inv.id];
+    const isClicking = Boolean(dispatchingEmailIds[inv.id]);
+    const isQueued = qState?.status === 'QUEUED';
+    const isSending = qState?.status === 'SENDING';
+    const isSent = qState?.status === 'SENT';
+    const isFailed = qState?.status === 'FAILED';
+
+    if (isClicking || isSending) {
+      return (
+        <button
+          disabled
+          className={`${compact ? 'px-2.5 py-1' : 'px-3 py-1.5'} bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 opacity-90 cursor-wait`}
+          title="Generating PDF & Sending Email..."
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>{compact ? 'Sending...' : 'Sending PDF...'}</span>
+        </button>
+      );
+    }
+
+    if (isQueued) {
+      return (
+        <button
+          disabled
+          className={`${compact ? 'px-2.5 py-1' : 'px-3 py-1.5'} bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 cursor-wait`}
+          title="Waiting in sequential email queue..."
+        >
+          <Clock className="w-3.5 h-3.5 animate-pulse" />
+          <span>Queued {qState.queuePosition ? `#${qState.queuePosition}` : ''}</span>
+        </button>
+      );
+    }
+
+    if (isSent) {
+      return (
+        <button
+          onClick={() => handleSendInvoiceEmail([inv.id], inv.invoice_number)}
+          className={`${compact ? 'px-2.5 py-1' : 'px-3 py-1.5'} bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer`}
+          title={`Sent to ${inv.partner?.email || 'partner'}. Click to resend email with PDF.`}
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>{compact ? 'Sent' : 'Sent · Resend'}</span>
+        </button>
+      );
+    }
+
+    if (isFailed) {
+      return (
+        <button
+          onClick={() => handleSendInvoiceEmail([inv.id], inv.invoice_number)}
+          className={`${compact ? 'px-2.5 py-1' : 'px-3 py-1.5'} bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer`}
+          title={qState?.error || 'Failed to send email. Click to retry.'}
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+          <span>{compact ? 'Retry' : 'Retry Email'}</span>
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => handleSendInvoiceEmail([inv.id], inv.invoice_number)}
+        className={`${compact ? 'px-2.5 py-1' : 'px-3 py-1.5'} bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer`}
+        title={`Send invoice ${inv.invoice_number} with PDF attachment to ${inv.partner?.email || 'partner'}`}
+      >
+        <Send className="w-3.5 h-3.5" />
+        <span>{compact ? 'Email' : 'Send Email'}</span>
+      </button>
+    );
   };
 
   const handlePrint = () => {
@@ -1163,6 +1327,22 @@ export default function AdminPartnersPage() {
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
               </select>
+              {(emailQueueMeta.isProcessing || emailQueueMeta.pendingCount > 0) && (
+                <div className="px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 text-xs font-bold inline-flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Queue Active ({emailQueueMeta.pendingCount} waiting)</span>
+                </div>
+              )}
+              {invoices.length > 0 && (
+                <button
+                  onClick={() => handleSendInvoiceEmail(invoices.map((i) => i.id), `${invoices.length} displayed invoices`)}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                  title="Queue all currently displayed invoices to be emailed one by one with PDF attachments"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Email All Shown ({invoices.length})</span>
+                </button>
+              )}
               <button
                 onClick={loadData}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#1e2029] text-slate-600 dark:text-slate-300 cursor-pointer"
@@ -1540,6 +1720,7 @@ export default function AdminPartnersPage() {
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {renderInvoiceEmailButton(inv, false)}
                               <button
                                 onClick={() => setSelectedInvoiceForView(inv)}
                                 className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 rounded-lg font-bold text-xs inline-flex items-center gap-1.5 transition cursor-pointer"
@@ -1923,6 +2104,7 @@ export default function AdminPartnersPage() {
                           </td>
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {renderInvoiceEmailButton({ ...inv, partner: selectedPartner }, true)}
                               <button
                                 onClick={() => {
                                   setSelectedInvoiceForView({
@@ -2340,6 +2522,7 @@ export default function AdminPartnersPage() {
                     <span>Delete</span>
                   </button>
                 )}
+                {renderInvoiceEmailButton(selectedInvoiceForView, false)}
                 <button
                   onClick={handlePrint}
                   className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
