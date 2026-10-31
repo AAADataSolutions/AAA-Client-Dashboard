@@ -1327,22 +1327,6 @@ export default function AdminPartnersPage() {
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
               </select>
-              {(emailQueueMeta.isProcessing || emailQueueMeta.pendingCount > 0) && (
-                <div className="px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 text-xs font-bold inline-flex items-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Queue Active ({emailQueueMeta.pendingCount} waiting)</span>
-                </div>
-              )}
-              {invoices.length > 0 && (
-                <button
-                  onClick={() => handleSendInvoiceEmail(invoices.map((i) => i.id), `${invoices.length} displayed invoices`)}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                  title="Queue all currently displayed invoices to be emailed one by one with PDF attachments"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Email All Shown ({invoices.length})</span>
-                </button>
-              )}
               <button
                 onClick={loadData}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#1e2029] text-slate-600 dark:text-slate-300 cursor-pointer"
@@ -1607,6 +1591,22 @@ export default function AdminPartnersPage() {
                 <option value="PAID">Paid</option>
                 <option value="REJECTED">Rejected</option>
               </select>
+              {(emailQueueMeta.isProcessing || emailQueueMeta.pendingCount > 0) && (
+                <div className="px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 text-xs font-bold inline-flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Queue Active ({emailQueueMeta.pendingCount} waiting)</span>
+                </div>
+              )}
+              {invoices.length > 0 && (
+                <button
+                  onClick={() => handleSendInvoiceEmail(invoices.map((i) => i.id), `${invoices.length} displayed invoices`)}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                  title="Queue all currently displayed invoices to be emailed one by one with PDF attachments"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Email All Shown ({invoices.length})</span>
+                </button>
+              )}
               <button
                 onClick={loadData}
                 className="p-1.5 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#1e2029] text-slate-600 dark:text-slate-300 cursor-pointer"
