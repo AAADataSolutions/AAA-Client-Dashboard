@@ -1977,22 +1977,6 @@ export default function AdminFinancesPage() {
                       <option value="DRAFT">Draft</option>
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Override Rate (%)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="Default"
-                      value={backorderForm.custom_commission_rate}
-                      onChange={(e) =>
-                        setBackorderForm({ ...backorderForm, custom_commission_rate: e.target.value })
-                      }
-                      className="w-full p-2.5 bg-slate-50 dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] rounded-xl text-slate-900 dark:text-white"
-                    />
-                  </div>
                 </div>
 
                 {/* Candidate properties checklist with live preview */}
