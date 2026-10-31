@@ -126,11 +126,13 @@ export async function generatePartnerInvoicePdfBuffer(data: PartnerInvoicePdfInp
         year: 'numeric',
         month: 'short',
         day: 'numeric',
+        timeZone: 'UTC',
       })
     : new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
+        timeZone: 'UTC',
       });
   const dateText = `Date: ${formattedDate}`;
   const dateWidth = fontRegular.widthOfTextAtSize(dateText, 9.5);
