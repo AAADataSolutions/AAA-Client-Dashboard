@@ -106,6 +106,22 @@ export async function GET(request: NextRequest) {
       .select('id, name, default_commission_rate, company_name');
     const allPartners = partnersData || [];
 
+    // 5a. Fetch Data Circuits linked to properties (graceful if table not created yet)
+    let allDataCircuits: any[] = [];
+    if (propIds.length > 0) {
+      try {
+        const { data: dcData } = await db
+          .from('data_circuits')
+          .select('*')
+          .in('property_id', propIds)
+          .neq('status', 'CANCELLED')
+          .order('created_at', { ascending: false });
+        allDataCircuits = dcData || [];
+      } catch {
+        allDataCircuits = [];
+      }
+    }
+
     // 5b. Fetch active (incomplete) porting requests to exclude from Properties until onboarded/completed
     const { data: activePortings } = await db
       .from('porting_requests')
@@ -175,12 +191,29 @@ export async function GET(request: NextRequest) {
       const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
       const isAssigned = Boolean(primaryOrg || orgs.length > 0);
 
+      const propCircuits = allDataCircuits.filter((dc: any) => dc.property_id === prop.id);
+      const primaryCircuit = propCircuits[0] || null;
+
+      let resolvedConnectivityType: 'PORTED' | 'DATA_CIRCUITED' | 'BOTH' =
+        prop.connectivity_type && ['PORTED', 'DATA_CIRCUITED', 'BOTH'].includes(prop.connectivity_type)
+          ? prop.connectivity_type
+          : 'PORTED';
+
+      if (primaryCircuit && dynamicServiceCount > 0 && !prop.connectivity_type) {
+        resolvedConnectivityType = 'BOTH';
+      } else if (primaryCircuit && !prop.connectivity_type) {
+        resolvedConnectivityType = 'DATA_CIRCUITED';
+      }
+
       return {
         id: prop.id,
         code: `PR-${100 + idx}`,
         name: prop.name,
         base_price: prop.base_price ?? prop.monthly_price ?? null,
         monthly_price: prop.monthly_price ?? null,
+        connectivity_type: resolvedConnectivityType,
+        data_circuit: primaryCircuit,
+        data_circuits: propCircuits,
         partner_id: prop.partner_id || null,
         partner_commission_override: prop.partner_commission_override ?? null,
         partner_name: partnerObj?.name || null,
@@ -212,6 +245,8 @@ export async function GET(request: NextRequest) {
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
         ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
         onboarding_date: prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null),
+        billing_status: prop.billing_status || 'BILLING_PENDING',
+        attachments: prop.attachments || [],
         created_at: prop.created_at,
         updated_at: prop.updated_at || prop.created_at,
       };
@@ -392,6 +427,7 @@ export async function POST(request: NextRequest) {
         partner_commission_override: cleanOverride,
         ray_baud_and_logs_enabled: isE911Verified,
         ray_baum_status: resolvedRayBaum,
+        billing_status: body.billing_status || 'BILLING_PENDING',
         status: resolvedStatus,
       })
       .select()

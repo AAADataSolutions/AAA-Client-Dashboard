@@ -42,6 +42,13 @@ import {
   Unlink,
   ExternalLink,
   Upload,
+  Server,
+  Wifi,
+  Globe,
+  FileText,
+  Calendar,
+  DollarSign,
+  Activity,
 } from 'lucide-react';
 import { ImportPropertiesModal } from '@/components/admin/ImportPropertiesModal';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -196,6 +203,16 @@ export default function AdminPropertiesPage() {
   // 3-Dots Action Menu Position (opens ABOVE the line)
   const [menuPosition, setMenuPosition] = useState<{ bottom: number; left: number; prop: PropertyItem } | null>(null);
 
+  // Comprehensive Property Side Modal (Drawer)
+  const [showPropertyDrawer, setShowPropertyDrawer] = useState(false);
+  const [selectedPropForDrawer, setSelectedPropForDrawer] = useState<PropertyRecord | null>(null);
+  const [propertyDrawerData, setPropertyDrawerData] = useState<any>(null);
+  const [loadingDrawerData, setLoadingDrawerData] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'DATA_CIRCUIT' | 'PORTING_DOCS'>('OVERVIEW');
+  const [drawerAssignServiceId, setDrawerAssignServiceId] = useState('');
+  const [assigningServiceInDrawer, setAssigningServiceInDrawer] = useState(false);
+  const [unassigningServiceId, setUnassigningServiceId] = useState<string | null>(null);
+
   // Assign to Organization Modal State
   const [showAssignOrgModal, setShowAssignOrgModal] = useState(false);
   const [selectedPropForAssignOrg, setSelectedPropForAssignOrg] = useState<PropertyItem | null>(null);
@@ -241,6 +258,8 @@ export default function AdminPropertiesPage() {
     ray_baud_and_logs_enabled: true,
     ray_baum_status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     e911_status: 'VERIFIED' as 'VERIFIED' | 'AUDIT_REQUIRED',
+    connectivity_type: 'PORTED' as 'PORTED' | 'DATA_CIRCUITED' | 'BOTH',
+    billing_status: 'BILLING_PENDING' as 'BILLING_DONE' | 'BILLING_PENDING',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED',
   });
   const [formLoading, setFormLoading] = useState(false);
@@ -645,6 +664,8 @@ export default function AdminPropertiesPage() {
       ray_baud_and_logs_enabled: isE911,
       ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
       e911_status: isE911 ? 'VERIFIED' : 'AUDIT_REQUIRED',
+      connectivity_type: (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED'),
+      billing_status: ((prop as any).billing_status === 'BILLING_DONE' ? 'BILLING_DONE' : 'BILLING_PENDING') as 'BILLING_DONE' | 'BILLING_PENDING',
       status: (prop.status as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED') || 'ACTIVE',
     });
     setFormError(null);
@@ -750,6 +771,115 @@ export default function AdminPropertiesPage() {
     } catch (err: any) {
       showToast('Error', err.message, 'error');
       loadData();
+    }
+  };
+
+  const handleQuickUpdateBillingStatus = async (propId: string, newBillingStatus: 'BILLING_DONE' | 'BILLING_PENDING') => {
+    dispatch(updatePropertyOptimistic({ id: propId, updates: { billing_status: newBillingStatus } as any }));
+    if (selectedPropForDrawer && selectedPropForDrawer.id === propId) {
+      setSelectedPropForDrawer((prev) => (prev ? { ...prev, billing_status: newBillingStatus } : prev));
+    }
+    if (propertyDrawerData?.property?.id === propId) {
+      setPropertyDrawerData((prev: any) =>
+        prev ? { ...prev, property: { ...prev.property, billing_status: newBillingStatus } } : prev
+      );
+    }
+    try {
+      const res = await fetch(`/api/admin/properties/${propId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billing_status: newBillingStatus }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update billing status.');
+      showToast(
+        'Billing Status Updated',
+        `Property marked as ${newBillingStatus === 'BILLING_DONE' ? 'Billing Done (Billed)' : 'Billing Pending'}.`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+      loadData();
+    }
+  };
+
+  // --- Handlers: Comprehensive Property Side Drawer ---
+  const handleOpenPropertyDrawer = async (prop: PropertyRecord | PropertyItem) => {
+    setSelectedPropForDrawer(prop as PropertyRecord);
+    setShowPropertyDrawer(true);
+    setDrawerTab('OVERVIEW');
+    setLoadingDrawerData(true);
+    try {
+      const res = await fetch(`/api/admin/properties/${prop.id}/details`);
+      const result = await res.json();
+      if (result.success && result.data) {
+        setPropertyDrawerData(result.data);
+      } else {
+        setPropertyDrawerData(null);
+      }
+    } catch (err) {
+      console.error('Failed to load property details', err);
+      setPropertyDrawerData(null);
+    } finally {
+      setLoadingDrawerData(false);
+    }
+  };
+
+  const refreshDrawerData = async (propertyId: string) => {
+    try {
+      const res = await fetch(`/api/admin/properties/${propertyId}/details`);
+      const result = await res.json();
+      if (result.success && result.data) {
+        setPropertyDrawerData(result.data);
+      }
+    } catch (err) {
+      console.error('Failed to refresh drawer data', err);
+    }
+  };
+
+  const handleDrawerAssignService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropForDrawer || !drawerAssignServiceId) return;
+
+    try {
+      setAssigningServiceInDrawer(true);
+      const res = await fetch(`/api/admin/properties/${selectedPropForDrawer.id}/services`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service_id: drawerAssignServiceId }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to assign service');
+
+      showToast('Service Assigned', 'Service linked to property successfully.', 'success');
+      setDrawerAssignServiceId('');
+      await refreshDrawerData(selectedPropForDrawer.id);
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setAssigningServiceInDrawer(false);
+    }
+  };
+
+  const handleDrawerUnassignService = async (serviceId: string, serviceName: string) => {
+    if (!selectedPropForDrawer) return;
+
+    try {
+      setUnassigningServiceId(serviceId);
+      const res = await fetch(`/api/admin/properties/${selectedPropForDrawer.id}/services?serviceId=${serviceId}`, {
+        method: 'DELETE',
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to unassign service');
+
+      showToast('Service Unassigned', `${serviceName || 'Service'} removed from property.`, 'success');
+      await refreshDrawerData(selectedPropForDrawer.id);
+      loadData();
+    } catch (err: any) {
+      showToast('Error', err.message, 'error');
+    } finally {
+      setUnassigningServiceId(null);
     }
   };
 
@@ -884,6 +1014,8 @@ export default function AdminPropertiesPage() {
                 ray_baud_and_logs_enabled: true,
                 ray_baum_status: 'ACTIVE',
                 e911_status: 'VERIFIED',
+                connectivity_type: 'PORTED',
+                billing_status: 'BILLING_PENDING',
                 status: 'ACTIVE',
               });
               setFormError(null);
@@ -1197,6 +1329,8 @@ export default function AdminPropertiesPage() {
                   ray_baud_and_logs_enabled: true,
                   ray_baum_status: 'ACTIVE',
                   e911_status: 'VERIFIED',
+                  connectivity_type: 'PORTED',
+                  billing_status: 'BILLING_PENDING',
                   status: 'ACTIVE',
                 });
                 setShowCreateModal(true);
@@ -1225,16 +1359,55 @@ export default function AdminPropertiesPage() {
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM EMAIL</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY STATUS</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">BILLING STATUS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-[#1f212c]">
                 {properties.map((prop: PropertyRecord) => {
                   return (
-                    <tr key={prop.id} className="hover:bg-slate-50/60 dark:hover:bg-[#181a24] transition">
-                      {/* 1. Property Name with Address underneath */}
+                    <tr key={prop.id} onClick={() => handleOpenPropertyDrawer(prop)} className="hover:bg-slate-50/80 dark:hover:bg-[#181a24] transition cursor-pointer group">
+                      {/* 1. Property Name with Address & Connectivity / Data Circuit underneath */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-bold text-black dark:text-white text-sm block">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-black dark:text-white text-sm">
+                            {prop.name}
+                          </span>
+                          {(() => {
+                            const connType = prop.connectivity_type || (prop.data_circuit ? 'BOTH' : 'PORTED');
+                            if (connType === 'BOTH') {
+                              return (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-sans">
+                                  Ported &amp; Data Circuited
+                                </span>
+                              );
+                            }
+                            if (connType === 'DATA_CIRCUITED') {
+                              return (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60 font-sans">
+                                  Data Circuited
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-sans">
+                                Ported
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        {prop.data_circuit && (
+                          <div className="flex items-center gap-2 mt-0.5 text-[10.5px]">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50 font-medium">
+                              Carrier: <strong>{prop.data_circuit.carrier_name || 'Pending'}</strong>
+                              {prop.data_circuit.bandwidth ? ` (${prop.data_circuit.bandwidth})` : ''}
+                              {prop.data_circuit.circuit_monthly_price !== null && prop.data_circuit.circuit_monthly_price !== undefined
+                                ? ` • $${Number(prop.data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`
+                                : ''}
+                            </span>
+                          </div>
+                        )}
+                        <span className="hidden">
                           {prop.name}
                         </span>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
@@ -1271,7 +1444,7 @@ export default function AdminPropertiesPage() {
                               {prop.main_phone}
                             </span>
                             <button
-                              onClick={() => handleCopy(prop.main_phone || '', `main-phone-${prop.id}`)}
+                              onClick={(e) => { e.stopPropagation(); handleCopy(prop.main_phone || '', `main-phone-${prop.id}`); }}
                               className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
                               title="Copy Main Phone"
                             >
@@ -1406,7 +1579,7 @@ export default function AdminPropertiesPage() {
 
                       {/* 10. Property Status (Inline Select) */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <select
+                        <select onClick={(e) => e.stopPropagation()}
                           value={prop.status === 'ONBOARDING' ? 'ACTIVE' : (prop.status || 'ACTIVE')}
                           onChange={(e) => handleQuickUpdateStatus(prop.id, e.target.value)}
                           className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
@@ -1423,18 +1596,34 @@ export default function AdminPropertiesPage() {
                         </select>
                       </td>
 
+                      {/* 11. Billing Status (Inline Select - Changeable Anytime) */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={(prop as any).billing_status === 'BILLING_DONE' ? 'BILLING_DONE' : 'BILLING_PENDING'}
+                          onChange={(e) => handleQuickUpdateBillingStatus(prop.id, e.target.value as 'BILLING_DONE' | 'BILLING_PENDING')}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+                            (prop as any).billing_status === 'BILLING_DONE'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                          }`}
+                        >
+                          <option value="BILLING_DONE" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">Billing Done (Billed)</option>
+                          <option value="BILLING_PENDING" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">Billing Pending</option>
+                        </select>
+                      </td>
+
                       {/* 12. Actions */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleOpenEdit(prop)}
+                            onClick={(e) => { e.stopPropagation(); handleOpenEdit(prop); }}
                             className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
                             title="Edit Property"
                           >
                             <Settings className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={(e) => handleOpenMenu(e, prop)}
+                            onClick={(e) => { e.stopPropagation(); handleOpenMenu(e, prop); }}
                             className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
                             title="More Actions"
                           >
@@ -1507,7 +1696,7 @@ export default function AdminPropertiesPage() {
             <button
               onClick={() => {
                 setSelectedPropForDetails(menuPosition.prop);
-                setShowDetailsModal(true);
+                handleOpenPropertyDrawer(menuPosition.prop);
                 setMenuPosition(null);
               }}
               className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 cursor-pointer font-medium"
@@ -1756,6 +1945,78 @@ export default function AdminPropertiesPage() {
                   </div>
                   <div className="text-slate-500 font-medium">
                     Services: {selectedPropForDetails.services_count || 0} active
+                  </div>
+                </div>
+
+                {/* Connectivity & Data Circuit Details Section */}
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider">
+                      Connectivity &amp; Data Circuit
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                      {(() => {
+                        const ct = selectedPropForDetails.connectivity_type || (selectedPropForDetails.data_circuit ? 'BOTH' : 'PORTED');
+                        if (ct === 'BOTH') return 'Ported & Data Circuited';
+                        if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
+                        return 'Ported';
+                      })()}
+                    </span>
+                  </div>
+
+                  {selectedPropForDetails.data_circuit ? (
+                    <div className="space-y-3 pt-2 border-t border-slate-200/60 dark:border-[#222430]">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Carrier Name</span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {selectedPropForDetails.data_circuit.carrier_name || 'Pending'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Bandwidth</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {selectedPropForDetails.data_circuit.bandwidth || '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Circuit Pricing</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {selectedPropForDetails.data_circuit.circuit_monthly_price !== null && selectedPropForDetails.data_circuit.circuit_monthly_price !== undefined
+                              ? `$${Number(selectedPropForDetails.data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`
+                              : '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Wholesaler (Admin Only)</span>
+                          <span className="font-semibold text-amber-700 dark:text-amber-400">
+                            {selectedPropForDetails.data_circuit.wholesaler_name || '—'}
+                            {selectedPropForDetails.data_circuit.revenue_share_percentage
+                              ? ` (${selectedPropForDetails.data_circuit.revenue_share_percentage}% share)`
+                              : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {selectedPropForDetails.data_circuit.technical_details && (
+                        <div className="pt-2 border-t border-slate-200/60 dark:border-[#222430]">
+                          <span className="text-[10px] font-bold uppercase text-slate-500 block mb-1">
+                            Technical Configuration (IP / WAN / Gateway)
+                          </span>
+                          <div className="p-2.5 rounded-lg bg-white dark:bg-[#111217] border border-slate-200 dark:border-[#222430] text-[11px] font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                            {selectedPropForDetails.data_circuit.technical_details}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 pt-1">
+                      No Data Circuit provisioned for this property location.
+                    </p>
+                  )}
+                </div>
+                <div className="hidden">
+                  <div>
                   </div>
                 </div>
               </div>
@@ -2557,6 +2818,18 @@ export default function AdminPropertiesPage() {
                       <option value="INACTIVE">Inactive (Non-Compliant)</option>
                     </select>
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Billing Status</label>
+                    <select
+                      value={formData.billing_status}
+                      onChange={(e) => setFormData({ ...formData, billing_status: e.target.value as 'BILLING_DONE' | 'BILLING_PENDING' })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                    >
+                      <option value="BILLING_DONE">Billing Done (Billed)</option>
+                      <option value="BILLING_PENDING">Billing Pending</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430] shrink-0">
@@ -2878,6 +3151,18 @@ export default function AdminPropertiesPage() {
                     </select>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="font-bold text-black dark:text-white block">Billing Status</label>
+                    <select
+                      value={formData.billing_status}
+                      onChange={(e) => setFormData({ ...formData, billing_status: e.target.value as 'BILLING_DONE' | 'BILLING_PENDING' })}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                    >
+                      <option value="BILLING_DONE">Billing Done (Billed)</option>
+                      <option value="BILLING_PENDING">Billing Pending</option>
+                    </select>
+                  </div>
+
                   <div className="col-span-2 space-y-1">
                     <label className="font-bold text-black dark:text-white block">Property Status</label>
                     <select
@@ -3016,6 +3301,1005 @@ export default function AdminPropertiesPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 10. COMPREHENSIVE PROPERTY RIGHT-SIDE DRAWER (ALL TABS) */}
+      <AnimatePresence>
+        {showPropertyDrawer && selectedPropForDrawer && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="fixed inset-0" onClick={() => setShowPropertyDrawer(false)} />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="relative w-full max-w-2xl bg-white dark:bg-[#15161c] border-l border-slate-200 dark:border-[#222430] h-full flex flex-col shadow-2xl z-10 overflow-hidden"
+            >
+              {/* Drawer Top Header */}
+              <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between bg-slate-50/80 dark:bg-[#111217] shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-black text-slate-900 dark:text-white text-base">
+                        {selectedPropForDrawer.name}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                        {selectedPropForDrawer.status === 'ACTIVE' || selectedPropForDrawer.status === 'ONBOARDING'
+                          ? 'ONBOARDED'
+                          : selectedPropForDrawer.status || 'ACTIVE'}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          (propertyDrawerData?.property?.billing_status || (selectedPropForDrawer as any).billing_status) === 'BILLING_DONE'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50'
+                            : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/50'
+                        }`}
+                      >
+                        {(propertyDrawerData?.property?.billing_status || (selectedPropForDrawer as any).billing_status) === 'BILLING_DONE'
+                          ? 'BILLING DONE'
+                          : 'BILLING PENDING'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
+                        {(() => {
+                          const ct = selectedPropForDrawer.connectivity_type || (selectedPropForDrawer.data_circuit ? 'BOTH' : 'PORTED');
+                          if (ct === 'BOTH') return 'Ported & Data Circuited';
+                          if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
+                          return 'Ported';
+                        })()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span>
+                        {selectedPropForDrawer.address
+                          ? `${selectedPropForDrawer.address}, ${selectedPropForDrawer.city || ''}, ${selectedPropForDrawer.state || ''} ${selectedPropForDrawer.zip_code || ''}`
+                          : 'Property Master Record'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => refreshDrawerData(selectedPropForDrawer.id)}
+                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                    title="Refresh Data"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingDrawerData ? 'animate-spin text-blue-500' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => setShowPropertyDrawer(false)}
+                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#222430] cursor-pointer"
+                    title="Close"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-Navigation Tabs: 1. Overview | 2. Services | 3. E911 State | 4. Data Circuit */}
+              <div className="flex items-center border-b border-slate-200 dark:border-[#222430] px-4 bg-white dark:bg-[#15161c] text-xs font-bold shrink-0 overflow-x-auto">
+                {[
+                  { key: 'OVERVIEW', label: '1. Overview', icon: Building2 },
+                  {
+                    key: 'SERVICES',
+                    label: `2. Services (${propertyDrawerData?.services?.length ?? selectedPropForDrawer.services_count ?? 0})`,
+                    icon: PhoneCall,
+                  },
+                  { key: 'E911', label: '3. E911 State', icon: ShieldCheck },
+                  {
+                    key: 'DATA_CIRCUIT',
+                    label: '4. Data Circuit',
+                    icon: Wifi,
+                  },
+                  {
+                    key: 'PORTING_DOCS',
+                    label: `5. Porting Docs (${propertyDrawerData?.porting_attachments?.length ?? 0})`,
+                    icon: FileText,
+                  },
+                ].map((t) => {
+                  const Icon = t.icon;
+                  const isActive = drawerTab === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => setDrawerTab(t.key as any)}
+                      className={`py-3 px-3.5 border-b-2 font-bold flex items-center gap-1.5 cursor-pointer whitespace-nowrap transition-colors ${
+                        isActive
+                          ? 'border-black dark:border-white text-black dark:text-white'
+                          : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tab Contents Area */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+                {loadingDrawerData && !propertyDrawerData ? (
+                  <div className="p-16 text-center text-slate-400">
+                    <Loader2 className="w-7 h-7 animate-spin mx-auto mb-3 text-blue-600" />
+                    <p className="font-medium">Loading complete property database details...</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* TAB 1: OVERVIEW */}
+                    {drawerTab === 'OVERVIEW' && (
+                      <div className="space-y-5">
+                        {/* Section 1: Property Identity & Primary Info */}
+                        <div className="bg-slate-50/80 dark:bg-[#111217] p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                Property Name
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg font-medium text-slate-900 dark:text-white">
+                                {propertyDrawerData?.property?.name || selectedPropForDrawer.name}
+                              </p>
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                Street Address
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                                {propertyDrawerData?.property?.address || selectedPropForDrawer.address || '—'}
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                City, State &amp; ZIP
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                                {propertyDrawerData?.property?.city || selectedPropForDrawer.city},{' '}
+                                {propertyDrawerData?.property?.state || selectedPropForDrawer.state}{' '}
+                                {propertyDrawerData?.property?.zip_code || selectedPropForDrawer.zip_code}
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                Country
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                                {propertyDrawerData?.property?.country || selectedPropForDrawer.country || 'USA'}
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                Main Phone Number
+                              </label>
+                              <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                                <span>{propertyDrawerData?.property?.main_phone || selectedPropForDrawer.main_phone || '—'}</span>
+                                {selectedPropForDrawer.main_phone && (
+                                  <button
+                                    onClick={() => handleCopy(selectedPropForDrawer.main_phone || '', 'drawer-main-phone')}
+                                    className="text-slate-400 hover:text-blue-600 cursor-pointer"
+                                  >
+                                    {copiedField === 'drawer-main-phone' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                Fax Number
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200">
+                                {propertyDrawerData?.property?.fax || selectedPropForDrawer.fax || '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section 2: Client & Administration */}
+                        <div className="bg-slate-50/80 dark:bg-[#111217] p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                          <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                            Client &amp; Management Administration
+                          </span>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                Client / Organization
+                              </label>
+                              <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
+                                {propertyDrawerData?.organization ? (
+                                  <a
+                                    href={`/admin/organizations/${propertyDrawerData.organization.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                  >
+                                    <span>{propertyDrawerData.organization.name}</span>
+                                    <ExternalLink className="w-3 h-3 opacity-60" />
+                                  </a>
+                                ) : (
+                                  <span className="text-slate-400">Unassigned (Direct Property)</span>
+                                )}
+                                {propertyDrawerData?.organization && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-[#222430] text-slate-700 dark:text-slate-300">
+                                    {propertyDrawerData.organization.type || 'GROUP'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                General Manager Name
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg font-medium text-slate-900 dark:text-white">
+                                {propertyDrawerData?.property?.general_manager_name || selectedPropForDrawer.general_manager_name || '—'}
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                General Manager Email
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <Mail className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{propertyDrawerData?.property?.general_manager_email || selectedPropForDrawer.general_manager_email || '—'}</span>
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1">
+                                General Manager Phone
+                              </label>
+                              <p className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                <Phone className="w-3.5 h-3.5 text-slate-400" />
+                                <span>
+                                  {propertyDrawerData?.property?.general_manager_phone ||
+                                    selectedPropForDrawer.general_manager_phone ||
+                                    propertyDrawerData?.property?.main_phone ||
+                                    '—'}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Property Contacts List */}
+                          {propertyDrawerData?.contacts && propertyDrawerData.contacts.length > 0 && (
+                            <div className="pt-2">
+                              <label className="font-bold text-black dark:text-white block text-[11px] mb-1.5">
+                                Saved Property Contacts ({propertyDrawerData.contacts.length})
+                              </label>
+                              <div className="space-y-1.5">
+                                {propertyDrawerData.contacts.map((c: any) => (
+                                  <div
+                                    key={c.id}
+                                    className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between text-xs"
+                                  >
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-slate-900 dark:text-white">{c.name}</span>
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-[#222430] text-slate-600 dark:text-slate-300">
+                                          {c.role || 'Contact'}
+                                        </span>
+                                        {c.is_primary && (
+                                          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200">
+                                            PRIMARY
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 text-slate-500 text-[11px] mt-0.5">
+                                        {c.email && <span>{c.email}</span>}
+                                        {c.phone && <span>{c.phone}</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Section 3: Commercial & Billing Details */}
+                        <div className="bg-slate-50/80 dark:bg-[#111217] p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                          <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                            Commercial &amp; Financial Details
+                          </span>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">Monthly Price</span>
+                              <span className="text-base font-black text-slate-900 dark:text-white">
+                                {propertyDrawerData?.property?.monthly_price !== null && propertyDrawerData?.property?.monthly_price !== undefined
+                                  ? `$${Number(propertyDrawerData.property.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : selectedPropForDrawer.monthly_price !== null && selectedPropForDrawer.monthly_price !== undefined
+                                  ? `$${Number(selectedPropForDrawer.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : '—'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">Recurring revenue</span>
+                            </div>
+
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">Base Price</span>
+                              <span className="text-base font-bold text-slate-700 dark:text-slate-300">
+                                {propertyDrawerData?.property?.base_price !== null && propertyDrawerData?.property?.base_price !== undefined
+                                  ? `$${Number(propertyDrawerData.property.base_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : '—'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">Before added services</span>
+                            </div>
+
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">Services Cost</span>
+                              <span className="text-base font-bold text-purple-600 dark:text-purple-400">
+                                ${Number(propertyDrawerData?.stats?.services_monthly_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                {propertyDrawerData?.services?.length || 0} active services
+                              </span>
+                            </div>
+
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase block">Onboarding Date</span>
+                              <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                                {propertyDrawerData?.property?.onboarding_date || selectedPropForDrawer.onboarding_date || '—'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">Billing start date</span>
+                            </div>
+                          </div>
+
+                          {/* Billing Status Quick Selector Inside Overview Drawer */}
+                          <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between gap-3 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block font-bold uppercase">Property Billing Status</span>
+                              <span className="text-slate-700 dark:text-slate-300 text-[11px]">
+                                Change billing status between Billing Done and Billing Pending anytime
+                              </span>
+                            </div>
+                            <select
+                              value={
+                                (propertyDrawerData?.property?.billing_status || (selectedPropForDrawer as any).billing_status) === 'BILLING_DONE'
+                                  ? 'BILLING_DONE'
+                                  : 'BILLING_PENDING'
+                              }
+                              onChange={(e) =>
+                                handleQuickUpdateBillingStatus(
+                                  selectedPropForDrawer.id,
+                                  e.target.value as 'BILLING_DONE' | 'BILLING_PENDING'
+                                )
+                              }
+                              className={`text-xs font-bold px-3 py-1.5 rounded-lg border cursor-pointer focus:outline-none ${
+                                (propertyDrawerData?.property?.billing_status || (selectedPropForDrawer as any).billing_status) === 'BILLING_DONE'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                              }`}
+                            >
+                              <option value="BILLING_DONE">Billing Done (Billed)</option>
+                              <option value="BILLING_PENDING">Billing Pending</option>
+                            </select>
+                          </div>
+
+                          {/* Channel Partner Row */}
+                          <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">Channel Partner</span>
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                {propertyDrawerData?.partner?.name || (selectedPropForDrawer as any).partner?.name || 'No Partner Assigned'}
+                                {propertyDrawerData?.partner?.company_name ? ` (${propertyDrawerData.partner.company_name})` : ''}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">Partner Commission Rate</span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                {propertyDrawerData?.property?.partner_commission_override !== null && propertyDrawerData?.property?.partner_commission_override !== undefined
+                                  ? `${propertyDrawerData.property.partner_commission_override}% (Custom Override)`
+                                  : propertyDrawerData?.partner?.default_commission_rate !== undefined
+                                  ? `${propertyDrawerData.partner.default_commission_rate}% (Default Rate)`
+                                  : '—'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section 4: System Audit & Dates */}
+                        <div className="bg-slate-50/80 dark:bg-[#111217] p-4 rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2 text-[11.5px]">
+                          <div className="flex items-center justify-between py-1 border-b border-slate-200/50 dark:border-[#222430]">
+                            <span className="text-slate-500 font-medium">Ray Baum Act &amp; Kari's Law Compliance:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              {propertyDrawerData?.property?.ray_baud_and_logs_enabled ? 'Active / Compliant' : 'Inactive'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-slate-200/50 dark:border-[#222430]">
+                            <span className="text-slate-500 font-medium">E911 Registry Status:</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">
+                              {propertyDrawerData?.e911?.property_e911_status || 'VERIFIED'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between py-1 border-b border-slate-200/50 dark:border-[#222430]">
+                            <span className="text-slate-500 font-medium">Record Created At:</span>
+                            <span className="font-mono text-slate-700 dark:text-slate-300">
+                              {propertyDrawerData?.property?.created_at ? new Date(propertyDrawerData.property.created_at).toLocaleString() : '—'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between py-1">
+                            <span className="text-slate-500 font-medium">Last Record Update:</span>
+                            <span className="font-mono text-slate-700 dark:text-slate-300">
+                              {propertyDrawerData?.property?.updated_at ? new Date(propertyDrawerData.property.updated_at).toLocaleString() : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 2: SERVICES (LIST + ADD + DELETE SERVICES DIRECTLY) */}
+                    {drawerTab === 'SERVICES' && (
+                      <div className="space-y-4">
+                        {/* Summary & Quick Stats */}
+                        <div className="p-4 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/70 dark:border-purple-900/40 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
+                              <PhoneCall className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white text-xs">
+                                {propertyDrawerData?.services?.length || 0} Attached Services
+                              </p>
+                              <p className="text-[11px] text-purple-700 dark:text-purple-300 font-medium">
+                                Total Service Charges: ${Number(propertyDrawerData?.stats?.services_monthly_total || 0).toFixed(2)}/mo
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Assign / Add Service Directly Form */}
+                        <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                          <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block">
+                            + Add Service to this Property
+                          </span>
+                          <form onSubmit={handleDrawerAssignService} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <select
+                              value={drawerAssignServiceId}
+                              onChange={(e) => setDrawerAssignServiceId(e.target.value)}
+                              className="flex-1 px-3 py-2 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                            >
+                              <option value="">-- Choose an Available Service to Link --</option>
+                              {(propertyDrawerData?.available_services || []).map((s: any) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.phone_number} — {s.service_type || 'Voice Trunk'} (${Number(s.price || 0).toFixed(2)}/mo)
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="submit"
+                              disabled={!drawerAssignServiceId || assigningServiceInDrawer}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-sm"
+                            >
+                              {assigningServiceInDrawer ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                              Link Service
+                            </button>
+                          </form>
+                          {(!propertyDrawerData?.available_services || propertyDrawerData.available_services.length === 0) && (
+                            <p className="text-[10.5px] text-slate-400 italic">
+                              All available numbers in the system are currently assigned.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* List of Attached Services */}
+                        <div className="space-y-2.5">
+                          <label className="font-bold text-black dark:text-white block text-xs">
+                            Active Services Assigned to {selectedPropForDrawer.name}
+                          </label>
+
+                          {(!propertyDrawerData?.services || propertyDrawerData.services.length === 0) ? (
+                            <div className="p-8 text-center border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-slate-400 text-xs">
+                              <PhoneCall className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                              <p className="font-semibold">No services attached to this property yet.</p>
+                              <p className="text-[11px] mt-0.5">Use the selector above to assign a telephone number or trunk.</p>
+                            </div>
+                          ) : (
+                            propertyDrawerData.services.map((svc: any) => (
+                              <div
+                                key={svc.id}
+                                className="p-3.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between gap-3 shadow-2xs hover:border-slate-300 dark:hover:border-[#2e3140] transition"
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                                      {svc.phone_number}
+                                    </span>
+                                    <button
+                                      onClick={() => handleCopy(svc.phone_number, `svc-copy-${svc.id}`)}
+                                      className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                                      title="Copy Number"
+                                    >
+                                      {copiedField === `svc-copy-${svc.id}` ? (
+                                        <Check className="w-3 h-3 text-emerald-500" />
+                                      ) : (
+                                        <Copy className="w-3 h-3" />
+                                      )}
+                                    </button>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                      {svc.service_type || 'Voice Trunk'}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                      {svc.status || 'ACTIVE'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+                                    {svc.service_name && <span>Name: <strong>{svc.service_name}</strong></span>}
+                                    {svc.custom_service_id && <span>ID: <strong className="font-mono">{svc.custom_service_id}</strong></span>}
+                                    {svc.description && <span>{svc.description}</span>}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="font-bold text-slate-900 dark:text-white text-xs">
+                                    ${Number(svc.price || 0).toFixed(2)}/mo
+                                  </span>
+                                  <button
+                                    onClick={() => handleDrawerUnassignService(svc.id, svc.phone_number)}
+                                    disabled={unassigningServiceId === svc.id}
+                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                                    title="Unassign / Remove Service"
+                                  >
+                                    {unassigningServiceId === svc.id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                    ) : (
+                                      <Trash2 className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 3: E911 STATE */}
+                    {drawerTab === 'E911' && (
+                      <div className="space-y-4">
+                        {/* E911 Big Status Banner */}
+                        <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+                              <ShieldCheck className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 dark:text-white text-sm">
+                                E911 Routing &amp; PSAP Validation Status
+                              </p>
+                              <p className="text-xs text-emerald-700 dark:text-emerald-300 font-bold mt-0.5">
+                                Status: {propertyDrawerData?.e911?.property_e911_status || 'VERIFIED'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
+                            PSAP Active
+                          </span>
+                        </div>
+
+                        {/* Registered Emergency Address */}
+                        <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2">
+                          <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                            Registered Emergency Dispatchable Address
+                          </span>
+                          <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl text-xs space-y-1">
+                            <p className="font-bold text-slate-900 dark:text-white text-sm">
+                              {propertyDrawerData?.e911?.registered_address ||
+                                `${selectedPropForDrawer.address}, ${selectedPropForDrawer.city}, ${selectedPropForDrawer.state} ${selectedPropForDrawer.zip_code}`}
+                            </p>
+                            <p className="text-[11px] text-slate-500">
+                              Matches property street location: <strong className="text-emerald-600">Yes (Geocoded)</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Ray Baum's Act & Kari's Law Compliance */}
+                        <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                          <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                            Ray Baum's Act &amp; Kari's Law Compliance Audit
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] text-slate-400 block">Dispatchable Location Status</span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                                <Check className="w-3.5 h-3.5" /> Compliant &amp; Active
+                              </span>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] text-slate-400 block">Direct 911 Dialing (Kari's Law)</span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                                <Check className="w-3.5 h-3.5" /> No Prefix Required (911 Active)
+                              </span>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] text-slate-400 block">Automated Notification Logs</span>
+                              <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block">
+                                {propertyDrawerData?.e911?.ray_baud_and_logs_enabled ? 'Enabled (Instant SMS/Email)' : 'Disabled'}
+                              </span>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                              <span className="text-[10px] text-slate-400 block">PSAP Verification Timestamp</span>
+                              <span className="font-mono text-slate-800 dark:text-slate-200 mt-0.5 block">
+                                {propertyDrawerData?.e911?.verified_at
+                                  ? new Date(propertyDrawerData.e911.verified_at).toLocaleDateString()
+                                  : 'System Verified'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {propertyDrawerData?.e911?.correction_notes && (
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300">
+                              <span className="font-bold block text-xs">PSAP Audit Correction Notes:</span>
+                              <p className="mt-1 text-[11px]">{propertyDrawerData.e911.correction_notes}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Shortcut to E911 Hub */}
+                        <div className="pt-2 flex justify-end">
+                          <a
+                            href="/admin/e911"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#222430] dark:hover:bg-[#2c2f3e] text-slate-800 dark:text-white rounded-xl font-bold flex items-center gap-1.5 transition"
+                          >
+                            <span>Open E911 Compliance Center</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB 4: DATA CIRCUIT ("DATA SUBJECT" / DATA CIRCUIT DETAILS) */}
+                    {drawerTab === 'DATA_CIRCUIT' && (
+                      <div className="space-y-4">
+                        {propertyDrawerData?.data_circuit ? (
+                          <>
+                            {/* Circuit Primary Stage Banner */}
+                            <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                                  <Wifi className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-slate-900 dark:text-white text-sm">
+                                    Data Circuit Provisioning
+                                  </p>
+                                  <p className="text-xs text-blue-700 dark:text-blue-300 font-bold mt-0.5">
+                                    Stage: {propertyDrawerData.data_circuit.status?.replace(/_/g, ' ') || 'STARTED'}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-xs">
+                                {propertyDrawerData.data_circuit.status || 'STARTED'}
+                              </span>
+                            </div>
+
+                            {/* Carrier & Client Pricing Specs */}
+                            <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                              <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                                Carrier &amp; Pricing Parameters
+                              </span>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                                  <span className="text-[10px] text-slate-400 block">Carrier (Client Sees)</span>
+                                  <span className="font-bold text-slate-900 dark:text-white text-sm mt-0.5 block">
+                                    {propertyDrawerData.data_circuit.carrier_name || 'Pending Selection'}
+                                  </span>
+                                </div>
+
+                                <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                                  <span className="text-[10px] text-slate-400 block">Bandwidth</span>
+                                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5 block">
+                                    {propertyDrawerData.data_circuit.bandwidth || '1 Gig'}
+                                  </span>
+                                </div>
+
+                                <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                                  <span className="text-[10px] text-slate-400 block">Client Monthly Price</span>
+                                  <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">
+                                    ${Number(propertyDrawerData.data_circuit.circuit_monthly_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo
+                                  </span>
+                                </div>
+
+                                <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
+                                  <span className="text-[10px] text-slate-400 block">Wholesaler (Hidden)</span>
+                                  <span className="font-bold text-amber-700 dark:text-amber-400 text-sm mt-0.5 block">
+                                    {propertyDrawerData.data_circuit.wholesaler_name || '—'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Wholesaler Revenue Share Breakdown */}
+                              <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl flex items-center justify-between text-xs">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block">Wholesaler Revenue Share Percentage</span>
+                                  <span className="font-bold text-slate-900 dark:text-white">
+                                    {propertyDrawerData.data_circuit.revenue_share_percentage || 0}%
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] text-slate-400 block">Estimated Monthly Revenue Share</span>
+                                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                    ${Number(propertyDrawerData.data_circuit.monthly_revenue_share_amount || 0).toFixed(2)}/mo
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Full Descriptive Technical Details (Entered during creation/provisioning) */}
+                            <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider">
+                                  Descriptive Technical Information (WAN IP, IP Address, Gateway, DNS, etc.)
+                                </span>
+                                {propertyDrawerData.data_circuit.technical_details && (
+                                  <button
+                                    onClick={() => handleCopy(propertyDrawerData.data_circuit.technical_details, 'tech-details-copy')}
+                                    className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline cursor-pointer"
+                                  >
+                                    {copiedField === 'tech-details-copy' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                    <span>Copy Technical Details</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {propertyDrawerData.data_circuit.technical_details ? (
+                                <div className="p-3 bg-slate-900 text-slate-100 rounded-xl font-mono text-xs whitespace-pre-wrap leading-relaxed shadow-inner border border-slate-800">
+                                  {propertyDrawerData.data_circuit.technical_details}
+                                </div>
+                              ) : (
+                                <div className="p-4 text-center border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-slate-400 text-xs">
+                                  No technical details recorded yet for this circuit.
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Lifecycle Milestones & Signed Agreement Gate */}
+                            <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2.5 text-xs">
+                              <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                                Lifecycle Milestones &amp; Agreement Documents
+                              </span>
+
+                              <div className="space-y-2">
+                                <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
+                                  <span>Signed Agreement PDF:</span>
+                                  {propertyDrawerData.data_circuit.agreement_file_url ? (
+                                    <a
+                                      href={propertyDrawerData.data_circuit.agreement_file_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                    >
+                                      <FileText className="w-3.5 h-3.5" />
+                                      <span>{propertyDrawerData.data_circuit.agreement_file_name || 'View Agreement PDF'}</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-400">Pending Upload</span>
+                                  )}
+                                </div>
+
+                                <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
+                                  <span>Site Survey Status:</span>
+                                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                                    {propertyDrawerData.data_circuit.site_survey_status || 'PENDING'}
+                                  </span>
+                                </div>
+
+                                <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
+                                  <span>FOC Status &amp; Date:</span>
+                                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                                    {propertyDrawerData.data_circuit.foc_date
+                                      ? `${propertyDrawerData.data_circuit.foc_status || 'CONFIRMED'} (${propertyDrawerData.data_circuit.foc_date})`
+                                      : propertyDrawerData.data_circuit.foc_status || 'PENDING'}
+                                  </span>
+                                </div>
+
+                                {propertyDrawerData.data_circuit.installed_at && (
+                                  <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
+                                    <span>Installation Completed At:</span>
+                                    <span className="font-mono text-emerald-600 font-bold">
+                                      {new Date(propertyDrawerData.data_circuit.installed_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Competing Wholesaler Quotes History */}
+                            {propertyDrawerData.data_circuit.quotes && propertyDrawerData.data_circuit.quotes.length > 0 && (
+                              <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2.5">
+                                <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
+                                  Wholesaler Quotes History ({propertyDrawerData.data_circuit.quotes.length})
+                                </span>
+                                <div className="space-y-1.5">
+                                  {propertyDrawerData.data_circuit.quotes.map((q: any) => (
+                                    <div
+                                      key={q.id}
+                                      className={`p-2.5 rounded-lg border text-xs flex items-center justify-between ${
+                                        q.is_selected
+                                          ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
+                                          : 'border-slate-200 dark:border-[#222430] bg-white dark:bg-[#181a24]'
+                                      }`}
+                                    >
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-slate-900 dark:text-white">{q.wholesaler_name}</span>
+                                          <span className="text-slate-400">via</span>
+                                          <span className="font-medium text-slate-700 dark:text-slate-300">{q.carrier_name}</span>
+                                          {q.is_selected && (
+                                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-blue-600 text-white">
+                                              FINALIZED
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                          Bandwidth: {q.bandwidth} • Rev Share: {q.proposed_rev_share_percentage}% (${Number(q.proposed_rev_share_amount || 0).toFixed(2)}/mo)
+                                        </p>
+                                      </div>
+                                      <span className="font-bold text-slate-900 dark:text-white">
+                                        ${Number(q.quoted_monthly_price || 0).toFixed(2)}/mo
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Shortcut to Data Circuits Manager */}
+                            <div className="pt-2 flex justify-end">
+                              <a
+                                href="/admin/data-circuits"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-1.5 transition shadow-sm"
+                              >
+                                <span>Manage Circuit in Data Circuits Center</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="p-8 text-center border border-dashed border-slate-200 dark:border-[#222430] rounded-2xl space-y-3">
+                            <Wifi className="w-8 h-8 mx-auto text-slate-400" />
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white text-sm">
+                                Ported Only — No Data Circuit Attached
+                              </p>
+                              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                                This property currently has Voice/DID services provisioned without an active dedicated Data Circuit pipeline.
+                              </p>
+                            </div>
+                            <div className="pt-2">
+                              <a
+                                href="/admin/data-circuits"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Start Data Circuit for this Property</span>
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB 5: PORTING DOCS & IMAGES (VIEW & DOWNLOAD) */}
+                    {drawerTab === 'PORTING_DOCS' && (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-900/40 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 dark:text-white text-sm">
+                                Porting Documents &amp; Images
+                              </p>
+                              <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium mt-0.5">
+                                All LOAs, CSRs, signed contracts, billing copies &amp; images uploaded during porting
+                              </p>
+                            </div>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-200">
+                            {propertyDrawerData?.porting_attachments?.length || 0} File{(propertyDrawerData?.porting_attachments?.length || 0) === 1 ? '' : 's'}
+                          </span>
+                        </div>
+
+                        {(!propertyDrawerData?.porting_attachments || propertyDrawerData.porting_attachments.length === 0) ? (
+                          <div className="p-10 text-center border border-dashed border-slate-200 dark:border-[#222430] rounded-2xl space-y-2 text-slate-400">
+                            <FileText className="w-8 h-8 mx-auto opacity-40" />
+                            <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">
+                              No Porting Documents or Images Attached
+                            </p>
+                            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                              Documents or images uploaded while creating or managing this property in the Porting section will automatically appear here for viewing and download.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {propertyDrawerData.porting_attachments.map((att: any, idx: number) => {
+                              const downloadUrl = `/api/admin/porting/attachment?path=${encodeURIComponent(att.storage_path)}`;
+                              const isImage =
+                                (att.mime_type && att.mime_type.startsWith('image/')) ||
+                                /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(att.file_name || '');
+                              const sizeKb = att.file_size ? `${(Number(att.file_size) / 1024).toFixed(1)} KB` : '';
+
+                              return (
+                                <div
+                                  key={att.id || att.storage_path || idx}
+                                  className="p-3.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl space-y-3 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-800/60 transition"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="w-9 h-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900/40">
+                                        <FileText className="w-4 h-4" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                                          {att.file_name || 'Porting Attachment'}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-[10.5px] text-slate-400 mt-0.5">
+                                          <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-[#222430] text-slate-600 dark:text-slate-300 font-semibold uppercase text-[9.5px]">
+                                            {isImage ? 'IMAGE' : 'DOCUMENT / PDF'}
+                                          </span>
+                                          {sizeKb && <span>• {sizeKb}</span>}
+                                          {att.created_at && (
+                                            <span>• {new Date(att.created_at).toLocaleDateString()}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <a
+                                        href={downloadUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download={att.file_name || true}
+                                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                        <span>Download / View</span>
+                                      </a>
+                                    </div>
+                                  </div>
+
+                                  {isImage && (
+                                    <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-[#222430] bg-slate-50 dark:bg-[#111217] max-h-60 flex items-center justify-center p-2">
+                                      <img
+                                        src={downloadUrl}
+                                        alt={att.file_name || 'Porting Image'}
+                                        className="max-h-56 w-auto object-contain rounded"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

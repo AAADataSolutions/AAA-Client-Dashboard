@@ -29,6 +29,8 @@ import {
   Eye,
   Edit2,
   Users,
+  FileText,
+  Wifi,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useToast } from '@/components/client/ClientToast';
@@ -55,11 +57,75 @@ const itemVariants: Variants = {
   }
 };
 
+export function getCircuitStageBadge(status?: string): { label: string; bg: string; text: string; border: string } {
+  switch (status) {
+    case 'INSTALLED':
+      return {
+        label: '7. Installed',
+        bg: 'bg-emerald-50 dark:bg-emerald-950/60',
+        text: 'text-emerald-700 dark:text-emerald-300',
+        border: 'border-emerald-200 dark:border-emerald-800/60',
+      };
+    case 'FOC_STAGE':
+      return {
+        label: '6. FOC Confirmed',
+        bg: 'bg-teal-50 dark:bg-teal-950/60',
+        text: 'text-teal-700 dark:text-teal-300',
+        border: 'border-teal-200 dark:border-teal-800/60',
+      };
+    case 'SITE_SURVEY':
+      return {
+        label: '5. Site Survey',
+        bg: 'bg-amber-50 dark:bg-amber-950/60',
+        text: 'text-amber-700 dark:text-amber-300',
+        border: 'border-amber-200 dark:border-amber-800/60',
+      };
+    case 'PAPERWORK_SIGNED':
+      return {
+        label: '4. Paperwork Signed',
+        bg: 'bg-emerald-50 dark:bg-emerald-950/60',
+        text: 'text-emerald-700 dark:text-emerald-300',
+        border: 'border-emerald-200 dark:border-emerald-800/60',
+      };
+    case 'QUOTATION_SENT':
+      return {
+        label: '3. Quotation Sent',
+        bg: 'bg-purple-50 dark:bg-purple-950/60',
+        text: 'text-purple-700 dark:text-purple-300',
+        border: 'border-purple-200 dark:border-purple-800/60',
+      };
+    case 'PRICING_FINALIZED':
+      return {
+        label: '2. Pricing Finalized',
+        bg: 'bg-sky-50 dark:bg-sky-950/60',
+        text: 'text-sky-700 dark:text-sky-300',
+        border: 'border-sky-200 dark:border-sky-800/60',
+      };
+    case 'STARTED':
+    case 'REQUESTED':
+      return {
+        label: '1. Started',
+        bg: 'bg-blue-50 dark:bg-blue-950/60',
+        text: 'text-blue-700 dark:text-blue-300',
+        border: 'border-blue-200 dark:border-blue-800/60',
+      };
+    default:
+      return {
+        label: status || 'Pending',
+        bg: 'bg-slate-100 dark:bg-slate-800',
+        text: 'text-slate-600 dark:text-slate-400',
+        border: 'border-slate-200 dark:border-slate-700',
+      };
+  }
+}
+
 interface PropertyRecord {
   id: string;
   org_property_id: string;
   name: string;
   monthly_price: number | null;
+  connectivity_type?: string;
+  data_circuit?: any;
   address: string;
   city: string;
   state: string;
@@ -561,6 +627,9 @@ export default function ClientPropertiesPage() {
                     RAY BAUM AND KARY'S LAW
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    DATA CIRCUIT STATUS
+                  </th>
+                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     GM NAME
                   </th>
                   <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -587,16 +656,40 @@ export default function ClientPropertiesPage() {
                       onClick={() => handleOpenPropertyDetails(prop)}
                       className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
                     >
-                      {/* Column 1: PROPERTY with Address underneath */}
+                      {/* Column 1: PROPERTY with Address & Connectivity / Data Circuit underneath */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
                             <Hotel className="w-4 h-4" />
                           </div>
                           <div>
-                            <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors block">
-                              {prop.name}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {prop.name}
+                              </span>
+                              {(() => {
+                                const connType = (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED');
+                                if (connType === 'BOTH') {
+                                  return (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+                                      Ported &amp; Data Circuited
+                                    </span>
+                                  );
+                                }
+                                if (connType === 'DATA_CIRCUITED') {
+                                  return (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60">
+                                      Data Circuited
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                    Ported
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
                               <MapPin className="w-3 h-3 shrink-0 text-slate-400" />
                               <span>
@@ -605,6 +698,17 @@ export default function ClientPropertiesPage() {
                                   : (prop.address || '—')}
                               </span>
                             </div>
+                            {(prop as any).data_circuit && (
+                              <div className="flex items-center gap-2 mt-1 text-[10.5px]">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50 font-medium">
+                                  Carrier: <strong>{(prop as any).data_circuit.carrier_name || 'Pending'}</strong>
+                                  {(prop as any).data_circuit.bandwidth ? ` (${(prop as any).data_circuit.bandwidth})` : ''}
+                                  {(prop as any).data_circuit.circuit_monthly_price !== null && (prop as any).data_circuit.circuit_monthly_price !== undefined
+                                    ? ` • $${Number((prop as any).data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`
+                                    : ''}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -691,6 +795,38 @@ export default function ClientPropertiesPage() {
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                             <span>Inactive</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Column: DATA CIRCUIT STATUS */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {(prop as any).data_circuit ? (
+                          <div className="space-y-1">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold border ${
+                                getCircuitStageBadge((prop as any).data_circuit.status).bg
+                              } ${getCircuitStageBadge((prop as any).data_circuit.status).text} ${
+                                getCircuitStageBadge((prop as any).data_circuit.status).border
+                              }`}
+                            >
+                              {getCircuitStageBadge((prop as any).data_circuit.status).label}
+                            </span>
+                            <div className="text-[10.5px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                              <span>{(prop as any).data_circuit.carrier_name || 'Carrier Pending'}</span>
+                              {(prop as any).data_circuit.bandwidth && (
+                                <span>• {(prop as any).data_circuit.bandwidth}</span>
+                              )}
+                              {(prop as any).data_circuit.agreement_file_url && (
+                                <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800" title="Signed Agreement Available">
+                                  <FileText className="w-2.5 h-2.5" /> PDF
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[11px] italic">
+                            Ported Only
                           </span>
                         )}
                       </td>
@@ -834,6 +970,41 @@ export default function ClientPropertiesPage() {
                         : 'Not set'}
                     </span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">Connectivity:</span>
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      {(() => {
+                        const ct = (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED');
+                        if (ct === 'BOTH') return 'Ported & Data Circuited';
+                        if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
+                        return 'Ported';
+                      })()}
+                    </span>
+                  </div>
+                  {(prop as any).data_circuit && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Circuit Status:</span>
+                      <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                        <span>{getCircuitStageBadge((prop as any).data_circuit.status).label}</span>
+                        {(prop as any).data_circuit.agreement_file_url && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-200">
+                            <FileText className="w-2.5 h-2.5" /> PDF
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {(prop as any).data_circuit && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 text-[11px]">Carrier / Price:</span>
+                      <span className="font-semibold text-blue-600 dark:text-blue-400">
+                        {(prop as any).data_circuit.carrier_name || 'Pending'}
+                        {(prop as any).data_circuit.circuit_monthly_price !== null && (prop as any).data_circuit.circuit_monthly_price !== undefined
+                          ? ` • $${Number((prop as any).data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : ''}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 text-[11px]">Stage:</span>
                     <span className="font-semibold text-purple-600 dark:text-purple-400">

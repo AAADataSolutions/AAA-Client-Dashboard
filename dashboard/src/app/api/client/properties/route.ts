@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
           general_manager_email,
           ray_baum_status,
           ray_baud_and_logs_enabled,
+          connectivity_type,
           status,
           onboarding_date,
           created_at
@@ -106,6 +107,23 @@ export async function GET(request: NextRequest) {
         .in('property_id', propIds)
         .neq('status', 'DISCONNECTED');
       directServices = directData || [];
+    }
+
+    // Fetch Data Circuits linked to these properties — STRICT CLIENT PRIVACY:
+    // Never select or return wholesaler_name, revenue_share_percentage, monthly_revenue_share_amount, or internal_admin_notes!
+    let clientDataCircuits: any[] = [];
+    if (propIds.length > 0) {
+      try {
+        const { data: dcData } = await supabase
+          .from('data_circuits')
+          .select('id, property_id, status, carrier_name, bandwidth, circuit_monthly_price, site_survey_status, foc_status, foc_date, installed_at, technical_details, agreement_file_name, agreement_file_url, agreement_file_size, paperwork_signed_at, created_at')
+          .in('property_id', propIds)
+          .neq('status', 'CANCELLED')
+          .order('created_at', { ascending: false });
+        clientDataCircuits = dcData || [];
+      } catch {
+        clientDataCircuits = [];
+      }
     }
 
     // Transform and calculate metrics
@@ -151,11 +169,28 @@ export async function GET(request: NextRequest) {
         const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
         const e911StatusStr = isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED';
 
+        const propCircuits = clientDataCircuits.filter((dc: any) => dc.property_id === prop.id);
+        const primaryCircuit = propCircuits[0] || null;
+
+        let resolvedConnectivityType: 'PORTED' | 'DATA_CIRCUITED' | 'BOTH' =
+          prop.connectivity_type && ['PORTED', 'DATA_CIRCUITED', 'BOTH'].includes(prop.connectivity_type)
+            ? prop.connectivity_type
+            : 'PORTED';
+
+        if (primaryCircuit && servicesList.length > 0 && !prop.connectivity_type) {
+          resolvedConnectivityType = 'BOTH';
+        } else if (primaryCircuit && !prop.connectivity_type) {
+          resolvedConnectivityType = 'DATA_CIRCUITED';
+        }
+
         return {
           id: prop.id,
           org_property_id: op.id,
           name: prop.name,
           monthly_price: prop.monthly_price ?? null,
+          connectivity_type: resolvedConnectivityType,
+          data_circuit: primaryCircuit,
+          data_circuits: propCircuits,
           address: prop.address,
           city: prop.city,
           state: prop.state,

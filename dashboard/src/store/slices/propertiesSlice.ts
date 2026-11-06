@@ -16,6 +16,9 @@ export interface PropertyRecord {
   name: string;
   base_price?: number | null;
   monthly_price?: number | null;
+  connectivity_type?: 'PORTED' | 'DATA_CIRCUITED' | 'BOTH' | string;
+  data_circuit?: any | null;
+  data_circuits?: any[];
   partner_id?: string | null;
   partner_commission_override?: number | null;
   partner_name?: string | null;
@@ -48,6 +51,8 @@ export interface PropertyRecord {
   created_at: string;
   updated_at?: string;
   onboarding_date?: string | null;
+  billing_status?: 'BILLING_DONE' | 'BILLING_PENDING' | string;
+  attachments?: any[];
 }
 
 export type PropertyItem = PropertyRecord;

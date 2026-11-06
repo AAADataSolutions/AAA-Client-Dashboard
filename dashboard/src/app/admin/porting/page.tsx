@@ -302,7 +302,7 @@ export function getStageDate(rec: any, status?: string): string {
       rawDate = null;
   }
 
-  return formatStageDate(rawDate);
+  return formatStageDate(rawDate || rec.target_date || rec.created_at);
 }
 
 interface OrgOption {
@@ -417,6 +417,8 @@ export default function AdminPortingPage() {
   const [stage4AssignedToName, setStage4AssignedToName] = useState<string>('');
   const [stage4AssignmentMode, setStage4AssignmentMode] = useState<'TEAMMATE' | 'CUSTOM'>('TEAMMATE');
   const [stage4Notes, setStage4Notes] = useState<string>('');
+  const [stageAssignments, setStageAssignments] = useState<Record<string, { assigned_to: string; assigned_to_name: string; mode: 'TEAMMATE' | 'CUSTOM'; notes: string }>>({});
+  const [showBillingConfirmModal, setShowBillingConfirmModal] = useState(false);
 
   const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
   const [modalNewFiles, setModalNewFiles] = useState<File[]>([]);
@@ -739,6 +741,30 @@ export default function AdminPortingPage() {
     setStage4AssignedTo((record as any).stage4_assigned_to || '');
     setStage4AssignedToName((record as any).stage4_assigned_to_name || '');
     setStage4Notes((record as any).stage4_notes || '');
+    const rawAssignments = (record as any).stage_assignments || {};
+    const initialStageAssignments: Record<string, { assigned_to: string; assigned_to_name: string; mode: 'TEAMMATE' | 'CUSTOM'; notes: string }> = {};
+    STAGES_ROAD.forEach((st) => {
+      const existing = rawAssignments[st.key] || {};
+      let assigned_to = existing.assigned_to || '';
+      let assigned_to_name = existing.assigned_to_name || '';
+      let notes = existing.notes || '';
+      if (st.key === 'SIGNED') {
+        assigned_to = assigned_to || (record as any).stage3_assigned_to || record.assigned_to || '';
+        assigned_to_name = assigned_to_name || (record as any).stage3_assigned_to_name || record.assigned_to_name || '';
+        notes = notes || (record as any).stage3_notes || record.internal_notes || '';
+      } else if (st.key === 'CSR_DETAILS') {
+        assigned_to = assigned_to || (record as any).stage4_assigned_to || '';
+        assigned_to_name = assigned_to_name || (record as any).stage4_assigned_to_name || '';
+        notes = notes || (record as any).stage4_notes || '';
+      }
+      initialStageAssignments[st.key] = {
+        assigned_to,
+        assigned_to_name,
+        mode: existing.mode || (assigned_to_name && !assigned_to ? 'CUSTOM' : 'TEAMMATE'),
+        notes,
+      };
+    });
+    setStageAssignments(initialStageAssignments);
     setExistingAttachments(record.attachments || []);
     setModalNewFiles([]);
 
@@ -772,6 +798,9 @@ export default function AdminPortingPage() {
 
   const handleStageSelect = (stageKey: LifecycleStage) => {
     setEditStageStatus(stageKey);
+    if (stageKey === 'COMPLETED') {
+      setShowBillingConfirmModal(true);
+    }
   };
 
   // Check if current stage is Stage 3+ for internal handoff unlock
@@ -845,8 +874,7 @@ export default function AdminPortingPage() {
     try {
       setUploadingFiles(true);
       const newlyUploadedAttachments: any[] = [];
-      if (modalNewFiles.length > 0) {
-        const supabase = createClient();
+      if (false && modalNewFiles.length > 0) { const supabase = createClient();
         for (let i = 0; i < modalNewFiles.length; i++) {
           const file = modalNewFiles[i];
           const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -864,6 +892,37 @@ export default function AdminPortingPage() {
               mime_type: file.type || 'application/octet-stream',
               storage_path: storagePath,
             });
+          }
+        }
+      }
+
+      if (modalNewFiles.length > 0) {
+        for (let i = 0; i < modalNewFiles.length; i++) {
+          const file = modalNewFiles[i];
+          const fd = new FormData();
+          fd.append('file', file);
+          const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
+          const upJson = await upRes.json();
+          if (upRes.ok && upJson.success && upJson.data) {
+            newlyUploadedAttachments.push(upJson.data);
+          } else {
+            throw new Error(upJson.error || `Failed to upload ${file.name}`);
+          }
+        }
+      }
+
+      if (modalNewFiles.length > 0) {
+        newlyUploadedAttachments.length = 0;
+        for (let i = 0; i < modalNewFiles.length; i++) {
+          const file = modalNewFiles[i];
+          const fd = new FormData();
+          fd.append('file', file);
+          const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
+          const upJson = await upRes.json();
+          if (upRes.ok && upJson.success && upJson.data) {
+            newlyUploadedAttachments.push(upJson.data);
+          } else {
+            throw new Error(upJson.error || `Failed to upload ${file.name}`);
           }
         }
       }
@@ -913,6 +972,20 @@ export default function AdminPortingPage() {
       }[] = [];
 
       if (createFiles.length > 0) {
+        for (let i = 0; i < createFiles.length; i++) {
+          const file = createFiles[i];
+          const fd = new FormData();
+          fd.append('file', file);
+          const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
+          const upJson = await upRes.json();
+          if (upRes.ok && upJson.success && upJson.data) {
+            uploadedAttachments.push(upJson.data);
+          } else {
+            throw new Error(upJson.error || `Failed to upload ${file.name}`);
+          }
+        }
+      }
+      if (false && createFiles.length > 0) {
         const supabase = createClient();
         for (let i = 0; i < createFiles.length; i++) {
           const file = createFiles[i];
@@ -938,7 +1011,7 @@ export default function AdminPortingPage() {
       }
 
       const res = await fetch('/api/admin/porting', {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           organization_id: createForm.organization_id || null,
@@ -1097,9 +1170,13 @@ export default function AdminPortingPage() {
   };
 
   // Handle Update Stage Submit (Unified Modal)
-  const handleUpdateStageSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdateStageSubmit = async (e?: React.FormEvent, chosenBillingStatus?: 'BILLING_DONE' | 'BILLING_PENDING') => {
+    if (e) e.preventDefault();
     if (!selectedRecord) return;
+    if (editStageStatus === 'COMPLETED' && !chosenBillingStatus) {
+      setShowBillingConfirmModal(true);
+      return;
+    }
 
     try {
       setUpdatingStage(true);
@@ -1130,6 +1207,37 @@ export default function AdminPortingPage() {
         setUploadingFiles(false);
       }
 
+      if (modalNewFiles.length > 0) {
+        for (let i = 0; i < modalNewFiles.length; i++) {
+          const file = modalNewFiles[i];
+          const fd = new FormData();
+          fd.append('file', file);
+          const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
+          const upJson = await upRes.json();
+          if (upRes.ok && upJson.success && upJson.data) {
+            newlyUploadedAttachments.push(upJson.data);
+          } else {
+            throw new Error(upJson.error || `Failed to upload ${file.name}`);
+          }
+        }
+      }
+
+      if (modalNewFiles.length > 0) {
+        newlyUploadedAttachments.length = 0;
+        for (let i = 0; i < modalNewFiles.length; i++) {
+          const file = modalNewFiles[i];
+          const fd = new FormData();
+          fd.append('file', file);
+          const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
+          const upJson = await upRes.json();
+          if (upRes.ok && upJson.success && upJson.data) {
+            newlyUploadedAttachments.push(upJson.data);
+          } else {
+            throw new Error(upJson.error || `Failed to upload ${file.name}`);
+          }
+        }
+      }
+
       const combinedAttachments = [...existingAttachments, ...newlyUploadedAttachments];
 
       const res = await fetch('/api/admin/porting', {
@@ -1147,15 +1255,17 @@ export default function AdminPortingPage() {
           porting_submitted_date: stageDates.porting_submitted_date || null,
           foc_confirmed_date: stageDates.foc_confirmed_date || null,
           live_cutover_date: stageDates.live_cutover_date || null,
-          stage3_assigned_to: stage3AssignedTo || null,
-          stage3_assigned_to_name: stage3AssignedToName || null,
-          stage3_notes: stage3Notes || null,
-          stage4_assigned_to: stage4AssignedTo || null,
-          stage4_assigned_to_name: stage4AssignedToName || null,
-          stage4_notes: stage4Notes || null,
-          assigned_to: stage3AssignedTo || stage4AssignedTo || null,
-          assigned_to_name: stage3AssignedToName || stage4AssignedToName || null,
-          internal_notes: stage3Notes || stage4Notes || null,
+          stage3_assigned_to: stageAssignments.SIGNED?.assigned_to || stage3AssignedTo || null,
+          stage3_assigned_to_name: stageAssignments.SIGNED?.assigned_to_name || stage3AssignedToName || null,
+          stage3_notes: stageAssignments.SIGNED?.notes || stage3Notes || null,
+          stage4_assigned_to: stageAssignments.CSR_DETAILS?.assigned_to || stage4AssignedTo || null,
+          stage4_assigned_to_name: stageAssignments.CSR_DETAILS?.assigned_to_name || stage4AssignedToName || null,
+          stage4_notes: stageAssignments.CSR_DETAILS?.notes || stage4Notes || null,
+          assigned_to: stageAssignments[editStageStatus]?.assigned_to || stageAssignments.SIGNED?.assigned_to || stage3AssignedTo || null,
+          assigned_to_name: stageAssignments[editStageStatus]?.assigned_to_name || stageAssignments.SIGNED?.assigned_to_name || stage3AssignedToName || null,
+          internal_notes: stageAssignments[editStageStatus]?.notes || stageAssignments.SIGNED?.notes || stage3Notes || null,
+          stage_assignments: stageAssignments,
+          ...(chosenBillingStatus ? { billing_status: chosenBillingStatus } : {}),
           attachments: combinedAttachments,
         }),
       });
@@ -1169,10 +1279,11 @@ export default function AdminPortingPage() {
       showToast(
         isNowCompleted ? 'Property Onboarded & Activated' : 'Lifecycle Stage Updated',
         isNowCompleted
-          ? `${selectedRecord.property_name} is now onboarded and has moved to the Properties section.`
+          ? `${selectedRecord.property_name} is now onboarded (${chosenBillingStatus === 'BILLING_DONE' ? 'Billing Done' : 'Billing Pending'}) and has moved to the Properties section.`
           : `${selectedRecord.property_name} updated to ${getStageBadge(editStageStatus).label}.`,
         'success'
       );
+      setShowBillingConfirmModal(false);
       setShowUnifiedModal(false);
       loadData();
     } catch (err: any) {
@@ -1560,6 +1671,16 @@ export default function AdminPortingPage() {
                           <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400 pl-1">
                             {getStageDate(rec, rec.status || rec.stage)}
                           </span>
+                          {(() => {
+                            const curStageKey = normalizeStageKey(rec.status || rec.stage || 'DRAFT');
+                            const curAssignee = (rec as any).stage_assignments?.[curStageKey]?.assigned_to_name || (curStageKey === 'SIGNED' ? (rec as any).stage3_assigned_to_name : curStageKey === 'CSR_DETAILS' ? (rec as any).stage4_assigned_to_name : '') || rec.assigned_to_name;
+                            if (!curAssignee) return null;
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-[10px] font-semibold">
+                                👤 {curAssignee}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </td>
 
@@ -2400,233 +2521,179 @@ export default function AdminPortingPage() {
                       </div>
                     </div>
 
-                    {/* STAGE 3 & STAGE 4: ASSIGNEE & NOTES (ADMIN ONLY) */}
-                    {isStage3OrAbove ? (
-                      <div className="space-y-4">
-                        {/* STAGE 3 ASSIGNMENT & NOTES */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 dark:from-[#131728] dark:via-[#13141a] dark:to-[#171a2a] border border-blue-200/80 dark:border-blue-800/50 rounded-xl space-y-4 shadow-sm"
-                        >
-                          {/* Header */}
-                          <div className="flex items-center justify-between border-b border-blue-100 dark:border-blue-950/60 pb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
-                                3
+                    {/* PER-STAGE TEAM MEMBER ASSIGNMENT & NOTES (ALL 8 STAGES) */}
+                    {(() => {
+                      const activeStageObj = STAGES_ROAD.find((s) => s.key === editStageStatus) || STAGES_ROAD[0];
+                      const curStageData = stageAssignments[editStageStatus] || {
+                        assigned_to: '',
+                        assigned_to_name: '',
+                        mode: 'TEAMMATE' as const,
+                        notes: '',
+                      };
+                      const updateCurStageData = (patch: Partial<typeof curStageData>) => {
+                        setStageAssignments((prev) => ({
+                          ...prev,
+                          [editStageStatus]: {
+                            ...(prev[editStageStatus] || { assigned_to: '', assigned_to_name: '', mode: 'TEAMMATE', notes: '' }),
+                            ...patch,
+                          },
+                        }));
+                      };
+                      return (
+                        <div className="space-y-3">
+                          <motion.div
+                            key={editStageStatus}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-4 bg-gradient-to-br from-blue-50/70 via-slate-50 to-indigo-50/50 dark:from-[#131728] dark:via-[#13141a] dark:to-[#171a2a] border border-blue-200/80 dark:border-blue-800/50 rounded-xl space-y-4 shadow-sm"
+                          >
+                            <div className="flex items-center justify-between border-b border-blue-100 dark:border-blue-950/60 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                                  {activeStageObj.step}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-slate-900 dark:text-white text-xs">
+                                    Stage {activeStageObj.step}: {activeStageObj.label} — Team Member Assignment &amp; Notes
+                                  </h4>
+                                  <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                    Assign a team member from dropdown or enter a custom name for Stage {activeStageObj.step} ({activeStageObj.label})
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <h4 className="font-bold text-slate-900 dark:text-white text-xs">
-                                  Stage 3: Contract Signed — Assignee &amp; Notes
-                                </h4>
-                                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
-                                  Executed agreement verification, contract handoff &amp; operational notes
-                                </p>
-                              </div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-semibold text-[10px] border border-blue-200 dark:border-blue-800">
+                                Stage {activeStageObj.step} Assignee
+                              </span>
                             </div>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-semibold text-[10px] border border-blue-200 dark:border-blue-800">
-                              <Lock className="w-3 h-3" /> Admin Only
-                            </span>
-                          </div>
 
-                          {/* Stage 3 Assignee */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="font-bold text-slate-900 dark:text-white block text-xs">
+                                  Assigned Team Member (Stage {activeStageObj.step}):
+                                </label>
+                                <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCurStageData({ mode: 'TEAMMATE' })}
+                                    className={`px-2.5 py-0.5 rounded font-semibold cursor-pointer ${
+                                      curStageData.mode === 'TEAMMATE'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-slate-500'
+                                    }`}
+                                  >
+                                    Select from Dropdown
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateCurStageData({ mode: 'CUSTOM' })}
+                                    className={`px-2.5 py-0.5 rounded font-semibold cursor-pointer ${
+                                      curStageData.mode === 'CUSTOM'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-slate-500'
+                                    }`}
+                                  >
+                                    Enter New / Custom Name
+                                  </button>
+                                </div>
+                              </div>
+
+                              {curStageData.mode === 'TEAMMATE' ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  <select
+                                    value={curStageData.assigned_to}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      const found = teammates.find((t) => t.id === val);
+                                      updateCurStageData({
+                                        assigned_to: val,
+                                        assigned_to_name: found ? found.full_name || found.email : '',
+                                      });
+                                    }}
+                                    className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+                                  >
+                                    <option value="">-- Select Team Member from Dropdown --</option>
+                                    {teammates.map((tm) => (
+                                      <option key={tm.id} value={tm.id}>
+                                        {tm.full_name || tm.email} ({tm.role || 'Team Member'})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder="Or type a new team member name directly..."
+                                    value={curStageData.assigned_to_name}
+                                    onChange={(e) =>
+                                      updateCurStageData({
+                                        assigned_to_name: e.target.value,
+                                        assigned_to: '',
+                                      })
+                                    }
+                                    className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                                  />
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  placeholder={`Enter team member name for Stage ${activeStageObj.step} (${activeStageObj.label})...`}
+                                  value={curStageData.assigned_to_name}
+                                  onChange={(e) =>
+                                    updateCurStageData({
+                                      assigned_to_name: e.target.value,
+                                      assigned_to: '',
+                                    })
+                                  }
+                                  className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+                                />
+                              )}
+                            </div>
+
+                            <div className="space-y-1.5">
                               <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                                Stage 3 Assignee:
+                                Stage {activeStageObj.step} Operational Notes:
                               </label>
-                              <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
-                                <button
-                                  type="button"
-                                  onClick={() => setStage3AssignmentMode('TEAMMATE')}
-                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                                    stage3AssignmentMode === 'TEAMMATE'
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-slate-500'
-                                  }`}
-                                >
-                                  Teammate List
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setStage3AssignmentMode('CUSTOM')}
-                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                                    stage3AssignmentMode === 'CUSTOM'
-                                      ? 'bg-blue-600 text-white'
-                                      : 'text-slate-500'
-                                  }`}
-                                >
-                                  Custom Name
-                                </button>
-                              </div>
-                            </div>
-
-                            {stage3AssignmentMode === 'TEAMMATE' ? (
-                              <select
-                                value={stage3AssignedTo}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setStage3AssignedTo(val);
-                                  const found = teammates.find((t) => t.id === val);
-                                  setStage3AssignedToName(found ? found.full_name || found.email : '');
-                                }}
-                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
-                              >
-                                <option value="">-- Select Teammate to Assign (Stage 3) --</option>
-                                {teammates.map((tm) => (
-                                  <option key={tm.id} value={tm.id}>
-                                    {tm.full_name || tm.email} ({tm.role || 'Member'})
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                placeholder="Enter custom assignee name or role for Stage 3..."
-                                value={stage3AssignedToName}
-                                onChange={(e) => {
-                                  setStage3AssignedToName(e.target.value);
-                                  setStage3AssignedTo('');
-                                }}
+                              <textarea
+                                rows={2}
+                                placeholder={`Add operational notes or handoff instructions for Stage ${activeStageObj.step} (${activeStageObj.label})...`}
+                                value={curStageData.notes}
+                                onChange={(e) => updateCurStageData({ notes: e.target.value })}
                                 className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                               />
-                            )}
-                          </div>
+                            </div>
 
-                          {/* Stage 3 Notes */}
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                              Stage 3 Operational Notes:
-                            </label>
-                            <textarea
-                              rows={2}
-                              placeholder="Add Stage 3 notes, contract signature details, GM signoff notes..."
-                              value={stage3Notes}
-                              onChange={(e) => setStage3Notes(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                            />
-                          </div>
-                        </motion.div>
-
-                        {/* STAGE 4 ASSIGNMENT & NOTES */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 bg-gradient-to-br from-teal-50/70 via-slate-50 to-emerald-50/50 dark:from-[#112022] dark:via-[#13141a] dark:to-[#12221b] border border-teal-200/80 dark:border-teal-800/50 rounded-xl space-y-4 shadow-sm"
-                        >
-                          {/* Header */}
-                          <div className="flex items-center justify-between border-b border-teal-100 dark:border-teal-950/60 pb-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-xs">
-                                4
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-slate-900 dark:text-white text-xs">
-                                  Stage 4: CSR and Contract Details — Assignee &amp; Notes
-                                </h4>
-                                <p className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
-                                  Customer Service Record (CSR) validation, losing carrier PIN &amp; technical details
+                            {/* Quick overview of all stages with assignees */}
+                            {Object.entries(stageAssignments).some(([, v]) => v?.assigned_to_name) && (
+                              <div className="pt-2 border-t border-blue-100 dark:border-blue-950/60">
+                                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                                  Assigned Team Members Across Stages (Click any stage to edit):
                                 </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {STAGES_ROAD.map((st) => {
+                                    const stAssign = stageAssignments[st.key];
+                                    if (!stAssign?.assigned_to_name) return null;
+                                    return (
+                                      <button
+                                        key={st.key}
+                                        type="button"
+                                        onClick={() => setEditStageStatus(st.key)}
+                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold border transition cursor-pointer ${
+                                          editStageStatus === st.key
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#222430] hover:border-blue-400'
+                                        }`}
+                                      >
+                                        <span>Stage {st.step}:</span>
+                                        <span className="font-bold">{stAssign.assigned_to_name}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 font-semibold text-[10px] border border-teal-200 dark:border-teal-800">
-                              <Lock className="w-3 h-3" /> Admin Only
-                            </span>
-                          </div>
-
-                          {/* Stage 4 Assignee */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                                Stage 4 Assignee:
-                              </label>
-                              <div className="flex items-center p-0.5 bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#2a2c3a] rounded-lg text-[10px]">
-                                <button
-                                  type="button"
-                                  onClick={() => setStage4AssignmentMode('TEAMMATE')}
-                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                                    stage4AssignmentMode === 'TEAMMATE'
-                                      ? 'bg-teal-600 text-white'
-                                      : 'text-slate-500'
-                                  }`}
-                                >
-                                  Teammate List
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setStage4AssignmentMode('CUSTOM')}
-                                  className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
-                                    stage4AssignmentMode === 'CUSTOM'
-                                      ? 'bg-teal-600 text-white'
-                                      : 'text-slate-500'
-                                  }`}
-                                >
-                                  Custom Name
-                                </button>
-                              </div>
-                            </div>
-
-                            {stage4AssignmentMode === 'TEAMMATE' ? (
-                              <select
-                                value={stage4AssignedTo}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setStage4AssignedTo(val);
-                                  const found = teammates.find((t) => t.id === val);
-                                  setStage4AssignedToName(found ? found.full_name || found.email : '');
-                                }}
-                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-teal-500 cursor-pointer"
-                              >
-                                <option value="">-- Select Teammate to Assign (Stage 4) --</option>
-                                {teammates.map((tm) => (
-                                  <option key={tm.id} value={tm.id}>
-                                    {tm.full_name || tm.email} ({tm.role || 'Member'})
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                placeholder="Enter custom assignee name or role for Stage 4..."
-                                value={stage4AssignedToName}
-                                onChange={(e) => {
-                                  setStage4AssignedToName(e.target.value);
-                                  setStage4AssignedTo('');
-                                }}
-                                className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-teal-500"
-                              />
                             )}
-                          </div>
-
-                          {/* Stage 4 Notes */}
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-900 dark:text-white block text-xs">
-                              Stage 4 Operational Notes:
-                            </label>
-                            <textarea
-                              rows={2}
-                              placeholder="Add Stage 4 CSR notes, losing carrier BTN, account number, authorized contact info..."
-                              value={stage4Notes}
-                              onChange={(e) => setStage4Notes(e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs focus:outline-none focus:border-teal-500"
-                            />
-                          </div>
-                        </motion.div>
-                      </div>
-                    ) : (
-                      /* Locked banner for Stage 1 & 2 */
-                      <div className="p-4 bg-slate-50 dark:bg-[#111217] rounded-xl border border-slate-200 dark:border-[#222430] flex items-center gap-3 text-slate-500 dark:text-slate-400">
-                        <div className="w-8 h-8 rounded-lg bg-slate-200/80 dark:bg-[#1f212c] flex items-center justify-center shrink-0 text-slate-500">
-                          <Lock className="w-4 h-4" />
+                          </motion.div>
                         </div>
-                        <p className="text-xs leading-relaxed">
-                          <strong className="text-slate-800 dark:text-slate-200">
-                            Task Assignment &amp; Internal Notes
-                          </strong>{' '}
-                          unlocks at <strong>Stage 3 (Contract signed)</strong> and <strong>Stage 4 (CSR and contract details)</strong>. Once reached, you can assign teammates and log private operational notes for both stages.
-                        </p>
-                      </div>
-                    )}
+                      );
+                    })()}
+                    {/* Legacy Stage 3/4 block removed - replaced by dynamic all-stage assignment above */}
 
                     {/* Modal Submit Footer */}
                     <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100 dark:border-[#222430]">
@@ -3546,6 +3613,103 @@ export default function AdminPortingPage() {
                   className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#1f212c] dark:hover:bg-[#2a2c3a] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ONBOARDING BILLING STATUS CONFIRMATION POP-UP MODAL */}
+      <AnimatePresence>
+        {showBillingConfirmModal && selectedRecord && (
+          <div className="fixed inset-0 min-h-screen w-screen h-screen z-[60] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/70 dark:border-emerald-800/50">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                      Onboarding &amp; Billing Status
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {selectedRecord.property_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBillingConfirmModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                This property is moving to <strong>Stage 8: Onboarding</strong> and will be moved to the <strong>Properties</strong> page. Please confirm whether billing is completed or pending for this property:
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={updatingStage}
+                  onClick={() => {
+                    setEditStageStatus('COMPLETED');
+                    handleUpdateStageSubmit(undefined, 'BILLING_DONE');
+                  }}
+                  className="p-3.5 rounded-xl border-2 border-emerald-500/80 bg-emerald-50/70 hover:bg-emerald-100/80 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-left transition cursor-pointer group disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="inline-flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-300 text-xs">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      Billing Done
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white">
+                      BILLED
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80 leading-snug">
+                    Move to Properties page &amp; mark status as <strong>Billing Done</strong>.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={updatingStage}
+                  onClick={() => {
+                    setEditStageStatus('COMPLETED');
+                    handleUpdateStageSubmit(undefined, 'BILLING_PENDING');
+                  }}
+                  className="p-3.5 rounded-xl border-2 border-amber-500/80 bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/70 text-left transition cursor-pointer group disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="inline-flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300 text-xs">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      Billing Pending
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-600 text-white">
+                      PENDING
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80 leading-snug">
+                    Move to Properties page &amp; mark status as <strong>Billing Pending</strong>.
+                  </p>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[#222430]">
+                <span className="text-[10.5px] text-slate-400">
+                  You can also change billing status anytime on the Properties page.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowBillingConfirmModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-[#1f212c] cursor-pointer"
+                >
+                  Cancel
                 </button>
               </div>
             </div>

@@ -79,6 +79,18 @@ export async function GET(request: NextRequest) {
       db.from('partner_invoices').select('*').order('period_start', { ascending: false }),
     ]);
 
+    // Optional: Fetch Data Circuit Monthly Revenues (gracefully handle if table not created yet)
+    let allDataCircuitRevs: any[] = [];
+    try {
+      const { data: dcRevData } = await db
+        .from('data_circuit_monthly_revenues')
+        .select('*')
+        .eq('revenue_received', true);
+      allDataCircuitRevs = dcRevData || [];
+    } catch {
+      allDataCircuitRevs = [];
+    }
+
     const allProps = propsRes.data || [];
     const orgProps = orgPropsRes.data || [];
     const allServices = servicesRes.data || [];
@@ -252,7 +264,14 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      const gmr = baseGmr + servicesGmr;
+      // Sum Data Circuit Revenue Share where revenue_received = true for this month
+      const dcRevsForMonth = allDataCircuitRevs.filter((r: any) => r.month_key === mKey && r.revenue_received);
+      const dataCircuitRevShare = dcRevsForMonth.reduce(
+        (sum: number, r: any) => sum + Number(r.revenue_share_amount || 0),
+        0
+      );
+
+      const gmr = baseGmr + servicesGmr + dataCircuitRevShare;
 
       // Check if real partner invoices exist in database for this specific month
       const matchingInvoices = allInvoices.filter((inv: any) => inv.period_start?.startsWith(mKey));
@@ -284,7 +303,7 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      const revenueIncrease = newPropsRev + newServicesRev;
+      const revenueIncrease = newPropsRev + newServicesRev + dataCircuitRevShare;
 
       // Vendors & Servers active in this month
       let monthVendorsCost = 0;
@@ -376,7 +395,10 @@ export async function GET(request: NextRequest) {
           });
         }
       });
-      const exactPrevGmr = Math.round((prevBaseGmr + prevServicesGmr) * 100) / 100;
+      const prevDcRevs = allDataCircuitRevs
+        .filter((r: any) => r.month_key === prevMKey && r.revenue_received)
+        .reduce((sum: number, r: any) => sum + Number(r.revenue_share_amount || 0), 0);
+      const exactPrevGmr = Math.round((prevBaseGmr + prevServicesGmr + prevDcRevs) * 100) / 100;
       const revenueAddedThisMonth = Math.round((gmr - exactPrevGmr) * 100) / 100;
       const revenueAddedGrowthPct = exactPrevGmr > 0
         ? Math.round(((gmr - exactPrevGmr) / exactPrevGmr) * 1000) / 10
@@ -386,6 +408,9 @@ export async function GET(request: NextRequest) {
         { label: `${monthShort[prevMonthIdx]} GMR`, value: exactPrevGmr, isTotal: true, color: '#2563eb' },
         { label: 'New listings', value: newPropsRev, isTotal: false, color: '#10b981' },
         { label: 'Service add-ons', value: newServicesRev, isTotal: false, color: '#10b981' },
+        ...(dataCircuitRevShare > 0
+          ? [{ label: 'Data Circuit share', value: dataCircuitRevShare, isTotal: false, color: '#06b6d4' }]
+          : []),
         { label: `${monthShort[mIdx]} GMR`, value: gmr, isTotal: true, color: '#2563eb' },
       ];
 
@@ -398,6 +423,8 @@ export async function GET(request: NextRequest) {
         grossMonthlyRevenue: Math.round(gmr * 100) / 100,
         basePropertyRevenue: Math.round(baseGmr * 100) / 100,
         servicesRevenue: Math.round(servicesGmr * 100) / 100,
+        dataCircuitRevenueShare: Math.round(dataCircuitRevShare * 100) / 100,
+        dataCircuitReceivedCount: dcRevsForMonth.length,
         revenueIncreaseMonthly: Math.round(revenueIncrease * 100) / 100,
         revenueAddedThisMonth,
         revenueAddedGrowthPct,

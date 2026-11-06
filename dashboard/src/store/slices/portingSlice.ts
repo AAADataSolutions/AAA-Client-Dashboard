@@ -48,6 +48,8 @@ export interface PortingRecord {
   stage4_assigned_to?: string | null;
   stage4_assigned_to_name?: string | null;
   stage4_notes?: string | null;
+  stage_assignments?: Record<string, { assigned_to?: string | null; assigned_to_name?: string | null; notes?: string | null }>;
+  billing_status?: 'BILLING_DONE' | 'BILLING_PENDING' | string;
   progress_pct?: number;
   stage?: string;
   attachments?: {

@@ -17,13 +17,16 @@ import {
   Plus,
   Clock,
   ExternalLink,
+  FileText,
+  Wifi,
+  Download,
 } from 'lucide-react';
 
 interface PropertyDetailDrawerProps {
   property: any;
   onClose: () => void;
   onCreateTicket?: (propertyId: string) => void;
-  defaultTab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS';
+  defaultTab?: 'OVERVIEW' | 'SERVICES' | 'DATA_CIRCUIT' | 'E911' | 'ONBOARDING' | 'TICKETS';
 }
 
 export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
@@ -32,7 +35,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
   onCreateTicket,
   defaultTab = 'OVERVIEW',
 }) => {
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'SERVICES' | 'DATA_CIRCUIT' | 'E911' | 'ONBOARDING' | 'TICKETS'>(defaultTab);
 
   React.useEffect(() => {
     if (defaultTab) {
@@ -85,6 +88,7 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
           {[
             { key: 'OVERVIEW', label: 'Overview' },
             { key: 'SERVICES', label: `Services (${services.length})` },
+            ...(property.data_circuit ? [{ key: 'DATA_CIRCUIT', label: 'Data Circuit' }] : []),
             { key: 'E911', label: 'E911 Status' },
             { key: 'ONBOARDING', label: 'Onboarding' },
             { key: 'TICKETS', label: `Tickets (${tickets.length})` },
@@ -159,16 +163,122 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                       </span>
                     </div>
                   </div>
-                  <div className="pt-2 border-t border-slate-100 dark:border-[#222430]">
-                    <span className="text-[10px] text-slate-400 block">Monthly Price</span>
-                    <span className="text-slate-800 dark:text-slate-200 font-semibold">
-                      {property.monthly_price !== null && property.monthly_price !== undefined
-                        ? `$${Number(property.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : 'Not set'}
-                    </span>
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#222430]">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Monthly Price</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                        {property.monthly_price !== null && property.monthly_price !== undefined
+                          ? `$${Number(property.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : 'Not set'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Connectivity Type</span>
+                      <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
+                        {(() => {
+                          const ct = property.connectivity_type || (property.data_circuit ? 'BOTH' : 'PORTED');
+                          if (ct === 'BOTH') return 'Ported & Data Circuited';
+                          if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
+                          return 'Ported';
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* Data Circuit & Network Details (Client-Safe: Never exposes Wholesaler) */}
+              {property.data_circuit && (
+                <div className="space-y-3">
+                  <h4 className="text-[11px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
+                    Data Circuit &amp; Network Details
+                  </h4>
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Carrier Name</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {property.data_circuit.carrier_name || 'Pending'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Bandwidth</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {property.data_circuit.bandwidth || '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Circuit Pricing</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                          {property.data_circuit.circuit_monthly_price !== null && property.data_circuit.circuit_monthly_price !== undefined
+                            ? `$${Number(property.data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Signed Agreement Document Card */}
+                    <div className="pt-2.5 border-t border-slate-100 dark:border-[#222430]">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1.5">
+                        Signed Agreement Document
+                      </span>
+                      {property.data_circuit.agreement_file_url ? (
+                        <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                                  {property.data_circuit.agreement_file_name || 'Signed_Agreement.pdf'}
+                                </p>
+                                <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 shrink-0">
+                                  SIGNED
+                                </span>
+                              </div>
+                              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                {property.data_circuit.paperwork_signed_at
+                                  ? `Executed on ${new Date(property.data_circuit.paperwork_signed_at).toLocaleDateString()}`
+                                  : 'Executed Client Agreement'}
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            href={property.data_circuit.agreement_file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shrink-0 transition-colors shadow-2xs cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>View Signed PDF</span>
+                            <ExternalLink className="w-3 h-3 opacity-75" />
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#111217] border border-slate-200/60 dark:border-[#252733] flex items-center justify-between text-xs text-slate-500">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Signed Agreement PDF:</span>
+                          </div>
+                          <span className="text-[11px] font-medium text-slate-400">Pending Execution</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {property.data_circuit.technical_details && (
+                      <div className="pt-2.5 border-t border-slate-100 dark:border-[#222430]">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1.5">
+                          Technical Configuration (IP / WAN / Gateway)
+                        </span>
+                        <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#111217] border border-slate-200/80 dark:border-[#252733] font-mono text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                          {property.data_circuit.technical_details}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Property Management & Contacts */}
               <div className="space-y-3">
@@ -358,6 +468,129 @@ export const PropertyDetailDrawer: React.FC<PropertyDetailDrawerProps> = ({
                     {e911?.verified_at ? new Date(e911.verified_at).toLocaleDateString() : 'Pending'}
                   </span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DATA_CIRCUIT */}
+          {activeTab === 'DATA_CIRCUIT' && property.data_circuit && (
+            <div className="space-y-4">
+              {/* Circuit Header Banner */}
+              <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                    <Wifi className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white text-xs">
+                      Data Circuit Connectivity
+                    </p>
+                    <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">
+                      Carrier: {property.data_circuit.carrier_name || 'Carrier Pending'} • {property.data_circuit.bandwidth || '1 Gig'}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-2xs">
+                  {property.data_circuit.status?.replace(/_/g, ' ') || 'STARTED'}
+                </span>
+              </div>
+
+              {/* Signed Agreement Document Box (Prominent) */}
+              <div className="p-4 bg-slate-50 dark:bg-[#181920] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                    Signed Agreement PDF
+                  </span>
+                  {property.data_circuit.agreement_file_url && (
+                    <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      <CheckCircle2 className="w-3 h-3" /> Countersigned
+                    </span>
+                  )}
+                </div>
+
+                {property.data_circuit.agreement_file_url ? (
+                  <div className="p-3.5 bg-white dark:bg-[#111217] rounded-xl border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 dark:text-white text-xs truncate">
+                          {property.data_circuit.agreement_file_name || 'Data_Circuit_Agreement.pdf'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {property.data_circuit.paperwork_signed_at
+                            ? `Executed on ${new Date(property.data_circuit.paperwork_signed_at).toLocaleDateString()}`
+                            : 'Official Agreement PDF'}
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href={property.data_circuit.agreement_file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shrink-0 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>View Signed PDF</span>
+                      <ExternalLink className="w-3 h-3 opacity-70" />
+                    </a>
+                  </div>
+                ) : (
+                  <div className="p-4 text-center border border-dashed border-slate-200 dark:border-[#222430] rounded-xl text-slate-400 text-xs">
+                    <FileText className="w-6 h-6 mx-auto mb-1.5 opacity-40" />
+                    <p className="font-semibold">Agreement PDF Pending Signature</p>
+                    <p className="text-[11px] mt-0.5">Once paperwork is signed, the executed PDF will appear here.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Technical Specifications */}
+              <div className="p-4 bg-slate-50 dark:bg-[#181920] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
+                <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Circuit Specifications
+                </span>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-white dark:bg-[#111217] rounded-xl border border-slate-200/60 dark:border-[#252733]">
+                    <span className="text-[10px] text-slate-400 block">Carrier Service</span>
+                    <span className="font-bold text-slate-900 dark:text-white mt-0.5 block">
+                      {property.data_circuit.carrier_name || 'Carrier Pending'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-[#111217] rounded-xl border border-slate-200/60 dark:border-[#252733]">
+                    <span className="text-[10px] text-slate-400 block">Bandwidth</span>
+                    <span className="font-bold text-slate-900 dark:text-white mt-0.5 block">
+                      {property.data_circuit.bandwidth || '1 Gig'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-[#111217] rounded-xl border border-slate-200/60 dark:border-[#252733]">
+                    <span className="text-[10px] text-slate-400 block">Circuit Monthly Price</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                      {property.data_circuit.circuit_monthly_price !== null && property.data_circuit.circuit_monthly_price !== undefined
+                        ? `$${Number(property.data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`
+                        : '—'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-[#111217] rounded-xl border border-slate-200/60 dark:border-[#252733]">
+                    <span className="text-[10px] text-slate-400 block">FOC Status</span>
+                    <span className="font-bold text-slate-900 dark:text-white mt-0.5 block">
+                      {property.data_circuit.foc_date
+                        ? `${property.data_circuit.foc_status || 'CONFIRMED'} (${property.data_circuit.foc_date})`
+                        : property.data_circuit.foc_status || 'PENDING'}
+                    </span>
+                  </div>
+                </div>
+
+                {property.data_circuit.technical_details && (
+                  <div className="pt-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
+                      Technical Configuration (IP Address, Gateway, WAN IP, DNS)
+                    </span>
+                    <div className="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] whitespace-pre-wrap leading-relaxed shadow-inner border border-slate-800">
+                      {property.data_circuit.technical_details}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

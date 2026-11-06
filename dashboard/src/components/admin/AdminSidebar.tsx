@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ArrowUpDown,
   Wrench,
+  Network,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { LogoutConfirmModal } from '@/components/common/LogoutConfirmModal';
@@ -72,6 +73,7 @@ const navItems: NavItem[] = [
     ],
   },
   { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
+  { label: 'Data Circuit', href: '/admin/data-circuits', icon: Network },
   { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]', hideForSuperAdmin: true },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white', hideForSuperAdmin: true },
   { label: 'Partners', href: '/admin/partners', icon: Users, superAdminOnly: true },

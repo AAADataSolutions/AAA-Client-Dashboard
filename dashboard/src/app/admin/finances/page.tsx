@@ -689,7 +689,12 @@ export default function AdminFinancesPage() {
           </div>
 
           <p className="text-[11px] text-blue-200 mt-2 pt-2 border-t border-white/10">
-            Across {gmrData.activePropertiesCount || 0} active billed hotel properties
+            Across {gmrData.activePropertiesCount || 0} active properties
+            {Number(gmrData.dataCircuitRevenueShare || 0) > 0 && (
+              <span className="ml-1 font-bold text-cyan-200">
+                (+{formatCurrency(Number(gmrData.dataCircuitRevenueShare))} Data Circuit share)
+              </span>
+            )}
           </p>
         </div>
 
