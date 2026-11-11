@@ -170,7 +170,9 @@ export default function AdminServicesPage() {
     device_type: '',
     serial_number: '',
     // Elevator Lines specific fields
+    // Elevator Lines specific fields
     extension: '',
+    pbx_server_id: 1,
   });
   const [showCustomServiceId, setShowCustomServiceId] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
@@ -519,6 +521,7 @@ export default function AdminServicesPage() {
           description: formData.description.trim() || null,
           price: formData.price ? Math.max(0, parseFloat(formData.price)) : 0,
           status: formData.status,
+          pbx_server_id: Number(formData.pbx_server_id) || 1,
         }),
       });
 
@@ -604,6 +607,7 @@ export default function AdminServicesPage() {
         device_type: '',
         serial_number: '',
         extension: '',
+        pbx_server_id: 1,
       });
       setShowCustomServiceId(false);
       loadData();
@@ -632,6 +636,7 @@ export default function AdminServicesPage() {
       device_type: '',
       serial_number: '',
       extension: '',
+      pbx_server_id: Number((svc as any).pbx_server_id) || 1,
     });
     setFormError(null);
     setShowEditModal(true);
@@ -667,6 +672,7 @@ export default function AdminServicesPage() {
           description: formData.description.trim() || null,
           price: formData.price ? Math.max(0, parseFloat(formData.price)) : 0,
           status: formData.status,
+          pbx_server_id: Number(formData.pbx_server_id) || 1,
         }),
       });
 
@@ -795,6 +801,7 @@ export default function AdminServicesPage() {
                 device_type: '',
                 serial_number: '',
                 extension: '',
+                pbx_server_id: 1,
               });
               setShowCustomServiceId(false);
               setFormError(null);
@@ -2060,6 +2067,21 @@ export default function AdminServicesPage() {
                             />
                           </div>
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          FreePBX Cluster Server (`server_id` for DID &amp; Call Forwarding)
+                        </label>
+                        <select
+                          value={formData.pbx_server_id}
+                          onChange={(e) => setFormData({ ...formData, pbx_server_id: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500 font-semibold"
+                        >
+                          <option value={1}>Server 1 — PBX 115 (Primary)</option>
+                          <option value={2}>Server 2 — PBX 142 (Secondary)</option>
+                          <option value={3}>Server 3 — PBX 240 (Tertiary)</option>
+                        </select>
                       </div>
 
                       <div>

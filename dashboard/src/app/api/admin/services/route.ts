@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
+import { pbxAddDid, normalizeDid, normalizePortalUsername, PbxServerId } from '@/lib/pbx/client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,6 +129,12 @@ export async function GET(request: NextRequest) {
         attached_properties: attached_properties,
         attached_property_name: primaryProp ? primaryProp.name : 'Unassigned',
         attached_organization_name: primaryProp ? primaryProp.organization_name : 'Unassigned',
+        pbx_server_id: Number(s.pbx_server_id || 1) as PbxServerId,
+        normalized_did: s.normalized_did || normalizeDid(s.phone_number),
+        portal_did_synced: Boolean(s.portal_did_synced),
+        call_forwarding_state: s.call_forwarding_state === 'ON' ? 'ON' : 'OFF',
+        active_forwarding_numbers: Array.isArray(s.active_forwarding_numbers) ? s.active_forwarding_numbers : [],
+        forwarding_updated_at: s.forwarding_updated_at || null,
         created_at: s.created_at,
         updated_at: s.updated_at,
       };
@@ -261,6 +268,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: sErr.message }, { status: 400 });
     }
 
+    const pbxServerId = ([1, 2, 3].includes(Number(body.pbx_server_id)) ? Number(body.pbx_server_id) : 1) as PbxServerId;
+    const cleanDid = normalizeDid(phone_number);
+    try {
+      await supabase
+        .from('services')
+        .update({ pbx_server_id: pbxServerId, normalized_did: cleanDid })
+        .eq('id', newService.id);
+    } catch {}
+
     // 2. Attach to Property if specified (Rule 2: One service can only be assigned to one property)
     let assignedPropName = 'Unassigned';
     if (property_id) {
@@ -314,6 +330,32 @@ export async function POST(request: NextRequest) {
       }
       // Sync property monthly price immediately
       await syncPropertyMonthlyPrice(supabase, property_id);
+
+      // Register DID with Call Forwarding Portal (did_management_api.php)
+      try {
+        const { data: opFull } = await supabase
+          .from('organization_properties')
+          .select('organization_id, organization:organizations(id, name, email, portal_username), property:properties(id, name)')
+          .eq('property_id', property_id)
+          .maybeSingle();
+        const orgObj: any = Array.isArray(opFull?.organization) ? opFull?.organization[0] : opFull?.organization;
+        const propObj: any = Array.isArray(opFull?.property) ? opFull?.property[0] : opFull?.property;
+        if (orgObj && cleanDid) {
+          const username = normalizePortalUsername(orgObj.portal_username || orgObj.email, orgObj.name);
+          const didRes = await pbxAddDid({
+            username,
+            property_name: propObj?.name || assignedPropName || 'Property',
+            did: cleanDid,
+            server_id: pbxServerId,
+            organization_id: orgObj.id,
+            property_id,
+            service_id: newService.id,
+          });
+          if (didRes.success) {
+            await supabase.from('services').update({ portal_did_synced: true }).eq('id', newService.id);
+          }
+        }
+      } catch {}
     }
 
     // Central Audit Log
@@ -381,6 +423,12 @@ export async function PUT(request: NextRequest) {
     if (description !== undefined) updates.description = description ? description.trim() : null;
     if (price !== undefined) updates.price = price === null || price === '' ? 0 : Math.max(0, parseFloat(String(price)));
     if (status !== undefined) updates.status = status;
+    if (body.pbx_server_id !== undefined) {
+      updates.pbx_server_id = [1, 2, 3].includes(Number(body.pbx_server_id)) ? Number(body.pbx_server_id) : 1;
+    }
+    if (phone_number !== undefined) {
+      updates.normalized_did = normalizeDid(phone_number);
+    }
     updates.updated_at = new Date().toISOString();
 
     const { data: updatedService, error: uErr } = await supabase

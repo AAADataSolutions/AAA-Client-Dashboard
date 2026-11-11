@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { sendInviteEmail } from '@/lib/email/mailer';
 import { getAppBaseUrl } from '@/lib/utils/url';
+import { pbxCreateManagementUser, normalizePortalUsername } from '@/lib/pbx/client';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -133,6 +134,11 @@ export async function GET(request: NextRequest) {
         properties_count: propCount,
         properties,
         status: org.status || 'ACTIVE',
+        portal_username: org.portal_username || (primaryContactEmail !== '—' ? primaryContactEmail : null),
+        portal_user_id: org.portal_user_id || null,
+        portal_active: org.portal_active ?? true,
+        portal_sync_status: org.portal_sync_status || 'UNSYNCED',
+        portal_last_synced_at: org.portal_last_synced_at || null,
         invite: {
           status: inviteStatus,
           url: inviteUrl,
@@ -305,6 +311,31 @@ export async function POST(request: NextRequest) {
 
     if (orgErr || !newOrg) {
       throw orgErr || new Error('Failed to create organization');
+    }
+
+    // 1.05 Sync with External Call Forwarding Portal (management_group.php)
+    const portalUsername = normalizePortalUsername(body.portal_username || adminContactEmail, name);
+    try {
+      const pbxRes = await pbxCreateManagementUser({
+        username: portalUsername,
+        hotel_name: name.trim(),
+        contact_name: (contact_name || name).trim(),
+        organization_id: newOrg.id,
+        triggered_by: user.id,
+      });
+      await dbClient
+        .from('organizations')
+        .update({
+          portal_username: portalUsername,
+          portal_user_id: pbxRes.data?.user_id || null,
+          portal_active: true,
+          portal_sync_status: pbxRes.success ? 'SYNCED' : 'ERROR',
+          portal_last_synced_at: new Date().toISOString(),
+          portal_sync_error: pbxRes.success ? null : (pbxRes.message || pbxRes.error_code || null),
+        })
+        .eq('id', newOrg.id);
+    } catch {
+      // Safe fallback if migration 29 columns are not added yet
     }
 
     // 1.1 Also create initial primary contact entry in organization_contacts

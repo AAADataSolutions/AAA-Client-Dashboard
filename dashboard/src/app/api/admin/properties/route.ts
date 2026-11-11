@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'ALL';
     const e911Filter = searchParams.get('e911') || 'ALL';
     const rayBaumFilter = searchParams.get('rayBaum') || 'ALL';
+    const billingStatusFilter = searchParams.get('billingStatus') || 'ALL';
     const sortBy = searchParams.get('sortBy') || 'NAME_ASC';
 
     // 1. Fetch Global DB Metrics
@@ -263,6 +264,12 @@ export async function GET(request: NextRequest) {
       return true;
     });
 
+    // Filter by Billing Status if requested
+    if (billingStatusFilter === 'BILLING_DONE') {
+      processed = processed.filter((p: any) => (p.billing_status || 'BILLING_PENDING') === 'BILLING_DONE');
+    } else if (billingStatusFilter === 'BILLING_PENDING') {
+      processed = processed.filter((p: any) => (p.billing_status || 'BILLING_PENDING') === 'BILLING_PENDING');
+    }
     // Filter by Ray Baum status if requested
     if (rayBaumFilter === 'ACTIVE') {
       processed = processed.filter((p: any) => p.ray_baum_status === 'Active');

@@ -49,6 +49,8 @@ import {
   Calendar,
   DollarSign,
   Activity,
+  Flame,
+  ArrowUpDown,
 } from 'lucide-react';
 import { ImportPropertiesModal } from '@/components/admin/ImportPropertiesModal';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -60,6 +62,7 @@ import {
   setOrgFilter,
   setE911Filter,
   setRayBaumFilter,
+  setBillingStatusFilter,
   setSortBy,
   setPagination,
   optimisticUpdatePropertyStatus,
@@ -208,10 +211,33 @@ export default function AdminPropertiesPage() {
   const [selectedPropForDrawer, setSelectedPropForDrawer] = useState<PropertyRecord | null>(null);
   const [propertyDrawerData, setPropertyDrawerData] = useState<any>(null);
   const [loadingDrawerData, setLoadingDrawerData] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'DATA_CIRCUIT' | 'PORTING_DOCS'>('OVERVIEW');
+  const [drawerTab, setDrawerTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'DATA_CIRCUIT' | 'PORTING_DOCS' | 'CALL_FORWARDING'>('OVERVIEW');
   const [drawerAssignServiceId, setDrawerAssignServiceId] = useState('');
   const [assigningServiceInDrawer, setAssigningServiceInDrawer] = useState(false);
   const [unassigningServiceId, setUnassigningServiceId] = useState<string | null>(null);
+
+  // Create New Service Directly From Property Drawer (Same flow as Services page)
+  const [showCreateServiceInDrawerModal, setShowCreateServiceInDrawerModal] = useState(false);
+  const [creatingServiceInDrawer, setCreatingServiceInDrawer] = useState(false);
+  const [serviceCreateError, setServiceCreateError] = useState<string | null>(null);
+  const [showCustomSvcIdInDrawer, setShowCustomSvcIdInDrawer] = useState(false);
+  const [dynamicServiceTypes, setDynamicServiceTypes] = useState<string[]>([]);
+  const [serviceCreateForm, setServiceCreateForm] = useState({
+    custom_service_id: '',
+    service_name: '',
+    phone_number: '',
+    service_type_name: 'Direct Inward Dial (DID)',
+    custom_type_input: '',
+    is_custom_type: false,
+    property_id: '',
+    description: '',
+    price: '',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE' | 'SUSPENDED',
+    device_type: '',
+    serial_number: '',
+    extension: '',
+    pbx_server_id: 1,
+  });
 
   // Assign to Organization Modal State
   const [showAssignOrgModal, setShowAssignOrgModal] = useState(false);
@@ -321,6 +347,7 @@ export default function AdminPropertiesPage() {
         status: filters.selectedStatus,
         e911: filters.selectedE911,
         rayBaum: filters.rayBaum,
+        billingStatus: filters.billingStatus,
         sortBy: filters.sortBy,
       })
     );
@@ -883,12 +910,216 @@ export default function AdminPropertiesPage() {
     }
   };
 
+  // Load dynamic service types for Drawer Service Creation Modal
+  useEffect(() => {
+    async function loadSvcTypes() {
+      try {
+        const res = await fetch('/api/admin/service-types');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setDynamicServiceTypes(json.data.map((t: any) => t.name).filter(Boolean));
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadSvcTypes();
+  }, []);
+
+  const availableDrawerServiceTypes = useMemo(() => {
+    const defaults = [
+      'Direct Inward Dial (DID)',
+      'Fire Lines',
+      'Elevator Lines',
+      'SIP Trunk - 100 Channels',
+      'Toll-Free 800 Route',
+      'Analog Emergency FXS',
+      'Cloud PBX Extension',
+      'Ray Baum Dedicated E911',
+    ];
+    const set = new Set<string>(defaults);
+    dynamicServiceTypes.forEach((d) => {
+      if (d && d.trim()) set.add(d.trim());
+    });
+    return Array.from(set);
+  }, [dynamicServiceTypes]);
+
+  const isFireLineSvcType = (type: string) => {
+    const t = (type || '').toLowerCase().replace(/[\s_-]+/g, '');
+    return t === 'firelines' || t === 'fireline' || t.includes('fireline');
+  };
+
+  const isElevatorLineSvcType = (type: string) => {
+    const t = (type || '').toLowerCase().replace(/[\s_-]+/g, '');
+    return t === 'elevatorlines' || t === 'elevatorline' || t.includes('elevatorline');
+  };
+
+  const handleOpenCreateServiceInDrawer = () => {
+    if (!selectedPropForDrawer) return;
+    setServiceCreateError(null);
+    setShowCustomSvcIdInDrawer(false);
+    setServiceCreateForm({
+      custom_service_id: `SVC-${Math.floor(100000 + Math.random() * 900000)}`,
+      service_name: '',
+      phone_number: '',
+      service_type_name: 'Direct Inward Dial (DID)',
+      custom_type_input: '',
+      is_custom_type: false,
+      property_id: selectedPropForDrawer.id,
+      description: '',
+      price: '',
+      status: 'ACTIVE',
+      device_type: '',
+      serial_number: '',
+      extension: '',
+      pbx_server_id: (selectedPropForDrawer as any).default_pbx_server_id || 1,
+    });
+    setShowCreateServiceInDrawerModal(true);
+  };
+
+  const handleCreateServiceInDrawerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropForDrawer) return;
+
+    const activeType = serviceCreateForm.is_custom_type
+      ? serviceCreateForm.custom_type_input.trim()
+      : serviceCreateForm.service_type_name;
+
+    const isFire = isFireLineSvcType(activeType);
+    const isElevator = isElevatorLineSvcType(activeType);
+
+    let serviceId = serviceCreateForm.custom_service_id.trim();
+    if (!serviceId) {
+      if (isFire) serviceId = `FL-${Math.floor(100000 + Math.random() * 900000)}`;
+      else if (isElevator) serviceId = `EL-${Math.floor(100000 + Math.random() * 900000)}`;
+      else serviceId = `SVC-${Math.floor(100000 + Math.random() * 900000)}`;
+    } else if (serviceId.length < 6) {
+      if (isFire || isElevator) {
+        serviceId = `${isFire ? 'FL' : 'EL'}-${Math.floor(100000 + Math.random() * 900000)}`;
+      } else {
+        setServiceCreateError('Service ID is mandatory and must be at least 6 characters.');
+        return;
+      }
+    }
+
+    if (!serviceCreateForm.phone_number.trim()) {
+      setServiceCreateError('Phone number is required.');
+      return;
+    }
+
+    if (isFire && !serviceCreateForm.device_type.trim()) {
+      setServiceCreateError('Device Type is required for Fire Lines.');
+      return;
+    }
+
+    try {
+      setCreatingServiceInDrawer(true);
+      setServiceCreateError(null);
+
+      let serviceName = serviceCreateForm.service_name.trim();
+      if (!serviceName) {
+        if (isFire) {
+          serviceName = serviceCreateForm.device_type.trim() || `Fire Line ${serviceCreateForm.phone_number.trim()}`;
+        } else if (isElevator) {
+          serviceName = serviceCreateForm.extension.trim()
+            ? `Elevator - ${serviceCreateForm.extension.trim()}`
+            : `Elevator Line ${serviceCreateForm.phone_number.trim()}`;
+        } else {
+          serviceName = `Service ${serviceCreateForm.phone_number.trim()}`;
+        }
+      }
+
+      const targetPropId = serviceCreateForm.property_id || selectedPropForDrawer.id;
+
+      // 1. Provision standard service via /api/admin/services
+      const res = await fetch('/api/admin/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          custom_service_id: serviceId,
+          service_name: serviceName,
+          phone_number: serviceCreateForm.phone_number.trim(),
+          service_type_name: isFire ? 'Fire Lines' : isElevator ? 'Elevator Lines' : activeType,
+          property_id: targetPropId,
+          description: serviceCreateForm.description.trim() || null,
+          price: serviceCreateForm.price ? Math.max(0, parseFloat(serviceCreateForm.price)) : 0,
+          status: serviceCreateForm.status,
+          pbx_server_id: Number(serviceCreateForm.pbx_server_id) || 1,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) throw new Error(result.error || 'Failed to create service.');
+
+      const createdService = result.data;
+
+      // 2. If Fire Line, also mirror to /api/admin/fire-lines
+      if (isFire) {
+        try {
+          await fetch('/api/admin/fire-lines', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              device_type: serviceCreateForm.device_type.trim(),
+              phone_number: serviceCreateForm.phone_number.trim(),
+              serial_number: serviceCreateForm.serial_number.trim() || null,
+              description: serviceCreateForm.description.trim() || null,
+              property_id: targetPropId,
+              service_id: createdService?.id || null,
+              price: serviceCreateForm.price ? Math.max(0, parseFloat(serviceCreateForm.price)) : 0,
+            }),
+          });
+        } catch {
+          // ignore mirror warning
+        }
+      }
+
+      // 3. If Elevator Line, also mirror to /api/admin/elevator-lines
+      if (isElevator) {
+        try {
+          await fetch('/api/admin/elevator-lines', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone_number: serviceCreateForm.phone_number.trim(),
+              extension: serviceCreateForm.extension.trim() || null,
+              description: serviceCreateForm.description.trim() || null,
+              status: 'ACTIVE',
+              property_id: targetPropId,
+              service_id: createdService?.id || null,
+              price: serviceCreateForm.price ? Math.max(0, parseFloat(serviceCreateForm.price)) : 0,
+            }),
+          });
+        } catch {
+          // ignore mirror warning
+        }
+      }
+
+      showToast(
+        isFire ? 'Fire Line Created' : isElevator ? 'Elevator Line Created' : 'Service Provisioned',
+        `${serviceId} (${serviceCreateForm.phone_number}) created and linked to ${selectedPropForDrawer.name}.`,
+        'success'
+      );
+
+      setShowCreateServiceInDrawerModal(false);
+      await refreshDrawerData(selectedPropForDrawer.id);
+      loadData();
+    } catch (err: any) {
+      setServiceCreateError(err.message || 'Failed to create service.');
+      showToast('Error', err.message, 'error');
+    } finally {
+      setCreatingServiceInDrawer(false);
+    }
+  };
+
   const resetAllFilters = () => {
     setSearchInput('');
     dispatch(setSearchQuery(''));
     dispatch(setOrgFilter('ALL'));
     dispatch(setStatusFilter('ALL'));
     dispatch(setE911Filter('ALL'));
+    dispatch(setRayBaumFilter('ALL'));
+    dispatch(setBillingStatusFilter('ALL'));
     dispatch(setSortBy('NAME_ASC'));
     dispatch(setPagination({ currentPage: 1 }));
   };
@@ -900,6 +1131,7 @@ export default function AdminPropertiesPage() {
     filters.selectedStatus !== 'ALL' ||
     filters.selectedE911 !== 'ALL' ||
     (filters.rayBaum && filters.rayBaum !== 'ALL') ||
+    (filters.billingStatus && filters.billingStatus !== 'ALL') ||
     filters.sortBy !== 'NAME_ASC';
 
   return (
@@ -1163,17 +1395,17 @@ export default function AdminPropertiesPage() {
             </select>
 
             <select
-              value={filters.selectedE911}
+              value={filters.billingStatus || 'ALL'}
               onChange={(e) => {
-                dispatch(setE911Filter(e.target.value));
+                dispatch(setBillingStatusFilter(e.target.value));
                 dispatch(setPagination({ currentPage: 1 }));
               }}
-              aria-label="Filter by E911"
+              aria-label="Filter by Billing Status"
               className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
-              <option value="ALL">E911: All E911</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="AUDIT_REQUIRED">Audit Required</option>
+              <option value="ALL">Billing: All</option>
+              <option value="BILLING_DONE">Billing Done (Billed)</option>
+              <option value="BILLING_PENDING">Billing Pending</option>
             </select>
 
             <select
@@ -1236,10 +1468,10 @@ export default function AdminPropertiesPage() {
                 </button>
               </span>
             )}
-            {filters.selectedE911 !== 'ALL' && (
+            {filters.billingStatus && filters.billingStatus !== 'ALL' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/40">
-                E911: {filters.selectedE911}
-                <button onClick={() => dispatch(setE911Filter('ALL'))} className="cursor-pointer">
+                Billing: {filters.billingStatus === 'BILLING_DONE' ? 'Billing Done' : 'Billing Pending'}
+                <button onClick={() => dispatch(setBillingStatusFilter('ALL'))} className="cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -3402,6 +3634,11 @@ export default function AdminPropertiesPage() {
                     label: `5. Porting Docs (${propertyDrawerData?.porting_attachments?.length ?? 0})`,
                     icon: FileText,
                   },
+                  {
+                    key: 'CALL_FORWARDING',
+                    label: '6. Call Forwarding & CDR',
+                    icon: PhoneCall,
+                  },
                 ].map((t) => {
                   const Icon = t.icon;
                   const isActive = drawerTab === t.key;
@@ -3762,9 +3999,19 @@ export default function AdminPropertiesPage() {
 
                         {/* Assign / Add Service Directly Form */}
                         <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
-                          <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block">
-                            + Add Service to this Property
-                          </span>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block">
+                              + Add or Create Service for this Property
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleOpenCreateServiceInDrawer}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-sm transition"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Create New Service</span>
+                            </button>
+                          </div>
                           <form onSubmit={handleDrawerAssignService} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <select
                               value={drawerAssignServiceId}
@@ -4092,21 +4339,68 @@ export default function AdminPropertiesPage() {
                                   )}
                                 </div>
 
-                                <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
-                                  <span>Site Survey Status:</span>
-                                  <span className="font-bold text-slate-800 dark:text-slate-200">
-                                    {propertyDrawerData.data_circuit.site_survey_status || 'PENDING'}
-                                  </span>
+                                <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-slate-700 dark:text-slate-300">Site Survey Status:</span>
+                                    <span
+                                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                        propertyDrawerData.data_circuit.site_survey_status === 'COMPLETED' ||
+                                        propertyDrawerData.data_circuit.site_survey_status === 'DONE'
+                                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                          : propertyDrawerData.data_circuit.site_survey_status === 'NOT_REQUIRED'
+                                          ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                      }`}
+                                    >
+                                      {propertyDrawerData.data_circuit.site_survey_status === 'COMPLETED' ||
+                                      propertyDrawerData.data_circuit.site_survey_status === 'DONE'
+                                        ? 'Site Survey: Done'
+                                        : propertyDrawerData.data_circuit.site_survey_status === 'NOT_REQUIRED'
+                                        ? 'Not Required'
+                                        : 'Site Survey: Pending'}
+                                    </span>
+                                  </div>
+                                  {propertyDrawerData.data_circuit.site_survey_notes && (
+                                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-[#111217] border border-slate-200/70 dark:border-[#252836] text-[11px] text-slate-700 dark:text-slate-300">
+                                      <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Site Survey Notes:</span>
+                                      {propertyDrawerData.data_circuit.site_survey_notes}
+                                    </div>
+                                  )}
                                 </div>
 
-                                <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
-                                  <span>FOC Status &amp; Date:</span>
-                                  <span className="font-bold text-slate-800 dark:text-slate-200">
-                                    {propertyDrawerData.data_circuit.foc_date
-                                      ? `${propertyDrawerData.data_circuit.foc_status || 'CONFIRMED'} (${propertyDrawerData.data_circuit.foc_date})`
-                                      : propertyDrawerData.data_circuit.foc_status || 'PENDING'}
-                                  </span>
+                                <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-semibold text-slate-700 dark:text-slate-300">FOC Status &amp; Date:</span>
+                                    <span
+                                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                        propertyDrawerData.data_circuit.foc_status === 'CONFIRMED'
+                                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                      }`}
+                                    >
+                                      {propertyDrawerData.data_circuit.foc_status === 'CONFIRMED'
+                                        ? `FOC Confirmed${propertyDrawerData.data_circuit.foc_date ? ` (${propertyDrawerData.data_circuit.foc_date})` : ''}`
+                                        : `FOC Pending Actions${propertyDrawerData.data_circuit.foc_date ? ` (${propertyDrawerData.data_circuit.foc_date})` : ''}`}
+                                    </span>
+                                  </div>
+                                  {propertyDrawerData.data_circuit.foc_pending_actions_notes && (
+                                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-[#111217] border border-slate-200/70 dark:border-[#252836] text-[11px] text-slate-700 dark:text-slate-300">
+                                      <span className="font-bold text-slate-900 dark:text-white block mb-0.5">FOC / Cutover Notes:</span>
+                                      {propertyDrawerData.data_circuit.foc_pending_actions_notes}
+                                    </div>
+                                  )}
                                 </div>
+
+                                {propertyDrawerData.data_circuit.internal_admin_notes && (
+                                  <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg space-y-1">
+                                    <span className="font-bold text-slate-900 dark:text-white block text-[11px]">
+                                      Internal Admin Notes:
+                                    </span>
+                                    <p className="text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                                      {propertyDrawerData.data_circuit.internal_admin_notes}
+                                    </p>
+                                  </div>
+                                )}
 
                                 {propertyDrawerData.data_circuit.installed_at && (
                                   <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
@@ -4194,6 +4488,99 @@ export default function AdminPropertiesPage() {
                                 <span>Start Data Circuit for this Property</span>
                               </a>
                             </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB 5: PORTING DOCS & IMAGES (VIEW & DOWNLOAD) */}
+                    {/* TAB 6: CALL FORWARDING & CDR LOGS */}
+                    {drawerTab === 'CALL_FORWARDING' && (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+                              <PhoneCall className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="font-black text-slate-900 dark:text-white text-sm">
+                                PBX DIDs, Call Forwarding &amp; CDR Call Logs
+                              </p>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mt-0.5">
+                                View attached DID numbers, FreePBX cluster servers, live Call Forwarding state, and CDR logs
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`/admin/call-forwarding?property_id=${selectedPropForDrawer.id}`}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition"
+                            >
+                              <PhoneCall className="w-3.5 h-3.5" />
+                              <span>Manage Call Forwarding</span>
+                            </a>
+                            <a
+                              href={`/admin/call-logs?property_id=${selectedPropForDrawer.id}`}
+                              className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>View CDR Logs</span>
+                            </a>
+                          </div>
+                        </div>
+
+                        {(!propertyDrawerData?.services || propertyDrawerData.services.length === 0) ? (
+                          <div className="p-10 text-center border border-dashed border-slate-200 dark:border-[#222430] rounded-2xl space-y-2 text-slate-400">
+                            <PhoneCall className="w-8 h-8 mx-auto opacity-40" />
+                            <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">
+                              No DIDs / Voice Services Attached Yet
+                            </p>
+                            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                              Assign a DID or Voice service in Tab 2 (Services) to control Call Forwarding and view live CDR logs for this property.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {propertyDrawerData.services.map((svc: any) => (
+                              <div
+                                key={svc.id}
+                                className="p-3.5 rounded-xl bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] flex flex-wrap items-center justify-between gap-3"
+                              >
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                                      {svc.did_number || svc.normalized_did || svc.service_name}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                      PBX Server #{svc.pbx_server_id || 1} ({svc.pbx_server_id === 2 ? '162.248.187.142' : svc.pbx_server_id === 3 ? '162.248.187.240' : '162.248.187.115'})
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {svc.service_name} • {svc.carrier || 'AAA SIP Trunk'}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-2.5">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                                      svc.call_forwarding_state === 'ON'
+                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                    }`}
+                                  >
+                                    {svc.call_forwarding_state === 'ON'
+                                      ? `FWD ON → ${svc.call_forwarding_destination || 'Active'}`
+                                      : 'FWD OFF (PBX Normal)'}
+                                  </span>
+                                  <a
+                                    href={`/admin/call-forwarding?property_id=${selectedPropForDrawer.id}`}
+                                    className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#252836] hover:bg-slate-50 dark:hover:bg-[#222430] text-xs font-bold text-blue-600 dark:text-blue-400"
+                                  >
+                                    Configure
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -4302,6 +4689,487 @@ export default function AdminPropertiesPage() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* PROVISION NEW SERVICE MODAL (FROM PROPERTY RIGHT SIDEBAR) */}
+      <AnimatePresence>
+        {showCreateServiceInDrawerModal && selectedPropForDrawer && (() => {
+          const currentType = serviceCreateForm.is_custom_type
+            ? serviceCreateForm.custom_type_input.trim()
+            : serviceCreateForm.service_type_name;
+          const isFire = isFireLineSvcType(currentType);
+          const isElevator = isElevatorLineSvcType(currentType);
+
+          const handleTypeSelect = (newType: string) => {
+            const isFL = isFireLineSvcType(newType);
+            const isEL = isElevatorLineSvcType(newType);
+            let newId = serviceCreateForm.custom_service_id;
+            if (!newId || newId.startsWith('SVC-') || newId.startsWith('FL-') || newId.startsWith('EL-')) {
+              if (isFL) newId = `FL-${Math.floor(100000 + Math.random() * 900000)}`;
+              else if (isEL) newId = `EL-${Math.floor(100000 + Math.random() * 900000)}`;
+              else newId = `SVC-${Math.floor(100000 + Math.random() * 900000)}`;
+            }
+            setServiceCreateForm((prev) => ({
+              ...prev,
+              service_type_name: newType,
+              custom_service_id: newId,
+            }));
+          };
+
+          return (
+            <div className="fixed inset-0 min-h-screen w-screen h-screen z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+                <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    {isFire ? (
+                      <Flame className="w-5 h-5 text-orange-500" />
+                    ) : isElevator ? (
+                      <ArrowUpDown className="w-5 h-5 text-purple-600" />
+                    ) : (
+                      <Plus className="w-4 h-4 text-blue-600" />
+                    )}
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                        {isFire
+                          ? 'Add Fire Line'
+                          : isElevator
+                          ? 'Add Elevator Line'
+                          : 'Provision New Service'}
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Directly attaching to <span className="font-bold text-slate-800 dark:text-slate-200">{selectedPropForDrawer.name}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateServiceInDrawerModal(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {serviceCreateError && (
+                  <div className="mx-5 mt-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-600 text-xs rounded-lg shrink-0">
+                    {serviceCreateError}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateServiceInDrawerSubmit} className="p-5 overflow-y-auto flex-1 min-h-0 space-y-4 text-xs">
+                  {isFire ? (
+                    <>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-black dark:text-white block">Service Type</label>
+                          <button
+                            type="button"
+                            onClick={() => setServiceCreateForm({ ...serviceCreateForm, is_custom_type: !serviceCreateForm.is_custom_type })}
+                            className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {serviceCreateForm.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                          </button>
+                        </div>
+
+                        {serviceCreateForm.is_custom_type ? (
+                          <input
+                            type="text"
+                            required
+                            value={serviceCreateForm.custom_type_input}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, custom_type_input: e.target.value })}
+                            placeholder="Enter new custom service type..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        ) : (
+                          <select
+                            value={serviceCreateForm.service_type_name}
+                            onChange={(e) => handleTypeSelect(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer font-medium"
+                          >
+                            {availableDrawerServiceTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Device Type <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={serviceCreateForm.device_type}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, device_type: e.target.value })}
+                          placeholder="e.g. Fire Communicator DACT, Fire Alarm Panel"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Phone Number <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={serviceCreateForm.phone_number}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, phone_number: e.target.value })}
+                          placeholder="e.g. +1 555-019-2831"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Serial Number</label>
+                          <input
+                            type="text"
+                            value={serviceCreateForm.serial_number}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, serial_number: e.target.value })}
+                            placeholder="e.g. SN-9812-FL-01"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={serviceCreateForm.price}
+                              onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, price: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Description</label>
+                        <textarea
+                          rows={2}
+                          value={serviceCreateForm.description}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, description: e.target.value })}
+                          placeholder="e.g. Primary life-safety monitoring dialer line"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none"
+                        />
+                      </div>
+
+                      <div className="pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span>
+                            Service ID:{' '}
+                            <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
+                              {serviceCreateForm.custom_service_id || 'Auto-generated (FL-XXXXXX)'}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomSvcIdInDrawer(!showCustomSvcIdInDrawer)}
+                            className="text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {showCustomSvcIdInDrawer ? 'Hide Custom ID' : 'Customize ID'}
+                          </button>
+                        </div>
+                        {showCustomSvcIdInDrawer && (
+                          <input
+                            type="text"
+                            value={serviceCreateForm.custom_service_id}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, custom_service_id: e.target.value })}
+                            placeholder="e.g. FL-MIA-001"
+                            className="mt-1.5 w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono"
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : isElevator ? (
+                    <>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-black dark:text-white block">Service Type</label>
+                          <button
+                            type="button"
+                            onClick={() => setServiceCreateForm({ ...serviceCreateForm, is_custom_type: !serviceCreateForm.is_custom_type })}
+                            className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {serviceCreateForm.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                          </button>
+                        </div>
+
+                        {serviceCreateForm.is_custom_type ? (
+                          <input
+                            type="text"
+                            required
+                            value={serviceCreateForm.custom_type_input}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, custom_type_input: e.target.value })}
+                            placeholder="Enter new custom service type..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        ) : (
+                          <select
+                            value={serviceCreateForm.service_type_name}
+                            onChange={(e) => handleTypeSelect(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer font-medium"
+                          >
+                            {availableDrawerServiceTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Phone Number <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={serviceCreateForm.phone_number}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, phone_number: e.target.value })}
+                          placeholder="e.g. +1 555-019-2844"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Extension / Cab ID</label>
+                          <input
+                            type="text"
+                            value={serviceCreateForm.extension}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, extension: e.target.value })}
+                            placeholder="e.g. Cab #1 - North Tower"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={serviceCreateForm.price}
+                              onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, price: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Description</label>
+                        <textarea
+                          rows={2}
+                          value={serviceCreateForm.description}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, description: e.target.value })}
+                          placeholder="e.g. Elevator cab emergency auto-dialer"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none"
+                        />
+                      </div>
+
+                      <div className="pt-1">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span>
+                            Service ID:{' '}
+                            <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
+                              {serviceCreateForm.custom_service_id || 'Auto-generated (EL-XXXXXX)'}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowCustomSvcIdInDrawer(!showCustomSvcIdInDrawer)}
+                            className="text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {showCustomSvcIdInDrawer ? 'Hide Custom ID' : 'Customize ID'}
+                          </button>
+                        </div>
+                        {showCustomSvcIdInDrawer && (
+                          <input
+                            type="text"
+                            value={serviceCreateForm.custom_service_id}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, custom_service_id: e.target.value })}
+                            placeholder="e.g. EL-MIA-001"
+                            className="mt-1.5 w-full px-3 py-1.5 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono"
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          Service ID <span className="text-rose-500">* (Min 6 chars)</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          minLength={6}
+                          value={serviceCreateForm.custom_service_id}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, custom_service_id: e.target.value })}
+                          placeholder="e.g. SVC-MIA-001"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Service Name</label>
+                          <input
+                            type="text"
+                            value={serviceCreateForm.service_name}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, service_name: e.target.value })}
+                            placeholder="e.g. Main Lobby Line"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">
+                            Phone Number / DID <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={serviceCreateForm.phone_number}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, phone_number: e.target.value })}
+                            placeholder="+1 (555) 019-2834"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-black dark:text-white block">Service Type</label>
+                          <button
+                            type="button"
+                            onClick={() => setServiceCreateForm({ ...serviceCreateForm, is_custom_type: !serviceCreateForm.is_custom_type })}
+                            className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                          >
+                            {serviceCreateForm.is_custom_type ? 'Choose Preset Type' : '+ Add New Custom Type'}
+                          </button>
+                        </div>
+
+                        {serviceCreateForm.is_custom_type ? (
+                          <input
+                            type="text"
+                            required
+                            value={serviceCreateForm.custom_type_input}
+                            onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, custom_type_input: e.target.value })}
+                            placeholder="Enter new custom service type..."
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs"
+                          />
+                        ) : (
+                          <select
+                            value={serviceCreateForm.service_type_name}
+                            onChange={(e) => handleTypeSelect(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer"
+                          >
+                            {availableDrawerServiceTypes.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Attached Property</label>
+                          <input
+                            type="text"
+                            disabled
+                            value={selectedPropForDrawer.name}
+                            className="w-full px-3 py-2 bg-slate-100 dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-bold text-black dark:text-white block mb-1">Monthly Price ($)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={serviceCreateForm.price}
+                              onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, price: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">
+                          FreePBX Cluster Server (`server_id` for DID &amp; Call Forwarding)
+                        </label>
+                        <select
+                          value={serviceCreateForm.pbx_server_id}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, pbx_server_id: Number(e.target.value) })}
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer font-semibold"
+                        >
+                          <option value={1}>Server 1 — PBX 115 (Primary)</option>
+                          <option value={2}>Server 2 — PBX 142 (Secondary)</option>
+                          <option value={3}>Server 3 — PBX 240 (Tertiary)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-black dark:text-white block mb-1">Description</label>
+                        <textarea
+                          rows={2}
+                          value={serviceCreateForm.description}
+                          onChange={(e) => setServiceCreateForm({ ...serviceCreateForm, description: e.target.value })}
+                          placeholder="e.g. Primary inbound DID for front desk operations"
+                          className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs resize-none"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#222430] shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateServiceInDrawerModal(false)}
+                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={creatingServiceInDrawer}
+                      className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      {creatingServiceInDrawer ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : isFire ? (
+                        'Save Fire Line'
+                      ) : isElevator ? (
+                        'Save Elevator Line'
+                      ) : (
+                        'Provision Service'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* IMPORT CSV MODAL */}

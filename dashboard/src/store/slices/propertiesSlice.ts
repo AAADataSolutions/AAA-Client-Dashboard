@@ -96,6 +96,7 @@ export interface PropertiesState {
     selectedE911: string;
     selectedE911Filter: string;
     rayBaum?: string;
+    billingStatus?: string;
     sortBy: string;
     sortOrder: 'asc' | 'desc';
   };
@@ -143,6 +144,7 @@ const initialState: PropertiesState = {
     selectedE911: 'ALL',
     selectedE911Filter: 'ALL',
     rayBaum: 'ALL',
+    billingStatus: 'ALL',
     sortBy: 'created_at',
     sortOrder: 'desc',
   },
@@ -166,6 +168,8 @@ export const fetchProperties = createAsyncThunk(
     if (e911Val && e911Val !== 'ALL') q.set('e911', e911Val);
     const rayBaumVal = params.rayBaum || params.selectedRayBaum;
     if (rayBaumVal && rayBaumVal !== 'ALL') q.set('rayBaum', rayBaumVal);
+    const billingVal = params.billingStatus || params.selectedBillingStatus;
+    if (billingVal && billingVal !== 'ALL') q.set('billingStatus', billingVal);
     if (params.page) q.set('page', String(params.page));
     const limitVal = params.limit || params.page_size;
     if (limitVal) q.set('limit', String(limitVal));
@@ -343,6 +347,12 @@ export const propertiesSlice = createSlice({
       state.pagination.page = 1;
       state.pagination.currentPage = 1;
     },
+    setBillingStatusFilter: (state, action: PayloadAction<string>) => {
+      state.filters.billingStatus = action.payload;
+      state.currentPage = 1;
+      state.pagination.page = 1;
+      state.pagination.currentPage = 1;
+    },
     setSortBy: (
       state,
       action: PayloadAction<string | { sortBy: string; sortOrder: 'asc' | 'desc' }>
@@ -488,6 +498,7 @@ export const {
   setOrgFilter,
   setE911Filter,
   setRayBaumFilter,
+  setBillingStatusFilter,
   setSortBy,
   setPagination,
   setFilters,

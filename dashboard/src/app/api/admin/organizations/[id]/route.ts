@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAdminAction } from '@/lib/audit/logger';
 import { getAppBaseUrl } from '@/lib/utils/url';
+import { pbxUpdateManagementUser, pbxDeactivateManagementUser, normalizePortalUsername } from '@/lib/pbx/client';
 
 export async function GET(
   request: NextRequest,
@@ -375,6 +376,11 @@ export async function GET(
         contact_name: primaryContact.name,
         primary_contact_name: primaryContact.name,
         status: org.status || 'ACTIVE',
+        portal_username: org.portal_username || org.email || null,
+        portal_user_id: org.portal_user_id || null,
+        portal_active: org.portal_active ?? true,
+        portal_sync_status: org.portal_sync_status || 'UNSYNCED',
+        portal_last_synced_at: org.portal_last_synced_at || null,
         created_at: org.created_at,
         updated_at: org.updated_at || org.created_at,
         primary_contact: primaryContact,
@@ -441,6 +447,48 @@ export async function PATCH(
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Sync updates/deactivation with Call Forwarding Portal (management_group.php)
+    try {
+      const oldUsername = normalizePortalUsername(updatedOrg.portal_username || updatedOrg.email, updatedOrg.name);
+      const newUsername = body.portal_username
+        ? normalizePortalUsername(body.portal_username, updatedOrg.name)
+        : (body.email ? normalizePortalUsername(body.email, updatedOrg.name) : oldUsername);
+
+      if (body.status === 'INACTIVE' || body.status === 'SUSPENDED' || body.status === 'ARCHIVED') {
+        await pbxDeactivateManagementUser({
+          username: oldUsername,
+          organization_id: id,
+        });
+        await dbClient
+          .from('organizations')
+          .update({
+            portal_active: false,
+            portal_sync_status: 'SYNCED',
+            portal_last_synced_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+      } else {
+        const pbxUpd = await pbxUpdateManagementUser({
+          username: oldUsername,
+          new_username: newUsername !== oldUsername ? newUsername : undefined,
+          hotel_name: updatedOrg.name,
+          contact_name: cleanContactName || updatedOrg.name,
+          organization_id: id,
+        });
+        await dbClient
+          .from('organizations')
+          .update({
+            portal_username: newUsername,
+            portal_user_id: pbxUpd.data?.user_id || updatedOrg.portal_user_id || null,
+            portal_sync_status: pbxUpd.success ? 'SYNCED' : 'ERROR',
+            portal_last_synced_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+      }
+    } catch {
+      // Non-blocking if migration 29 columns are not added yet
     }
 
     // Synchronize primary organization_contacts

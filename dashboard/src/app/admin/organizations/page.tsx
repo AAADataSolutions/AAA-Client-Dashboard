@@ -177,6 +177,24 @@ export default function AdminOrganizationsPage() {
     is_primary: false,
   });
   const [savingContact, setSavingContact] = useState(false);
+  const [syncingPbx, setSyncingPbx] = useState(false);
+
+  const handleSyncPbxPortal = async () => {
+    try {
+      setSyncingPbx(true);
+      const res = await fetch('/api/admin/pbx/sync-organizations', { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to sync with PBX Portal');
+      }
+      showToast(json.message || 'Management Groups synced with PBX Portal.');
+      loadOrganizations();
+    } catch (err: any) {
+      showToast(err.message || 'PBX Sync error', 'error');
+    } finally {
+      setSyncingPbx(false);
+    }
+  };
 
   // Delete Contact Confirmation Modal
   const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -669,6 +687,15 @@ export default function AdminOrganizationsPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={handleSyncPbxPortal}
+            disabled={syncingPbx}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-semibold text-xs transition shadow-2xs cursor-pointer disabled:opacity-50"
+            title="Synchronize Management Groups with Call Forwarding Portal (management_group.php)"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncingPbx ? 'animate-spin' : ''}`} />
+            <span>{syncingPbx ? 'Syncing PBX...' : 'Sync PBX Portal'}</span>
+          </button>
           <button
             onClick={handleExportCSV}
             disabled={exporting}

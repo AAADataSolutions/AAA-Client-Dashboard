@@ -30,6 +30,7 @@ import {
   ArrowUpDown,
   Wrench,
   Network,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { LogoutConfirmModal } from '@/components/common/LogoutConfirmModal';
@@ -65,15 +66,24 @@ const navItems: NavItem[] = [
   {
     label: 'Services',
     icon: PhoneCall,
-    hideForSuperAdmin: true,
+    hideForSuperAdmin: false,
     children: [
       { label: 'Services and Lines', href: '/admin/services', icon: PhoneCall },
+      { label: 'Call Forwarding', href: '/admin/call-forwarding', icon: GitBranch },
+      { label: 'Call Logs (CDR)', href: '/admin/call-logs', icon: FileClock },
       { label: 'Firelines', href: '/admin/firelines', icon: Flame },
       { label: 'Elevator Lines', href: '/admin/elevator-lines', icon: ArrowUpDown },
     ],
   },
   { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
-  { label: 'Data Circuit', href: '/admin/data-circuits', icon: Network },
+  {
+    label: 'Data Circuit',
+    icon: Network,
+    children: [
+      { label: 'Data Circuit Pipeline', href: '/admin/data-circuits', icon: Network },
+      { label: 'Data Circuit Installed', href: '/admin/data-circuits/installed', icon: CheckCircle2 },
+    ],
+  },
   { label: "E911 Compliance", href: '/admin/e911', icon: ShieldCheck, statusDot: 'bg-[#facc15]', hideForSuperAdmin: true },
   { label: 'Support Tickets', href: '/admin/tickets', icon: LifeBuoy, badgeColor: 'bg-[#f43f5e] text-white', hideForSuperAdmin: true },
   { label: 'Partners', href: '/admin/partners', icon: Users, superAdminOnly: true },
@@ -103,6 +113,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
 
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({
     Services: true,
+    'Data Circuit': true,
     Finances: true,
   });
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
@@ -228,7 +239,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle, on
                     {isOpen && isExpanded && (
                       <div className="pl-4 ml-3 border-l border-[#18274f] space-y-1 my-1">
                         {item.children.map((subItem) => {
-                          const isSubActive = pathname === subItem.href || (subItem.href !== '/admin/finances' && pathname.startsWith(subItem.href));
+                          const isSubActive = pathname === subItem.href || (subItem.href !== '/admin/finances' && subItem.href !== '/admin/data-circuits' && pathname.startsWith(subItem.href));
                           const SubIcon = subItem.icon || PhoneCall;
                           return (
                             <Link

@@ -51,6 +51,8 @@ const navItems: NavItem[] = [
     icon: PhoneCall,
     children: [
       { label: 'Services and Lines', href: '/dashboard/services', icon: PhoneCall },
+      { label: 'Call Forwarding', href: '/dashboard/call-forwarding', icon: GitBranch },
+      { label: 'Call Logs (CDR)', href: '/dashboard/call-logs', icon: Radio },
       { label: 'Firelines', href: '/dashboard/firelines', icon: Flame },
       { label: 'Elevator Lines', href: '/dashboard/elevator-lines', icon: ArrowUpDown },
     ],

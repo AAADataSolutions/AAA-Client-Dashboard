@@ -168,7 +168,21 @@ interface WholesalerItem {
   phone?: string | null;
 }
 
-export default function AdminDataCircuitsPage() {
+export default function AdminDataCircuitsPage(props?: any) {
+  const defaultView: 'PIPELINE' | 'INSTALLED' = props?.defaultView === 'INSTALLED' ? 'INSTALLED' : 'PIPELINE';
+  const [activeViewTab, setActiveViewTab] = useState<'PIPELINE' | 'INSTALLED'>(defaultView);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab')?.toUpperCase();
+      if (tabParam === 'INSTALLED') {
+        setActiveViewTab('INSTALLED');
+      } else if (tabParam === 'PIPELINE') {
+        setActiveViewTab('PIPELINE');
+      }
+    }
+  }, []);
   const now = new Date();
   const defaultMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [selectedMonth, setSelectedMonth] = useState(defaultMonthKey);
@@ -199,6 +213,19 @@ export default function AdminDataCircuitsPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  const pipelineCircuits = useMemo(
+    () => circuits.filter((c) => c.status !== 'INSTALLED'),
+    [circuits]
+  );
+  const installedCircuitsList = useMemo(
+    () => circuits.filter((c) => c.status === 'INSTALLED'),
+    [circuits]
+  );
+  const displayedCircuits = useMemo(
+    () => (activeViewTab === 'INSTALLED' ? installedCircuitsList : pipelineCircuits),
+    [activeViewTab, installedCircuitsList, pipelineCircuits]
+  );
 
   // Create Circuit Modal (Initial status: 'STARTED')
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -645,7 +672,15 @@ export default function AdminDataCircuitsPage() {
       if (!res.ok || !json.success) {
         throw new Error(json.error || 'Failed to update Data Circuit');
       }
-      showToast('Data Circuit Updated', `Saved stage (${stageForm.status}) and circuit configuration.`);
+      if (stageForm.status === 'INSTALLED' && selectedCircuit.status !== 'INSTALLED') {
+        showToast(
+          'Circuit Installed & Moved!',
+          `${selectedCircuit.property_name} is now INSTALLED and moved to the Data Circuit Installed tab.`
+        );
+        setShowManageModal(false);
+      } else {
+        showToast('Data Circuit Updated', `Saved stage (${stageForm.status}) and circuit configuration.`);
+      }
       await fetchCircuitsData();
     } catch (err: any) {
       showToast('Update failed', err.message, 'error');
@@ -891,15 +926,87 @@ export default function AdminDataCircuitsPage() {
         </div>
       </motion.div>
 
+      {/* 2 MAIN TABS: DATA CIRCUIT PIPELINE vs DATA CIRCUIT INSTALLED */}
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-wrap items-center gap-2 bg-white dark:bg-[#15161c] p-2 rounded-2xl border border-slate-200/80 dark:border-[#222430] shadow-xs"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setActiveViewTab('PIPELINE');
+            setStatusFilter('ALL');
+          }}
+          className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeViewTab === 'PIPELINE'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e202b]'
+          }`}
+        >
+          <Network className="w-4 h-4" />
+          <span>Data Circuit Pipeline</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+              activeViewTab === 'PIPELINE'
+                ? 'bg-white/20 text-white'
+                : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+            }`}
+          >
+            {pipelineCircuits.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveViewTab('INSTALLED');
+            setStatusFilter('ALL');
+          }}
+          className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
+            activeViewTab === 'INSTALLED'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e202b]'
+          }`}
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Data Circuit Installed</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+              activeViewTab === 'INSTALLED'
+                ? 'bg-white/20 text-white'
+                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+            }`}
+          >
+            {installedCircuitsList.length}
+          </span>
+        </button>
+
+        <span className="text-[11px] text-slate-400 ml-auto hidden md:inline pr-2">
+          {activeViewTab === 'PIPELINE'
+            ? 'Showing active pipeline circuits (Stages 1–6). Circuits automatically move to Installed once Stage 7 is saved.'
+            : 'Showing live, installed Data Circuits (Stage 7: Installed).'}
+        </span>
+      </motion.div>
+
       {/* Filter and Search Bar */}
       <motion.div
         variants={itemVariants}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#15161c] p-3 rounded-2xl border border-slate-200/80 dark:border-[#222430]"
       >
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-800/40 text-xs font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-            <Network className="w-4 h-4" />
-            <span>Active Circuits ({circuits.length})</span>
+          <div
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
+              activeViewTab === 'INSTALLED'
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300'
+                : 'bg-blue-50 dark:bg-blue-950/40 border-blue-200/60 dark:border-blue-800/40 text-blue-700 dark:text-blue-300'
+            }`}
+          >
+            {activeViewTab === 'INSTALLED' ? <CheckCircle2 className="w-4 h-4" /> : <Network className="w-4 h-4" />}
+            <span>
+              {activeViewTab === 'INSTALLED'
+                ? `Installed Data Circuits (${displayedCircuits.length})`
+                : `Pipeline Circuits (${displayedCircuits.length})`}
+            </span>
           </div>
         </div>
 
@@ -916,18 +1023,20 @@ export default function AdminDataCircuitsPage() {
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-hidden cursor-pointer"
-          >
-            <option value="ALL">All Stages (1-7)</option>
-            {CIRCUIT_STAGES.map((st) => (
-              <option key={st.key} value={st.key}>
-                {st.label}
-              </option>
-            ))}
-          </select>
+          {activeViewTab === 'PIPELINE' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-hidden cursor-pointer"
+            >
+              <option value="ALL">All Pipeline Stages (1-6)</option>
+              {CIRCUIT_STAGES.filter((st) => st.key !== 'INSTALLED').map((st) => (
+                <option key={st.key} value={st.key}>
+                  {st.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </motion.div>
 
@@ -946,6 +1055,7 @@ export default function AdminDataCircuitsPage() {
                 <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Client Price</th>
                 <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Revenue Share</th>
                 <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Stage</th>
+                <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Site Survey &amp; FOC</th>
                 <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Monthly revenue</th>
                 <th className="py-3.5 px-4 text-black dark:text-white font-black text-right whitespace-nowrap">Actions</th>
               </tr>
@@ -953,23 +1063,29 @@ export default function AdminDataCircuitsPage() {
             <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
+                  <td colSpan={9} className="py-16 text-center text-slate-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
                     Loading Data Circuits...
                   </td>
                 </tr>
-              ) : circuits.length === 0 ? (
+              ) : displayedCircuits.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-500">
+                  <td colSpan={9} className="py-16 text-center text-slate-500">
                     <Network className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
-                    <p className="font-bold text-slate-700 dark:text-slate-200">No Data Circuits Found</p>
+                    <p className="font-bold text-slate-700 dark:text-slate-200">
+                      {activeViewTab === 'INSTALLED'
+                        ? 'No Installed Data Circuits Yet'
+                        : 'No Pipeline Data Circuits Found'}
+                    </p>
                     <p className="text-xs text-slate-400 mt-1">
-                      Click &ldquo;New Data Circuit Request&rdquo; to start a new property data circuit.
+                      {activeViewTab === 'INSTALLED'
+                        ? 'Circuits automatically move here from the Pipeline the moment their stage is set to Installed.'
+                        : 'Click "New Data Circuit Request" to start a new property data circuit.'}
                     </p>
                   </td>
                 </tr>
               ) : (
-                circuits.map((c) => {
+                displayedCircuits.map((c) => {
                   const badge = getCircuitStageBadge(c.status);
                   const hasPdf = Boolean(c.agreement_file_name || c.agreement_storage_path || c.agreement_file_url);
                   const isRec = Boolean(c.current_month_revenue?.revenue_received);
@@ -1039,6 +1155,72 @@ export default function AdminDataCircuitsPage() {
                           <span className={hasPdf ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-amber-600'}>
                             {hasPdf ? '✓ PDF Signed' : '• Needs PDF'}
                           </span>
+                        </div>
+                      </td>
+
+                      {/* Site Survey & FOC Status + Notes */}
+                      <td
+                        className="py-3.5 px-4 max-w-[260px]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenManageModal(c, 'STAGES');
+                        }}
+                        title="Click to update Site Survey & FOC status and notes"
+                      >
+                        <div className="space-y-1.5">
+                          {/* Site Survey Status Badge + Notes */}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold border ${
+                                  c.site_survey_status === 'COMPLETED' || c.site_survey_status === 'DONE'
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
+                                    : c.site_survey_status === 'NOT_REQUIRED'
+                                    ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                                }`}
+                              >
+                                {c.site_survey_status === 'COMPLETED' || c.site_survey_status === 'DONE'
+                                  ? '✓ Site Survey: Done'
+                                  : c.site_survey_status === 'NOT_REQUIRED'
+                                  ? 'Site Survey: N/A'
+                                  : '• Site Survey: Pending'}
+                              </span>
+                            </div>
+                            {c.site_survey_notes && (
+                              <p
+                                className="text-[10.5px] text-slate-600 dark:text-slate-400 mt-0.5 truncate"
+                                title={c.site_survey_notes}
+                              >
+                                Note: {c.site_survey_notes}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* FOC Status Badge + Date + Notes */}
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold border ${
+                                  c.foc_status === 'CONFIRMED'
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
+                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+                                }`}
+                              >
+                                {c.foc_status === 'CONFIRMED'
+                                  ? `✓ FOC Confirmed${c.foc_date ? ` (${String(c.foc_date).slice(0, 10)})` : ''}`
+                                  : `• FOC: Pending Actions${c.foc_date ? ` (${String(c.foc_date).slice(0, 10)})` : ''}`}
+                              </span>
+                            </div>
+                            {c.foc_pending_actions_notes && (
+                              <p
+                                className="text-[10.5px] text-slate-600 dark:text-slate-400 mt-0.5 truncate"
+                                title={c.foc_pending_actions_notes}
+                              >
+                                FOC Note: {c.foc_pending_actions_notes}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -1631,25 +1813,27 @@ export default function AdminDataCircuitsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Step 5: Site Survey */}
                       <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] space-y-3">
-                        <h4 className="font-bold text-slate-900 dark:text-white">Step 5: Site Survey Status</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-white">Step 5: Site Survey Status &amp; Notes</h4>
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                            Site Survey Completed?
+                            Site Survey Status (Shown on Pipeline Table UI)
                           </label>
                           <select
                             value={stageForm.site_survey_status}
                             onChange={(e) => setStageForm((p) => ({ ...p, site_survey_status: e.target.value }))}
-                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#282a36]"
+                            className="w-full px-3 py-2 rounded-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#282a36] font-semibold"
                           >
-                            <option value="PENDING">Pending Site Survey</option>
-                            <option value="COMPLETED">Site Survey Completed</option>
+                            <option value="PENDING">Site Survey: Pending</option>
+                            <option value="COMPLETED">Site Survey: Done (Completed)</option>
                             <option value="NOT_REQUIRED">Not Required</option>
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-1">Site Survey Notes</label>
-                          <input
-                            type="text"
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                            Site Survey Notes (Saved to DB &amp; Visible in Property Right Sidebar)
+                          </label>
+                          <textarea
+                            rows={2}
                             placeholder="Demarc room verified, conduit ready..."
                             value={stageForm.site_survey_notes}
                             onChange={(e) => setStageForm((p) => ({ ...p, site_survey_notes: e.target.value }))}
@@ -1661,18 +1845,20 @@ export default function AdminDataCircuitsPage() {
                       {/* Step 6: FOC Status */}
                       <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] space-y-3">
                         <h4 className="font-bold text-slate-900 dark:text-white">
-                          Step 6: FOC Confirmed or Pending Actions
+                          Step 6: FOC Confirmed or Pending Actions &amp; Notes
                         </h4>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-500 mb-1">FOC Status</label>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                              FOC Status (Shown on Table UI)
+                            </label>
                             <select
                               value={stageForm.foc_status}
                               onChange={(e) => setStageForm((p) => ({ ...p, foc_status: e.target.value }))}
-                              className="w-full px-2.5 py-2 rounded-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#282a36]"
+                              className="w-full px-2.5 py-2 rounded-lg bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#282a36] font-semibold"
                             >
-                              <option value="PENDING_ACTIONS">Pending Actions</option>
-                              <option value="CONFIRMED">FOC Confirmed</option>
+                              <option value="PENDING_ACTIONS">FOC: Pending Actions</option>
+                              <option value="CONFIRMED">FOC: Confirmed</option>
                             </select>
                           </div>
                           <div>
@@ -1687,10 +1873,10 @@ export default function AdminDataCircuitsPage() {
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                            Pending Actions / Cutover Notes
+                            FOC / Pending Actions Notes (Saved to DB &amp; Visible in Property Right Sidebar)
                           </label>
-                          <input
-                            type="text"
+                          <textarea
+                            rows={2}
                             placeholder="Waiting on rack power / CPE delivery..."
                             value={stageForm.foc_pending_actions_notes}
                             onChange={(e) =>
