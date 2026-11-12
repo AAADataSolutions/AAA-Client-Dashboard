@@ -1,46 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, use } from 'react';
-import {
-  ShieldCheck,
-  Phone,
-  DoorOpen,
-  MapPin,
-  Plus,
-  Search,
-  Trash2,
-  Edit2,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  AlertTriangle,
-  X,
-  RefreshCw,
-  Upload,
-  Download,
-} from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ImportRayBaumModal } from '@/components/admin/ImportRayBaumModal';
-
-interface RayBaumRecord {
-  id: string;
-  property_id: string;
-  phone_number: string;
-  assigned_to_room: string | null;
-  location: string | null;
-  price?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface PropertyDetails {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-}
+import { RayBaumRecord, PropertyDetails, RayBaumFormState } from './_components/types';
+import { RayBaumTable } from './_components/RayBaumTable';
+import { RayBaumModals } from './_components/RayBaumModals';
 
 export default function AdminRayBaumPropertyPage({
   params,
@@ -59,7 +25,7 @@ export default function AdminRayBaumPropertyPage({
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submittingAdd, setSubmittingAdd] = useState(false);
-  const [addForm, setAddForm] = useState({
+  const [addForm, setAddForm] = useState<RayBaumFormState>({
     phone_number: '',
     assigned_to_room: '',
     location: '',
@@ -68,7 +34,7 @@ export default function AdminRayBaumPropertyPage({
 
   const [editingRecord, setEditingRecord] = useState<RayBaumRecord | null>(null);
   const [submittingEdit, setSubmittingEdit] = useState(false);
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<RayBaumFormState>({
     phone_number: '',
     assigned_to_room: '',
     location: '',
@@ -294,464 +260,41 @@ export default function AdminRayBaumPropertyPage({
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Section (Strictly per spec: Header + Sub-header, No KPI cards) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200 dark:border-[#222430]">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-1">
-              <ShieldCheck className="w-4 h-4" />
-              <span>RAY BAUM &amp; KARY'S LAW COMPLIANCE REGISTER</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Ray Baum and Kary's Law — {property?.name || 'Property'}
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span>{propertyAddress}</span>
-            </p>
-          </div>
+      <RayBaumTable
+        property={property}
+        propertyAddress={propertyAddress}
+        records={records}
+        filteredRecords={filteredRecords}
+        loading={loading}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        fetchData={fetchData}
+        handleExportCSV={handleExportCSV}
+        setShowImportModal={setShowImportModal}
+        setShowAddModal={setShowAddModal}
+        handleOpenEdit={handleOpenEdit}
+        setDeletingRecord={setDeletingRecord}
+      />
 
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              className="p-2 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#181920] text-slate-600 dark:text-slate-300 transition cursor-pointer"
-              title="Refresh records"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
-            </button>
-            <button
-              onClick={handleExportCSV}
-              className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#181920] text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
-              title="Export all Ray Baum records to CSV"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export CSV</span>
-            </button>
-            <button
-              onClick={() => setShowImportModal(true)}
-              className="px-3.5 py-2 rounded-lg border border-blue-200 dark:border-blue-900/40 bg-blue-50/70 hover:bg-blue-100/70 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
-              title="Import Ray Baum records from CSV"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import CSV</span>
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-2 transition shadow-sm cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Record</span>
-            </button>
-          </div>
-        </div>
+      <RayBaumModals
+        showAddModal={showAddModal}
+        setShowAddModal={setShowAddModal}
+        addForm={addForm}
+        setAddForm={setAddForm}
+        submittingAdd={submittingAdd}
+        handleCreateRecord={handleCreateRecord}
+        editingRecord={editingRecord}
+        setEditingRecord={setEditingRecord}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        submittingEdit={submittingEdit}
+        handleUpdateRecord={handleUpdateRecord}
+        deletingRecord={deletingRecord}
+        setDeletingRecord={setDeletingRecord}
+        submittingDelete={submittingDelete}
+        handleDeleteRecord={handleDeleteRecord}
+      />
 
-        {/* Search Bar */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by phone number, room, or location..."
-              className="w-full pl-9 pr-4 py-2 text-xs bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-4 text-xs flex-wrap">
-            <span className="text-slate-500 dark:text-slate-400 font-medium">
-              Total Records: <strong className="text-slate-900 dark:text-white">{records.length}</strong>
-            </span>
-            <span className="text-slate-500 dark:text-slate-400 font-medium">
-              Total Ray Baum Monthly Price: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">
-                ${records.reduce((sum, r) => sum + (Number(r.price) || 0), 0).toFixed(2)}/mo
-              </strong>
-            </span>
-          </div>
-        </div>
-
-        {/* Table View */}
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <th className="py-3.5 px-5 whitespace-nowrap">PHONE NO.</th>
-                  <th className="py-3.5 px-5 whitespace-nowrap">ASSIGNED TO ROOM</th>
-                  <th className="py-3.5 px-5 whitespace-nowrap">LOCATION</th>
-                  <th className="py-3.5 px-5 text-right whitespace-nowrap">MONTHLY PRICE</th>
-                  <th className="py-3.5 px-5 text-right whitespace-nowrap">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-                        <span>Loading dispatch records...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                        <p className="font-semibold text-slate-600 dark:text-slate-400">
-                          No dispatch records found.
-                        </p>
-                        <p className="text-[11px] text-slate-400">
-                          {searchQuery
-                            ? 'No matches for your search query.'
-                            : 'Click "Add Record" to create the first dispatchable location record.'}
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRecords.map((rec) => (
-                    <tr
-                      key={rec.id}
-                      className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors"
-                    >
-                      {/* 1. Phone No. */}
-                      <td className="py-3.5 px-5 whitespace-nowrap">
-                        <div className="flex items-center gap-2 font-mono font-semibold text-slate-900 dark:text-white">
-                          <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                          <span>{rec.phone_number}</span>
-                        </div>
-                      </td>
-
-                      {/* 2. Assigned to Room */}
-                      <td className="py-3.5 px-5 whitespace-nowrap">
-                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                          <DoorOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-medium">
-                            {rec.assigned_to_room || <span className="text-slate-400 italic">Unassigned</span>}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* 3. Location */}
-                      <td className="py-3.5 px-5 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                        <div className="flex items-center gap-1.5 max-w-md">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">
-                            {rec.location || <span className="text-slate-400 italic">Not specified</span>}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* 4. Monthly Price */}
-                      <td className="py-3.5 px-5 text-right whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">
-                        ${Number(rec.price || 0).toFixed(2)}
-                      </td>
-
-                      {/* 5. Actions */}
-                      <td className="py-3.5 px-5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEdit(rec)}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer"
-                            title="Edit record"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingRecord(rec)}
-                            className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                            title="Delete record"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal: Add Record */}
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl shadow-2xl p-6 space-y-5"
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#222430] pb-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Add Dispatchable Location
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateRecord} className="space-y-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Phone Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={addForm.phone_number}
-                    onChange={(e) => setAddForm({ ...addForm, phone_number: e.target.value })}
-                    placeholder="e.g. +1 (555) 123-4567"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Assigned to Room
-                  </label>
-                  <input
-                    type="text"
-                    value={addForm.assigned_to_room}
-                    onChange={(e) => setAddForm({ ...addForm, assigned_to_room: e.target.value })}
-                    placeholder="e.g. Room 402, Suite B, Lobby Desk"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Location Description
-                  </label>
-                  <input
-                    type="text"
-                    value={addForm.location}
-                    onChange={(e) => setAddForm({ ...addForm, location: e.target.value })}
-                    placeholder="e.g. 4th Floor North Wing, Main Building"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Monthly Price ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={addForm.price}
-                    onChange={(e) => setAddForm({ ...addForm, price: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
-                  />
-                  <p className="text-[10.5px] text-slate-400">
-                    This price will be automatically added to the property's total monthly billing price.
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#181920] text-slate-600 dark:text-slate-300 font-semibold text-xs cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingAdd}
-                    className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {submittingAdd ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                    <span>Save Record</span>
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal: Edit Record */}
-      <AnimatePresence>
-        {editingRecord && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl shadow-2xl p-6 space-y-5"
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#222430] pb-3">
-                <div className="flex items-center gap-2">
-                  <Edit2 className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Edit Dispatchable Location
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setEditingRecord(null)}
-                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleUpdateRecord} className="space-y-4 text-xs">
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Phone Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={editForm.phone_number}
-                    onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Assigned to Room
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.assigned_to_room}
-                    onChange={(e) => setEditForm({ ...editForm, assigned_to_room: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Location Description
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.location}
-                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    Monthly Price ($)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editForm.price}
-                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs font-mono"
-                  />
-                  <p className="text-[10.5px] text-slate-400">
-                    This price will be automatically added to the property's total monthly billing price.
-                  </p>
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-[#222430] flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingRecord(null)}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#181920] text-slate-600 dark:text-slate-300 font-semibold text-xs cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingEdit}
-                    className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
-                  >
-                    {submittingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                    <span>Update Record</span>
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal: Delete Confirmation */}
-      <AnimatePresence>
-        {deletingRecord && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-sm bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] rounded-xl shadow-2xl p-6 space-y-4"
-            >
-              <div className="flex items-center gap-3 text-rose-600">
-                <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Delete Record</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Are you sure you want to delete this dispatch record?
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Phone:</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{deletingRecord.phone_number}</span>
-                </div>
-                {deletingRecord.assigned_to_room && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Room:</span>
-                    <span className="text-slate-700 dark:text-slate-300">{deletingRecord.assigned_to_room}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDeletingRecord(null)}
-                  className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] hover:bg-slate-100 dark:hover:bg-[#181920] text-slate-600 dark:text-slate-300 font-semibold text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={submittingDelete}
-                  onClick={handleDeleteRecord}
-                  className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  {submittingDelete ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                  <span>Delete Record</span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
       {/* Modal: Import CSV */}
       <ImportRayBaumModal
         isOpen={showImportModal}

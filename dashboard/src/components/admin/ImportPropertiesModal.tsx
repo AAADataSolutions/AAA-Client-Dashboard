@@ -6,52 +6,26 @@ import {
   X,
   Upload,
   Download,
-  FileText,
-  CheckCircle2,
   AlertCircle,
   Loader2,
-  Building2,
   Check,
-  RefreshCw,
   Table as TableIcon,
   HelpCircle,
-  ArrowRight,
 } from 'lucide-react';
+import {
+  ParsedPropertyRow,
+  REQUIRED_HEADERS,
+  downloadPropertiesTemplate,
+  parsePropertiesCsv,
+} from './import-modals/propertiesCsvParser';
+import { PropertiesImportTable } from './import-modals/PropertiesImportTable';
+import { PropertiesImportResultView } from './import-modals/PropertiesImportResultView';
 
 interface ImportPropertiesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
-
-interface ParsedPropertyRow {
-  name: string;
-  location: string;
-  monthlyPrice: string;
-  onboardingDate: string;
-  mainPhone: string;
-  managementGroup: string;
-  e911Status: string;
-  rayBaumStatus: string;
-  gmName: string;
-  gmEmail: string;
-  isValid: boolean;
-  validationError?: string;
-  rawObj: Record<string, string>;
-}
-
-const REQUIRED_HEADERS = [
-  'Property Name',
-  'Property Location',
-  'Monthly price',
-  'Onboarding Date',
-  'Main Phone no',
-  'Management group',
-  'E911 Status',
-  'Ray Baum and Kari\'s law',
-  'GM Name',
-  'GM email',
-];
 
 export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
   isOpen,
@@ -73,159 +47,12 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Download CSV Template
-  const handleDownloadTemplate = () => {
-    const csvContent = `${REQUIRED_HEADERS.join(',')}\n` +
-      `"Grand Hyatt Downtown","123 Michigan Ave, Chicago, IL 60601",1450.00,"2026-03-01","+1 (312) 555-0199","Marriott Hospitality Group","Verified","Active","John Doe","jdoe@hotelchain.com"\n` +
-      `"Hilton Garden Inn Airport","456 Airport Way, Miami, FL 33142",1200.00,"2026-06-15","+1 (305) 555-0188","Hilton Worldwide","Verified","Active","Sarah Smith","ssmith@hilton.com"\n` +
-      `"Marriott Resort & Spa","789 Ocean Blvd, San Diego, CA 92109",1850.00,"2026-04-10","+1 (619) 555-0177","Marriott Hospitality Group","Verified","Active","Robert Taylor","rtaylor@marriott.com"`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'properties_import_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleProcessText = (text: string) => {
+    const { rows, error } = parsePropertiesCsv(text);
+    setParsedRows(rows);
+    setParseError(error);
   };
 
-  // 2. Parse CSV Text
-  const parseCSVText = (text: string) => {
-    try {
-      const lines: string[] = [];
-      let currentLine = '';
-      let inQuotes = false;
-
-      for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        const nextChar = text[i + 1];
-
-        if (char === '"') {
-          if (inQuotes && nextChar === '"') {
-            currentLine += '""'; // keep escaped quote for the row parser
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-            currentLine += char; // keep quote so row parser knows the cell is quoted
-          }
-        } else if ((char === '\r' || char === '\n') && !inQuotes) {
-          if (char === '\r' && nextChar === '\n') {
-            i++;
-          }
-          if (currentLine.trim()) {
-            lines.push(currentLine);
-          }
-          currentLine = '';
-        } else {
-          currentLine += char;
-        }
-      }
-      if (currentLine.trim()) {
-        lines.push(currentLine);
-      }
-
-      if (lines.length < 2) {
-        setParseError('The uploaded file must contain a header row and at least one property data row.');
-        setParsedRows([]);
-        return;
-      }
-
-      const parseRow = (line: string): string[] => {
-        const cells: string[] = [];
-        let currentCell = '';
-        let inQ = false;
-
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          const nextChar = line[i + 1];
-
-          if (char === '"') {
-            if (inQ && nextChar === '"') {
-              currentCell += '"';
-              i++;
-            } else {
-              inQ = !inQ;
-            }
-          } else if (char === ',' && !inQ) {
-            cells.push(currentCell.trim());
-            currentCell = '';
-          } else {
-            currentCell += char;
-          }
-        }
-        cells.push(currentCell.trim());
-        return cells;
-      };
-
-      const headers = parseRow(lines[0]).map((h) => h.replace(/^["']|["']$/g, '').trim());
-
-      const getVal = (rowObj: Record<string, string>, possibleKeys: string[]) => {
-        const normalized = Object.keys(rowObj).reduce((acc, k) => {
-          acc[k.toLowerCase().replace(/[^a-z0-9]/g, '')] = rowObj[k];
-          return acc;
-        }, {} as Record<string, string>);
-
-        for (const k of possibleKeys) {
-          const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (normalized[normK] !== undefined && normalized[normK] !== '') {
-            return normalized[normK];
-          }
-        }
-        return '';
-      };
-
-      const rows: ParsedPropertyRow[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cells = parseRow(lines[i]);
-        if (cells.every((c) => !c)) continue;
-
-        const rowObj: Record<string, string> = {};
-        headers.forEach((h, colIdx) => {
-          rowObj[h] = cells[colIdx] ? cells[colIdx].replace(/^["']|["']$/g, '').trim() : '';
-        });
-
-        const name = getVal(rowObj, ['Property Name', 'PropertyName', 'property_name', 'Name', 'name']);
-        const location = getVal(rowObj, ['Property Location', 'PropertyLocation', 'property_location', 'Location', 'location', 'Address', 'address']);
-        const monthlyPrice = getVal(rowObj, ['Monthly price', 'MonthlyPrice', 'monthly_price', 'Price', 'price', 'MRR']);
-        const onboardingDate = getVal(rowObj, ['Onboarding Date', 'OnboardingDate', 'onboarding_date', 'Onboarding date', 'Onboard Date', 'Date', 'date']);
-        const mainPhone = getVal(rowObj, ['Main Phone no', 'Main Phone No', 'MainPhoneNo', 'main_phone_no', 'Main Phone', 'Phone']);
-        const managementGroup = getVal(rowObj, ['Management group', 'Management Group', 'ManagementGroup', 'management_group', 'Organization', 'Group']);
-        const e911Status = getVal(rowObj, ['E911 Status', 'E911Status', 'e911_status', 'E911']);
-        const rayBaumStatus = getVal(rowObj, ['Ray Baum and Kari\'s law', 'Ray Baum and Kary\'s law', 'ay Baum and Kary\'s law', 'Ray Baum', 'ray_baum']);
-        const gmName = getVal(rowObj, ['GM Name', 'GMName', 'gm_name', 'General Manager Name']);
-        const gmEmail = getVal(rowObj, ['GM email', 'GMEmail', 'gm_email', 'General Manager Email']);
-
-        const isValid = Boolean(name.trim());
-        const validationError = !name.trim() ? 'Missing Property Name' : undefined;
-
-        rows.push({
-          name,
-          location: location || 'Address pending',
-          monthlyPrice: monthlyPrice || '—',
-          onboardingDate: onboardingDate || '—',
-          mainPhone: mainPhone || '—',
-          managementGroup: managementGroup || 'Unassigned',
-          e911Status: e911Status || 'Verified',
-          rayBaumStatus: rayBaumStatus || 'Active',
-          gmName: gmName || '—',
-          gmEmail: gmEmail || '—',
-          isValid,
-          validationError,
-          rawObj: rowObj,
-        });
-      }
-
-      setParsedRows(rows);
-      setParseError(null);
-    } catch (err: any) {
-      setParseError(err.message || 'Failed to parse CSV file.');
-      setParsedRows([]);
-    }
-  };
-
-  // 3. Handle File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -237,7 +64,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        parseCSVText(text);
+        handleProcessText(text);
       };
       reader.readAsText(file);
     }
@@ -268,13 +95,12 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        parseCSVText(text);
+        handleProcessText(text);
       };
       reader.readAsText(file);
     }
   };
 
-  // 4. Submit Import
   const handleExecuteImport = async () => {
     if (parsedRows.length === 0) return;
 
@@ -331,7 +157,6 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Animated Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -340,7 +165,6 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
             className="fixed inset-0 bg-black/70 backdrop-blur-xs cursor-pointer"
           />
 
-          {/* Modal Container */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -375,57 +199,14 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
             {/* Content Area */}
             <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
               {importResult ? (
-                /* Success Result View */
-                <div className="space-y-4 text-center py-6">
-                  <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-500 mx-auto flex items-center justify-center">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                      Properties Imported Successfully!
-                    </h4>
-                    <p className="text-xs text-slate-600 dark:text-slate-300 max-w-md mx-auto leading-relaxed">
-                      {importResult.message}
-                    </p>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 mt-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{importResult.importedCount} Properties set to Onboarded</span>
-                    </div>
-                  </div>
-
-                  {importResult.errors && importResult.errors.length > 0 && (
-                    <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-left text-xs max-w-xl mx-auto space-y-1">
-                      <span className="font-bold block">Rows with warnings / skipped:</span>
-                      <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
-                        {importResult.errors.map((err, i) => (
-                          <li key={i}>
-                            <strong>Row {err.row} ({err.propertyName}):</strong> {err.reason}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-center gap-3 pt-4 border-t border-slate-100 dark:border-[#222430]">
-                    <button
-                      onClick={handleReset}
-                      className="px-4 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-[#222430] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1c1e27] transition cursor-pointer"
-                    >
-                      Import More Properties
-                    </button>
-                    <button
-                      onClick={handleModalClose}
-                      className="px-5 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition shadow-xs cursor-pointer"
-                    >
-                      Done &amp; View Properties
-                    </button>
-                  </div>
-                </div>
+                <PropertiesImportResultView
+                  importResult={importResult}
+                  onReset={handleReset}
+                  onClose={handleModalClose}
+                />
               ) : parsedRows.length === 0 ? (
                 <>
-                  {/* Two Options Section: Download Template & Upload CSV */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Option 1: Download Template */}
                     <div className="p-4 rounded-xl border border-slate-200 dark:border-[#222430] bg-slate-50/70 dark:bg-[#111217] flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -444,7 +225,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={handleDownloadTemplate}
+                        onClick={downloadPropertiesTemplate}
                         className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 dark:border-[#2a2d3d] bg-white dark:bg-[#181920] hover:bg-slate-100 dark:hover:bg-[#20222c] text-slate-800 dark:text-slate-200 transition flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                       >
                         <Download className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -452,7 +233,6 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                       </motion.button>
                     </div>
 
-                    {/* Option 2: Upload CSV Header Info */}
                     <div className="p-4 rounded-xl border border-slate-200 dark:border-[#222430] bg-slate-50/70 dark:bg-[#111217] flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -475,7 +255,6 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Drag & Drop Upload Zone */}
                   <div
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
@@ -515,7 +294,6 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Error Notification */}
                   {parseError && (
                     <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-300 text-xs flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0" />
@@ -523,7 +301,6 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                     </div>
                   )}
 
-                  {/* Required Headers Reference Pill Badge Bar */}
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] space-y-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                       Required CSV Column Headers
@@ -541,143 +318,14 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                   </div>
                 </>
               ) : (
-                /* Parsed Preview View */
-                <div className="space-y-3.5">
-                  {/* File Details Bar */}
-                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#222430] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-bold text-slate-900 dark:text-white">
-                            {selectedFile?.name || 'Uploaded CSV'}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
-                            {validRowCount} Ready to Import
-                          </span>
-                          {parsedRows.length - validRowCount > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
-                              {parsedRows.length - validRowCount} Warnings
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB • ` : ''}
-                          {parsedRows.length} total rows detected
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv,text/csv"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleDownloadTemplate}
-                        className="px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg border border-slate-200 dark:border-[#282a36] hover:bg-slate-100 dark:hover:bg-[#20222a] flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        <Download className="w-3 h-3 text-blue-500" /> Template
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-2.5 py-1.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        <Upload className="w-3 h-3" /> Change CSV
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleReset}
-                        className="px-2.5 py-1.5 text-[11px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-[#20222a] flex items-center gap-1 transition cursor-pointer"
-                      >
-                        <RefreshCw className="w-3 h-3" /> Clear
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Preview Table Header with Scroll Hint */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      Parsed Properties Preview
-                    </span>
-                    <span className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-0.5 rounded-md border border-blue-200 dark:border-blue-900/50 flex items-center gap-1.5 font-medium">
-                      <span className="font-bold">↔</span>
-                      <span>Scroll horizontally to view all 10 columns</span>
-                    </span>
-                  </div>
-
-                  {/* Table Container with prominent horizontal scrollbar */}
-                  <div className="border border-slate-200 dark:border-[#222430] rounded-xl overflow-x-auto overflow-y-auto max-h-[380px] shadow-2xs [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2.5 [&::-webkit-scrollbar-thumb]:bg-slate-400/80 dark:[&::-webkit-scrollbar-thumb]:bg-slate-500 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-[#181920]">
-                    <table className="w-full min-w-[1250px] text-left text-xs border-collapse">
-                      <thead className="bg-slate-100 dark:bg-[#181920] text-slate-600 dark:text-slate-400 text-[10.5px] font-bold uppercase sticky top-0 border-b border-slate-200 dark:border-[#222430] z-10">
-                        <tr>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">#</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Property Name</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Location</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Monthly Price</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Onboarding Date</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Main Phone</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Management Group</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">E911 / Ray Baum</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">General Manager</th>
-                          <th className="px-3.5 py-2.5 whitespace-nowrap">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-[11.5px]">
-                        {parsedRows.map((row, idx) => (
-                          <tr
-                            key={idx}
-                            className={`hover:bg-slate-50/50 dark:hover:bg-[#181a24] ${
-                              !row.isValid ? 'bg-rose-50/30 dark:bg-rose-950/20' : ''
-                            }`}
-                          >
-                            <td className="px-3.5 py-2.5 text-slate-400 font-mono text-[10px] whitespace-nowrap">{idx + 1}</td>
-                            <td className="px-3.5 py-2.5 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
-                              {row.name || (
-                                <span className="text-rose-500 font-normal italic">Missing Name</span>
-                              )}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-300 whitespace-nowrap" title={row.location}>
-                              {row.location}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-200 font-mono whitespace-nowrap">
-                              {row.monthlyPrice !== '—' ? `$${row.monthlyPrice}` : '—'}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-200 font-mono text-[11px] whitespace-nowrap font-medium">
-                              {row.onboardingDate}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-400 font-mono whitespace-nowrap">
-                              {row.mainPhone}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
-                              {row.managementGroup}
-                            </td>
-                            <td className="px-3.5 py-2.5 whitespace-nowrap">
-                              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                                {row.e911Status} / {row.rayBaumStatus}
-                              </span>
-                            </td>
-                            <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                              {row.gmName} {row.gmEmail !== '—' ? `<${row.gmEmail}>` : ''}
-                            </td>
-                            <td className="px-3.5 py-2.5 whitespace-nowrap">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                                Onboarded
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <PropertiesImportTable
+                  selectedFile={selectedFile}
+                  parsedRows={parsedRows}
+                  validRowCount={validRowCount}
+                  onDownloadTemplate={downloadPropertiesTemplate}
+                  onChangeFileClick={() => fileInputRef.current?.click()}
+                  onReset={handleReset}
+                />
               )}
             </div>
 

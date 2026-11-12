@@ -3,52 +3,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  PhoneForwarded,
   Radio,
   Search,
   RefreshCw,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  X,
-  Hotel,
-  UserCheck,
-  ArrowRight,
-  Loader2,
-  Power,
-  PowerOff,
 } from 'lucide-react';
 import { useToast } from '@/components/client/ClientToast';
-
-interface ForwardingTarget {
-  name: string;
-  number: string;
-}
-
-interface SavedContact {
-  id: string;
-  name: string;
-  phone_number: string;
-  is_suggested?: boolean;
-}
-
-interface ClientDidItem {
-  id: string;
-  custom_service_id: string;
-  service_name: string;
-  phone_number: string;
-  normalized_did: string;
-  service_type: string;
-  status: string;
-  property_id: string | null;
-  property_name: string;
-  property_location: string;
-  pbx_server_id: 1 | 2 | 3;
-  pbx_server_label: string;
-  call_forwarding_state: 'ON' | 'OFF';
-  active_forwarding_numbers: ForwardingTarget[];
-  forwarding_updated_at: string;
-}
+import { ClientDidItem, ForwardingTarget, SavedContact } from './_components/types';
+import { CallForwardingModal } from './_components/CallForwardingModal';
+import { CallForwardingTableView } from './_components/CallForwardingTableView';
 
 export default function ClientCallForwardingPage() {
   const toast = useToast();
@@ -307,297 +269,31 @@ export default function ClientCallForwardingPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl bg-white dark:bg-[#13151c] border border-slate-200/80 dark:border-[#222430] overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 dark:border-[#222430] bg-slate-50/70 dark:bg-[#171922] text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3.5 px-4">Phone Number (DID)</th>
-                <th className="py-3.5 px-4">Property</th>
-                <th className="py-3.5 px-4">Call Forwarding Status</th>
-                <th className="py-3.5 px-4">Forwarded To</th>
-                <th className="py-3.5 px-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#1e202b] text-xs">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
-                    Loading your phone lines...
-                  </td>
-                </tr>
-              ) : filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
-                    No phone lines found.
-                  </td>
-                </tr>
-              ) : (
-                filteredItems.map((item) => {
-                  const isOn = item.call_forwarding_state === 'ON';
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-[#181a24] transition">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                              isOn
-                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600'
-                                : 'bg-slate-100 dark:bg-[#1f222e] text-slate-500'
-                            }`}
-                          >
-                            <PhoneForwarded className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white font-mono">
-                              {item.phone_number}
-                            </p>
-                            <span className="text-[10px] text-slate-400">{item.service_type}</span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white">
-                          <Hotel className="w-3.5 h-3.5 text-blue-500" />
-                          <span>{item.property_name}</span>
-                        </div>
-                        {item.property_location && (
-                          <span className="text-[11px] text-slate-400 block">{item.property_location}</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        {isOn ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            FORWARDING ON
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-[#1e202b] text-slate-600 dark:text-slate-400">
-                            <span className="w-2 h-2 rounded-full bg-slate-400" />
-                            OFF (Normal Hotel Routing)
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        {isOn && item.active_forwarding_numbers.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {item.active_forwarding_numbers.map((t, idx) => (
-                              <span
-                                key={idx}
-                                className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-medium text-emerald-800 dark:text-emerald-200"
-                              >
-                                {t.name}: <strong className="font-mono">{t.number}</strong>
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">Hotel Front Desk / Default PBX</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          {isOn && (
-                            <button
-                              onClick={() => handleDisableForwarding(item)}
-                              disabled={submitting}
-                              className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 font-semibold text-[11px] cursor-pointer transition"
-                            >
-                              Turn OFF
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleOpenModal(item)}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] cursor-pointer transition"
-                          >
-                            {isOn ? 'Edit Forwarding' : 'Forward Calls'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <CallForwardingTableView
+        loading={loading}
+        filteredItems={filteredItems}
+        submitting={submitting}
+        onDisableForwarding={handleDisableForwarding}
+        onOpenModal={handleOpenModal}
+      />
 
       {/* Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-[#14161f] border border-slate-200 dark:border-[#242736] shadow-2xl overflow-hidden">
-            <div className="p-5 border-b border-slate-100 dark:border-[#222430] flex items-center justify-between bg-slate-50/60 dark:bg-[#10121a]">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Manage Call Forwarding — {selectedItem.phone_number}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{selectedItem.property_name}</p>
-              </div>
-              <button
-                onClick={() => setSelectedItem(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto text-xs">
-              {/* Saved Contacts */}
-              <div className="space-y-2">
-                <label className="block text-[11px] font-bold text-slate-500 uppercase">
-                  Saved Forwarding Contacts (Click to Select)
-                </label>
-                {savedContacts.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {savedContacts.map((c) => {
-                      const isSelected = modalTargets.some(
-                        (t) => t.number.replace(/[^0-9]/g, '') === c.phone_number.replace(/[^0-9]/g, '')
-                      );
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => handleToggleSavedContact(c)}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-2 cursor-pointer transition ${
-                            isSelected
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-slate-50 dark:bg-[#191b24] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#282b3a]'
-                          }`}
-                        >
-                          <UserCheck className="w-3.5 h-3.5" />
-                          <span>{c.name}:</span>
-                          <span className="font-mono font-bold">{c.phone_number}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-slate-400 text-[11px]">No saved contacts yet. Save a contact below for 1-click access.</p>
-                )}
-
-                <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Contact Name (e.g. GM, Owner)"
-                    value={newContactName}
-                    onChange={(e) => setNewContactName(e.target.value)}
-                    className="flex-1 w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-[#191b24] border border-slate-200 dark:border-[#282b3a]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Phone Number"
-                    value={newContactNumber}
-                    onChange={(e) => setNewContactNumber(e.target.value)}
-                    className="flex-1 w-full px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-[#191b24] border border-slate-200 dark:border-[#282b3a] font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSavedContact}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold shrink-0 cursor-pointer"
-                  >
-                    + Save Contact
-                  </button>
-                </div>
-              </div>
-
-              {/* Active Destinations */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase">
-                    Forward Calls To
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setModalTargets([...modalTargets, { name: 'Backup Contact', number: '' }])}
-                    className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 hover:underline cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add Another Number
-                  </button>
-                </div>
-
-                {modalTargets.map((target, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Label (e.g. General Manager)"
-                      value={target.name}
-                      onChange={(e) => {
-                        const updated = [...modalTargets];
-                        updated[index].name = e.target.value;
-                        setModalTargets(updated);
-                      }}
-                      className="w-2/5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#191b24] border border-slate-200 dark:border-[#282b3a]"
-                    />
-                    <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
-                    <input
-                      type="text"
-                      placeholder="Phone Number (e.g. 20387679781)"
-                      value={target.number}
-                      onChange={(e) => {
-                        const updated = [...modalTargets];
-                        updated[index].number = e.target.value;
-                        setModalTargets(updated);
-                      }}
-                      className="flex-1 px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#191b24] border border-slate-200 dark:border-[#282b3a] font-mono"
-                    />
-                    {modalTargets.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setModalTargets(modalTargets.filter((_, i) => i !== index))}
-                        className="p-2 rounded-lg text-rose-500 hover:bg-rose-50 cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 dark:border-[#222430] bg-slate-50/60 dark:bg-[#10121a] flex flex-wrap items-center justify-between gap-3">
-              {selectedItem.call_forwarding_state === 'ON' ? (
-                <button
-                  type="button"
-                  onClick={() => handleDisableForwarding()}
-                  disabled={submitting}
-                  className="px-3.5 py-2 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-                >
-                  <PowerOff className="w-4 h-4" />
-                  <span>Turn Forwarding OFF</span>
-                </button>
-              ) : (
-                <div />
-              )}
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedItem(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-[#222430] text-slate-700 dark:text-slate-300 font-semibold text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEnableForwarding}
-                  disabled={submitting}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer"
-                >
-                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
-                  <span>Enable Call Forwarding</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CallForwardingModal
+        selectedItem={selectedItem}
+        onClose={() => setSelectedItem(null)}
+        savedContacts={savedContacts}
+        modalTargets={modalTargets}
+        setModalTargets={setModalTargets}
+        onToggleSavedContact={handleToggleSavedContact}
+        newContactName={newContactName}
+        setNewContactName={setNewContactName}
+        newContactNumber={newContactNumber}
+        setNewContactNumber={setNewContactNumber}
+        onAddSavedContact={handleAddSavedContact}
+        onDisableForwarding={() => handleDisableForwarding()}
+        onEnableForwarding={handleEnableForwarding}
+        submitting={submitting}
+      />
     </div>
   );
 }
-

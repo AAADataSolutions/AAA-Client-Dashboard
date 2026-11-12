@@ -1,74 +1,20 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import {
+  PbxServerId,
+  PBX_SERVERS,
+  getPbxServerLabel,
+  normalizeDid,
+  normalizePortalUsername,
+  PbxApiResponse,
+  ForwardingTarget,
+  SavedForwardingContact,
+  CdrCallRecord,
+} from './types';
+import { buildSimulatedPbxResponse } from './simulation';
 
-export type PbxServerId = 1 | 2 | 3;
-
-export const PBX_SERVERS: { id: PbxServerId; name: string; code: string; description: string }[] = [
-  { id: 1, name: 'PBX 115', code: 'PBX-115', description: 'Primary Voice Cluster (Server 1)' },
-  { id: 2, name: 'PBX 142', code: 'PBX-142', description: 'Secondary Voice Cluster (Server 2)' },
-  { id: 3, name: 'PBX 240', code: 'PBX-240', description: 'Tertiary Voice Cluster (Server 3)' },
-];
-
-export function getPbxServerLabel(serverId?: number | null): string {
-  switch (Number(serverId)) {
-    case 1:
-      return 'PBX 115 (Server 1)';
-    case 2:
-      return 'PBX 142 (Server 2)';
-    case 3:
-      return 'PBX 240 (Server 3)';
-    default:
-      return 'PBX 115 (Server 1)';
-  }
-}
-
-export function normalizeDid(rawPhone?: string | null): string {
-  if (!rawPhone) return '';
-  return String(rawPhone).replace(/[^0-9]/g, '');
-}
-
-export function normalizePortalUsername(rawInput?: string | null, fallbackName?: string | null): string {
-  const candidate = (rawInput || '').trim().toLowerCase();
-  if (candidate && candidate.length >= 3 && candidate.length <= 50 && /^[a-z0-9][a-z0-9._+@-]*$/i.test(candidate)) {
-    return candidate;
-  }
-  const cleanFallback = (fallbackName || 'org_user')
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, '_')
-    .replace(/^[^a-z0-9]+/, '')
-    .slice(0, 40);
-  return cleanFallback.length >= 3 ? cleanFallback : `user_${cleanFallback}`;
-}
-
-export interface PbxApiResponse<T = any> {
-  success: boolean;
-  message?: string;
-  error_code?: string;
-  data?: T;
-  simulated?: boolean;
-  httpStatus?: number;
-}
-
-export interface ForwardingTarget {
-  name: string;
-  number: string;
-}
-
-export interface SavedForwardingContact {
-  id: number | string;
-  name: string;
-  number: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface CdrCallRecord {
-  phone_number: string;
-  date_time: string;
-  src: string;
-  dst: string;
-  duration: number;
-  disposition: 'ANSWERED' | 'NO ANSWER' | 'BUSY' | 'FAILED' | string;
-}
+// Re-export everything from types and simulation so all callers work identically
+export * from './types';
+export * from './simulation';
 
 function getPbxConfig() {
   const baseUrl = (process.env.PBX_PORTAL_BASE_URL || process.env.API_BASE_URL || '').trim().replace(/\/+$/, '');
@@ -222,215 +168,6 @@ async function callPbxEndpoint<T = any>(
 
     return errRes;
   }
-}
-
-/**
- * Provides spec-accurate responses matching Third-portal-integration.md
- * when PBX_PORTAL_BASE_URL is not yet configured in environment variables.
- */
-function buildSimulatedPbxResponse<T = any>(endpointPath: string, payload: Record<string, any>): PbxApiResponse<T> {
-  if (endpointPath.includes('management_group.php')) {
-    const action = payload.action;
-    if (action === 'create') {
-      return {
-        success: true,
-        simulated: true,
-        httpStatus: 201,
-        message: 'Management group user created',
-        data: {
-          user_id: Math.floor(100 + Math.random() * 900),
-          username: payload.username,
-          hotel_name: payload.hotel_name,
-          contact_name: payload.contact_name,
-        } as any,
-      };
-    }
-    if (action === 'get') {
-      return {
-        success: true,
-        simulated: true,
-        httpStatus: 200,
-        data: {
-          user_id: 101,
-          username: payload.username,
-          contact_name: payload.contact_name || 'Organization Admin',
-          active: 1,
-          hotel_name: payload.hotel_name || 'Hotel Portfolio',
-        } as any,
-      };
-    }
-    if (action === 'list') {
-      return {
-        success: true,
-        simulated: true,
-        httpStatus: 200,
-        data: [] as any,
-      };
-    }
-    if (action === 'update') {
-      return {
-        success: true,
-        simulated: true,
-        httpStatus: 200,
-        message: 'Management group updated',
-        data: {
-          username: payload.new_username || payload.username,
-          user_id: 101,
-        } as any,
-      };
-    }
-    if (action === 'deactivate') {
-      return {
-        success: true,
-        simulated: true,
-        httpStatus: 200,
-        message: 'User deactivated',
-      };
-    }
-  }
-
-  if (endpointPath.includes('did_management_api.php')) {
-    return {
-      success: true,
-      simulated: true,
-      httpStatus: 200,
-      message: 'DID associated with management user and PBX server successfully.',
-      data: {
-        username: payload.username,
-        property_name: payload.property_name,
-        did: payload.did,
-        server_id: payload.server_id || 1,
-      } as any,
-    };
-  }
-
-  if (endpointPath.includes('call_forwarding_api.php')) {
-    const isForwardOn = payload.action === 'forward_on';
-    return {
-      success: true,
-      simulated: true,
-      httpStatus: 200,
-      message: isForwardOn
-        ? 'Call forwarding enabled successfully.'
-        : 'Call forwarding disabled and inbound route restored.',
-      data: {
-        did: payload.did,
-        server_id: payload.server_id,
-        call_forwarding_state: isForwardOn ? 'ON' : 'OFF',
-        forwarding_numbers: isForwardOn ? payload.forwarding_numbers || [] : [],
-      } as any,
-    };
-  }
-
-  if (endpointPath.includes('forwarding_number_list_api.php')) {
-    return {
-      success: true,
-      simulated: true,
-      httpStatus: 200,
-      message: 'Forwarding numbers retrieved successfully.',
-      data: {
-        username: payload.username,
-        user_id: 101,
-        total: 0,
-        forwarding_numbers: [],
-      } as any,
-    };
-  }
-
-  if (endpointPath.includes('forwarding_status_api.php')) {
-    return {
-      success: true,
-      simulated: true,
-      httpStatus: 200,
-      message: 'Call forwarding status retrieved successfully.',
-      data: {
-        did: payload.did,
-        call_forwarding_state: 'OFF',
-        numbers: [],
-      } as any,
-    };
-  }
-
-  if (endpointPath.includes('cdr_logs_api.php')) {
-    const phone = normalizeDid(payload.phone_number) || '9497481060';
-    const action = payload.action || 'incoming_calls';
-    const now = new Date();
-    const fmt = (d: Date) => d.toISOString().replace('T', ' ').substring(0, 19);
-
-    let sampleCalls: CdrCallRecord[] = [];
-    if (action === 'incoming_calls') {
-      sampleCalls = [
-        {
-          phone_number: phone,
-          date_time: fmt(new Date(now.getTime() - 2 * 3600 * 1000)),
-          src: '18025953380',
-          dst: phone,
-          duration: 142,
-          disposition: 'ANSWERED',
-        },
-        {
-          phone_number: phone,
-          date_time: fmt(new Date(now.getTime() - 5 * 3600 * 1000)),
-          src: '13125550194',
-          dst: phone,
-          duration: 68,
-          disposition: 'ANSWERED',
-        },
-        {
-          phone_number: phone,
-          date_time: fmt(new Date(now.getTime() - 18 * 3600 * 1000)),
-          src: '14075550122',
-          dst: phone,
-          duration: 0,
-          disposition: 'NO ANSWER',
-        },
-      ];
-    } else if (action === 'outgoing_calls') {
-      sampleCalls = [
-        {
-          phone_number: phone,
-          date_time: fmt(new Date(now.getTime() - 3 * 3600 * 1000)),
-          src: phone,
-          dst: '19048299088',
-          duration: 95,
-          disposition: 'ANSWERED',
-        },
-        {
-          phone_number: phone,
-          date_time: fmt(new Date(now.getTime() - 9 * 3600 * 1000)),
-          src: phone,
-          dst: '18005551212',
-          duration: 210,
-          disposition: 'ANSWERED',
-        },
-      ];
-    } else if (action === 'e911_calls') {
-      sampleCalls = [
-        {
-          phone_number: phone,
-          date_time: fmt(new Date(now.getTime() - 48 * 3600 * 1000)),
-          src: phone,
-          dst: '933',
-          duration: 34,
-          disposition: 'ANSWERED',
-        },
-      ];
-    }
-
-    return {
-      success: true,
-      simulated: true,
-      httpStatus: 200,
-      message: 'CDR logs retrieved successfully.',
-      data: {
-        phone_number: phone,
-        total: sampleCalls.length,
-        calls: sampleCalls,
-      } as any,
-    };
-  }
-
-  return { success: true, simulated: true, httpStatus: 200 };
 }
 
 // ============================================================================
@@ -726,4 +463,3 @@ export async function pbxGetCdrLogs(params: {
     }
   );
 }
-

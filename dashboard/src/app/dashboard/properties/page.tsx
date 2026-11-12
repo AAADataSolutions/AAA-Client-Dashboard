@@ -1,160 +1,27 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Hotel,
-  Search,
-  X,
-  MapPin,
-  Phone,
-  Mail,
-  ShieldCheck,
-  PhoneCall,
-  MoreVertical,
-  LifeBuoy,
-  Plus,
   RefreshCw,
-  LayoutGrid,
-  List,
   AlertCircle,
-  GitBranch,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  Copy,
-  Check,
-  AlertTriangle,
-  Radio,
-  ExternalLink,
-  Eye,
-  Edit2,
-  Users,
-  FileText,
-  Wifi,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useToast } from '@/components/client/ClientToast';
-import { PropertyDetailDrawer } from '@/components/client/PropertyDetailDrawer';
-import { CreateTicketModal } from '@/components/client/CreateTicketModal';
-import { EditGMModal } from '@/components/client/EditGMModal';
-import { OnboardingTimelineModal, getStageBadge } from '@/components/client/OnboardingTimelineModal';
-import { motion, type Variants } from 'framer-motion';
+import { motion } from 'framer-motion';
+import {
+  PropertyRecord,
+  getCircuitStageBadge,
+  containerVariants,
+  itemVariants,
+} from './_components/types';
+import { PropertiesTableView } from './_components/PropertiesTableView';
+import { PropertiesGridView, PropertiesPaginationAndMenu } from './_components/PropertiesGridAndMenu';
+import { PropertiesMetricCards } from './_components/PropertiesMetricCards';
+import { PropertiesFilterBar } from './_components/PropertiesFilterBar';
+import { PropertiesModals } from './_components/PropertiesModals';
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08 }
-  }
-};
-
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 300, damping: 24 }
-  }
-};
-
-export function getCircuitStageBadge(status?: string): { label: string; bg: string; text: string; border: string } {
-  switch (status) {
-    case 'INSTALLED':
-      return {
-        label: '7. Installed',
-        bg: 'bg-emerald-50 dark:bg-emerald-950/60',
-        text: 'text-emerald-700 dark:text-emerald-300',
-        border: 'border-emerald-200 dark:border-emerald-800/60',
-      };
-    case 'FOC_STAGE':
-      return {
-        label: '6. FOC Confirmed',
-        bg: 'bg-teal-50 dark:bg-teal-950/60',
-        text: 'text-teal-700 dark:text-teal-300',
-        border: 'border-teal-200 dark:border-teal-800/60',
-      };
-    case 'SITE_SURVEY':
-      return {
-        label: '5. Site Survey',
-        bg: 'bg-amber-50 dark:bg-amber-950/60',
-        text: 'text-amber-700 dark:text-amber-300',
-        border: 'border-amber-200 dark:border-amber-800/60',
-      };
-    case 'PAPERWORK_SIGNED':
-      return {
-        label: '4. Paperwork Signed',
-        bg: 'bg-emerald-50 dark:bg-emerald-950/60',
-        text: 'text-emerald-700 dark:text-emerald-300',
-        border: 'border-emerald-200 dark:border-emerald-800/60',
-      };
-    case 'QUOTATION_SENT':
-      return {
-        label: '3. Quotation Sent',
-        bg: 'bg-purple-50 dark:bg-purple-950/60',
-        text: 'text-purple-700 dark:text-purple-300',
-        border: 'border-purple-200 dark:border-purple-800/60',
-      };
-    case 'PRICING_FINALIZED':
-      return {
-        label: '2. Pricing Finalized',
-        bg: 'bg-sky-50 dark:bg-sky-950/60',
-        text: 'text-sky-700 dark:text-sky-300',
-        border: 'border-sky-200 dark:border-sky-800/60',
-      };
-    case 'STARTED':
-    case 'REQUESTED':
-      return {
-        label: '1. Started',
-        bg: 'bg-blue-50 dark:bg-blue-950/60',
-        text: 'text-blue-700 dark:text-blue-300',
-        border: 'border-blue-200 dark:border-blue-800/60',
-      };
-    default:
-      return {
-        label: status || 'Pending',
-        bg: 'bg-slate-100 dark:bg-slate-800',
-        text: 'text-slate-600 dark:text-slate-400',
-        border: 'border-slate-200 dark:border-slate-700',
-      };
-  }
-}
-
-interface PropertyRecord {
-  id: string;
-  org_property_id: string;
-  name: string;
-  monthly_price: number | null;
-  connectivity_type?: string;
-  data_circuit?: any;
-  address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-  country: string;
-  organization_name?: string;
-  organization_type?: string;
-  main_phone: string | null;
-  fax: string | null;
-  contact_person_name: string | null;
-  contact_person_email: string | null;
-  general_manager_name: string | null;
-  general_manager_phone: string | null;
-  general_manager_email: string | null;
-  ray_baud_and_logs_enabled: boolean;
-  status: string;
-  stage?: string;
-  services_count: number;
-  services: any[];
-  e911_status: string;
-  e911_verified_at: string | null;
-  e911_record: any | null;
-  onboarding_status: string | null;
-  onboarding_target_date: string | null;
-  onboarding_date?: string | null;
-  open_tickets_count: number;
-  tickets: any[];
-  created_at: string;
-}
+export { getCircuitStageBadge };
 
 export default function ClientPropertiesPage() {
   const { orgMembership } = useAuth();
@@ -282,18 +149,22 @@ export default function ClientPropertiesPage() {
     setMenuPosition(null);
   };
 
-  const handleOpenTimeline = (prop: PropertyRecord) => {
-    setViewingTimelineProp(prop);
-    setShowTimelineModal(true);
-    setMenuPosition(null);
-  };
-
   const handleCopyText = (text: string, id: string, label: string, e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     toast.success(`Copied ${label} to clipboard`);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('ALL');
+    setOnboardingFilter('ALL');
+    setStateFilter('ALL');
+    setSortBy('NEWEST');
+    setRayBaumFilter('ALL');
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL' || onboardingFilter !== 'ALL' || stateFilter !== 'ALL' || rayBaumFilter !== 'ALL' || sortBy !== 'NEWEST';
@@ -336,233 +207,27 @@ export default function ClientPropertiesPage() {
         </div>
       </motion.div>
 
-      {/* 2. Top Metric Cards - Blue Variant 1 */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Properties */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Total Properties
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <Hotel className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
-              {metrics.totalProperties || properties.length}
-            </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Locations</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">{metrics.activeProperties} Live Active properties</p>
-        </motion.div>
-
-        {/* Card 2: In Onboarding */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              In Onboarding
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <GitBranch className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
-              {metrics.onboardingProperties}
-            </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Pipelines</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">Cutover pipelines active</p>
-        </motion.div>
-
-        {/* Card 3: Assigned Voice Lines */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              Assigned Voice Lines
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <PhoneCall className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
-              {metrics.totalServices}
-            </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Telecom DIDs</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">Active telecom lines provisioned</p>
-        </motion.div>
-
-        {/* Card 4: E911 PSAP Verified */}
-        <motion.div
-          whileHover={{ y: -4, scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
-          className="relative overflow-hidden p-5 rounded-2xl bg-gradient-to-r from-blue-900 to-blue-800 text-white shadow-lg border border-blue-700/40 flex flex-col justify-between cursor-pointer"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-100">
-              E911 PSAP Verified
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <span className="text-2xl font-bold text-white">
-              {metrics.e911VerifiedProperties}
-            </span>
-            <span className="text-xs text-slate-200 ml-1.5 font-medium">Compliant</span>
-          </div>
-          <p className="text-[11px] text-slate-200 mt-2">Emergency dispatch ready</p>
-        </motion.div>
-      </motion.div>
+      {/* 2. Top Metric Cards */}
+      <PropertiesMetricCards metrics={metrics} fallbackTotal={properties.length} />
 
       {/* 3. Search & Filter Bar */}
-      <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-3.5 rounded-xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex flex-1 items-center gap-2.5 w-full">
-          {/* Omni Search */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search by property, city, state, GM name, phone, or email..."
-              className="w-full text-xs pl-9 pr-8 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 transition"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            aria-label="Filter properties by operational status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="ONBOARDING">Onboarding</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-
-          {/* Onboarding Stage Filter */}
-          <select
-            value={onboardingFilter}
-            onChange={(e) => {
-              setOnboardingFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            aria-label="Filter properties by onboarding pipeline status"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="ALL">All Stages</option>
-            <option value="ONBOARDING">In Onboarding</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
-
-          {/* Ray Baum and Kary's Law Filter */}
-          <select
-            value={rayBaumFilter}
-            onChange={(e) => {
-              setRayBaumFilter(e.target.value as any);
-              setCurrentPage(1);
-            }}
-            aria-label="Filter properties by Ray Baum and Kary's Law"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="ALL">Ray Baum: All</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-
-          {/* Sort By Filter */}
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setCurrentPage(1);
-            }}
-            aria-label="Sort properties"
-            className="text-xs px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#181920] border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-          >
-            <option value="NEWEST">Sort: Recently Added</option>
-            <option value="NAME_ASC">Sort: Name (A-Z)</option>
-            <option value="NAME_DESC">Sort: Name (Z-A)</option>
-            <option value="SERVICES_DESC">Sort: Most Voice Lines</option>
-            <option value="TICKETS_DESC">Sort: Open Tickets</option>
-          </select>
-        </div>
-
-        {/* View Toggle & Reset */}
-        <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('ALL');
-                setOnboardingFilter('ALL');
-                setStateFilter('ALL');
-                setSortBy('NEWEST');
-                setCurrentPage(1);
-              }}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-2 cursor-pointer font-medium whitespace-nowrap"
-            >
-              Reset Filters
-            </button>
-          )}
-
-          <div className="flex items-center bg-slate-100 dark:bg-[#181920] p-0.5 rounded-lg border border-slate-200/80 dark:border-[#222430]">
-            <button
-              onClick={() => setViewMode('LIST')}
-              className={`p-1.5 rounded-md text-xs transition cursor-pointer ${
-                viewMode === 'LIST'
-                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-              title="Table View"
-              aria-label="Switch to Table View"
-            >
-              <List className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('GRID')}
-              className={`p-1.5 rounded-md text-xs transition cursor-pointer ${
-                viewMode === 'GRID'
-                  ? 'bg-white dark:bg-[#252733] text-blue-600 dark:text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-              title="Grid View"
-              aria-label="Switch to Grid View"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <PropertiesFilterBar
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        onboardingFilter={onboardingFilter}
+        setOnboardingFilter={setOnboardingFilter}
+        rayBaumFilter={rayBaumFilter}
+        setRayBaumFilter={setRayBaumFilter}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        setCurrentPage={setCurrentPage}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        hasActiveFilters={hasActiveFilters}
+        onResetFilters={handleResetFilters}
+      />
 
       {/* 4. Main Properties Content: Table or Grid */}
       {loading ? (
@@ -602,625 +267,57 @@ export default function ClientPropertiesPage() {
           </p>
         </div>
       ) : viewMode === 'LIST' ? (
-        /* TABLE VIEW — Strictly Required Columns */
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] rounded-xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto [scrollbar-width:thin]">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
-              <thead>
-                <tr className="border-b border-slate-200/80 dark:border-[#222430] bg-slate-50/75 dark:bg-[#12131a]/80">
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    PROPERTY
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    MONTHLY PRICE
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    MAIN PHONE NO.
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    NO. OF SERVICES
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    E911 STATUS
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    RAY BAUM AND KARY'S LAW
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    DATA CIRCUIT STATUS
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    GM NAME
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    GM EMAIL
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                    PROPERTY STATUS
-                  </th>
-                  <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
-                    ACTIONS
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#20222c] text-xs">
-                {properties.map((prop) => {
-                  const gmName = prop.general_manager_name || prop.contact_person_name || '—';
-                  const gmEmail = prop.general_manager_email || prop.contact_person_email || null;
-                  const stageKey = prop.stage || prop.onboarding_status || (prop.status === 'ACTIVE' ? 'COMPLETED' : 'DRAFT');
-                  const stageBadge = getStageBadge(stageKey);
-
-                  return (
-                    <tr
-                      key={prop.id}
-                      onClick={() => handleOpenPropertyDetails(prop)}
-                      className="hover:bg-slate-50/70 dark:hover:bg-[#181922] transition-colors cursor-pointer group"
-                    >
-                      {/* Column 1: PROPERTY with Address & Connectivity / Data Circuit underneath */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
-                            <Hotel className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                {prop.name}
-                              </span>
-                              {(() => {
-                                const connType = (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED');
-                                if (connType === 'BOTH') {
-                                  return (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-                                      Ported &amp; Data Circuited
-                                    </span>
-                                  );
-                                }
-                                if (connType === 'DATA_CIRCUITED') {
-                                  return (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60">
-                                      Data Circuited
-                                    </span>
-                                  );
-                                }
-                                return (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                    Ported
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-normal mt-0.5">
-                              <MapPin className="w-3 h-3 shrink-0 text-slate-400" />
-                              <span>
-                                {prop.city
-                                  ? `${prop.address ? prop.address + ', ' : ''}${prop.city}, ${prop.state || prop.country} ${prop.zip_code || ''}`
-                                  : (prop.address || '—')}
-                              </span>
-                            </div>
-                            {(prop as any).data_circuit && (
-                              <div className="flex items-center gap-2 mt-1 text-[10.5px]">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/50 font-medium">
-                                  Carrier: <strong>{(prop as any).data_circuit.carrier_name || 'Pending'}</strong>
-                                  {(prop as any).data_circuit.bandwidth ? ` (${(prop as any).data_circuit.bandwidth})` : ''}
-                                  {(prop as any).data_circuit.circuit_monthly_price !== null && (prop as any).data_circuit.circuit_monthly_price !== undefined
-                                    ? ` • $${Number((prop as any).data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`
-                                    : ''}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Column 2: MONTHLY PRICE */}
-                      <td className="py-3.5 px-4 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-200">
-                        {prop.monthly_price !== null && prop.monthly_price !== undefined
-                          ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : '—'}
-                      </td>
-
-                      {/* Column 3: MAIN PHONE NO. */}
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap font-medium">
-                        {prop.main_phone ? (
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{prop.main_phone}</span>
-                            <button
-                              onClick={(e) => handleCopyText(prop.main_phone || '', `${prop.id}-main-phone`, 'Main phone', e)}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                              title="Copy Main Phone"
-                            >
-                              {copiedId === `${prop.id}-main-phone` ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Column 4: NO. OF SERVICES */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenPropertyDetails(prop, 'SERVICES');
-                          }}
-                          className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-blue-50 dark:bg-[#1a1c26] dark:hover:bg-blue-950/40 text-slate-700 hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400 border border-slate-200 hover:border-blue-300 dark:border-[#282a36] dark:hover:border-blue-800/60 transition cursor-pointer"
-                          title="Click to view assigned services"
-                        >
-                          <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                            {prop.services_count || 0}
-                          </span>
-                          <span className="font-normal text-[11px] text-slate-400 group-hover:text-blue-500">
-                            Services
-                          </span>
-                        </button>
-                      </td>
-
-                      {/* Column 5: E911 STATUS */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {prop.ray_baud_and_logs_enabled || prop.e911_status === 'VERIFIED' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/40 whitespace-nowrap">
-                            <ShieldCheck className="w-3 h-3" /> PSAP Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900/40 whitespace-nowrap">
-                            <AlertCircle className="w-3 h-3" /> Audit Required
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Column 6: RAY BAUM AND KARY'S LAW */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {(prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' || (prop as any).ray_baud_and_logs_enabled === true || (prop as any).is_ray_baum_active === true ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(`/dashboard/ray-baum/${prop.id}`, '_blank');
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 transition cursor-pointer shadow-xs group"
-                            title="Click to view Ray Baum and Kary's Law dispatch records in a new tab"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>View Ray Baum&apos;s No.</span>
-                            <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
-                          </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60 cursor-not-allowed">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                            <span>Inactive</span>
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Column: DATA CIRCUIT STATUS */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {(prop as any).data_circuit ? (
-                          <div className="space-y-1">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold border ${
-                                getCircuitStageBadge((prop as any).data_circuit.status).bg
-                              } ${getCircuitStageBadge((prop as any).data_circuit.status).text} ${
-                                getCircuitStageBadge((prop as any).data_circuit.status).border
-                              }`}
-                            >
-                              {getCircuitStageBadge((prop as any).data_circuit.status).label}
-                            </span>
-                            <div className="text-[10.5px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                              <span>{(prop as any).data_circuit.carrier_name || 'Carrier Pending'}</span>
-                              {(prop as any).data_circuit.bandwidth && (
-                                <span>• {(prop as any).data_circuit.bandwidth}</span>
-                              )}
-                              {(prop as any).data_circuit.agreement_file_url && (
-                                <span className="inline-flex items-center gap-0.5 text-[9.5px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-200 dark:border-emerald-800" title="Signed Agreement Available">
-                                  <FileText className="w-2.5 h-2.5" /> PDF
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-[11px] italic">
-                            Ported Only
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Column 7: GM NAME */}
-                      <td className="py-3.5 px-4 text-slate-800 dark:text-slate-200 whitespace-nowrap font-medium">
-                        <div className="flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate max-w-[130px]" title={gmName}>
-                            {gmName}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Column 8: GM EMAIL */}
-                      <td className="py-3.5 px-4 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {gmEmail && gmEmail !== 'N/A' ? (
-                          <div className="flex items-center gap-1.5">
-                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate max-w-[150px]" title={gmEmail}>
-                              {gmEmail}
-                            </span>
-                            <button
-                              onClick={(e) => handleCopyText(gmEmail, `${prop.id}-email`, 'GM email', e)}
-                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                              title="Copy email"
-                            >
-                              {copiedId === `${prop.id}-email` ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Column 9: PROPERTY STATUS */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                            prop.status === 'ACTIVE' || prop.status === 'ONBOARDING'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              prop.status === 'ACTIVE' || prop.status === 'ONBOARDING'
-                                ? 'bg-emerald-500'
-                                : 'bg-slate-400'
-                            }`}
-                          />
-                          {prop.status === 'ACTIVE' || prop.status === 'ONBOARDING' ? 'Onboarded' : prop.status}
-                        </span>
-                      </td>
-
-                      {/* Column 11: ACTIONS */}
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => handleOpenPropertyDetails(prop)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#20222d] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 text-xs font-semibold transition cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View</span>
-                          </button>
-                          <button
-                            onClick={(e) => handleOpenMenu(e, prop)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#20222d] transition cursor-pointer"
-                            aria-label="More property actions"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <PropertiesTableView
+          properties={properties}
+          copiedId={copiedId}
+          handleOpenPropertyDetails={handleOpenPropertyDetails}
+          handleCopyText={handleCopyText}
+          handleOpenMenu={handleOpenMenu}
+        />
       ) : (
-        /* GRID VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {properties.map((prop) => (
-            <div
-              key={prop.id}
-              onClick={() => handleOpenPropertyDetails(prop)}
-              className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] p-4 rounded-xl shadow-xs hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/40">
-                      <Hotel className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
-                        {prop.name}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-slate-400" />
-                        <span>{prop.city}, {prop.state}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold shrink-0 ${
-                      prop.status === 'ACTIVE'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                        : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
-                    }`}
-                  >
-                    {prop.status}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-xs py-2 border-t border-b border-slate-100 dark:border-[#20222c] my-2 text-slate-600 dark:text-slate-300">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">General Manager:</span>
-                    <span className="font-medium text-slate-900 dark:text-white truncate max-w-[150px]">
-                      {prop.general_manager_name || prop.contact_person_name || '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Active Services:</span>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400">
-                      {prop.services_count} Lines
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Monthly Price:</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                      {prop.monthly_price !== null && prop.monthly_price !== undefined
-                        ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : 'Not set'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Connectivity:</span>
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                      {(() => {
-                        const ct = (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED');
-                        if (ct === 'BOTH') return 'Ported & Data Circuited';
-                        if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
-                        return 'Ported';
-                      })()}
-                    </span>
-                  </div>
-                  {(prop as any).data_circuit && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 text-[11px]">Circuit Status:</span>
-                      <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                        <span>{getCircuitStageBadge((prop as any).data_circuit.status).label}</span>
-                        {(prop as any).data_circuit.agreement_file_url && (
-                          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1 py-0.2 rounded border border-emerald-200">
-                            <FileText className="w-2.5 h-2.5" /> PDF
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {(prop as any).data_circuit && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 text-[11px]">Carrier / Price:</span>
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">
-                        {(prop as any).data_circuit.carrier_name || 'Pending'}
-                        {(prop as any).data_circuit.circuit_monthly_price !== null && (prop as any).data_circuit.circuit_monthly_price !== undefined
-                          ? ` • $${Number((prop as any).data_circuit.circuit_monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : ''}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 text-[11px]">Stage:</span>
-                    <span className="font-semibold text-purple-600 dark:text-purple-400">
-                      {getStageBadge(prop.stage || prop.onboarding_status || 'DRAFT').label}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenPropertyDetails(prop);
-                  }}
-                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>View Details</span>
-                </button>
-                <button
-                  onClick={(e) => handleOpenMenu(e, prop)}
-                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-[#20222d] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                  aria-label="Property options"
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 5. Pagination */}
-      {totalRecords > 0 && (
-        <div className="bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-[#222430] px-4 py-3 rounded-xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-          <div>
-            Showing <strong className="text-slate-800 dark:text-slate-200">{(currentPage - 1) * pageSize + 1}</strong> to{' '}
-            <strong className="text-slate-800 dark:text-slate-200">
-              {Math.min(currentPage * pageSize, totalRecords)}
-            </strong>{' '}
-            of <strong className="text-slate-800 dark:text-slate-200">{totalRecords}</strong> properties
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1f212a] transition cursor-pointer"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .map((p, idx, arr) => (
-                  <React.Fragment key={p}>
-                    {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1">...</span>}
-                    <button
-                      onClick={() => setCurrentPage(p)}
-                      className={`w-7 h-7 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                        currentPage === p
-                          ? 'bg-blue-600 text-white'
-                          : 'border border-slate-200 dark:border-[#252733] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1f212a]'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  </React.Fragment>
-                ))}
-            </div>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#252733] text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#1f212a] transition cursor-pointer"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 6. Fixed 3-Dots Overlay Action Menu with all requested actions */}
-      {menuPosition && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setMenuPosition(null)}
-            aria-hidden="true"
-          />
-          <div
-            style={{
-              position: 'fixed',
-              ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
-              ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
-              left: `${menuPosition.left}px`,
-            }}
-            className="z-50 w-60 rounded-xl bg-white dark:bg-[#1a1b24] border border-slate-200 dark:border-[#282a36] shadow-xl py-1 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in zoom-in-95 duration-100"
-          >
-            <div className="px-3 py-1.5 border-b border-slate-100 dark:border-[#252733]">
-              <span className="text-[10.5px] uppercase font-bold text-slate-400 block tracking-wider">
-                Property Actions
-              </span>
-              <span className="font-semibold text-slate-900 dark:text-white truncate block">
-                {menuPosition.prop.name}
-              </span>
-            </div>
-
-            {/* Action 1: View property details */}
-            <button
-              onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'OVERVIEW')}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5 text-blue-500" />
-              <span>View Property Details</span>
-            </button>
-
-            {/* Action 2: View services */}
-            <button
-              onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'SERVICES')}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <PhoneCall className="w-3.5 h-3.5 text-blue-500" />
-              <span>View Services ({menuPosition.prop.services_count})</span>
-            </button>
-
-            {/* Action 3: View tickets */}
-            <button
-              onClick={() => handleOpenPropertyDetails(menuPosition.prop, 'TICKETS')}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
-            >
-              <LifeBuoy className="w-3.5 h-3.5 text-amber-500" />
-              <span>View Tickets ({menuPosition.prop.tickets?.length || 0})</span>
-            </button>
-
-            {/* Action 4: Edit GM details */}
-            <button
-              onClick={() => handleOpenEditGM(menuPosition.prop)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-2 transition cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Edit GM Details</span>
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* 7. Property Details Slide-Over Drawer */}
-      {showDrawer && selectedPropForDrawer && (
-        <PropertyDetailDrawer
-          property={selectedPropForDrawer}
-          defaultTab={drawerDefaultTab}
-          onClose={() => {
-            setShowDrawer(false);
-            setSelectedPropForDrawer(null);
-          }}
-          onCreateTicket={(propId) => {
-            setShowDrawer(false);
-            handleOpenTicketModalForProp(propId);
-          }}
+        <PropertiesGridView
+          properties={properties}
+          handleOpenPropertyDetails={handleOpenPropertyDetails}
+          handleOpenMenu={handleOpenMenu}
         />
       )}
 
-      {/* 8. Create Support Ticket Modal */}
-      {showCreateTicketModal && (
-        <CreateTicketModal
-          isOpen={showCreateTicketModal}
-          onClose={() => {
-            setShowCreateTicketModal(false);
-            setTicketPropId(null);
-          }}
-          preselectedPropertyId={ticketPropId || undefined}
-          onSuccess={() => {
-            fetchProperties();
-          }}
-        />
-      )}
+      {/* 5 & 6. Pagination & 3-Dots Action Menu */}
+      <PropertiesPaginationAndMenu
+        totalRecords={totalRecords}
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        setCurrentPage={setCurrentPage}
+        menuPosition={menuPosition}
+        setMenuPosition={setMenuPosition}
+        handleOpenPropertyDetails={handleOpenPropertyDetails}
+        handleOpenEditGM={handleOpenEditGM}
+      />
 
-      {/* 9. Edit GM Details Modal */}
-      {showEditGMModal && editingGMProp && (
-        <EditGMModal
-          isOpen={showEditGMModal}
-          onClose={() => {
-            setShowEditGMModal(false);
-            setEditingGMProp(null);
-          }}
-          property={editingGMProp}
-          onSuccess={() => {
-            fetchProperties();
-          }}
-        />
-      )}
-
-      {/* 10. Onboarding Timeline Modal (Admin UI Roadmap) */}
-      {showTimelineModal && viewingTimelineProp && (
-        <OnboardingTimelineModal
-          isOpen={showTimelineModal}
-          onClose={() => {
-            setShowTimelineModal(false);
-            setViewingTimelineProp(null);
-          }}
-          record={{
-            property_name: viewingTimelineProp.name,
-            organization_name: viewingTimelineProp.organization_name || orgName,
-            property_address: `${viewingTimelineProp.address}, ${viewingTimelineProp.city}, ${viewingTimelineProp.state}`,
-            status: viewingTimelineProp.stage || viewingTimelineProp.onboarding_status || 'DRAFT',
-            stage: viewingTimelineProp.stage || viewingTimelineProp.onboarding_status || 'DRAFT',
-            target_date: viewingTimelineProp.onboarding_target_date,
-            general_manager_name: viewingTimelineProp.general_manager_name,
-            general_manager_phone: viewingTimelineProp.general_manager_phone,
-            general_manager_email: viewingTimelineProp.general_manager_email,
-          }}
-        />
-      )}
+      {/* Modals and Drawer */}
+      <PropertiesModals
+        showDrawer={showDrawer}
+        selectedPropForDrawer={selectedPropForDrawer}
+        drawerDefaultTab={drawerDefaultTab}
+        setShowDrawer={setShowDrawer}
+        setSelectedPropForDrawer={setSelectedPropForDrawer}
+        handleOpenTicketModalForProp={handleOpenTicketModalForProp}
+        showCreateTicketModal={showCreateTicketModal}
+        setShowCreateTicketModal={setShowCreateTicketModal}
+        ticketPropId={ticketPropId}
+        setTicketPropId={setTicketPropId}
+        onRefresh={fetchProperties}
+        showEditGMModal={showEditGMModal}
+        editingGMProp={editingGMProp}
+        setShowEditGMModal={setShowEditGMModal}
+        setEditingGMProp={setEditingGMProp}
+        showTimelineModal={showTimelineModal}
+        viewingTimelineProp={viewingTimelineProp}
+        setShowTimelineModal={setShowTimelineModal}
+        setViewingTimelineProp={setViewingTimelineProp}
+        orgName={orgName}
+      />
     </motion.div>
   );
 }
