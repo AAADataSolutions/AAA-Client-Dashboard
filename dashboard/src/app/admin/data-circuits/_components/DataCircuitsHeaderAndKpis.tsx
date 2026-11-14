@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   DollarSign,
   Check,
+  Upload,
+  Download,
 } from 'lucide-react';
 import {
   itemVariants,
@@ -38,6 +40,8 @@ interface DataCircuitsHeaderAndKpisProps {
   onOpenWholesalers: () => void;
   onRefresh: () => void;
   onOpenCreate: () => void;
+  onOpenImport: () => void;
+  onExportCsv: () => void;
 }
 
 export default function DataCircuitsHeaderAndKpis({
@@ -58,6 +62,8 @@ export default function DataCircuitsHeaderAndKpis({
   onOpenWholesalers,
   onRefresh,
   onOpenCreate,
+  onOpenImport,
+  onExportCsv,
 }: DataCircuitsHeaderAndKpisProps) {
   return (
     <>
@@ -81,6 +87,24 @@ export default function DataCircuitsHeaderAndKpis({
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={onExportCsv}
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e202b] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            title="Export Data Circuits as CSV"
+          >
+            <Download className="w-4 h-4 text-slate-500" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={onOpenImport}
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e202b] text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            title="Import Data Circuits from CSV"
+          >
+            <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span>Import CSV</span>
+          </button>
+
           <button
             onClick={onOpenWholesalers}
             className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#15161c] border border-slate-200 dark:border-[#222430] text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e202b] text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-xs"
@@ -193,7 +217,7 @@ export default function DataCircuitsHeaderAndKpis({
             </span>
           </div>
           <p className="text-[11px] text-blue-200 mt-2 pt-2 border-t border-white/10">
-            Confirmed received &amp; added to Finances GMR
+            All-Time Paid: <span className="font-bold text-emerald-300">{formatCurrency(metrics.totalHistoricalRevShareReceived || 0)}</span>
           </p>
         </div>
       </motion.div>

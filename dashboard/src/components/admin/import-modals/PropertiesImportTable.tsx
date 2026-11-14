@@ -1,13 +1,20 @@
 'use client';
 
 import React from 'react';
-import { FileText, Download, Upload, RefreshCw } from 'lucide-react';
+import { FileText, Download, Upload, RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 import { ParsedPropertyRow } from './propertiesCsvParser';
+
+export interface AnnotatedPropertyRow extends ParsedPropertyRow {
+  isDuplicate?: boolean;
+  duplicateReason?: string;
+}
 
 interface PropertiesImportTableProps {
   selectedFile: File | null;
-  parsedRows: ParsedPropertyRow[];
+  parsedRows: AnnotatedPropertyRow[];
   validRowCount: number;
+  duplicateCount?: number;
+  onRemoveRow?: (index: number) => void;
   onDownloadTemplate: () => void;
   onChangeFileClick: () => void;
   onReset: () => void;
@@ -17,6 +24,8 @@ export const PropertiesImportTable: React.FC<PropertiesImportTableProps> = ({
   selectedFile,
   parsedRows,
   validRowCount,
+  duplicateCount = 0,
+  onRemoveRow,
   onDownloadTemplate,
   onChangeFileClick,
   onReset,
@@ -75,6 +84,16 @@ export const PropertiesImportTable: React.FC<PropertiesImportTableProps> = ({
         </div>
       </div>
 
+      {/* Duplicate Warning Banner */}
+      {duplicateCount > 0 && (
+        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-semibold">
+          <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+          <span>
+            {duplicateCount} duplicate property row{duplicateCount === 1 ? '' : 's'} detected. Remove all duplicate rows from the preview table below to enable import.
+          </span>
+        </div>
+      )}
+
       {/* Preview Table Header with Scroll Hint */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-slate-900 dark:text-white">
@@ -92,6 +111,7 @@ export const PropertiesImportTable: React.FC<PropertiesImportTableProps> = ({
           <thead className="bg-slate-100 dark:bg-[#181920] text-slate-600 dark:text-slate-400 text-[10.5px] font-bold uppercase sticky top-0 border-b border-slate-200 dark:border-[#222430] z-10">
             <tr>
               <th className="px-3 py-2.5 whitespace-nowrap">#</th>
+              <th className="px-3 py-2.5 whitespace-nowrap">Action</th>
               <th className="px-3 py-2.5 whitespace-nowrap">Property Name</th>
               <th className="px-3 py-2.5 whitespace-nowrap">Street Address</th>
               <th className="px-3 py-2.5 whitespace-nowrap">City, State, Zip</th>
@@ -113,13 +133,46 @@ export const PropertiesImportTable: React.FC<PropertiesImportTableProps> = ({
               <tr
                 key={idx}
                 className={`hover:bg-slate-50/50 dark:hover:bg-[#181a24] ${
-                  !row.isValid ? 'bg-rose-50/30 dark:bg-rose-950/20' : ''
+                  row.isDuplicate
+                    ? 'bg-rose-50/60 dark:bg-rose-950/30'
+                    : !row.isValid
+                    ? 'bg-rose-50/30 dark:bg-rose-950/20'
+                    : ''
                 }`}
               >
                 <td className="px-3 py-2 text-slate-400 font-mono text-[10px] whitespace-nowrap">{idx + 1}</td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  {onRemoveRow && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveRow(idx)}
+                      className="p-1 rounded-md text-rose-500 hover:text-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition cursor-pointer"
+                      title="Remove row from import"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </td>
                 <td className="px-3 py-2 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
-                  {row.name || (
-                    <span className="text-rose-500 font-normal italic">Missing Name</span>
+                  <div className="flex items-center gap-2">
+                    <span>
+                      {row.name || (
+                        <span className="text-rose-500 font-normal italic">Missing Name</span>
+                      )}
+                    </span>
+                    {row.isDuplicate && (
+                      <span
+                        className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9.5px] font-bold uppercase tracking-wide"
+                        title={row.duplicateReason}
+                      >
+                        Duplicate
+                      </span>
+                    )}
+                  </div>
+                  {row.isDuplicate && row.duplicateReason && (
+                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-normal block">
+                      {row.duplicateReason}
+                    </span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-300 whitespace-nowrap">

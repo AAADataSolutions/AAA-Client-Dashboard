@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         zip_code,
         country,
         main_phone,
+        fax,
         general_manager_name,
         general_manager_phone,
         general_manager_email,
@@ -112,8 +113,18 @@ export async function GET(request: NextRequest) {
     });
 
     const revByCircuitMonth = new Map<string, any>();
+    const paidStatsByCircuit = new Map<string, { count: number; total: number }>();
+    let totalHistoricalRevShareReceived = 0;
     allMonthlyRevs.forEach((r: any) => {
       revByCircuitMonth.set(`${r.data_circuit_id}_${r.month_key}`, r);
+      if (r.revenue_received) {
+        const amt = Number(r.revenue_share_amount || 0);
+        totalHistoricalRevShareReceived += amt;
+        const curr = paidStatsByCircuit.get(r.data_circuit_id) || { count: 0, total: 0 };
+        curr.count += 1;
+        curr.total = Math.round((curr.total + amt) * 100) / 100;
+        paidStatsByCircuit.set(r.data_circuit_id, curr);
+      }
     });
 
     // 5. Enrich circuits
@@ -128,16 +139,22 @@ export async function GET(request: NextRequest) {
           : Math.round(price * (pct / 100) * 100) / 100;
 
       const monthRevRecord = revByCircuitMonth.get(`${c.id}_${monthKey}`) || null;
+      const paidStats = paidStatsByCircuit.get(c.id) || { count: 0, total: 0 };
 
       return {
         ...c,
         circuit_monthly_price: price,
         revenue_share_percentage: pct,
         monthly_revenue_share_amount: revShareAmt,
+        times_paid_count: paidStats.count,
+        total_revenue_paid: paidStats.total,
         property_name: prop?.name || 'Unknown Property',
         property_address: prop ? `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip_code}` : '',
         property_city: prop?.city || '',
         property_state: prop?.state || '',
+        property_zip_code: prop?.zip_code || '',
+        property_country: prop?.country || 'USA',
+        property_fax: prop?.fax || '',
         property_connectivity_type: prop?.connectivity_type || 'DATA_CIRCUITED',
         property: prop,
         quotes,
@@ -219,6 +236,7 @@ export async function GET(request: NextRequest) {
         expectedMonthlyRevShare: Math.round(expectedMonthlyRevShare * 100) / 100,
         receivedMonthlyRevShare: Math.round(receivedMonthlyRevShare * 100) / 100,
         pendingMonthlyRevShare: Math.round(Math.max(0, expectedMonthlyRevShare - receivedMonthlyRevShare) * 100) / 100,
+        totalHistoricalRevShareReceived: Math.round(totalHistoricalRevShareReceived * 100) / 100,
       },
     });
   } catch (err: any) {

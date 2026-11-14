@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -46,6 +46,52 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [existingPropertyNames, setExistingPropertyNames] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/admin/properties?limit=2000')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && Array.isArray(json.data)) {
+          const names = new Set<string>(
+            json.data.map((p: any) => String(p.name || '').trim().toLowerCase()).filter(Boolean)
+          );
+          setExistingPropertyNames(names);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen]);
+
+  const rowsWithDuplicateFlags = useMemo(() => {
+    const csvCounts = new Map<string, number>();
+    parsedRows.forEach((r) => {
+      const k = r.name.trim().toLowerCase();
+      if (k) csvCounts.set(k, (csvCounts.get(k) || 0) + 1);
+    });
+
+    return parsedRows.map((r) => {
+      const k = r.name.trim().toLowerCase();
+      const existsInDb = Boolean(k && existingPropertyNames.has(k));
+      const dupInCsv = Boolean(k && (csvCounts.get(k) || 0) > 1);
+      const isDuplicate = existsInDb || dupInCsv;
+      const duplicateReason = existsInDb
+        ? 'Already exists in Properties'
+        : dupInCsv
+        ? 'Duplicate in CSV'
+        : undefined;
+      return { ...r, isDuplicate, duplicateReason };
+    });
+  }, [parsedRows, existingPropertyNames]);
+
+  const duplicateCount = useMemo(
+    () => rowsWithDuplicateFlags.filter((r) => r.isDuplicate).length,
+    [rowsWithDuplicateFlags]
+  );
+
+  const handleRemoveRow = (rowIndex: number) => {
+    setParsedRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+  };
 
   const handleProcessText = (text: string) => {
     const { rows, error } = parsePropertiesCsv(text);
@@ -102,7 +148,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
   };
 
   const handleExecuteImport = async () => {
-    if (parsedRows.length === 0) return;
+    if (parsedRows.length === 0 || duplicateCount > 0) return;
 
     setImporting(true);
     setParseError(null);
@@ -320,8 +366,10 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
               ) : (
                 <PropertiesImportTable
                   selectedFile={selectedFile}
-                  parsedRows={parsedRows}
+                  parsedRows={rowsWithDuplicateFlags}
                   validRowCount={validRowCount}
+                  duplicateCount={duplicateCount}
+                  onRemoveRow={handleRemoveRow}
                   onDownloadTemplate={downloadPropertiesTemplate}
                   onChangeFileClick={() => fileInputRef.current?.click()}
                   onReset={handleReset}
@@ -351,7 +399,7 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleExecuteImport}
-                    disabled={importing || validRowCount === 0}
+                    disabled={importing || validRowCount === 0 || duplicateCount > 0}
                     className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-2 transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {importing ? (

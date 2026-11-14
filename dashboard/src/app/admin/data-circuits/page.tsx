@@ -16,6 +16,8 @@ import CreateDataCircuitModal from './_components/CreateDataCircuitModal';
 import ManageDataCircuitModal from './_components/ManageDataCircuitModal';
 import WholesalersDirectoryModal from './_components/WholesalersDirectoryModal';
 import DeleteCircuitModal from './_components/DeleteCircuitModal';
+import { ImportDataCircuitsModal } from './_components/ImportDataCircuitsModal';
+import { exportDataCircuitsToCsv } from './_components/dataCircuitsCsvParser';
 
 export default function DataCircuitsAdminPage({
   initialTab = 'PIPELINE',
@@ -62,9 +64,15 @@ export default function DataCircuitsAdminPage({
   const [wholesalers, setWholesalers] = useState<WholesalerItem[]>([]);
   const [showWholesalersModal, setShowWholesalersModal] = useState(false);
 
-  // Filters
+  // Filters & Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeViewTab, searchQuery, statusFilter]);
 
   const pipelineCircuits = useMemo(
     () => circuits.filter((c) => c.status !== 'INSTALLED'),
@@ -78,9 +86,15 @@ export default function DataCircuitsAdminPage({
     () => (activeViewTab === 'INSTALLED' ? installedCircuitsList : pipelineCircuits),
     [activeViewTab, installedCircuitsList, pipelineCircuits]
   );
+  const totalPages = Math.max(1, Math.ceil(displayedCircuits.length / pageSize));
+  const paginatedCircuits = useMemo(
+    () => displayedCircuits.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [displayedCircuits, currentPage]
+  );
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedCircuit, setSelectedCircuit] = useState<any | null>(null);
   const [showManageModal, setShowManageModal] = useState(false);
   const [modalTab, setModalTab] = useState<'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW'>('PRICING');
@@ -276,11 +290,27 @@ export default function DataCircuitsAdminPage({
           onOpenWholesalers={() => setShowWholesalersModal(true)}
           onRefresh={fetchCircuitsData}
           onOpenCreate={() => setShowCreateModal(true)}
+          onOpenImport={() => setShowImportModal(true)}
+          onExportCsv={() => {
+            exportDataCircuitsToCsv(
+              displayedCircuits,
+              activeViewTab === 'INSTALLED' ? 'data-circuits-installed' : 'data-circuits-pipeline'
+            );
+            showToast(
+              'Exported CSV',
+              `Exported ${displayedCircuits.length} ${activeViewTab === 'INSTALLED' ? 'installed' : 'pipeline'} data circuit(s).`
+            );
+          }}
         />
 
         {/* Circuits Table */}
         <DataCircuitsTable
-          displayedCircuits={displayedCircuits}
+          displayedCircuits={paginatedCircuits}
+          totalCount={displayedCircuits.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
           activeViewTab={activeViewTab}
           loading={loading}
           selectedMonth={selectedMonth}
@@ -331,6 +361,17 @@ export default function DataCircuitsAdminPage({
         onClose={() => setCircuitToDelete(null)}
         onDelete={handleDeleteCircuit}
         deleting={deleting}
+      />
+
+      {/* Import Data Circuits CSV Modal */}
+      <ImportDataCircuitsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        existingCircuitPropertyNames={circuits.map((c) => c.property_name).filter(Boolean)}
+        onSuccess={() => {
+          fetchCircuitsData();
+          fetchWholesalers();
+        }}
       />
     </div>
   );

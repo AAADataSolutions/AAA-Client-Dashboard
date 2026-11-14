@@ -191,11 +191,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cache existing organizations, servers, and vendors
-    const [{ data: allOrgs }, { data: allServers }, { data: allVendors }] = await Promise.all([
+    // Cache existing organizations, servers, vendors, and property names
+    const [{ data: allOrgs }, { data: allServers }, { data: allVendors }, { data: existingPropsData }] = await Promise.all([
       dbClient.from('organizations').select('id, name'),
       dbClient.from('servers').select('id, name'),
       dbClient.from('vendors').select('id, name'),
+      dbClient.from('properties').select('id, name'),
     ]);
     const orgsMap = new Map<string, string>();
     (allOrgs || []).forEach((o: any) => {
@@ -208,6 +209,10 @@ export async function POST(request: NextRequest) {
     const vendorsMap = new Map<string, string>();
     (allVendors || []).forEach((v: any) => {
       if (v.name) vendorsMap.set(v.name.trim().toLowerCase(), v.id);
+    });
+    const existingPropNames = new Set<string>();
+    (existingPropsData || []).forEach((p: any) => {
+      if (p.name) existingPropNames.add(p.name.trim().toLowerCase());
     });
 
     const importedProperties: any[] = [];
@@ -226,6 +231,13 @@ export async function POST(request: NextRequest) {
         errors.push({ row: rowNum, propertyName: 'Row ' + rowNum, reason: 'Missing Property Name' });
         continue;
       }
+
+      const normPropName = propertyName.trim().toLowerCase();
+      if (existingPropNames.has(normPropName)) {
+        errors.push({ row: rowNum, propertyName: propertyName.trim(), reason: 'Duplicate property name already exists' });
+        continue;
+      }
+      existingPropNames.add(normPropName);
 
       // 2. Street Address, City, State, Zip, Country
       const streetRaw = getHeaderValue(row, [

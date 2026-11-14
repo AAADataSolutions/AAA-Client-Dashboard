@@ -8,6 +8,8 @@ import {
   Loader2,
   Trash2,
   MapPin,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   itemVariants,
@@ -17,6 +19,11 @@ import {
 
 interface DataCircuitsTableProps {
   displayedCircuits: any[];
+  totalCount?: number;
+  currentPage?: number;
+  totalPages?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
   loading: boolean;
   activeViewTab: 'PIPELINE' | 'INSTALLED';
   selectedMonth: string;
@@ -29,6 +36,11 @@ interface DataCircuitsTableProps {
 
 export default function DataCircuitsTable({
   displayedCircuits,
+  totalCount,
+  currentPage = 1,
+  totalPages = 1,
+  pageSize = 10,
+  onPageChange,
   loading,
   activeViewTab,
   selectedMonth,
@@ -38,6 +50,9 @@ export default function DataCircuitsTable({
   onDeleteCircuit,
   onOpenCreate,
 }: DataCircuitsTableProps) {
+  const effectiveTotal = totalCount ?? displayedCircuits.length;
+  const startItem = effectiveTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(effectiveTotal, currentPage * pageSize);
   return (
     <motion.div
       variants={itemVariants}
@@ -182,6 +197,11 @@ export default function DataCircuitsTable({
                           ? `Added ${formatCurrency(c.monthly_revenue_share_amount)}`
                           : `Pending (${selectedMonth})`}
                       </span>
+                      {Number(c.times_paid_count || 0) > 0 && (
+                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                          Paid {c.times_paid_count}x ({formatCurrency(c.total_revenue_paid)} total)
+                        </span>
+                      )}
                     </td>
 
                     {/* Actions */}
@@ -209,6 +229,38 @@ export default function DataCircuitsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Bar */}
+      {effectiveTotal > 0 && onPageChange && (
+        <div className="px-4 py-3 border-t border-slate-200 dark:border-[#222430] bg-slate-50/70 dark:bg-[#111217] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <span className="text-slate-600 dark:text-slate-400 font-medium">
+            Showing <span className="font-bold text-slate-900 dark:text-white">{startItem}</span>–
+            <span className="font-bold text-slate-900 dark:text-white">{endItem}</span> of{' '}
+            <span className="font-bold text-slate-900 dark:text-white">{effectiveTotal}</span> circuits
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => onPageChange(currentPage - 1)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-300 font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-[#1e202b] flex items-center gap-1 cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Prev
+            </button>
+            <span className="px-3 py-1.5 font-bold text-slate-700 dark:text-slate-300">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => onPageChange(currentPage + 1)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-300 font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-[#1e202b] flex items-center gap-1 cursor-pointer"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

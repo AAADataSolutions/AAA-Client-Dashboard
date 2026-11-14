@@ -175,6 +175,7 @@ export interface CircuitMetrics {
   expectedMonthlyRevShare: number;
   receivedMonthlyRevShare: number;
   pendingMonthlyRevShare: number;
+  totalHistoricalRevShareReceived?: number;
 }
 
 export const formatCurrency = (val: number) =>
