@@ -121,7 +121,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
       {/* Right: Org ID Pill, Theme Switcher, Notifications & User Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Organization ID Display & 1-Click Copy */}
-        {orgId && (
+        {/* {orgId && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#161822] border border-slate-200 dark:border-[#232536] text-xs">
             <Building2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
             <div className="flex items-center gap-1 text-[11.5px] font-mono">
@@ -150,7 +150,7 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ onOpenSidebar, isSid
               )}
             </button>
           </div>
-        )}
+        )} */}
 
         {/* Theme Switcher Toggle (Sun / Moon) */}
         <button

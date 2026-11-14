@@ -7,6 +7,7 @@ import {
   Phone,
   Mail,
   ShieldCheck,
+  CheckCircle2,
   MoreVertical,
   AlertCircle,
   User,
@@ -17,12 +18,15 @@ import {
   FileText,
 } from 'lucide-react';
 import { getStageBadge } from '@/components/client/OnboardingTimelineModal';
-import { PropertyRecord, getCircuitStageBadge } from './types';
+import { PropertyRecord, getCircuitStageBadge, formatBilledDate } from './types';
 
 interface PropertiesTableViewProps {
   properties: PropertyRecord[];
   copiedId: string | null;
-  handleOpenPropertyDetails: (prop: PropertyRecord, tab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS') => void;
+  handleOpenPropertyDetails: (
+    prop: PropertyRecord,
+    tab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'TICKETS' | 'DATA_CIRCUIT' | 'PORTING_DOCS'
+  ) => void;
   handleCopyText: (text: string, id: string, label: string, e: React.MouseEvent) => void;
   handleOpenMenu: (e: React.MouseEvent<HTMLButtonElement>, prop: PropertyRecord) => void;
 }
@@ -52,6 +56,9 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
               </th>
               <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 NO. OF SERVICES
+              </th>
+              <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                BILLING STATUS
               </th>
               <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 E911 STATUS
@@ -196,6 +203,40 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
                     </button>
                   </td>
 
+                  {/* Column 4b: BILLING STATUS (with Billed Date underneath) */}
+                  <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col items-start gap-1">
+                      {(prop as any).billing_status === 'BILLING_DONE' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          Billing Done
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          Billing Pending
+                        </span>
+                      )}
+
+                      {(prop as any).billing_status === 'BILLING_DONE' ? (
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 pl-1 flex items-center gap-1">
+                          <span>Billed:</span>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">
+                            {(prop as any).billed_date
+                              ? formatBilledDate((prop as any).billed_date)
+                              : prop.onboarding_date
+                              ? formatBilledDate(prop.onboarding_date)
+                              : 'Done'}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500 pl-1 italic">
+                          Unbilled
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
                   {/* Column 5: E911 STATUS */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
                     {prop.ray_baud_and_logs_enabled || prop.e911_status === 'VERIFIED' ? (
@@ -211,7 +252,7 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
 
                   {/* Column 6: RAY BAUM AND KARY'S LAW */}
                   <td className="py-3.5 px-4 whitespace-nowrap">
-                    {(prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' || (prop as any).ray_baud_and_logs_enabled === true || (prop as any).is_ray_baum_active === true ? (
+                    {(prop as any).ray_baum_status === 'Active' || (prop as any).ray_baum_status === 'ACTIVE' || (prop as any).is_ray_baum_active === true ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

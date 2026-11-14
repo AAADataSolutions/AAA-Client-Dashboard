@@ -20,6 +20,8 @@ import {
   Flame,
   ChevronDown,
   ArrowUpDown,
+  Network,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { LogoutConfirmModal } from '@/components/common/LogoutConfirmModal';
@@ -59,6 +61,14 @@ const navItems: NavItem[] = [
   },
   { label: "E911 Compliance", href: '/dashboard/e911', icon: ShieldCheck },
   { label: 'Porting', href: '/dashboard/porting', icon: ArrowLeftRight },
+  {
+    label: 'Data Circuit',
+    icon: Network,
+    children: [
+      { label: 'Data Circuit Pipeline', href: '/dashboard/data-circuits', icon: Network },
+      { label: 'Data Circuit Installed', href: '/dashboard/data-circuits/installed', icon: CheckCircle2 },
+    ],
+  },
   { label: 'Support Tickets', href: '/dashboard/tickets', icon: LifeBuoy },
   { label: 'Account & Team', href: '/dashboard/account', icon: Users },
 ];
@@ -70,9 +80,19 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
   const orgName = orgMembership?.organization?.name || 'My Organization';
   const isClientAdmin = effectiveRole === 'ADMIN';
 
-  const [servicesExpanded, setServicesExpanded] = React.useState(true);
+  const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({
+    Services: true,
+    'Data Circuit': true,
+  });
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [label]: prev[label] === undefined ? false : !prev[label],
+    }));
+  };
 
   const handleConfirmSignOut = async () => {
     try {
@@ -160,12 +180,14 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                   (c) => pathname === c.href || pathname.startsWith(c.href)
                 );
 
+                const isGroupExpanded = Boolean(expandedGroups[item.label]);
+
                 return (
                   <div key={item.label} className="space-y-1">
                     {isOpen ? (
                       <button
                         type="button"
-                        onClick={() => setServicesExpanded(!servicesExpanded)}
+                        onClick={() => toggleGroup(item.label)}
                         className={`w-full group flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer ${
                           isGroupActive
                             ? 'bg-gradient-to-r from-[#1c367d] via-[#172b68] to-[#12204d] text-white font-semibold shadow-xs border border-white/5'
@@ -184,7 +206,7 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                           className={`w-3.5 h-3.5 ${
                             isGroupActive ? 'text-white' : 'text-[#8fa3ca] group-hover:text-white'
                           } transition-transform duration-200 ${
-                            servicesExpanded ? 'rotate-0' : '-rotate-90'
+                            isGroupExpanded ? 'rotate-0' : '-rotate-90'
                           }`}
                         />
                       </button>
@@ -206,11 +228,12 @@ export const ClientSidebar: React.FC<ClientSidebarProps> = ({ isOpen, onClose })
                       </Link>
                     )}
 
-                    {isOpen && servicesExpanded && (
+                    {isOpen && isGroupExpanded && (
                       <div className="pl-4 ml-3 border-l border-[#18274f] space-y-1 my-1">
                         {item.children.map((subItem) => {
                           const isSubActive =
-                            pathname === subItem.href || pathname.startsWith(subItem.href);
+                            pathname === subItem.href ||
+                            (subItem.href !== '/dashboard/data-circuits' && pathname.startsWith(subItem.href));
                           const SubIcon = subItem.icon || PhoneCall;
                           return (
                             <Link

@@ -23,6 +23,12 @@ export interface PropertyRecord {
   partner_commission_override?: number | null;
   partner_name?: string | null;
   partner?: any;
+  server_id?: string | null;
+  server_name?: string | null;
+  server?: any;
+  vendor_id?: string | null;
+  vendor_name?: string | null;
+  vendor?: any;
   address: string;
   city: string;
   state: string;
@@ -52,6 +58,7 @@ export interface PropertyRecord {
   updated_at?: string;
   onboarding_date?: string | null;
   billing_status?: 'BILLING_DONE' | 'BILLING_PENDING' | string;
+  billed_date?: string | null;
   attachments?: any[];
 }
 

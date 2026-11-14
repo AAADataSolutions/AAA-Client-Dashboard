@@ -14,7 +14,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { PropertyRecord } from '@/store/slices/propertiesSlice';
-import { DrawerTabType, ServiceCreateFormData } from './types';
+import { DrawerTabType, ServiceCreateFormData, OrgOption, PartnerOption, ServerOption, VendorOption } from './types';
 import { PropertyMasterDrawerTab1Overview } from './PropertyMasterDrawerTab1Overview';
 import { PropertyMasterDrawerTab2And3 } from './PropertyMasterDrawerTab2And3';
 import { PropertyMasterDrawerTab4And5 } from './PropertyMasterDrawerTab4And5';
@@ -50,6 +50,11 @@ export interface PropertyMasterDrawerProps {
   availableDrawerServiceTypes: string[];
   showCustomSvcIdInDrawer: boolean;
   setShowCustomSvcIdInDrawer: (show: boolean) => void;
+  onOpenEdit?: (prop: any) => void;
+  orgOptions?: OrgOption[];
+  partnerOptions?: PartnerOption[];
+  serverOptions?: ServerOption[];
+  vendorOptions?: VendorOption[];
 }
 
 export function PropertyMasterDrawer({
@@ -81,6 +86,11 @@ export function PropertyMasterDrawer({
   availableDrawerServiceTypes,
   showCustomSvcIdInDrawer,
   setShowCustomSvcIdInDrawer,
+  onOpenEdit,
+  orgOptions,
+  partnerOptions,
+  serverOptions,
+  vendorOptions,
 }: PropertyMasterDrawerProps) {
   return (
     <>
@@ -222,6 +232,12 @@ export function PropertyMasterDrawer({
                       copiedField={copiedField}
                       handleCopy={handleCopy}
                       handleQuickUpdateBillingStatus={handleQuickUpdateBillingStatus}
+                      onOpenEdit={onOpenEdit}
+                      onDataChanged={() => refreshDrawerData(selectedPropForDrawer.id)}
+                      orgOptions={orgOptions}
+                      partnerOptions={partnerOptions}
+                      serverOptions={serverOptions}
+                      vendorOptions={vendorOptions}
                     />
 
                     <PropertyMasterDrawerTab2And3
@@ -237,13 +253,16 @@ export function PropertyMasterDrawer({
                       handleCopy={handleCopy}
                       handleDrawerUnassignService={handleDrawerUnassignService}
                       unassigningServiceId={unassigningServiceId}
+                      onDataChanged={() => refreshDrawerData(selectedPropForDrawer.id)}
                     />
 
                     <PropertyMasterDrawerTab4And5
                       drawerTab={drawerTab}
+                      selectedPropForDrawer={selectedPropForDrawer}
                       propertyDrawerData={propertyDrawerData}
                       copiedField={copiedField}
                       handleCopy={handleCopy}
+                      onDataChanged={() => refreshDrawerData(selectedPropForDrawer.id)}
                     />
 
                     <PropertyMasterDrawerTab6Pbx

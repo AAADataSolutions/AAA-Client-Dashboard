@@ -91,6 +91,12 @@ export async function PATCH(
         updatePayload.partner_commission_override = null;
       }
     }
+    if (body.server_id !== undefined) {
+      updatePayload.server_id = body.server_id && String(body.server_id).trim() ? String(body.server_id).trim() : null;
+    }
+    if (body.vendor_id !== undefined) {
+      updatePayload.vendor_id = body.vendor_id && String(body.vendor_id).trim() ? String(body.vendor_id).trim() : null;
+    }
     if (body.partner_commission_override !== undefined) {
       const targetPartnerId = updatePayload.partner_id !== undefined ? updatePayload.partner_id : body.partner_id;
       updatePayload.partner_commission_override =
@@ -106,7 +112,13 @@ export async function PATCH(
     } else if (body.e911_status !== undefined) {
       updatePayload.ray_baud_and_logs_enabled = body.e911_status === 'VERIFIED' || body.e911_status === 'ACTIVE';
     }
-    if (body.ray_baum_status !== undefined) updatePayload.ray_baum_status = body.ray_baum_status;
+    if (body.ray_baum_status !== undefined) {
+      updatePayload.ray_baum_status = body.ray_baum_status
+        ? String(body.ray_baum_status).trim().toUpperCase() === 'ACTIVE'
+          ? 'ACTIVE'
+          : 'INACTIVE'
+        : 'INACTIVE';
+    }
     if (body.connectivity_type !== undefined && ['PORTED', 'DATA_CIRCUITED', 'BOTH'].includes(body.connectivity_type)) {
       updatePayload.connectivity_type = body.connectivity_type;
     }
@@ -114,14 +126,39 @@ export async function PATCH(
       updatePayload.onboarding_date = body.onboarding_date && String(body.onboarding_date).trim() ? String(body.onboarding_date).trim() : null;
     }
     if (body.status !== undefined && body.status !== 'UNASSIGNED') updatePayload.status = body.status;
-    if (body.billing_status !== undefined) updatePayload.billing_status = body.billing_status;
+    if (body.billing_status !== undefined) {
+      updatePayload.billing_status = body.billing_status;
+      if (body.billed_date !== undefined) {
+        updatePayload.billed_date = body.billed_date;
+      } else if (body.billing_status === 'BILLING_DONE') {
+        updatePayload.billed_date = new Date().toISOString().slice(0, 10);
+      } else if (body.billing_status === 'BILLING_PENDING') {
+        updatePayload.billed_date = null;
+      }
+    } else if (body.billed_date !== undefined) {
+      updatePayload.billed_date = body.billed_date;
+    }
 
-    const { data: updatedProp, error: propErr } = await db
+    let { data: updatedProp, error: propErr } = await db
       .from('properties')
       .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
+
+    if (propErr && propErr.message && (propErr.message.includes('billed_date') || propErr.message.includes('server_id') || propErr.message.includes('vendor_id'))) {
+      if (propErr.message.includes('billed_date')) delete updatePayload.billed_date;
+      if (propErr.message.includes('server_id')) delete updatePayload.server_id;
+      if (propErr.message.includes('vendor_id')) delete updatePayload.vendor_id;
+      const retry = await db
+        .from('properties')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+      updatedProp = retry.data;
+      propErr = retry.error;
+    }
 
     if (propErr) {
       return NextResponse.json({ success: false, error: propErr.message }, { status: 400 });
@@ -175,15 +212,20 @@ export async function PATCH(
       }
     }
 
-    // Keep e911_records in sync with property e911 status
-    if (updatePayload.ray_baud_and_logs_enabled !== undefined) {
+    // Keep e911_records in sync with property e911 status, emergency address, and correction notes
+    if (
+      updatePayload.ray_baud_and_logs_enabled !== undefined ||
+      body.emergency_address !== undefined ||
+      body.correction_notes !== undefined ||
+      body.e911_status !== undefined
+    ) {
       const { data: opList } = await supabase
         .from('organization_properties')
         .select('id')
         .eq('property_id', id);
 
       if (opList && opList.length > 0) {
-        const isVer = updatePayload.ray_baud_and_logs_enabled;
+        const isVer = updatePayload.ray_baud_and_logs_enabled ?? (body.e911_status === 'VERIFIED');
         for (const op of opList) {
           const { data: existingE911 } = await supabase
             .from('e911_records')
@@ -191,21 +233,32 @@ export async function PATCH(
             .eq('organization_property_id', op.id)
             .maybeSingle();
 
+          const e911Update: Record<string, any> = {
+            updated_at: new Date().toISOString(),
+          };
+          if (updatePayload.ray_baud_and_logs_enabled !== undefined || body.e911_status !== undefined) {
+            e911Update.status = isVer ? 'VERIFIED' : 'PENDING';
+            e911Update.verified_at = isVer ? new Date().toISOString() : null;
+          }
+          if (body.emergency_address !== undefined) {
+            e911Update.emergency_address = body.emergency_address ? String(body.emergency_address).trim() : `${updatedProp.address}, ${updatedProp.city}, ${updatedProp.state} ${updatedProp.zip_code}`;
+          }
+          if (body.correction_notes !== undefined) {
+            e911Update.correction_notes = body.correction_notes ? String(body.correction_notes).trim() : null;
+          }
+
           if (existingE911) {
             await supabase
               .from('e911_records')
-              .update({
-                status: isVer ? 'VERIFIED' : 'PENDING',
-                verified_at: isVer ? new Date().toISOString() : null,
-                updated_at: new Date().toISOString(),
-              })
+              .update(e911Update)
               .eq('id', existingE911.id);
           } else {
             await supabase.from('e911_records').insert({
               organization_property_id: op.id,
-              emergency_address: `${updatedProp.address}, ${updatedProp.city}, ${updatedProp.state} ${updatedProp.zip_code}`,
+              emergency_address: e911Update.emergency_address || `${updatedProp.address}, ${updatedProp.city}, ${updatedProp.state} ${updatedProp.zip_code}`,
               status: isVer ? 'VERIFIED' : 'PENDING',
               verified_at: isVer ? new Date().toISOString() : null,
+              correction_notes: e911Update.correction_notes || null,
             });
           }
         }

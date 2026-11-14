@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, ShieldCheck, Copy } from 'lucide-react';
 import {
@@ -33,6 +34,12 @@ export default function ManageDataCircuitModal({
   onReload,
   onToast,
 }: ManageDataCircuitModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [newQuoteForm, setNewQuoteForm] = useState({
     wholesaler_name: '',
     carrier_name: '',
@@ -97,10 +104,13 @@ export default function ManageDataCircuitModal({
     if (!selectedCircuit) return;
     try {
       setAddingQuote(true);
-      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}/quotes`, {
-        method: 'POST',
+      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newQuoteForm),
+        body: JSON.stringify({
+          action: 'ADD_QUOTE',
+          ...newQuoteForm,
+        }),
       });
       const json = await res.json();
       if (json.success) {
@@ -154,8 +164,14 @@ export default function ManageDataCircuitModal({
   const handleSelectWinningQuote = async (quote: any, sendQuotation = false) => {
     if (!selectedCircuit) return;
     try {
-      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}/quotes/${quote.id}/select`, {
-        method: 'POST',
+      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SELECT_QUOTE',
+          quote_id: quote.id,
+          send_quotation: sendQuotation,
+        }),
       });
       const json = await res.json();
       if (json.success) {
@@ -176,8 +192,13 @@ export default function ManageDataCircuitModal({
     if (!selectedCircuit) return;
     if (!confirm('Are you sure you want to delete this quote?')) return;
     try {
-      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}/quotes?quote_id=${quoteId}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DELETE_QUOTE',
+          quote_id: quoteId,
+        }),
       });
       const json = await res.json();
       if (json.success) {
@@ -200,10 +221,11 @@ export default function ManageDataCircuitModal({
       setUploadingPdf(true);
       const fd = new FormData();
       fd.append('file', agreementFile);
+      fd.append('circuit_id', selectedCircuit.id);
       if (advanceStage) {
         fd.append('advance_stage', 'true');
       }
-      const res = await fetch(`/api/admin/data-circuits/${selectedCircuit.id}/agreement-pdf`, {
+      const res = await fetch('/api/admin/data-circuits/attachment', {
         method: 'POST',
         body: fd,
       });
@@ -246,10 +268,12 @@ export default function ManageDataCircuitModal({
     }
   };
 
-  return (
+  if (!mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {showManageModal && selectedCircuit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -264,7 +288,7 @@ export default function ManageDataCircuitModal({
                     {selectedCircuit.property_name} — Data Circuit
                   </h3>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50">
-                    {getCircuitStageBadge(selectedCircuit.status).label}
+                    {getCircuitStageBadge(selectedCircuit.status, selectedCircuit).label}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">{selectedCircuit.property_address}</p>
@@ -431,6 +455,7 @@ export default function ManageDataCircuitModal({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

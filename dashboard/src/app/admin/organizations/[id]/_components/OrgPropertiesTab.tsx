@@ -10,8 +10,22 @@ import {
   Copy,
   ExternalLink,
   MoreVertical,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { type OrgDetail, getStageBadge } from './types';
+
+function formatBilledDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const raw = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00Z`;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
 
 interface OrgPropertiesTabProps {
   org: OrgDetail;
@@ -60,6 +74,7 @@ export function OrgPropertiesTab({
               {isSuperAdmin && <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[120px]">Monthly Price</th>}
               <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">Main Phone No.</th>
               <th className="py-3 px-3.5 font-bold text-center whitespace-nowrap min-w-[100px]">No. of Services</th>
+              <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[120px]">Billing Status</th>
               <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[110px]">E911 Status</th>
               <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[170px]">Ray Baum and Kary's Law</th>
               <th className="py-3 px-3.5 font-bold whitespace-nowrap min-w-[130px]">GM Name</th>
@@ -72,7 +87,7 @@ export function OrgPropertiesTab({
           <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
             {org.properties?.length === 0 ? (
               <tr>
-                <td colSpan={isSuperAdmin ? 11 : 10} className="py-12 text-center text-slate-400 text-xs">
+                <td colSpan={isSuperAdmin ? 12 : 11} className="py-12 text-center text-slate-400 text-xs">
                   No properties assigned to this organization yet.
                 </td>
               </tr>
@@ -136,6 +151,40 @@ export function OrgPropertiesTab({
                     >
                       {prop.services_count || 0} Lines
                     </button>
+                  </td>
+
+                  {/* Billing Status (Next to No. of services with Billed Date underneath) */}
+                  <td className="py-3.5 px-3.5 whitespace-nowrap">
+                    <div className="flex flex-col items-start gap-1">
+                      {prop.billing_status === 'BILLING_DONE' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          Billing Done
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                          <AlertCircle className="w-3 h-3 text-amber-600" />
+                          Billing Pending
+                        </span>
+                      )}
+
+                      {prop.billing_status === 'BILLING_DONE' ? (
+                        <span className="text-[10.5px] font-medium text-slate-400 dark:text-slate-500 pl-0.5 flex items-center gap-1">
+                          <span>Billed:</span>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">
+                            {prop.billed_date
+                              ? formatBilledDate(prop.billed_date)
+                              : prop.onboarding_date
+                              ? formatBilledDate(prop.onboarding_date)
+                              : 'Done'}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[10.5px] font-normal text-slate-400 dark:text-slate-500 pl-0.5 italic">
+                          Unbilled
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* E911 Status */}

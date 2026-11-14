@@ -20,42 +20,15 @@ export async function GET(request: NextRequest) {
     const billingStatusFilter = searchParams.get('billingStatus') || 'ALL';
     const sortBy = searchParams.get('sortBy') || 'NAME_ASC';
 
-    // 1. Fetch Global DB Metrics
-    const { count: totalPropertiesCount } = await supabase
-      .from('properties')
-      .select('*', { count: 'exact', head: true });
-
-    const { count: verifiedE911Count } = await supabase
-      .from('properties')
-      .select('*', { count: 'exact', head: true })
-      .eq('ray_baud_and_logs_enabled', true);
-
-    const { count: totalServicesCount } = await supabase
-      .from('services')
-      .select('*', { count: 'exact', head: true });
-
-    const { count: pendingOrInactiveCount } = await supabase
-      .from('properties')
-      .select('*', { count: 'exact', head: true })
-      .neq('status', 'ACTIVE');
-
-    // 2. Fetch Properties
+    // 1. Fetch Properties
     let query = supabase.from('properties').select('*', { count: 'exact' });
-
     if (search) {
       query = query.or(`name.ilike.%${search}%,city.ilike.%${search}%,state.ilike.%${search}%,address.ilike.%${search}%,general_manager_name.ilike.%${search}%,contact_person_name.ilike.%${search}%,general_manager_email.ilike.%${search}%`);
     }
-
-    // Note: status is filtered in-memory below after post-processing and organization assignment checks
-
-    if (e911Filter === 'VERIFIED') {
-      query = query.eq('ray_baud_and_logs_enabled', true);
-    } else if (e911Filter === 'AUDIT_REQUIRED') {
-      query = query.eq('ray_baud_and_logs_enabled', false);
-    }
+    if (e911Filter === 'VERIFIED') query = query.eq('ray_baud_and_logs_enabled', true);
+    else if (e911Filter === 'AUDIT_REQUIRED') query = query.eq('ray_baud_and_logs_enabled', false);
 
     const { data: rawProps, error } = await query;
-
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
@@ -63,23 +36,17 @@ export async function GET(request: NextRequest) {
     const propList = rawProps || [];
     const propIds = propList.map((p: any) => p.id);
 
-    // 3. Fetch Organization Properties links
+    // 2. Fetch Organization Properties links
     let allOrgProps: any[] = [];
     if (propIds.length > 0) {
       const { data: opData } = await supabase
         .from('organization_properties')
-        .select(`
-          id,
-          property_id,
-          status,
-          organization:organizations(id, name, email, phone, type),
-          onboardings(id, status, target_date)
-        `)
+        .select(`id, property_id, status, organization:organizations(id, name, email, phone, type), onboardings(id, status, target_date)`)
         .in('property_id', propIds);
       allOrgProps = opData || [];
     }
 
-    // 4. Fetch Services linked via organization_property_services
+    // 3. Fetch Services linked via organization_property_services
     const opIds = allOrgProps.map((op: any) => op.id);
     let allServicesLinks: any[] = [];
     if (opIds.length > 0) {
@@ -90,7 +57,7 @@ export async function GET(request: NextRequest) {
       allServicesLinks = opsData || [];
     }
 
-    // 4b. Fetch Services linked directly via services.property_id (supports unassigned properties)
+    // 4. Fetch Services linked directly via services.property_id
     let directServices: any[] = [];
     if (propIds.length > 0) {
       const { data: directData } = await supabase
@@ -101,13 +68,17 @@ export async function GET(request: NextRequest) {
       directServices = directData || [];
     }
 
-    // 5. Fetch Partners
-    const { data: partnersData } = await supabase
-      .from('partners')
-      .select('id, name, default_commission_rate, company_name');
+    // 5. Fetch Partners, Servers & Vendors
+    const [{ data: partnersData }, { data: serversData }, { data: vendorsData }] = await Promise.all([
+      supabase.from('partners').select('id, name, default_commission_rate, company_name'),
+      db.from('servers').select('id, name, provider, status'),
+      db.from('vendors').select('id, name, category, status'),
+    ]);
     const allPartners = partnersData || [];
+    const allServers = serversData || [];
+    const allVendors = vendorsData || [];
 
-    // 5a. Fetch Data Circuits linked to properties (graceful if table not created yet)
+    // 6. Fetch Data Circuits linked to properties
     let allDataCircuits: any[] = [];
     if (propIds.length > 0) {
       try {
@@ -123,47 +94,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5b. Fetch active (incomplete) porting requests to exclude from Properties until onboarded/completed
+    // 7. Active portings to exclude from Properties until onboarded/completed
     const { data: activePortings } = await db
       .from('porting_requests')
       .select('organization_property_id, property_name')
       .not('status', 'in', '("COMPLETED","ONBOARDED")');
 
-    const activeOpIds = new Set(
-      (activePortings || [])
-        .map((p: any) => p.organization_property_id)
-        .filter(Boolean)
-    );
-    const activePortingNames = new Set(
-      (activePortings || [])
-        .map((p: any) => (p.property_name || '').toLowerCase().trim())
-        .filter(Boolean)
-    );
+    const activeOpIds = new Set((activePortings || []).map((p: any) => p.organization_property_id).filter(Boolean));
+    const activePortingNames = new Set((activePortings || []).map((p: any) => (p.property_name || '').toLowerCase().trim()).filter(Boolean));
 
-    // 6. Map and combine
+    // 8. Map and combine
     let processed = propList.map((prop: any, idx: number) => {
       const matchingOps = allOrgProps.filter((op: any) => op.property_id === prop.id);
       const matchingOpIds = matchingOps.map((op: any) => op.id);
       const orgs = matchingOps.map((op: any) => op.organization).filter(Boolean);
       const primaryOrg = orgs[0] || null;
 
-      // Count actual services linked to this property (both legacy via org and direct)
       const serviceIdSet = new Set<string>();
       allServicesLinks
         .filter((sl: any) => matchingOpIds.includes(sl.organization_property_id))
-        .forEach((sl: any) => {
-          if (sl.service_id) serviceIdSet.add(sl.service_id);
-        });
+        .forEach((sl: any) => { if (sl.service_id) serviceIdSet.add(sl.service_id); });
       directServices
         .filter((ds: any) => ds.property_id === prop.id)
-        .forEach((ds: any) => {
-          if (ds.id) serviceIdSet.add(ds.id);
-        });
+        .forEach((ds: any) => { if (ds.id) serviceIdSet.add(ds.id); });
       const dynamicServiceCount = serviceIdSet.size;
 
       const partnerObj = allPartners.find((pt: any) => pt.id === prop.partner_id) || null;
+      const serverObj = allServers.find((sv: any) => sv.id === prop.server_id) || null;
+      const vendorObj = allVendors.find((vn: any) => vn.id === prop.vendor_id) || null;
 
-      // Calculate onboarding stage
       const STAGE_MAP: Record<string, string> = {
         DRAFT: 'Draft Initialized',
         CONTRACT_SENT: 'Contract Sent',
@@ -189,9 +148,8 @@ export async function GET(request: NextRequest) {
       const gmPhone = prop.general_manager_phone || prop.main_phone || 'N/A';
       const gmEmail = prop.general_manager_email || prop.contact_person_email || 'N/A';
 
-      const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
+      const isE911Verified = (prop.e911_status?.toUpperCase() === 'VERIFIED') || Boolean(prop.ray_baud_and_logs_enabled && prop.e911_status !== 'AUDIT_REQUIRED' && prop.e911_status !== 'PENDING');
       const isAssigned = Boolean(primaryOrg || orgs.length > 0);
-
       const propCircuits = allDataCircuits.filter((dc: any) => dc.property_id === prop.id);
       const primaryCircuit = propCircuits[0] || null;
 
@@ -199,12 +157,8 @@ export async function GET(request: NextRequest) {
         prop.connectivity_type && ['PORTED', 'DATA_CIRCUITED', 'BOTH'].includes(prop.connectivity_type)
           ? prop.connectivity_type
           : 'PORTED';
-
-      if (primaryCircuit && dynamicServiceCount > 0 && !prop.connectivity_type) {
-        resolvedConnectivityType = 'BOTH';
-      } else if (primaryCircuit && !prop.connectivity_type) {
-        resolvedConnectivityType = 'DATA_CIRCUITED';
-      }
+      if (primaryCircuit && dynamicServiceCount > 0 && !prop.connectivity_type) resolvedConnectivityType = 'BOTH';
+      else if (primaryCircuit && !prop.connectivity_type) resolvedConnectivityType = 'DATA_CIRCUITED';
 
       return {
         id: prop.id,
@@ -219,6 +173,12 @@ export async function GET(request: NextRequest) {
         partner_commission_override: prop.partner_commission_override ?? null,
         partner_name: partnerObj?.name || null,
         partner: partnerObj,
+        server_id: prop.server_id || null,
+        server_name: serverObj?.name || null,
+        server: serverObj,
+        vendor_id: prop.vendor_id || null,
+        vendor_name: vendorObj?.name || null,
+        vendor: vendorObj,
         address: prop.address,
         city: prop.city,
         state: prop.state,
@@ -244,40 +204,36 @@ export async function GET(request: NextRequest) {
         services_count: dynamicServiceCount,
         onboarding_stage: stage,
         e911_status: isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED',
-        ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
+        ray_baum_status: prop.ray_baum_status && String(prop.ray_baum_status).trim().toUpperCase() === 'ACTIVE' ? 'Active' : 'Inactive',
         onboarding_date: prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null),
         billing_status: prop.billing_status || 'BILLING_PENDING',
+        billed_date: prop.billed_date || (prop.billing_status === 'BILLING_DONE' ? (prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null)) : null),
         attachments: prop.attachments || [],
         created_at: prop.created_at,
         updated_at: prop.updated_at || prop.created_at,
       };
     });
 
-    // Exclude properties that are currently in an active porting pipeline (until they become Onboarding / Completed)
+    // Exclude properties in active porting pipeline
     processed = processed.filter((p: any) => {
       const isLinkedToActivePorting = p.org_links?.some((op: any) => activeOpIds.has(op.id));
       if (isLinkedToActivePorting) return false;
-
-      if (!p.is_assigned && activePortingNames.has((p.name || '').toLowerCase().trim())) {
-        return false;
-      }
+      if (!p.is_assigned && activePortingNames.has((p.name || '').toLowerCase().trim())) return false;
       return true;
     });
 
-    // Filter by Billing Status if requested
     if (billingStatusFilter === 'BILLING_DONE') {
       processed = processed.filter((p: any) => (p.billing_status || 'BILLING_PENDING') === 'BILLING_DONE');
     } else if (billingStatusFilter === 'BILLING_PENDING') {
       processed = processed.filter((p: any) => (p.billing_status || 'BILLING_PENDING') === 'BILLING_PENDING');
     }
-    // Filter by Ray Baum status if requested
+
     if (rayBaumFilter === 'ACTIVE') {
       processed = processed.filter((p: any) => p.ray_baum_status === 'Active');
     } else if (rayBaumFilter === 'INACTIVE') {
       processed = processed.filter((p: any) => p.ray_baum_status === 'Inactive');
     }
 
-    // Filter by Organization if requested
     if (orgId && orgId !== 'ALL') {
       processed = processed.filter((p: any) =>
         p.organizations.some((o: any) => o.id === orgId) ||
@@ -286,7 +242,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Filter by Status if requested
     if (status && status !== 'ALL') {
       const sUpper = status.toUpperCase();
       if (sUpper === 'UNASSIGNED') {
@@ -296,21 +251,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sorting
     processed.sort((a: any, b: any) => {
       switch (sortBy) {
-        case 'NAME_ASC':
-          return a.name.localeCompare(b.name);
-        case 'NAME_DESC':
-          return b.name.localeCompare(a.name);
-        case 'NEWEST':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case 'ORGS_DESC':
-          return (b.organizations_count || 0) - (a.organizations_count || 0);
-        case 'SERVICES_DESC':
-          return (b.services_count || 0) - (a.services_count || 0);
-        default:
-          return a.name.localeCompare(b.name);
+        case 'NAME_ASC': return a.name.localeCompare(b.name);
+        case 'NAME_DESC': return b.name.localeCompare(a.name);
+        case 'NEWEST': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'ORGS_DESC': return (b.organizations_count || 0) - (a.organizations_count || 0);
+        case 'SERVICES_DESC': return (b.services_count || 0) - (a.services_count || 0);
+        default: return a.name.localeCompare(b.name);
       }
     });
 
@@ -336,10 +284,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { success: false, error: err.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -355,6 +300,8 @@ export async function POST(request: NextRequest) {
       organization_id,
       partner_id,
       partner_commission_override,
+      server_id,
+      vendor_id,
       address,
       city,
       state,
@@ -373,7 +320,6 @@ export async function POST(request: NextRequest) {
       ray_baud_and_logs_enabled,
       ray_baum_status,
       e911_status,
-      status,
     } = body;
 
     if (!name || !name.trim()) {
@@ -387,16 +333,19 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Determine E911 and Ray Baum status
     const isE911Verified =
       ray_baud_and_logs_enabled !== undefined
         ? Boolean(ray_baud_and_logs_enabled)
         : (e911_status === 'VERIFIED' || e911_status === 'ACTIVE');
 
-    const resolvedRayBaum = ray_baum_status || (isE911Verified ? 'ACTIVE' : 'INACTIVE');
+    const resolvedRayBaum = ray_baum_status
+      ? (String(ray_baum_status).trim().toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE')
+      : 'INACTIVE';
     const resolvedStatus = 'ACTIVE';
 
     const cleanPartnerId = partner_id && partner_id.trim() ? partner_id.trim() : null;
+    const cleanServerId = server_id && String(server_id).trim() ? String(server_id).trim() : null;
+    const cleanVendorId = vendor_id && String(vendor_id).trim() ? String(vendor_id).trim() : null;
     const cleanOverride =
       cleanPartnerId &&
       partner_commission_override !== null &&
@@ -411,58 +360,71 @@ export async function POST(request: NextRequest) {
         ? String(onboarding_date).trim()
         : new Date().toISOString().slice(0, 10);
 
-    const { data: newProp, error: propErr } = await db
+    const propInsertPayload: Record<string, any> = {
+      name: name.trim(),
+      address: address.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      zip_code: zip_code.trim(),
+      country: country?.trim() || 'USA',
+      main_phone: main_phone?.trim() || null,
+      fax: fax?.trim() || null,
+      contact_person_name: contact_person_name?.trim() || null,
+      contact_person_email: contact_person_email?.trim() || null,
+      general_manager_name: general_manager_name?.trim() || null,
+      general_manager_phone: general_manager_phone?.trim() || null,
+      general_manager_email: general_manager_email?.trim() || null,
+      base_price: base_price !== null && base_price !== '' && base_price !== undefined ? Number(base_price) : (monthly_price !== null && monthly_price !== '' && monthly_price !== undefined ? Number(monthly_price) : 0),
+      monthly_price: monthly_price === null || monthly_price === '' || monthly_price === undefined ? (base_price !== null && base_price !== '' && base_price !== undefined ? Number(base_price) : 0) : Number(monthly_price),
+      onboarding_date: resolvedOnboardingDate,
+      partner_id: cleanPartnerId,
+      partner_commission_override: cleanOverride,
+      server_id: cleanServerId,
+      vendor_id: cleanVendorId,
+      ray_baud_and_logs_enabled: isE911Verified,
+      ray_baum_status: resolvedRayBaum,
+      billing_status: body.billing_status || 'BILLING_PENDING',
+      billed_date: body.billed_date !== undefined
+        ? body.billed_date
+        : (body.billing_status === 'BILLING_DONE' ? (resolvedOnboardingDate || new Date().toISOString().slice(0, 10)) : null),
+      status: resolvedStatus,
+    };
+
+    let { data: newProp, error: propErr } = await db
       .from('properties')
-      .insert({
-        name: name.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        zip_code: zip_code.trim(),
-        country: country?.trim() || 'USA',
-        main_phone: main_phone?.trim() || null,
-        fax: fax?.trim() || null,
-        contact_person_name: contact_person_name?.trim() || null,
-        contact_person_email: contact_person_email?.trim() || null,
-        general_manager_name: general_manager_name?.trim() || null,
-        general_manager_phone: general_manager_phone?.trim() || null,
-        general_manager_email: general_manager_email?.trim() || null,
-        base_price: base_price !== null && base_price !== '' && base_price !== undefined ? Number(base_price) : (monthly_price !== null && monthly_price !== '' && monthly_price !== undefined ? Number(monthly_price) : 0),
-        monthly_price: monthly_price === null || monthly_price === '' || monthly_price === undefined ? (base_price !== null && base_price !== '' && base_price !== undefined ? Number(base_price) : 0) : Number(monthly_price),
-        onboarding_date: resolvedOnboardingDate,
-        partner_id: cleanPartnerId,
-        partner_commission_override: cleanOverride,
-        ray_baud_and_logs_enabled: isE911Verified,
-        ray_baum_status: resolvedRayBaum,
-        billing_status: body.billing_status || 'BILLING_PENDING',
-        status: resolvedStatus,
-      })
+      .insert(propInsertPayload)
       .select()
       .single();
+
+    if (propErr && propErr.message && (propErr.message.includes('billed_date') || propErr.message.includes('server_id') || propErr.message.includes('vendor_id'))) {
+      if (propErr.message.includes('billed_date')) delete propInsertPayload.billed_date;
+      if (propErr.message.includes('server_id')) delete propInsertPayload.server_id;
+      if (propErr.message.includes('vendor_id')) delete propInsertPayload.vendor_id;
+      const retry = await db
+        .from('properties')
+        .insert(propInsertPayload)
+        .select()
+        .single();
+      newProp = retry.data;
+      propErr = retry.error;
+    }
 
     if (propErr) {
       return NextResponse.json({ success: false, error: propErr.message }, { status: 400 });
     }
 
-    // Link to organization if specified (Rule 1: One property can be assigned to only one organization)
     let orgName = 'Unassigned';
     if (organization_id) {
       const { data: org } = await db.from('organizations').select('name').eq('id', organization_id).maybeSingle();
-
       if (org) orgName = org.name;
 
       const { data: newOp } = await db
         .from('organization_properties')
-        .insert({
-          organization_id,
-          property_id: newProp.id,
-          status: 'ACTIVE',
-        })
+        .insert({ organization_id, property_id: newProp.id, status: 'ACTIVE' })
         .select('id')
         .single();
 
       if (newOp) {
-        // Auto-create onboarding record set to COMPLETED for direct property creation
         await db.from('onboardings').insert({
           organization_property_id: newOp.id,
           status: 'COMPLETED',
@@ -470,7 +432,6 @@ export async function POST(request: NextRequest) {
           target_date: resolvedOnboardingDate,
         });
 
-        // Auto-create e911 record
         await db.from('e911_records').insert({
           organization_property_id: newOp.id,
           emergency_address: `${address.trim()}, ${city.trim()}, ${state.trim()} ${zip_code.trim()}`,
@@ -480,7 +441,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Central Audit Log
     await logAuditEvent({
       action: 'PROPERTY_CREATED',
       entity_type: 'PROPERTY',

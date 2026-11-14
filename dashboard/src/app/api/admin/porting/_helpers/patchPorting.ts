@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { getStageDateKeyForStatus, parseNotesMetadata, toSafeLegacyEnum } from './portingMetadata';
 import { syncRelatedPortingEntities } from './syncPortingEntities';
+import { handlePostPorting } from './postPorting';
 
 export async function handlePatchPorting(request: NextRequest) {
   try {
@@ -53,6 +54,21 @@ export async function handlePatchPorting(request: NextRequest) {
     } = body;
 
     if (!id) {
+      const resolvedName = property_name || body.name || body.propertyName;
+      const resolvedPhone = property_phone || body.main_phone || body.phone || body.propertyPhone;
+      if (resolvedName) {
+        // Fallback: If client sent creation payload to PATCH, route to handlePostPorting
+        const dummyReq = new NextRequest(request.url, {
+          method: 'POST',
+          headers: request.headers,
+          body: JSON.stringify({
+            ...body,
+            property_name: resolvedName,
+            property_phone: resolvedPhone || 'Pending Phone',
+          }),
+        });
+        return handlePostPorting(dummyReq);
+      }
       return NextResponse.json({ success: false, error: 'Porting Request ID is required.' }, { status: 400 });
     }
 

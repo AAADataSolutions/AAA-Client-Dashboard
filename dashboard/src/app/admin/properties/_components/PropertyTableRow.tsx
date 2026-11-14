@@ -12,6 +12,7 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { PropertyItem, PropertyRecord } from '@/store/slices/propertiesSlice';
+import { formatBilledDate } from './types';
 
 export interface PropertyTableRowProps {
   prop: PropertyRecord;
@@ -185,6 +186,47 @@ export function PropertyTableRow({
         </button>
       </td>
 
+      {/* 6. Billing Status (Next to No. of services with Billed Date underneath) */}
+      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col items-start gap-1">
+          <select
+            value={(prop as any).billing_status === 'BILLING_DONE' ? 'BILLING_DONE' : 'BILLING_PENDING'}
+            onChange={(e) =>
+              handleQuickUpdateBillingStatus(prop.id, e.target.value as 'BILLING_DONE' | 'BILLING_PENDING')
+            }
+            className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
+              (prop as any).billing_status === 'BILLING_DONE'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+            }`}
+          >
+            <option value="BILLING_DONE" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">
+              Billing Done (Billed)
+            </option>
+            <option value="BILLING_PENDING" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">
+              Billing Pending
+            </option>
+          </select>
+
+          {(prop as any).billing_status === 'BILLING_DONE' ? (
+            <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 pl-1 flex items-center gap-1">
+              <span>Billed:</span>
+              <span className="font-semibold text-slate-600 dark:text-slate-300">
+                {(prop as any).billed_date
+                  ? formatBilledDate((prop as any).billed_date)
+                  : prop.onboarding_date
+                  ? formatBilledDate(prop.onboarding_date)
+                  : 'Today'}
+              </span>
+            </span>
+          ) : (
+            <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500 pl-1 italic">
+              Unbilled
+            </span>
+          )}
+        </div>
+      </td>
+
       {/* 6. E911 Status */}
       <td className="py-3.5 px-4 whitespace-nowrap">
         {prop.ray_baud_and_logs_enabled ? (
@@ -281,27 +323,7 @@ export function PropertyTableRow({
         </select>
       </td>
 
-      {/* 11. Billing Status (Inline Select - Changeable Anytime) */}
-      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-        <select
-          value={(prop as any).billing_status === 'BILLING_DONE' ? 'BILLING_DONE' : 'BILLING_PENDING'}
-          onChange={(e) =>
-            handleQuickUpdateBillingStatus(prop.id, e.target.value as 'BILLING_DONE' | 'BILLING_PENDING')
-          }
-          className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 transition ${
-            (prop as any).billing_status === 'BILLING_DONE'
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-          }`}
-        >
-          <option value="BILLING_DONE" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">
-            Billing Done (Billed)
-          </option>
-          <option value="BILLING_PENDING" className="bg-white dark:bg-[#1e2029] text-slate-800 dark:text-slate-100">
-            Billing Pending
-          </option>
-        </select>
-      </td>
+
 
       {/* 12. Actions */}
       <td className="py-3.5 px-4 text-right whitespace-nowrap">

@@ -43,12 +43,15 @@ export const CIRCUIT_STAGES: {
   { key: 'INSTALLED', label: '7. Installed', step: 7, desc: 'Circuit live & operational' },
 ];
 
-export function getCircuitStageBadge(status: string) {
+export function getCircuitStageBadge(
+  status: string,
+  circuit?: { site_survey_status?: string; foc_status?: string } | null
+) {
   switch (status) {
     case 'STARTED':
     case 'REQUESTED':
       return {
-        label: '1. Started',
+        label: 'Started',
         bg: 'bg-slate-100 dark:bg-slate-800/80',
         text: 'text-slate-700 dark:text-slate-300',
         border: 'border-slate-200 dark:border-slate-700',
@@ -56,7 +59,7 @@ export function getCircuitStageBadge(status: string) {
       };
     case 'PRICING_FINALIZED':
       return {
-        label: '2. Pricing Finalized',
+        label: 'Pricing Finalized',
         bg: 'bg-blue-50 dark:bg-blue-950/50',
         text: 'text-blue-700 dark:text-blue-300',
         border: 'border-blue-200 dark:border-blue-800/50',
@@ -64,7 +67,7 @@ export function getCircuitStageBadge(status: string) {
       };
     case 'QUOTATION_SENT':
       return {
-        label: '3. Quotation Sent',
+        label: 'Quotation Sent',
         bg: 'bg-indigo-50 dark:bg-indigo-950/50',
         text: 'text-indigo-700 dark:text-indigo-300',
         border: 'border-indigo-200 dark:border-indigo-800/50',
@@ -72,31 +75,62 @@ export function getCircuitStageBadge(status: string) {
       };
     case 'PAPERWORK_SIGNED':
       return {
-        label: '4. Paperwork Signed',
+        label: 'Paperwork Signed',
         bg: 'bg-teal-50 dark:bg-teal-950/50',
         text: 'text-teal-700 dark:text-teal-300',
         border: 'border-teal-200 dark:border-teal-800/50',
         pct: 57,
       };
-    case 'SITE_SURVEY':
+    case 'SITE_SURVEY': {
+      const surveyStatus = circuit?.site_survey_status;
+      if (surveyStatus === 'COMPLETED' || surveyStatus === 'DONE') {
+        return {
+          label: 'Site Survey: Completed',
+          bg: 'bg-emerald-50 dark:bg-emerald-950/50',
+          text: 'text-emerald-700 dark:text-emerald-300',
+          border: 'border-emerald-200 dark:border-emerald-800/50',
+          pct: 71,
+        };
+      }
+      if (surveyStatus === 'NOT_REQUIRED') {
+        return {
+          label: 'Site Survey: N/A',
+          bg: 'bg-slate-100 dark:bg-slate-800/80',
+          text: 'text-slate-700 dark:text-slate-300',
+          border: 'border-slate-200 dark:border-slate-700',
+          pct: 71,
+        };
+      }
       return {
-        label: '5. Site Survey',
+        label: 'Site Survey: Pending',
         bg: 'bg-purple-50 dark:bg-purple-950/50',
         text: 'text-purple-700 dark:text-purple-300',
         border: 'border-purple-200 dark:border-purple-800/50',
         pct: 71,
       };
-    case 'FOC_STAGE':
+    }
+    case 'FOC_STAGE': {
+      const focStatus = circuit?.foc_status;
+      if (focStatus === 'CONFIRMED') {
+        return {
+          label: 'FOC Confirmed',
+          bg: 'bg-emerald-50 dark:bg-emerald-950/50',
+          text: 'text-emerald-700 dark:text-emerald-300',
+          border: 'border-emerald-200 dark:border-emerald-800/50',
+          pct: 85,
+        };
+      }
       return {
-        label: '6. FOC Status',
+        label: 'FOC: Pending',
         bg: 'bg-amber-50 dark:bg-amber-950/50',
         text: 'text-amber-700 dark:text-amber-300',
         border: 'border-amber-200 dark:border-amber-800/50',
         pct: 85,
       };
+    }
     case 'INSTALLED':
       return {
-        label: '7. Installed',
+        label: 'Installed',
         bg: 'bg-emerald-50 dark:bg-emerald-950/50',
         text: 'text-emerald-700 dark:text-emerald-300',
         border: 'border-emerald-200 dark:border-emerald-800/50',

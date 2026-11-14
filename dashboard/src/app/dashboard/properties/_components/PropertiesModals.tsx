@@ -8,7 +8,7 @@ import { PropertyRecord } from './types';
 interface PropertiesModalsProps {
   showDrawer: boolean;
   selectedPropForDrawer: PropertyRecord | null;
-  drawerDefaultTab: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS';
+  drawerDefaultTab: 'OVERVIEW' | 'SERVICES' | 'E911' | 'TICKETS' | 'DATA_CIRCUIT' | 'PORTING_DOCS';
   setShowDrawer: (show: boolean) => void;
   setSelectedPropForDrawer: (prop: PropertyRecord | null) => void;
   handleOpenTicketModalForProp: (propId: string) => void;
@@ -68,6 +68,11 @@ export function PropertiesModals({
             setShowDrawer(false);
             handleOpenTicketModalForProp(propId);
           }}
+          onPropertyUpdated={(updated) => {
+            setSelectedPropForDrawer(updated);
+            onRefresh();
+          }}
+          onRefresh={onRefresh}
         />
       )}
 

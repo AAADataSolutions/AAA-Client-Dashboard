@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ShieldCheck,
   ExternalLink,
+  FileText,
 } from 'lucide-react';
 import { type PortingRecordItem, getStageDate } from './types';
 
@@ -30,12 +31,7 @@ interface PortingTableAndMenuProps {
   pageSize: number;
   totalRecords: number;
   totalPages: number;
-  menuPosition: {
-    top?: number;
-    bottom?: number;
-    left: number;
-    record: PortingRecordItem;
-  } | null;
+  menuPosition: { top?: number; bottom?: number; left: number; record: PortingRecordItem } | null;
   setMenuPosition: (pos: any) => void;
   handleCopyNumbers: (record: PortingRecordItem, e?: React.MouseEvent) => void;
   handleOpenProperty: (propId: string) => void;
@@ -72,6 +68,7 @@ export function PortingTableAndMenu({
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY</th>
                 <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY STATUS</th>
+                <th className="py-3 px-4 whitespace-nowrap">PORTING DOCS</th>
                 <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
                 <th className="py-3 px-4 whitespace-nowrap">NO. OF SERVICES</th>
                 <th className="py-3 px-4 whitespace-nowrap">E911 STATUS</th>
@@ -84,14 +81,14 @@ export function PortingTableAndMenu({
             <tbody className="divide-y divide-slate-100 dark:divide-[#222430]/60">
               {loading && portings.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-500" />
                     Loading porting records...
                   </td>
                 </tr>
               ) : portings.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <ArrowLeftRight className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     No porting records found matching your filter.
                   </td>
@@ -105,43 +102,16 @@ export function PortingTableAndMenu({
                     item.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
                     (item as any).stage || item.status || 'DRAFT'
                   );
-                  let badge = {
-                    label: 'Stage 1: Draft initialized',
-                    bg: 'bg-slate-100 dark:bg-[#1a1c24]',
-                    text: 'text-slate-800 dark:text-slate-200',
-                    border: 'border-slate-200 dark:border-[#2a2c3a]',
-                  };
-                  switch (normalizedStage) {
-                    case 'DRAFT':
-                      badge = { label: 'Draft initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' };
-                      break;
-                    case 'CONTRACT_SENT':
-                      badge = { label: 'Contract sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50' };
-                      break;
-                    case 'SIGNED':
-                      badge = { label: 'Contract signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50' };
-                      break;
-                    case 'CSR_DETAILS':
-                    case 'CSR_AND_CONTRACT_DETAILS':
-                      badge = { label: 'CSR and contract details', bg: 'bg-teal-50 dark:bg-teal-950/50', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-200 dark:border-teal-800/50' };
-                      break;
-                    case 'CUT_SHEET_REVIEW':
-                    case 'SOF_WAITING':
-                    case 'CUT_SHEET':
-                      badge = { label: 'Cut sheet review', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50' };
-                      break;
-                    case 'PORTING_SUBMITTED':
-                    case 'SUBMITTED':
-                    case 'IN_PROGRESS':
-                      badge = { label: 'Porting submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50' };
-                      break;
-                    case 'FOC_RECEIVED':
-                      badge = { label: 'FOC Confirm', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50' };
-                      break;
-                    case 'COMPLETED':
-                      badge = { label: 'Onboarding', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50' };
-                      break;
-                  }
+                  const badge = {
+                    DRAFT: { label: 'Draft initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' },
+                    CONTRACT_SENT: { label: 'Contract sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50' },
+                    SIGNED: { label: 'Contract signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50' },
+                    CSR_DETAILS: { label: 'CSR and contract details', bg: 'bg-teal-50 dark:bg-teal-950/50', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-200 dark:border-teal-800/50' },
+                    CUT_SHEET_REVIEW: { label: 'Cut sheet review', bg: 'bg-purple-50 dark:bg-purple-950/50', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800/50' },
+                    PORTING_SUBMITTED: { label: 'Porting submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50' },
+                    FOC_RECEIVED: { label: 'FOC Confirm', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50' },
+                    COMPLETED: { label: 'Onboarding', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50' },
+                  }[normalizedStage] || { label: 'Draft initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' };
 
                   const locationStr = item.city
                     ? `${item.city}${item.state ? `, ${item.state}` : ''}`
@@ -195,6 +165,22 @@ export function PortingTableAndMenu({
                             {getStageDate(item, normalizedStage)}
                           </span>
                         </div>
+                      </td>
+
+                      {/* 3b. Porting Docs */}
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {item.attachments && item.attachments.length > 0 ? (
+                          <button
+                            onClick={() => setSelectedPortingForDrawer(item)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-300/60 dark:border-purple-800 transition cursor-pointer shadow-xs group"
+                            title="Click to view porting documents & attachments"
+                          >
+                            <FileText className="w-3 h-3 text-purple-500 group-hover:scale-110 transition-transform" />
+                            <span>{item.attachments.length} {item.attachments.length === 1 ? 'Doc' : 'Docs'}</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-normal text-xs pl-1">0 Docs</span>
+                        )}
                       </td>
 
                       {/* 4. Main Phone No. */}
@@ -418,6 +404,17 @@ export function PortingTableAndMenu({
             >
               <Eye className="w-3.5 h-3.5 text-blue-500" />
               <span>View Porting Timeline</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedPortingForDrawer(menuPosition.record);
+                setMenuPosition(null);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-[#222430] flex items-center gap-2 transition cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-purple-500" />
+              <span>View Porting Docs ({menuPosition.record.attachments?.length || 0})</span>
             </button>
 
             <button

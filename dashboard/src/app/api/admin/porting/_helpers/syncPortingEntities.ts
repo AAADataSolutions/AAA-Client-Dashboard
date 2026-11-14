@@ -272,7 +272,18 @@ export async function syncRelatedPortingEntities(params: {
       propUpdate.onboarding_date = effectiveOnbDate.slice(0, 10);
     }
 
-    if (body.billing_status !== undefined) propUpdate.billing_status = body.billing_status;
+    if (body.billing_status !== undefined) {
+      propUpdate.billing_status = body.billing_status;
+      if (body.billed_date !== undefined) {
+        propUpdate.billed_date = body.billed_date;
+      } else if (body.billing_status === 'BILLING_DONE') {
+        propUpdate.billed_date = (live_cutover_date || completed_at || updated.completed_at || todayStr).slice(0, 10);
+      } else if (body.billing_status === 'BILLING_PENDING') {
+        propUpdate.billed_date = null;
+      }
+    } else if (body.billed_date !== undefined) {
+      propUpdate.billed_date = body.billed_date;
+    }
     if (attachments !== undefined && Array.isArray(attachments)) propUpdate.attachments = attachments;
 
     const { error: propUpdErr } = await db.from('properties').update(propUpdate).eq('id', propId);

@@ -1,12 +1,33 @@
+'use client';
+
 import React from 'react';
 import { Wifi, FileText, CheckCircle2, ExternalLink } from 'lucide-react';
 
 interface PropertyDataCircuitTabProps {
-  dataCircuit: any;
+  dataCircuit?: any;
+  property?: any;
 }
 
 export function PropertyDataCircuitTab({ dataCircuit }: PropertyDataCircuitTabProps) {
-  if (!dataCircuit) return null;
+  if (!dataCircuit) {
+    return (
+      <div className="space-y-4">
+        <div className="p-8 text-center rounded-xl bg-slate-50 dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430] space-y-2.5">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto border border-blue-100 dark:border-blue-900/40">
+            <Wifi className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-800 dark:text-white text-xs">
+              Ported Voice Only — No Enterprise Data Circuit
+            </h4>
+            <p className="text-slate-400 text-[11px] max-w-sm mx-auto mt-1 leading-relaxed">
+              This property location operates on standard ported voice trunks. An enterprise dedicated internet circuit has not been requested or provisioned for this site.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

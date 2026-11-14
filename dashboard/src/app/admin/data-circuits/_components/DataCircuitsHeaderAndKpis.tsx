@@ -198,75 +198,13 @@ export default function DataCircuitsHeaderAndKpis({
         </div>
       </motion.div>
 
-      {/* 2 MAIN TABS: DATA CIRCUIT PIPELINE vs DATA CIRCUIT INSTALLED */}
-      <motion.div
-        variants={itemVariants}
-        className="flex flex-wrap items-center gap-2 bg-white dark:bg-[#15161c] p-2 rounded-2xl border border-slate-200/80 dark:border-[#222430] shadow-xs"
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setActiveViewTab('PIPELINE');
-            setStatusFilter('ALL');
-          }}
-          className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
-            activeViewTab === 'PIPELINE'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e202b]'
-          }`}
-        >
-          <Network className="w-4 h-4" />
-          <span>Data Circuit Pipeline</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-              activeViewTab === 'PIPELINE'
-                ? 'bg-white/20 text-white'
-                : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
-            }`}
-          >
-            {pipelineCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveViewTab('INSTALLED');
-            setStatusFilter('ALL');
-          }}
-          className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition cursor-pointer ${
-            activeViewTab === 'INSTALLED'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e202b]'
-          }`}
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Data Circuit Installed</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-              activeViewTab === 'INSTALLED'
-                ? 'bg-white/20 text-white'
-                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-            }`}
-          >
-            {installedCount}
-          </span>
-        </button>
-
-        <span className="text-[11px] text-slate-400 ml-auto hidden md:inline pr-2">
-          {activeViewTab === 'PIPELINE'
-            ? 'Showing active pipeline circuits (Stages 1–6). Circuits automatically move to Installed once Stage 7 is saved.'
-            : 'Showing live, installed Data Circuits (Stage 7: Installed).'}
-        </span>
-      </motion.div>
-
       {/* Filter and Search Bar */}
       <motion.div
         variants={itemVariants}
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#15161c] p-3 rounded-2xl border border-slate-200/80 dark:border-[#222430]"
       >
         <div className="flex items-center gap-2">
-          <div
+          {/* <div
             className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${
               activeViewTab === 'INSTALLED'
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300'
@@ -279,7 +217,7 @@ export default function DataCircuitsHeaderAndKpis({
                 ? `Installed Data Circuits (${displayedCount})`
                 : `Pipeline Circuits (${displayedCount})`}
             </span>
-          </div>
+          </div> */}
         </div>
 
         {/* Search & Stage Filter */}

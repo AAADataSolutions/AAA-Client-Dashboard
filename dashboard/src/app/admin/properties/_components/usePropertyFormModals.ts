@@ -89,6 +89,8 @@ export function usePropertyFormModals({
       organization_id: prop.primary_organization?.id || prop.organizations?.[0]?.id || prop.organization_id || '',
       partner_id: (prop as any).partner_id || (prop as any).partner?.id || '',
       partner_commission_override: (prop as any).partner_commission_override !== null && (prop as any).partner_commission_override !== undefined ? (prop as any).partner_commission_override : '',
+      server_id: (prop as any).server_id || (prop as any).server?.id || '',
+      vendor_id: (prop as any).vendor_id || (prop as any).vendor?.id || '',
       address: prop.address || '',
       city: prop.city || '',
       state: prop.state || '',
@@ -107,6 +109,7 @@ export function usePropertyFormModals({
       e911_status: isE911 ? 'VERIFIED' : 'AUDIT_REQUIRED',
       connectivity_type: (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED'),
       billing_status: ((prop as any).billing_status === 'BILLING_DONE' ? 'BILLING_DONE' : 'BILLING_PENDING') as 'BILLING_DONE' | 'BILLING_PENDING',
+      billed_date: (prop as any).billed_date || null,
       status: (prop.status as 'ACTIVE' | 'INACTIVE' | 'ARCHIVED') || 'ACTIVE',
     });
     setFormError(null);
@@ -126,10 +129,17 @@ export function usePropertyFormModals({
       setFormLoading(true);
       setFormError(null);
 
+      const editPayload: any = { ...formData };
+      if (formData.billing_status === 'BILLING_DONE' && !formData.billed_date) {
+        editPayload.billed_date = (selectedPropForEdit as any).billed_date || new Date().toISOString().slice(0, 10);
+      } else if (formData.billing_status === 'BILLING_PENDING') {
+        editPayload.billed_date = null;
+      }
+
       const res = await fetch(`/api/admin/properties/${selectedPropForEdit.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(editPayload),
       });
 
       const result = await res.json();
@@ -215,7 +225,16 @@ export function usePropertyFormModals({
   };
 
   const handleQuickUpdateBillingStatus = async (propId: string, newBillingStatus: 'BILLING_DONE' | 'BILLING_PENDING') => {
-    dispatch(updatePropertyOptimistic({ id: propId, updates: { billing_status: newBillingStatus } as any }));
+    const today = new Date().toISOString().slice(0, 10);
+    const newBilledDate = newBillingStatus === 'BILLING_DONE' ? today : null;
+
+    dispatch(updatePropertyOptimistic({
+      id: propId,
+      updates: {
+        billing_status: newBillingStatus,
+        billed_date: newBilledDate,
+      } as any,
+    }));
     if (onBillingStatusUpdate) {
       onBillingStatusUpdate(propId, newBillingStatus);
     }
@@ -223,7 +242,10 @@ export function usePropertyFormModals({
       const res = await fetch(`/api/admin/properties/${propId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ billing_status: newBillingStatus }),
+        body: JSON.stringify({
+          billing_status: newBillingStatus,
+          billed_date: newBilledDate,
+        }),
       });
       const result = await res.json();
       if (!res.ok || !result.success) throw new Error(result.error || 'Failed to update billing status.');

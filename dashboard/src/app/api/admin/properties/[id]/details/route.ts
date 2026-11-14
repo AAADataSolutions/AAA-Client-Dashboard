@@ -26,7 +26,7 @@ export async function GET(
       );
     }
 
-    // 2. Fetch Channel Partner if assigned
+    // 2. Fetch Channel Partner, Server & Vendor if assigned
     let partnerData: any = null;
     if (prop.partner_id) {
       const { data: partner } = await db
@@ -35,6 +35,26 @@ export async function GET(
         .eq('id', prop.partner_id)
         .maybeSingle();
       partnerData = partner || null;
+    }
+
+    let serverData: any = null;
+    if (prop.server_id) {
+      const { data: srv } = await db
+        .from('servers')
+        .select('id, name, provider, status')
+        .eq('id', prop.server_id)
+        .maybeSingle();
+      serverData = srv || null;
+    }
+
+    let vendorData: any = null;
+    if (prop.vendor_id) {
+      const { data: vnd } = await db
+        .from('vendors')
+        .select('id, name, category, status')
+        .eq('id', prop.vendor_id)
+        .maybeSingle();
+      vendorData = vnd || null;
     }
 
     // 3. Fetch Organization Link & Onboarding
@@ -276,6 +296,8 @@ export async function GET(
         property: prop,
         organization: organizationData,
         partner: partnerData,
+        server: serverData,
+        vendor: vendorData,
         contacts: contactsList,
         services: assignedServices,
         available_services: availableServices,

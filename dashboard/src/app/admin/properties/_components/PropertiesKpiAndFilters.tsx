@@ -120,17 +120,86 @@ export function PropertiesKpiAndFilters({
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => {
-              const headers = ['ID,Name,Address,City,State,Zip,GM Name,GM Phone,GM Email,Status\n'];
-              const rows = properties.map((p: PropertyRecord) =>
-                `"${p.id}","${p.name}","${p.address}","${p.city}","${p.state}","${p.zip_code}","${p.general_manager_name || ''}","${p.general_manager_phone || ''}","${p.general_manager_email || ''}","${p.status}"`
-              );
-              const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
+              const headers = [
+                'Property Name',
+                'Street Address',
+                'City',
+                'State',
+                'Zip',
+                'Country',
+                'Main Phone Number',
+                'Fax Number',
+                'Organization Name',
+                'General Manager Name',
+                'General Manager Email',
+                'General Manager Phone',
+                'Monthly Pricing',
+                "Ray Baum and Kari's Law Status",
+                'E911 Status',
+                'Onboarding Date',
+                'Billing Status',
+                'Billing Date',
+                'Data Subject Status',
+                'Server Name',
+                'Vendor Name',
+              ];
+              const escapeCsv = (val: any) => {
+                if (val === null || val === undefined) return '""';
+                const str = String(val).replace(/"/g, '""');
+                return `"${str}"`;
+              };
+              const rows = properties.map((p: PropertyRecord) => {
+                const orgName =
+                  p.organization_name && p.organization_name !== 'Unassigned'
+                    ? p.organization_name
+                    : p.primary_organization?.name || p.organizations?.[0]?.name || '';
+                const gmName = p.general_manager_name && p.general_manager_name !== 'N/A' ? p.general_manager_name : '';
+                const gmEmail = p.general_manager_email && p.general_manager_email !== 'N/A' ? p.general_manager_email : '';
+                const gmPhone = p.general_manager_phone && p.general_manager_phone !== 'N/A' ? p.general_manager_phone : '';
+                const monthlyPrice =
+                  p.monthly_price !== null && p.monthly_price !== undefined
+                    ? Number(p.monthly_price).toFixed(2)
+                    : p.base_price !== null && p.base_price !== undefined
+                    ? Number(p.base_price).toFixed(2)
+                    : '0.00';
+                const isRb = (p.ray_baum_status || '').toUpperCase() === 'ACTIVE';
+                const isE9 = Boolean(p.ray_baud_and_logs_enabled) || (p.e911_status || '').toUpperCase() === 'VERIFIED';
+                const bStatus = (p as any).billing_status === 'BILLING_DONE' ? 'Billing Done' : 'Billing Pending';
+                const bDate = (p as any).billed_date || (bStatus === 'Billing Done' ? p.onboarding_date || '' : '');
+                const dataSubStatus = p.connectivity_type || (p.data_circuit ? 'BOTH' : 'PORTED');
+
+                return [
+                  escapeCsv(p.name || ''),
+                  escapeCsv(p.address || ''),
+                  escapeCsv(p.city || ''),
+                  escapeCsv(p.state || ''),
+                  escapeCsv(p.zip_code || ''),
+                  escapeCsv(p.country || 'USA'),
+                  escapeCsv(p.main_phone || ''),
+                  escapeCsv(p.fax || ''),
+                  escapeCsv(orgName),
+                  escapeCsv(gmName),
+                  escapeCsv(gmEmail),
+                  escapeCsv(gmPhone),
+                  escapeCsv(monthlyPrice),
+                  escapeCsv(isRb ? 'Active' : 'Inactive'),
+                  escapeCsv(isE9 ? 'Verified' : 'Audit Required'),
+                  escapeCsv(p.onboarding_date || ''),
+                  escapeCsv(bStatus),
+                  escapeCsv(bDate),
+                  escapeCsv(dataSubStatus),
+                  escapeCsv(p.server_name || p.server?.name || ''),
+                  escapeCsv(p.vendor_name || p.vendor?.name || ''),
+                ].join(',');
+              });
+              const csvContent = `${headers.join(',')}\n${rows.join('\n')}`;
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `properties-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `properties-export-${new Date().toISOString().slice(0, 10)}.csv`;
               a.click();
-              showToast('Exported', 'Properties list exported as CSV.', 'info');
+              showToast('Exported', 'Properties list exported as CSV with all 21 columns.', 'info');
             }}
             className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer shadow-2xs"
           >

@@ -49,6 +49,20 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true });
     const allDevices = dbDevices || [];
 
+    // Fetch properties assigned to vendors so their monthly_price adds to vendor's "You Earn"
+    let assignedProperties: any[] = [];
+    try {
+      const { data: vendorProps, error: vpErr } = await supabase
+        .from('properties')
+        .select('id, name, vendor_id, monthly_price, base_price')
+        .not('vendor_id', 'is', null);
+      if (!vpErr && vendorProps) {
+        assignedProperties = vendorProps;
+      }
+    } catch {
+      assignedProperties = [];
+    }
+
     const enriched = vendors.map((v: any) => {
       const vAllocations = allocations.filter((a: any) => a.vendor_id === v.id);
       const vDevices = allDevices.filter((d: any) => d.vendor_id === v.id);
@@ -64,7 +78,12 @@ export async function GET(request: NextRequest) {
         supabase.from('vendors').update({ monthly_cost: devicesTotalCost }).eq('id', v.id).then();
       }
 
-      const earned = Number(v.monthly_billed || 0);
+      const vProperties = assignedProperties.filter((p: any) => p.vendor_id === v.id);
+      const propertiesEarnedTotal = vProperties.reduce(
+        (sum: number, p: any) => sum + Number(p.monthly_price ?? p.base_price ?? 0),
+        0
+      );
+      const earned = Number(v.monthly_billed || 0) + propertiesEarnedTotal;
       const netMargin = earned - paid;
       const marginPct = earned > 0 ? Math.round((netMargin / earned) * 1000) / 10 : earned === 0 && paid > 0 ? -100.0 : 0.0;
 
@@ -80,6 +99,9 @@ export async function GET(request: NextRequest) {
         monthly_cost_manual: Number(v.monthly_cost || 0),
         pay_source: hasDevices ? 'DEVICES' : 'MANUAL',
         monthly_billed: earned,
+        monthly_billed_manual: Number(v.monthly_billed || 0),
+        assigned_properties_count: vProperties.length,
+        assigned_properties_revenue: propertiesEarnedTotal,
         net_margin: netMargin,
         margin_pct: marginPct,
         status: v.status || 'ACTIVE',

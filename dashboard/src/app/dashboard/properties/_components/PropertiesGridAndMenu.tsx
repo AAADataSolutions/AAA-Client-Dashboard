@@ -18,7 +18,10 @@ import { PropertyRecord, getCircuitStageBadge } from './types';
 
 interface PropertiesGridViewProps {
   properties: PropertyRecord[];
-  handleOpenPropertyDetails: (prop: PropertyRecord, tab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS') => void;
+  handleOpenPropertyDetails: (
+    prop: PropertyRecord,
+    tab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'TICKETS' | 'DATA_CIRCUIT' | 'PORTING_DOCS'
+  ) => void;
   handleOpenMenu: (e: React.MouseEvent<HTMLButtonElement>, prop: PropertyRecord) => void;
 }
 

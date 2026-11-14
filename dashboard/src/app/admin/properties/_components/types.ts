@@ -56,6 +56,20 @@ export interface PartnerOption {
   default_commission_rate: number;
 }
 
+export interface ServerOption {
+  id: string;
+  name: string;
+  provider?: string;
+  status?: string;
+}
+
+export interface VendorOption {
+  id: string;
+  name: string;
+  category?: string;
+  status?: string;
+}
+
 export interface Toast {
   id: string;
   title: string;
@@ -76,6 +90,8 @@ export interface PropertyFormData {
   organization_id: string;
   partner_id: string;
   partner_commission_override: string | number;
+  server_id: string;
+  vendor_id: string;
   address: string;
   city: string;
   state: string;
@@ -94,6 +110,7 @@ export interface PropertyFormData {
   e911_status: 'VERIFIED' | 'AUDIT_REQUIRED';
   connectivity_type: 'PORTED' | 'DATA_CIRCUITED' | 'BOTH';
   billing_status: 'BILLING_DONE' | 'BILLING_PENDING';
+  billed_date?: string | null;
   status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 }
 
@@ -119,6 +136,8 @@ export const getDefaultPropertyFormData = (): PropertyFormData => ({
   organization_id: '',
   partner_id: '',
   partner_commission_override: '',
+  server_id: '',
+  vendor_id: '',
   address: '',
   city: '',
   state: '',
@@ -137,8 +156,21 @@ export const getDefaultPropertyFormData = (): PropertyFormData => ({
   e911_status: 'VERIFIED',
   connectivity_type: 'PORTED',
   billing_status: 'BILLING_PENDING',
+  billed_date: null,
   status: 'ACTIVE',
 });
+
+export function formatBilledDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const raw = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00Z`;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
 
 export const isFireLineSvcType = (type: string) => {
   const t = (type || '').toLowerCase().replace(/[\s_-]+/g, '');

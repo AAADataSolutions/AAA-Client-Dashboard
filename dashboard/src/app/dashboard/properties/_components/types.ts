@@ -101,6 +101,9 @@ export interface PropertyRecord {
   general_manager_phone: string | null;
   general_manager_email: string | null;
   ray_baud_and_logs_enabled: boolean;
+  ray_baum_status?: string;
+  is_ray_baum_active?: boolean;
+  porting_attachments?: any[];
   status: string;
   stage?: string;
   services_count: number;
@@ -113,5 +116,19 @@ export interface PropertyRecord {
   onboarding_date?: string | null;
   open_tickets_count: number;
   tickets: any[];
+  billing_status?: string;
+  billed_date?: string | null;
   created_at: string;
+}
+
+export function formatBilledDate(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const raw = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00Z`;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
 }

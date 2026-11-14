@@ -57,7 +57,7 @@ export default function ClientPropertiesPage() {
   // Drawer & Modal states
   const [selectedPropForDrawer, setSelectedPropForDrawer] = useState<PropertyRecord | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
-  const [drawerDefaultTab, setDrawerDefaultTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS'>('OVERVIEW');
+  const [drawerDefaultTab, setDrawerDefaultTab] = useState<'OVERVIEW' | 'SERVICES' | 'E911' | 'TICKETS' | 'DATA_CIRCUIT' | 'PORTING_DOCS'>('OVERVIEW');
   const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [ticketPropId, setTicketPropId] = useState<string | null>(null);
 
@@ -136,7 +136,10 @@ export default function ClientPropertiesPage() {
     setMenuPosition(null);
   };
 
-  const handleOpenPropertyDetails = (prop: PropertyRecord, tab: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS' = 'OVERVIEW') => {
+  const handleOpenPropertyDetails = (
+    prop: PropertyRecord,
+    tab: 'OVERVIEW' | 'SERVICES' | 'E911' | 'TICKETS' | 'DATA_CIRCUIT' | 'PORTING_DOCS' = 'OVERVIEW'
+  ) => {
     setSelectedPropForDrawer(prop);
     setDrawerDefaultTab(tab);
     setShowDrawer(true);

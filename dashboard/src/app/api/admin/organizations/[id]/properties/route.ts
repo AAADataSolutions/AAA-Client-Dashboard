@@ -19,27 +19,7 @@ export async function GET(
         id,
         status,
         created_at,
-        property:properties(
-          id,
-          name,
-          monthly_price,
-          address,
-          city,
-          state,
-          zip_code,
-          country,
-          main_phone,
-          fax,
-          general_manager_name,
-          general_manager_phone,
-          general_manager_email,
-          contact_person_name,
-          contact_person_email,
-          ray_baud_and_logs_enabled,
-          ray_baum_status,
-          status,
-          created_at
-        )
+        property:properties(*)
       `)
       .eq('organization_id', id);
 
@@ -109,6 +89,8 @@ export async function GET(
         general_manager_email: p?.general_manager_email || p?.contact_person_email || '—',
         ray_baum_status: isRayBaumActive ? 'Active' : 'Inactive',
         e911_status: e911Status,
+        billing_status: p?.billing_status || 'BILLING_PENDING',
+        billed_date: p?.billed_date || (p?.billing_status === 'BILLING_DONE' ? (p?.onboarding_date || (p?.created_at ? p.created_at.slice(0, 10) : null)) : null),
         created_at: p?.created_at,
       };
     });

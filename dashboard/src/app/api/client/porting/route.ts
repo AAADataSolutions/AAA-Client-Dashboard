@@ -2,15 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendPortingEmail } from '@/lib/email/mailer';
+import { parseNotesMetadata, getStageDateKeyForStatus } from '@/app/api/admin/porting/_helpers/portingMetadata';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
@@ -54,8 +51,8 @@ export async function GET(request: NextRequest) {
         *,
         organization_property:organization_properties(
           id,
-          property:properties(id, name, address, city, state, zip_code, main_phone, monthly_price, general_manager_name, general_manager_email, ray_baud_and_logs_enabled, ray_baum_status),
-          onboardings(id, status, target_date, draft_date, contract_sent_date, signed_date, csr_details_date, cut_sheet_review_date, porting_submitted_date, sof_review_date, foc_confirmed_date, live_cutover_date, assigned_to, assigned_to_name, internal_notes, stage3_assigned_to, stage3_assigned_to_name, stage3_notes, stage4_assigned_to, stage4_assigned_to_name, stage4_notes)
+          property:properties(id, name, address, city, state, zip_code, main_phone, monthly_price, general_manager_name, general_manager_email, ray_baud_and_logs_enabled, ray_baum_status, attachments),
+          onboardings(id, status, target_date, draft_date, contract_sent_date, signed_date, csr_details_date, cut_sheet_review_date, porting_submitted_date, sof_review_date, foc_confirmed_date, live_cutover_date, assigned_to, assigned_to_name, internal_notes, stage3_assigned_to, stage3_assigned_to_name, stage3_notes, stage4_assigned_to, stage4_assigned_to_name, stage4_notes, attachments)
         ),
         attachments:porting_attachments(
           id, file_name, file_size, mime_type, storage_path, created_at
@@ -91,21 +88,42 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: (simpleRecords || []).map((item: any) => ({
-          ...item,
-          property_name: item.property_name || 'Property',
-          property_address: item.property_address || '',
-          property_phone: item.property_phone || '',
-          monthly_price: null,
-          general_manager_name: '—',
-          general_manager_email: '—',
-          ray_baud_and_logs_enabled: false,
-          ray_baum_status: 'INACTIVE',
-          organization_name: orgName,
-          attachments: item.attachments || [],
-          services: [],
-          services_count: 0,
-        })),
+        data: (simpleRecords || []).map((item: any) => {
+          const parsedMeta = parseNotesMetadata(item.notes);
+          const metaDates = parsedMeta.stage_dates || {};
+          const metaProp = parsedMeta.property_details || {};
+          const effectiveStatus = parsedMeta.effective_stage || item.status || 'DRAFT';
+          const resolvedTargetDate = item.target_date || metaDates.target_date || null;
+          return {
+            ...item,
+            property_name: item.property_name || metaProp.property_name || 'Property',
+            property_address: item.property_address || metaProp.street_address || '',
+            property_phone: item.property_phone || metaProp.property_phone || '',
+            monthly_price: metaProp.monthly_price ? Number(metaProp.monthly_price) : null,
+            general_manager_name: metaProp.general_manager_name || '—',
+            general_manager_email: metaProp.general_manager_email || '—',
+            ray_baud_and_logs_enabled: false,
+            ray_baum_status: metaProp.ray_baum_status || 'INACTIVE',
+            organization_name: orgName,
+            status: effectiveStatus,
+            stage: effectiveStatus,
+            target_date: resolvedTargetDate,
+            draft_date: item.draft_date || metaDates.draft_date || (effectiveStatus === 'DRAFT' ? (resolvedTargetDate || item.created_at) : null),
+            contract_sent_date: item.contract_sent_date || metaDates.contract_sent_date || null,
+            signed_date: item.signed_date || metaDates.signed_date || null,
+            csr_details_date: item.csr_details_date || metaDates.csr_details_date || null,
+            cut_sheet_review_date: item.cut_sheet_review_date || metaDates.cut_sheet_review_date || null,
+            porting_submitted_date: item.porting_submitted_date || metaDates.porting_submitted_date || null,
+            foc_confirmed_date: item.foc_confirmed_date || metaDates.foc_confirmed_date || null,
+            live_cutover_date: item.completed_at || metaDates.live_cutover_date || null,
+            stage_dates: metaDates,
+            notes: parsedMeta.cleanNotes || '',
+            attachments: Array.isArray(item.attachments) ? item.attachments : [],
+            attachments_count: Array.isArray(item.attachments) ? item.attachments.length : 0,
+            services: [],
+            services_count: 0,
+          };
+        }),
         total: simpleRecords?.length || 0,
         metrics: { total: simpleRecords?.length || 0, inProgress: 0, focReceived: 0, completed: 0, actionRequired: 0 },
         filters: { properties: [] },
@@ -129,38 +147,97 @@ export async function GET(request: NextRequest) {
         };
       });
 
+      // Extract metadata from item.notes
+      const parsedMeta = parseNotesMetadata(item.notes);
+      const metaDates = parsedMeta.stage_dates || {};
+      const metaProp = parsedMeta.property_details || {};
+      const cleanNotes = parsedMeta.cleanNotes || '';
+
+      // Determine effective 8-stage status
+      let effectiveStatus = item.status || ob?.status || 'DRAFT';
+      const metaEffectiveStage = parsedMeta.effective_stage || metaDates.effective_stage;
+      if (item.status === 'COMPLETED' || item.status === 'ONBOARDED' || ob?.status === 'COMPLETED') {
+        effectiveStatus = 'COMPLETED';
+      } else if (metaEffectiveStage) {
+        effectiveStatus = metaEffectiveStage;
+      } else if (ob?.status && ob.status !== 'IN_PROGRESS') {
+        effectiveStatus = ob.status;
+      }
+
+      const resolvedTargetDate = item.target_date || ob?.target_date || metaDates.target_date || null;
+      const currentStageDateKey = getStageDateKeyForStatus(effectiveStatus);
+
+      const resolvedDates: Record<string, string | null> = {
+        draft_date: ob?.draft_date || metaDates.draft_date || (effectiveStatus === 'DRAFT' ? (resolvedTargetDate || item.created_at) : null),
+        contract_sent_date: ob?.contract_sent_date || metaDates.contract_sent_date || null,
+        signed_date: ob?.signed_date || metaDates.signed_date || null,
+        csr_details_date: ob?.csr_details_date || metaDates.csr_details_date || null,
+        cut_sheet_review_date: ob?.cut_sheet_review_date || ob?.sof_review_date || metaDates.cut_sheet_review_date || null,
+        porting_submitted_date: ob?.porting_submitted_date || metaDates.porting_submitted_date || null,
+        sof_review_date: ob?.sof_review_date || metaDates.sof_review_date || null,
+        foc_confirmed_date: ob?.foc_confirmed_date || item.foc_confirmed_date || metaDates.foc_confirmed_date || null,
+        live_cutover_date: ob?.live_cutover_date || item.completed_at || metaDates.live_cutover_date || null,
+      };
+
+      if (currentStageDateKey && !resolvedDates[currentStageDateKey]) {
+        resolvedDates[currentStageDateKey] = resolvedTargetDate || item.created_at || null;
+      }
+
+      const rawPrice = prop?.monthly_price ?? prop?.base_price ?? metaProp.monthly_price ?? null;
+
+      // Merge attachments from porting_attachments, metadata, onboardings, and properties
+      const rawAtts = [
+        ...(Array.isArray(item.attachments) ? item.attachments : []),
+        ...(Array.isArray(parsedMeta.attachments) ? parsedMeta.attachments : []),
+        ...(Array.isArray(ob?.attachments) ? ob.attachments : []),
+        ...(Array.isArray(prop?.attachments) ? prop.attachments : []),
+      ];
+      const mergedAtts: any[] = [];
+      rawAtts.forEach((att: any) => {
+        if (!att || (!att.storage_path && !att.file_name)) return;
+        const exists = mergedAtts.some(
+          (a: any) =>
+            (att.storage_path && a.storage_path === att.storage_path) ||
+            (att.id && a.id === att.id)
+        );
+        if (!exists) {
+          mergedAtts.push({
+            id: att.id || att.storage_path,
+            file_name: att.file_name || att.storage_path?.split('/').pop() || 'Document.pdf',
+            file_size: Number(att.file_size || 0),
+            mime_type: att.mime_type || 'application/pdf',
+            storage_path: att.storage_path,
+            created_at: att.created_at || item.created_at,
+          });
+        }
+      });
+
       return {
         id: item.id,
         org_property_id: item.organization_property_id,
         property_id: prop?.id || null,
-        property_name: item.property_name || prop?.name || 'New Property',
-        property_address: item.property_address || prop?.address || '—',
-        city: prop?.city || '',
-        state: prop?.state || '',
-        zip_code: prop?.zip_code || '',
-        property_phone: item.property_phone || prop?.main_phone || '—',
-        fax: item.fax || '—',
-        monthly_price: prop?.monthly_price || null,
-        general_manager_name: prop?.general_manager_name || '—',
-        general_manager_email: prop?.general_manager_email || '—',
+        property_name: item.property_name || prop?.name || metaProp.property_name || 'New Property',
+        property_address: item.property_address || prop?.address || metaProp.street_address || '—',
+        city: prop?.city || metaProp.city || '',
+        state: prop?.state || metaProp.state || '',
+        zip_code: prop?.zip_code || metaProp.zip_code || '',
+        property_phone: item.property_phone || prop?.main_phone || metaProp.property_phone || '—',
+        fax: item.fax || prop?.fax || metaProp.fax || '—',
+        monthly_price: rawPrice !== null ? Number(rawPrice) : null,
+        general_manager_name: prop?.general_manager_name || metaProp.general_manager_name || '—',
+        general_manager_email: prop?.general_manager_email || metaProp.general_manager_email || '—',
         ray_baud_and_logs_enabled: prop?.ray_baud_and_logs_enabled ?? false,
-        ray_baum_status: prop?.ray_baum_status || 'INACTIVE',
+        ray_baum_status: prop?.ray_baum_status || metaProp.ray_baum_status || 'INACTIVE',
         organization_name: orgName,
         carrier_details: item.carrier_details || '',
-        status: item.status || ob?.status || 'DRAFT',
-        target_date: item.target_date || ob?.target_date || null,
-        draft_date: ob?.draft_date || null,
-        contract_sent_date: ob?.contract_sent_date || null,
-        signed_date: ob?.signed_date || null,
-        csr_details_date: ob?.csr_details_date || null,
-        cut_sheet_review_date: ob?.cut_sheet_review_date || ob?.sof_review_date || null,
-        porting_submitted_date: ob?.porting_submitted_date || null,
-        sof_review_date: ob?.sof_review_date || null,
-        foc_confirmed_date: ob?.foc_confirmed_date || null,
-        live_cutover_date: ob?.live_cutover_date || item.completed_at || null,
+        status: effectiveStatus,
+        stage: effectiveStatus,
+        target_date: resolvedTargetDate,
+        ...resolvedDates,
+        stage_dates: { ...metaDates, ...resolvedDates },
         assigned_to: ob?.assigned_to || null,
         assigned_to_name: ob?.assigned_to_name || null,
-        internal_notes: ob?.internal_notes || item.notes || null,
+        internal_notes: ob?.internal_notes || cleanNotes || null,
         stage3_assigned_to: ob?.stage3_assigned_to || ob?.assigned_to || null,
         stage3_assigned_to_name: ob?.stage3_assigned_to_name || ob?.assigned_to_name || null,
         stage3_notes: ob?.stage3_notes || ob?.internal_notes || null,
@@ -168,11 +245,12 @@ export async function GET(request: NextRequest) {
         stage4_assigned_to_name: ob?.stage4_assigned_to_name || null,
         stage4_notes: ob?.stage4_notes || null,
         rejection_reason: item.rejection_reason || null,
-        notes: item.notes || ob?.internal_notes || '',
+        notes: cleanNotes || ob?.internal_notes || '',
         is_activated: item.is_activated || false,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        attachments: item.attachments || [],
+        attachments: mergedAtts,
+        attachments_count: mergedAtts.length,
         services: services,
         services_count: services.length,
       };
@@ -258,8 +336,8 @@ export async function POST(request: NextRequest) {
 
     const dbClient = createAdminClient() || supabase;
 
-    // 1. Create or link property record in properties table
-    const { data: newProp, error: propErr } = await dbClient
+    // 1. Create property record
+    const { data: newProp } = await dbClient
       .from('properties')
       .insert({
         name: property_name.trim(),
@@ -279,27 +357,15 @@ export async function POST(request: NextRequest) {
 
     let createdOpId: string | null = null;
     if (newProp) {
-      // 2. Link in organization_properties
       const { data: newOp } = await dbClient
         .from('organization_properties')
-        .insert({
-          organization_id: member.organization_id,
-          property_id: newProp.id,
-          status: 'ACTIVE',
-        })
+        .insert({ organization_id: member.organization_id, property_id: newProp.id, status: 'ACTIVE' })
         .select('id')
         .single();
 
       if (newOp) {
         createdOpId = newOp.id;
-
-        // 3. Create initial onboarding record in DRAFT stage
-        await dbClient.from('onboardings').insert({
-          organization_property_id: newOp.id,
-          status: 'DRAFT',
-        });
-
-        // 4. Create initial e911 record
+        await dbClient.from('onboardings').insert({ organization_property_id: newOp.id, status: 'DRAFT' });
         await dbClient.from('e911_records').insert({
           organization_property_id: newOp.id,
           emergency_address: property_address ? property_address.trim() : 'Address pending',
@@ -385,7 +451,7 @@ export async function POST(request: NextRequest) {
       attachments: emailAttachments,
     });
 
-    // Notify all admins via in-app notifications
+    // Notify admins via in-app notifications
     const { data: admins } = await dbClient
       .from('profiles')
       .select('id')
@@ -393,18 +459,18 @@ export async function POST(request: NextRequest) {
       .eq('status', 'ACTIVE');
 
     if (admins && admins.length > 0) {
-      const notifs = admins.map((a: any) => ({
-        recipient_id: a.id,
-        sender_id: user.id,
-        type: 'NEW_PORTING_REQUEST',
-        title: `New Porting Request: ${newPorting.property_name}`,
-        message: `${profile.full_name || 'A client'} from ${orgName} submitted a porting request for ${newPorting.property_phone}.`,
-        entity_type: 'porting_request',
-        entity_id: newPorting.id,
-        organization_id: member.organization_id,
-      }));
-
-      await dbClient.from('notifications').insert(notifs);
+      await dbClient.from('notifications').insert(
+        admins.map((a: any) => ({
+          recipient_id: a.id,
+          sender_id: user.id,
+          type: 'NEW_PORTING_REQUEST',
+          title: `New Porting Request: ${newPorting.property_name}`,
+          message: `${profile.full_name || 'A client'} from ${orgName} submitted a porting request for ${newPorting.property_phone}.`,
+          entity_type: 'porting_request',
+          entity_id: newPorting.id,
+          organization_id: member.organization_id,
+        }))
+      );
     }
 
     return NextResponse.json({ success: true, data: newPorting });

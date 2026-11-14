@@ -83,7 +83,11 @@ export function usePortingActions({ loadData, showToast }: UsePortingActionsProp
           const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
           const upJson = await upRes.json();
           if (upRes.ok && upJson.success && upJson.data) {
-            uploadedAttachments.push(upJson.data);
+            if (Array.isArray(upJson.data)) {
+              uploadedAttachments.push(...upJson.data);
+            } else {
+              uploadedAttachments.push(upJson.data);
+            }
           } else {
             throw new Error(upJson.error || `Failed to upload ${file.name}`);
           }
@@ -91,7 +95,7 @@ export function usePortingActions({ loadData, showToast }: UsePortingActionsProp
       }
 
       const res = await fetch('/api/admin/porting', {
-        method: 'PATCH',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           organization_id: createForm.organization_id || null,

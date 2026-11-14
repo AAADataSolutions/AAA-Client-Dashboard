@@ -65,26 +65,46 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
   );
 
   const getStageIndex = (status: string) => {
-    switch (status) {
-      case 'DRAFT': return 0;
-      case 'CONTRACT_SENT': return 1;
-      case 'SIGNED': return 2;
-      case 'CSR_DETAILS':
-      case 'CSR_AND_CONTRACT_DETAILS': return 3;
-      case 'CUT_SHEET_REVIEW':
-      case 'SOF_WAITING':
-      case 'CUT_SHEET': return 4;
-      case 'PORTING_SUBMITTED':
-      case 'SUBMITTED':
-      case 'IN_PROGRESS': return 5;
-      case 'FOC_RECEIVED': return 6;
-      case 'COMPLETED': return 7;
-      default: return 0;
-    }
+    if (status === 'CONTRACT_SENT') return 1;
+    if (status === 'SIGNED') return 2;
+    if (status.includes('CSR')) return 3;
+    if (status.includes('CUT_SHEET') || status === 'SOF_WAITING') return 4;
+    if (status.includes('SUBMITTED') || status === 'IN_PROGRESS') return 5;
+    if (status.includes('FOC')) return 6;
+    if (status === 'COMPLETED' || status === 'ONBOARDED') return 7;
+    return 0;
   };
 
   const currentStageIdx = getStageIndex(normalizedStatus);
   const currentStageObj = STAGES_ROAD[currentStageIdx] || STAGES_ROAD[0];
+
+  const stageDateFormatted = (() => {
+    const raw = (
+      porting[currentStageObj.key.toLowerCase() + '_date'] ||
+      porting.stage_dates?.[currentStageObj.key.toLowerCase() + '_date'] ||
+      (currentStageObj.key === 'DRAFT' ? (porting.draft_date || porting.created_at) : null) ||
+      (currentStageObj.key === 'FOC_RECEIVED' ? (porting.foc_confirmed_date || porting.target_date) : null) ||
+      (currentStageObj.key === 'COMPLETED' ? (porting.live_cutover_date || porting.completed_at) : null) ||
+      porting.target_date ||
+      porting.updated_at ||
+      porting.created_at
+    );
+    if (!raw) return null;
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return String(raw);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return null;
+    }
+  })();
+
+  const cleanDisplayNotes = (notes?: string | null) => {
+    if (!notes) return '';
+    return notes.replace(/<!--METADATA:[\s\S]*?-->/g, '').trim();
+  };
+
+  const displayNotes = cleanDisplayNotes(porting.notes || porting.internal_notes);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200 font-sans">
@@ -141,6 +161,11 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                   <span className="font-semibold text-slate-900 dark:text-white mt-0.5 block">
                     Stage {currentStageObj.step}: {currentStageObj.label}
                   </span>
+                  {stageDateFormatted && (
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mt-0.5">
+                      Stage Date: {stageDateFormatted}
+                    </span>
+                  )}
                 </div>
                 <span
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200/60"
@@ -391,7 +416,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
             </span>
             <div className="p-3.5 rounded-xl bg-white dark:bg-[#181920] border border-slate-200/80 dark:border-[#222430]">
               <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-xs">
-                {porting.notes || 'No specific carrier account or authorization instructions attached.'}
+                {displayNotes || 'No specific carrier account or authorization instructions attached.'}
               </p>
             </div>
           </div>
@@ -420,7 +445,9 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
             {porting.attachments && porting.attachments.length > 0 ? (
               <div className="space-y-2">
                 {porting.attachments.map((att: any, idx: number) => {
-                  const fileUrl = `/api/client/porting/attachment?path=${encodeURIComponent(att.storage_path)}`;
+                  const fileUrl = att.storage_path?.startsWith('http')
+                    ? att.storage_path
+                    : att.url || `/api/client/porting/attachment?path=${encodeURIComponent(att.storage_path || '')}`;
                   return (
                     <div
                       key={att.id || idx}
@@ -433,7 +460,7 @@ export const PortingDetailDrawer: React.FC<PortingDetailDrawerProps> = ({
                             {att.file_name}
                           </p>
                           <p className="text-[10.5px] text-slate-400">
-                            {(att.file_size / 1024 / 1024).toFixed(2)} MB &bull; {att.mime_type || 'Document'}
+                            {att.file_size ? `${(att.file_size / 1024 / 1024).toFixed(2)} MB • ` : ''}{att.mime_type || 'Document'}
                           </p>
                         </div>
                       </div>

@@ -57,3 +57,77 @@ export interface BackorderFormData {
   notes: string;
   send_email: boolean;
 }
+
+export interface PortingRevenueItem {
+  id: string;
+  propertyName: string;
+  organizationName: string;
+  address?: string;
+  monthlyPrice: number;
+  servicesPrice: number;
+  totalMonthly: number;
+  servicesCount: number;
+  billingStatus: 'BILLING_DONE' | 'BILLING_PENDING';
+  onboardingDate?: string;
+}
+
+export interface DataCircuitRevenueItem {
+  id: string;
+  propertyName: string;
+  propertyAddress?: string;
+  wholesalerName: string;
+  carrierName: string;
+  bandwidth?: string;
+  clientMonthlyPrice: number;
+  revenueSharePercentage: number;
+  monthlyCommission: number;
+  isReceived: boolean;
+  status: string;
+}
+
+export interface RevenueStreamsData {
+  monthKey: string;
+  portingRevenue: {
+    totalPortingMrr: number;
+    basePropertiesGmr: number;
+    servicesGmr: number;
+    propertiesCount: number;
+    servicesCount: number;
+    billingDoneCount: number;
+    billingPendingCount: number;
+    items: PortingRevenueItem[];
+  };
+  dataCircuitRevenue: {
+    totalExpectedRevShare: number;
+    receivedRevShare: number;
+    pendingRevShare: number;
+    circuitsCount: number;
+    receivedCount: number;
+    pendingCount: number;
+    wholesalerBreakdown: Array<{
+      wholesalerName: string;
+      expectedAmount: number;
+      receivedAmount: number;
+      circuitsCount: number;
+    }>;
+    carrierBreakdown: Array<{
+      carrierName: string;
+      commissionAmount: number;
+      circuitsCount: number;
+    }>;
+    items: DataCircuitRevenueItem[];
+  };
+  summary: {
+    totalCombinedInflow: number;
+    portingPercentage: number;
+    circuitPercentage: number;
+    annualizedInflow: number;
+  };
+  historicalTrends: Array<{
+    monthKey: string;
+    monthLabel: string;
+    portingRevenue: number;
+    circuitRevenue: number;
+    totalRevenue: number;
+  }>;
+}

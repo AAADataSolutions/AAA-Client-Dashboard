@@ -4,7 +4,7 @@ import React from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Settings, X, Loader2 } from 'lucide-react';
 import { PropertyItem } from '@/store/slices/propertiesSlice';
-import { OrgOption, PartnerOption, PropertyFormData } from './types';
+import { OrgOption, PartnerOption, ServerOption, VendorOption, PropertyFormData, formatBilledDate } from './types';
 
 interface EditPropertyModalProps {
   showEditModal: boolean;
@@ -17,6 +17,8 @@ interface EditPropertyModalProps {
   handleSaveEdit: (e: React.FormEvent) => void;
   orgOptions: OrgOption[];
   partnerOptions: PartnerOption[];
+  serverOptions?: ServerOption[];
+  vendorOptions?: VendorOption[];
   isSuperAdmin: boolean;
 }
 
@@ -31,6 +33,8 @@ export function EditPropertyModal({
   handleSaveEdit,
   orgOptions,
   partnerOptions,
+  serverOptions = [],
+  vendorOptions = [],
   isSuperAdmin,
 }: EditPropertyModalProps) {
   return (
@@ -220,6 +224,38 @@ export function EditPropertyModal({
                   )}
                 </div>
 
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block">Assigned Server</label>
+                  <select
+                    value={formData.server_id}
+                    onChange={(e) => setFormData({ ...formData, server_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">No Server Assigned</option>
+                    {serverOptions.map((srv) => (
+                      <option key={srv.id} value={srv.id}>
+                        {srv.name}{srv.provider ? ` (${srv.provider})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block">Assigned Vendor</label>
+                  <select
+                    value={formData.vendor_id}
+                    onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">No Vendor Assigned</option>
+                    {vendorOptions.map((vnd) => (
+                      <option key={vnd.id} value={vnd.id}>
+                        {vnd.name}{vnd.category ? ` (${vnd.category})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="col-span-2 space-y-1">
                   <label className="font-bold text-black dark:text-white block">
                     Street Address <span className="text-rose-500">*</span>
@@ -347,6 +383,11 @@ export function EditPropertyModal({
                     <option value="BILLING_DONE">Billing Done (Billed)</option>
                     <option value="BILLING_PENDING">Billing Pending</option>
                   </select>
+                  {formData.billing_status === 'BILLING_DONE' && (
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block pt-0.5">
+                      Billed Date: {formatBilledDate(formData.billed_date || formData.onboarding_date) || 'Today'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="col-span-2 space-y-1">

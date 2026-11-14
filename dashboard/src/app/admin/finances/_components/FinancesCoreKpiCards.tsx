@@ -12,8 +12,10 @@ interface FinancesCoreKpiCardsProps {
   availableMonths: MonthOption[];
   gmrMonth: string;
   setGmrMonth: (m: string) => void;
-  revAddedMonth: string;
-  setRevAddedMonth: (m: string) => void;
+  revAddedVoiceMonth: string;
+  setRevAddedVoiceMonth: (m: string) => void;
+  revAddedInternetMonth: string;
+  setRevAddedInternetMonth: (m: string) => void;
   partnerOutflowMonth: string;
   setPartnerOutflowMonth: (m: string) => void;
   nrvMonth: string;
@@ -27,7 +29,8 @@ interface FinancesCoreKpiCardsProps {
   cumulativeYtd: boolean;
   setCumulativeYtd: (c: boolean) => void;
   gmrData: any;
-  revAddedData: any;
+  revAddedVoiceData: any;
+  revAddedInternetData: any;
   partnerOutflowData: any;
   nrvData: any;
   netProfitData: any;
@@ -41,8 +44,10 @@ export default function FinancesCoreKpiCards({
   availableMonths,
   gmrMonth,
   setGmrMonth,
-  revAddedMonth,
-  setRevAddedMonth,
+  revAddedVoiceMonth,
+  setRevAddedVoiceMonth,
+  revAddedInternetMonth,
+  setRevAddedInternetMonth,
   partnerOutflowMonth,
   setPartnerOutflowMonth,
   nrvMonth,
@@ -56,7 +61,8 @@ export default function FinancesCoreKpiCards({
   cumulativeYtd,
   setCumulativeYtd,
   gmrData,
-  revAddedData,
+  revAddedVoiceData,
+  revAddedInternetData,
   partnerOutflowData,
   nrvData,
   netProfitData,
@@ -65,11 +71,33 @@ export default function FinancesCoreKpiCards({
   realYtdProfit,
   sparklinePoints,
 }: FinancesCoreKpiCardsProps) {
+  // Voice added calculations
+  const voiceAdded =
+    revAddedVoiceData.voiceRevenueAddedThisMonth !== undefined
+      ? revAddedVoiceData.voiceRevenueAddedThisMonth
+      : (revAddedVoiceData.revenueAddedThisMonth || 0) - (revAddedVoiceData.dataCircuitRevenueShare || 0);
+
+  const voiceGrowth =
+    revAddedVoiceData.voiceRevenueGrowthPct !== undefined
+      ? revAddedVoiceData.voiceRevenueGrowthPct
+      : revAddedVoiceData.revenueAddedGrowthPct || 0;
+
+  // Internet added calculations
+  const internetAdded =
+    revAddedInternetData.internetRevenueAddedThisMonth !== undefined
+      ? revAddedInternetData.internetRevenueAddedThisMonth
+      : revAddedInternetData.dataCircuitRevenueShare || 0;
+
+  const internetGrowth =
+    revAddedInternetData.internetRevenueGrowthPct !== undefined
+      ? revAddedInternetData.internetRevenueGrowthPct
+      : 100;
+
   return (
     <>
-      {/* Row 1: Core Revenue & Partner Outflows */}
+      {/* Row 1: GMR, Voice Added, Internet Added, Partner Outflow (4 cards in one row) */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Gross Monthly Revenue (GMR) Card */}
+        {/* Card 1: Gross Monthly Revenue (GMR) */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -118,16 +146,16 @@ export default function FinancesCoreKpiCards({
           </p>
         </div>
 
-        {/* Revenue Added This Month Card (Pure Number, No Graph) */}
+        {/* Card 2: Revenue Added This Month from Voice Services (Green) */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#047857] via-[#065f46] to-[#064e3b] text-white border border-emerald-600/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200">
-                Revenue Added This Month
+                Revenue Added (Voice)
               </span>
               <select
-                value={revAddedMonth}
-                onChange={(e) => setRevAddedMonth(e.target.value)}
+                value={revAddedVoiceMonth}
+                onChange={(e) => setRevAddedVoiceMonth(e.target.value)}
                 className="bg-black/25 text-white text-[10px] font-bold rounded-lg px-2 py-0.5 border border-white/20 focus:outline-hidden cursor-pointer hover:bg-black/40 transition"
               >
                 {availableMonths.map((m) => (
@@ -140,18 +168,14 @@ export default function FinancesCoreKpiCards({
 
             <div className="mt-2.5 flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-2">
-                <span className={`text-2xl font-black ${
-                  (revAddedData.revenueAddedThisMonth ?? 0) >= 0 ? 'text-white' : 'text-rose-300'
-                }`}>
-                  {formatCurrency(revAddedData.revenueAddedThisMonth ?? 0)}
+                <span className={`text-2xl font-black ${voiceAdded >= 0 ? 'text-white' : 'text-rose-300'}`}>
+                  {formatCurrency(voiceAdded)}
                 </span>
-                {revAddedData.revenueAddedGrowthPct !== undefined && revAddedData.previousMonthGmr > 0 && (
+                {voiceGrowth !== 0 && (
                   <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    revAddedData.revenueAddedThisMonth >= 0
-                      ? 'bg-emerald-400/20 text-emerald-200'
-                      : 'bg-rose-500/20 text-rose-200'
+                    voiceAdded >= 0 ? 'bg-emerald-400/20 text-emerald-200' : 'bg-rose-500/20 text-rose-200'
                   }`}>
-                    {revAddedData.revenueAddedThisMonth >= 0 ? '+' : ''}{revAddedData.revenueAddedGrowthPct}%
+                    {voiceAdded >= 0 ? '+' : ''}{voiceGrowth}%
                   </span>
                 )}
               </div>
@@ -159,13 +183,56 @@ export default function FinancesCoreKpiCards({
           </div>
 
           <p className="text-[11px] text-emerald-200 mt-2 pt-2 border-t border-white/10">
-            {revAddedData.previousMonthName
-              ? `From ${formatCurrency(revAddedData.previousMonthGmr || 0)} (${revAddedData.previousMonthShort || 'prev'}) to ${formatCurrency(revAddedData.grossMonthlyRevenue || 0)}`
-              : 'Net new recurring revenue addition'}
+            {revAddedVoiceData.previousMonthName
+              ? `From ${formatCurrency(revAddedVoiceData.prevVoiceGmr || revAddedVoiceData.previousMonthGmr || 0)} (${revAddedVoiceData.previousMonthShort || 'prev'}) to ${formatCurrency(revAddedVoiceData.voiceGmr || revAddedVoiceData.grossMonthlyRevenue || 0)}`
+              : 'Voice line plans & recurring additions'}
           </p>
         </div>
 
-        {/* Partner Commission Outflow Card */}
+        {/* Card 3: Revenue Added This Month from Internet Services (Green) */}
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-[#047857] via-[#065f46] to-[#064e3b] text-white border border-emerald-600/50 shadow-md relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200">
+                Revenue Added (Internet)
+              </span>
+              <select
+                value={revAddedInternetMonth}
+                onChange={(e) => setRevAddedInternetMonth(e.target.value)}
+                className="bg-black/25 text-white text-[10px] font-bold rounded-lg px-2 py-0.5 border border-white/20 focus:outline-hidden cursor-pointer hover:bg-black/40 transition"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m.key} value={m.key} className="bg-[#0f172a] text-white">
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mt-2.5 flex items-baseline justify-between gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-black ${internetAdded >= 0 ? 'text-white' : 'text-rose-300'}`}>
+                  {formatCurrency(internetAdded)}
+                </span>
+                {internetGrowth !== 0 && (
+                  <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    internetAdded >= 0 ? 'bg-emerald-400/20 text-emerald-200' : 'bg-rose-500/20 text-rose-200'
+                  }`}>
+                    {internetAdded >= 0 ? '+' : ''}{internetGrowth}%
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-emerald-200 mt-2 pt-2 border-t border-white/10">
+            {revAddedInternetData.dataCircuitReceivedCount
+              ? `${revAddedInternetData.dataCircuitReceivedCount} active circuit rev shares received`
+              : 'Data circuit vendor commission share'}
+          </p>
+        </div>
+
+        {/* Card 4: Partner Outflow */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -199,8 +266,11 @@ export default function FinancesCoreKpiCards({
             Across {partnerOutflowData.activePartnersCount || 0} active channel partners
           </p>
         </div>
+      </motion.div>
 
-        {/* Net Retained Value (NRV) Card */}
+      {/* Row 2: NRV, Net Profit, Operating Expenses, ARR (4 cards in one row) */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 5: Net Retained Value (NRV) */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -234,11 +304,8 @@ export default function FinancesCoreKpiCards({
             Company revenue after partner share disbursements
           </p>
         </div>
-      </motion.div>
 
-      {/* Row 2: Net Profit Hero, Operating Expenses, and ARR */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Net Profit (The Glowing Hero Card) */}
+        {/* Card 6: Net Profit (Hero Card) */}
         <div
           className={`p-5 rounded-2xl bg-white dark:bg-[#15161c] text-slate-900 dark:text-white border shadow-lg relative overflow-hidden flex flex-col justify-between ${
             (cumulativeYtd ? realYtdProfit : netProfitData.netProfit || 0) >= 0
@@ -277,7 +344,7 @@ export default function FinancesCoreKpiCards({
 
             <div className="mt-2.5">
               <span
-                className={`text-3xl font-black font-mono ${
+                className={`text-2xl font-black font-mono ${
                   (cumulativeYtd ? realYtdProfit : netProfitData.netProfit || 0) >= 0
                     ? 'text-emerald-600 dark:text-emerald-400'
                     : 'text-rose-600'
@@ -294,7 +361,7 @@ export default function FinancesCoreKpiCards({
           </p>
         </div>
 
-        {/* Total Operating Expenses Card */}
+        {/* Card 7: Total Operating Expenses */}
         <div className="p-5 rounded-2xl bg-[#0a1330] text-white border border-slate-800 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -387,7 +454,7 @@ export default function FinancesCoreKpiCards({
           </div>
         </div>
 
-        {/* Annualized Run-Rate (ARR) Card */}
+        {/* Card 8: Annualized Run-Rate (ARR) */}
         <div className="p-5 rounded-2xl bg-gradient-to-br from-[#1e40af] via-[#1e3a8a] to-[#2b2a7a] text-white border border-blue-700/50 shadow-md relative overflow-hidden flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between gap-2">

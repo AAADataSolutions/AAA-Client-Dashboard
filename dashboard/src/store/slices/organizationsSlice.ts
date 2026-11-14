@@ -83,7 +83,7 @@ const initialState: OrganizationsState = {
   currentPage: 1,
   searchQuery: '',
   selectedStatus: 'ALL',
-  selectedTypeFilter: 'ALL',
+  selectedTypeFilter: 'GROUP',
   selectedPropFilter: 'ALL',
   loading: false,
   error: null,

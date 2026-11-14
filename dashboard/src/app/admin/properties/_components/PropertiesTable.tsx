@@ -160,6 +160,7 @@ export function PropertiesTable({
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MAIN PHONE NO.</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">CLIENT</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">NO. OF SERVICES</th>
+                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">BILLING STATUS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">E911 STATUS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">RAY BAUM AND KARY&apos;S LAW</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>

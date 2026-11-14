@@ -153,20 +153,23 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 3. Compute 5 KPI Cards per Task.md:
-    // Total Organizations, Active Organizations, Pending / Invited, Total Properties, Organizations with No Properties
-    const totalOrganizations = allProcessed.length;
+    // 3. Compute KPI Cards (Filtered by type if selected, so metrics align with toggle)
+    const metricsPool = typeFilter !== 'ALL'
+      ? allProcessed.filter((o: any) => (o.type || 'GROUP') === typeFilter)
+      : allProcessed;
+
+    const totalOrganizations = metricsPool.length;
     const totalGroups = allProcessed.filter((o: any) => (o.type || 'GROUP') === 'GROUP').length;
     const totalIndividuals = allProcessed.filter((o: any) => o.type === 'INDIVIDUAL').length;
-    const activeOrganizations = allProcessed.filter((o: any) => o.status === 'ACTIVE').length;
-    const pendingOrInvited = allProcessed.filter(
+    const activeOrganizations = metricsPool.filter((o: any) => o.status === 'ACTIVE').length;
+    const pendingOrInvited = metricsPool.filter(
       (o: any) =>
         o.status === 'PENDING_ONBOARDING' ||
         o.invite.status === 'PENDING' ||
         o.invite.status === 'INVITED'
     ).length;
-    const totalProperties = allProcessed.reduce((acc: number, o: any) => acc + (o.properties_count || 0), 0);
-    const noPropertiesOrganizations = allProcessed.filter((o: any) => o.properties_count === 0).length;
+    const totalProperties = metricsPool.reduce((acc: number, o: any) => acc + (o.properties_count || 0), 0);
+    const noPropertiesOrganizations = metricsPool.filter((o: any) => o.properties_count === 0).length;
 
     // 4. In-Memory Search & Filtering
     let filtered = allProcessed;

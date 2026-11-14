@@ -22,6 +22,8 @@ import {
   containerVariants,
   OrgOption,
   PartnerOption,
+  ServerOption,
+  VendorOption,
   Toast,
 } from './_components/types';
 import { PropertiesKpiAndFilters } from './_components/PropertiesKpiAndFilters';
@@ -52,6 +54,8 @@ export default function AdminPropertiesPage() {
 
   const [orgOptions, setOrgOptions] = useState<OrgOption[]>([]);
   const [partnerOptions, setPartnerOptions] = useState<PartnerOption[]>([]);
+  const [serverOptions, setServerOptions] = useState<ServerOption[]>([]);
+  const [vendorOptions, setVendorOptions] = useState<VendorOption[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Search input state (char-by-char)
@@ -111,6 +115,42 @@ export default function AdminPropertiesPage() {
       }
     }
     loadPartners();
+  }, []);
+
+  // Load servers and vendors for dropdowns
+  useEffect(() => {
+    async function loadServersAndVendors() {
+      try {
+        const [srvRes, vndRes] = await Promise.all([
+          fetch('/api/admin/servers'),
+          fetch('/api/admin/vendors'),
+        ]);
+        const [srvData, vndData] = await Promise.all([srvRes.json(), vndRes.json()]);
+        if (srvData.success && Array.isArray(srvData.data)) {
+          setServerOptions(
+            srvData.data.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              provider: s.provider,
+              status: s.status,
+            }))
+          );
+        }
+        if (vndData.success && Array.isArray(vndData.data)) {
+          setVendorOptions(
+            vndData.data.map((v: any) => ({
+              id: v.id,
+              name: v.name,
+              category: v.category,
+              status: v.status,
+            }))
+          );
+        }
+      } catch (err) {
+        console.warn('Could not load server/vendor options:', err);
+      }
+    }
+    loadServersAndVendors();
   }, []);
 
   // Sync search input with Redux (char-by-char instant)
@@ -285,6 +325,8 @@ export default function AdminPropertiesPage() {
         handleSaveCreate={formModals.handleSaveCreate}
         orgOptions={orgOptions}
         partnerOptions={partnerOptions}
+        serverOptions={serverOptions}
+        vendorOptions={vendorOptions}
         isSuperAdmin={isSuperAdmin}
       />
 
@@ -300,6 +342,8 @@ export default function AdminPropertiesPage() {
         handleSaveEdit={formModals.handleSaveEdit}
         orgOptions={orgOptions}
         partnerOptions={partnerOptions}
+        serverOptions={serverOptions}
+        vendorOptions={vendorOptions}
         isSuperAdmin={isSuperAdmin}
       />
 
@@ -388,8 +432,13 @@ export default function AdminPropertiesPage() {
         creatingServiceInDrawer={drawerActions.creatingServiceInDrawer}
         handleCreateServiceInDrawerSubmit={drawerActions.handleCreateServiceInDrawerSubmit}
         availableDrawerServiceTypes={drawerActions.availableDrawerServiceTypes}
+        serverOptions={serverOptions}
+        vendorOptions={vendorOptions}
         showCustomSvcIdInDrawer={drawerActions.showCustomSvcIdInDrawer}
         setShowCustomSvcIdInDrawer={drawerActions.setShowCustomSvcIdInDrawer}
+        onOpenEdit={formModals.handleOpenEdit}
+        orgOptions={orgOptions}
+        partnerOptions={partnerOptions}
       />
 
       {/* IMPORT CSV MODAL */}

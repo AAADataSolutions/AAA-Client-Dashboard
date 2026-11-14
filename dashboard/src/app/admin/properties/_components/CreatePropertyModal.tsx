@@ -3,7 +3,7 @@
 import React from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Plus, X, Loader2 } from 'lucide-react';
-import { OrgOption, PartnerOption, PropertyFormData } from './types';
+import { OrgOption, PartnerOption, ServerOption, VendorOption, PropertyFormData } from './types';
 
 interface CreatePropertyModalProps {
   showCreateModal: boolean;
@@ -15,6 +15,8 @@ interface CreatePropertyModalProps {
   handleSaveCreate: (e: React.FormEvent) => void;
   orgOptions: OrgOption[];
   partnerOptions: PartnerOption[];
+  serverOptions?: ServerOption[];
+  vendorOptions?: VendorOption[];
   isSuperAdmin: boolean;
 }
 
@@ -28,6 +30,8 @@ export function CreatePropertyModal({
   handleSaveCreate,
   orgOptions,
   partnerOptions,
+  serverOptions = [],
+  vendorOptions = [],
   isSuperAdmin,
 }: CreatePropertyModalProps) {
   return (
@@ -214,6 +218,38 @@ export function CreatePropertyModal({
                         )}
                     </p>
                   )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block">Assigned Server</label>
+                  <select
+                    value={formData.server_id}
+                    onChange={(e) => setFormData({ ...formData, server_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">No Server Assigned</option>
+                    {serverOptions.map((srv) => (
+                      <option key={srv.id} value={srv.id}>
+                        {srv.name}{srv.provider ? ` (${srv.provider})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-black dark:text-white block">Assigned Vendor</label>
+                  <select
+                    value={formData.vendor_id}
+                    onChange={(e) => setFormData({ ...formData, vendor_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430] rounded-lg text-slate-900 dark:text-white text-xs cursor-pointer focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">No Vendor Assigned</option>
+                    {vendorOptions.map((vnd) => (
+                      <option key={vnd.id} value={vnd.id}>
+                        {vnd.name}{vnd.category ? ` (${vnd.category})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="col-span-2 space-y-1">

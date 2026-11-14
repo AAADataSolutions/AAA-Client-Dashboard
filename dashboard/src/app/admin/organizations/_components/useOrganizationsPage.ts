@@ -337,7 +337,6 @@ export function useOrganizationsPage() {
   const hasActiveFilters =
     searchQuery !== '' ||
     selectedStatus !== 'ALL' ||
-    selectedTypeFilter !== 'ALL' ||
     selectedPropFilter !== 'ALL';
 
   return {

@@ -51,29 +51,7 @@ export async function GET(request: NextRequest) {
         status,
         created_at,
         organization:organizations(id, name, type),
-        property:properties(
-          id,
-          name,
-          monthly_price,
-          address,
-          city,
-          state,
-          zip_code,
-          country,
-          main_phone,
-          fax,
-          contact_person_name,
-          contact_person_email,
-          general_manager_name,
-          general_manager_phone,
-          general_manager_email,
-          ray_baum_status,
-          ray_baud_and_logs_enabled,
-          connectivity_type,
-          status,
-          onboarding_date,
-          created_at
-        ),
+        property:properties(*),
         services:organization_property_services(
           id,
           service:services(id, phone_number, status, service_type_id, service_type:service_types(name))
@@ -166,8 +144,11 @@ export async function GET(request: NextRequest) {
         const gmPhone = prop.general_manager_phone || prop.main_phone || null;
         const gmEmail = prop.general_manager_email || prop.contact_person_email || null;
 
-        const isE911Verified = Boolean(prop.ray_baud_and_logs_enabled);
-        const e911StatusStr = isE911Verified ? 'VERIFIED' : 'AUDIT_REQUIRED';
+        const isE911Verified = (prop.e911_status?.toUpperCase() === 'VERIFIED') || (e911Record?.status?.toUpperCase() === 'VERIFIED');
+        const e911StatusStr = isE911Verified ? 'VERIFIED' : (prop.e911_status || 'AUDIT_REQUIRED');
+        const isRayBaumActive = Boolean(
+          prop.ray_baum_status && String(prop.ray_baum_status).trim().toUpperCase() === 'ACTIVE'
+        );
 
         const propCircuits = clientDataCircuits.filter((dc: any) => dc.property_id === prop.id);
         const primaryCircuit = propCircuits[0] || null;
@@ -206,7 +187,8 @@ export async function GET(request: NextRequest) {
           general_manager_phone: gmPhone,
           general_manager_email: gmEmail,
           ray_baud_and_logs_enabled: isE911Verified,
-          ray_baum_status: prop.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
+          ray_baum_status: isRayBaumActive ? 'Active' : 'Inactive',
+          is_ray_baum_active: isRayBaumActive,
           status: propStatus,
           stage: onboardingRecord?.status || (propStatus === 'ACTIVE' ? 'COMPLETED' : 'DRAFT'),
           services_count: servicesList.length,
@@ -219,6 +201,9 @@ export async function GET(request: NextRequest) {
           open_tickets_count: openTix.length,
           tickets: ticketsList,
           onboarding_date: prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null),
+          billing_status: (prop as any).billing_status || 'BILLING_PENDING',
+          billed_date: (prop as any).billed_date || ((prop as any).billing_status === 'BILLING_DONE' ? (prop.onboarding_date || (prop.created_at ? prop.created_at.slice(0, 10) : null)) : null),
+          porting_attachments: Array.isArray(prop.attachments) ? prop.attachments : [],
           created_at: prop.created_at,
         };
       })

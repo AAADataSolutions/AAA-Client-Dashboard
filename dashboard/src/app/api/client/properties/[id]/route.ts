@@ -62,10 +62,29 @@ export async function GET(
       );
     }
 
-    const prop: any = orgProp.property;
+    const prop: any = orgProp.property ? { ...orgProp.property } : {};
+    delete prop.server_id;
+    delete prop.vendor_id;
+    delete prop.server;
+    delete prop.vendor;
+    delete prop.server_name;
+    delete prop.vendor_name;
     const servicesList = (orgProp.services || []).map((s: any) => s.service).filter(Boolean);
     const e911Record = Array.isArray(orgProp.e911) && orgProp.e911.length > 0 ? orgProp.e911[0] : null;
     const onboardingRecord = Array.isArray(orgProp.onboardings) && orgProp.onboardings.length > 0 ? orgProp.onboardings[0] : null;
+
+    // Fetch primary data circuit for client (client-safe: no wholesaler info)
+    const { data: dcList } = await supabase
+      .from('data_circuits')
+      .select('id, property_id, status, carrier_name, bandwidth, circuit_monthly_price, site_survey_status, foc_status, foc_date, installed_at, technical_details, agreement_file_name, agreement_file_url, agreement_file_size, paperwork_signed_at, created_at')
+      .eq('property_id', id)
+      .neq('status', 'CANCELLED')
+      .order('created_at', { ascending: false });
+
+    const primaryCircuit = dcList && dcList.length > 0 ? dcList[0] : null;
+    const isRayBaumActive = Boolean(
+      prop.ray_baum_status && String(prop.ray_baum_status).trim().toUpperCase() === 'ACTIVE'
+    );
 
     return NextResponse.json({
       success: true,
@@ -77,6 +96,11 @@ export async function GET(
         e911_record: e911Record,
         onboarding: onboardingRecord,
         tickets: orgProp.tickets || [],
+        data_circuit: primaryCircuit,
+        data_circuits: dcList || [],
+        ray_baum_status: isRayBaumActive ? 'Active' : 'Inactive',
+        is_ray_baum_active: isRayBaumActive,
+        porting_attachments: Array.isArray(prop.attachments) ? prop.attachments : [],
       },
     });
   } catch (err: any) {

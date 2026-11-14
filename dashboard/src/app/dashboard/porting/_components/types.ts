@@ -113,32 +113,41 @@ export const getStageDate = (rec: any, status?: string): string => {
 
   switch (currentStage) {
     case 'DRAFT':
-      rawDate = rec.draft_date;
+      rawDate = rec.draft_date || rec.stage_dates?.draft_date;
       break;
     case 'CONTRACT_SENT':
-      rawDate = rec.contract_sent_date;
+      rawDate = rec.contract_sent_date || rec.stage_dates?.contract_sent_date;
       break;
     case 'SIGNED':
-      rawDate = rec.signed_date;
+      rawDate = rec.signed_date || rec.stage_dates?.signed_date;
       break;
     case 'CSR_DETAILS':
-      rawDate = rec.csr_details_date;
+      rawDate = rec.csr_details_date || rec.stage_dates?.csr_details_date;
       break;
     case 'CUT_SHEET_REVIEW':
-      rawDate = rec.cut_sheet_review_date || rec.sof_review_date;
+      rawDate = rec.cut_sheet_review_date || rec.sof_review_date || rec.stage_dates?.cut_sheet_review_date || rec.stage_dates?.sof_review_date;
       break;
     case 'PORTING_SUBMITTED':
-      rawDate = rec.porting_submitted_date;
+      rawDate = rec.porting_submitted_date || rec.stage_dates?.porting_submitted_date;
       break;
     case 'FOC_RECEIVED':
-      rawDate = rec.foc_confirmed_date;
+      rawDate = rec.foc_confirmed_date || rec.stage_dates?.foc_confirmed_date;
       break;
     case 'COMPLETED':
-      rawDate = rec.live_cutover_date || rec.completed_at;
+      rawDate = rec.live_cutover_date || rec.completed_at || rec.stage_dates?.live_cutover_date;
       break;
     default:
       rawDate = null;
   }
 
-  return formatStageDate(rawDate);
+  // Fallback to target_date, created_at, or updated_at so date is never blank or '(-)'
+  if (!rawDate || rawDate === '(-)' || rawDate === '—' || rawDate === 'null' || rawDate === 'undefined') {
+    rawDate = rec.target_date || rec.foc_confirmed_date || rec.foc_date || rec.completed_at || rec.created_at || rec.updated_at || null;
+  }
+
+  const formatted = formatStageDate(rawDate);
+  if (formatted === '(-)' && (rec.created_at || rec.updated_at)) {
+    return formatStageDate(rec.created_at || rec.updated_at);
+  }
+  return formatted;
 };

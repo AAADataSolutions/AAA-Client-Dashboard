@@ -62,11 +62,10 @@ const navItems: NavItem[] = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
   { label: 'Management Groups', href: '/admin/organizations', icon: Building2 },
   { label: 'Properties', href: '/admin/properties', icon: Hotel },
-  { label: 'Technicians', href: '/admin/technicians', icon: Wrench },
   {
     label: 'Services',
     icon: PhoneCall,
-    hideForSuperAdmin: false,
+    hideForSuperAdmin: true,
     children: [
       { label: 'Services and Lines', href: '/admin/services', icon: PhoneCall },
       { label: 'Call Forwarding', href: '/admin/call-forwarding', icon: GitBranch },
@@ -76,6 +75,7 @@ const navItems: NavItem[] = [
     ],
   },
   { label: 'Porting', href: '/admin/porting', icon: ArrowLeftRight },
+  { label: 'Technicians', href: '/admin/technicians', icon: Wrench },
   {
     label: 'Data Circuit',
     icon: Network,

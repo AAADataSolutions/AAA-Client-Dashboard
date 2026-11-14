@@ -15,11 +15,11 @@ function parseCSV(text: string): Record<string, string>[] {
 
     if (char === '"') {
       if (inQuotes && nextChar === '"') {
-        currentLine += '""'; // keep escaped quote for the row parser
+        currentLine += '""';
         i++;
       } else {
         inQuotes = !inQuotes;
-        currentLine += char; // keep quote so row parser knows the cell is quoted
+        currentLine += char;
       }
     } else if ((char === '\r' || char === '\n') && !inQuotes) {
       if (char === '\r' && nextChar === '\n') {
@@ -39,24 +39,23 @@ function parseCSV(text: string): Record<string, string>[] {
 
   if (lines.length < 2) return [];
 
-  // Parse a single CSV row into columns
   const parseRow = (line: string): string[] => {
     const cells: string[] = [];
     let currentCell = '';
-    let inQuotes = false;
+    let inQ = false;
 
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const nextChar = line[i + 1];
 
       if (char === '"') {
-        if (inQuotes && nextChar === '"') {
+        if (inQ && nextChar === '"') {
           currentCell += '"';
           i++;
         } else {
-          inQuotes = !inQuotes;
+          inQ = !inQ;
         }
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === ',' && !inQ) {
         cells.push(currentCell.trim());
         currentCell = '';
       } else {
@@ -67,13 +66,12 @@ function parseCSV(text: string): Record<string, string>[] {
     return cells;
   };
 
-  const rawHeaders = parseRow(lines[0]);
-  const headers = rawHeaders.map((h) => h.replace(/^["']|["']$/g, '').trim());
+  const headers = parseRow(lines[0]).map((h) => h.replace(/^["']|["']$/g, '').trim());
 
   const rows: Record<string, string>[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = parseRow(lines[i]);
-    if (cells.every((c) => !c)) continue; // skip empty line
+    if (cells.every((c) => !c)) continue;
 
     const rowObj: Record<string, string> = {};
     headers.forEach((header, colIndex) => {
@@ -89,49 +87,25 @@ function parseCSV(text: string): Record<string, string>[] {
 function parseLocation(locStr: string): { address: string; city: string; state: string; zip_code: string; country: string } {
   const clean = (locStr || '').trim();
   if (!clean) {
-    return {
-      address: 'Address pending',
-      city: 'City',
-      state: 'IL',
-      zip_code: '00000',
-      country: 'USA',
-    };
+    return { address: 'Address pending', city: 'City', state: 'IL', zip_code: '00000', country: 'USA' };
   }
-
   const parts = clean.split(',').map((p) => p.trim()).filter(Boolean);
-
   if (parts.length >= 3) {
     const address = parts[0];
     const city = parts[1];
     const stateZip = parts.slice(2).join(' ');
-    
-    // Parse "IL 60601" or "Illinois 60601"
-    const stateZipMatch = stateZip.match(/([A-Za-z\s]+)\s*(\d{5}(?:-\d{4})?)?/);
-    const state = stateZipMatch && stateZipMatch[1] ? stateZipMatch[1].trim() : parts[2] || 'IL';
-    const zip_code = stateZipMatch && stateZipMatch[2] ? stateZipMatch[2].trim() : '00000';
-
+    const match = stateZip.match(/([A-Za-z\s]+)\s*(\d{5}(?:-\d{4})?)?/);
+    const state = match && match[1] ? match[1].trim() : parts[2] || 'IL';
+    const zip_code = match && match[2] ? match[2].trim() : '00000';
     return { address, city, state, zip_code, country: 'USA' };
   } else if (parts.length === 2) {
     const address = parts[0];
-    const stateZipMatch = parts[1].match(/([A-Za-z\s]+)\s*(\d{5}(?:-\d{4})?)?/);
-    const cityOrState = stateZipMatch && stateZipMatch[1] ? stateZipMatch[1].trim() : parts[1];
-    const zip_code = stateZipMatch && stateZipMatch[2] ? stateZipMatch[2].trim() : '00000';
-    return {
-      address,
-      city: cityOrState,
-      state: 'IL',
-      zip_code,
-      country: 'USA',
-    };
-  } else {
-    return {
-      address: clean,
-      city: 'City',
-      state: 'IL',
-      zip_code: '00000',
-      country: 'USA',
-    };
+    const match = parts[1].match(/([A-Za-z\s]+)\s*(\d{5}(?:-\d{4})?)?/);
+    const cityOrState = match && match[1] ? match[1].trim() : parts[1];
+    const zip_code = match && match[2] ? match[2].trim() : '00000';
+    return { address, city: cityOrState, state: 'IL', zip_code, country: 'USA' };
   }
+  return { address: clean, city: 'City', state: 'IL', zip_code: '00000', country: 'USA' };
 }
 
 // Find header value flexibly
@@ -156,21 +130,15 @@ function parseDateString(dateStr: string): string {
     return new Date().toISOString().slice(0, 10);
   }
   const clean = dateStr.trim();
-  // If already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
-    return clean;
-  }
-  // If YYYY/MM/DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
   if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(clean)) {
     const [y, m, d] = clean.split('/');
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
-  // If MM/DD/YYYY or M/D/YYYY
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(clean)) {
     const [m, d, y] = clean.split('/');
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
-  // Try generic Date.parse
   const parsed = new Date(clean);
   if (!isNaN(parsed.getTime())) {
     return parsed.toISOString().slice(0, 10);
@@ -223,11 +191,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cache existing organizations
-    const { data: allOrgs } = await dbClient.from('organizations').select('id, name');
+    // Cache existing organizations, servers, and vendors
+    const [{ data: allOrgs }, { data: allServers }, { data: allVendors }] = await Promise.all([
+      dbClient.from('organizations').select('id, name'),
+      dbClient.from('servers').select('id, name'),
+      dbClient.from('vendors').select('id, name'),
+    ]);
     const orgsMap = new Map<string, string>();
     (allOrgs || []).forEach((o: any) => {
       orgsMap.set(o.name.trim().toLowerCase(), o.id);
+    });
+    const serversMap = new Map<string, string>();
+    (allServers || []).forEach((s: any) => {
+      if (s.name) serversMap.set(s.name.trim().toLowerCase(), s.id);
+    });
+    const vendorsMap = new Map<string, string>();
+    (allVendors || []).forEach((v: any) => {
+      if (v.name) vendorsMap.set(v.name.trim().toLowerCase(), v.id);
     });
 
     const importedProperties: any[] = [];
@@ -235,189 +215,169 @@ export async function POST(request: NextRequest) {
 
     for (let index = 0; index < rawRows.length; index++) {
       const row = rawRows[index];
-      const rowNum = index + 2; // Accounting for 1-based index + header row
+      const rowNum = index + 2;
 
       // 1. Property Name
       const propertyName = getHeaderValue(row, [
-        'Property Name',
-        'PropertyName',
-        'property_name',
-        'Name',
-        'name',
+        'Property Name', 'PropertyName', 'property_name', 'Name', 'name',
       ]);
 
       if (!propertyName.trim()) {
-        errors.push({
-          row: rowNum,
-          propertyName: 'Row ' + rowNum,
-          reason: 'Missing Property Name',
-        });
+        errors.push({ row: rowNum, propertyName: 'Row ' + rowNum, reason: 'Missing Property Name' });
         continue;
       }
 
-      // 2. Property Location
-      const locationRaw = getHeaderValue(row, [
-        'Property Location',
-        'PropertyLocation',
-        'property_location',
-        'Location',
-        'location',
-        'Address',
-        'address',
+      // 2. Street Address, City, State, Zip, Country
+      const streetRaw = getHeaderValue(row, [
+        'Street Address', 'StreetAddress', 'street_address', 'Address', 'address', 'Property Location', 'Location',
       ]);
-      const loc = parseLocation(locationRaw);
+      const cityRaw = getHeaderValue(row, ['City', 'city']);
+      const stateRaw = getHeaderValue(row, ['State', 'state']);
+      const zipRaw = getHeaderValue(row, ['Zip', 'zip', 'Zip Code', 'zip_code', 'postal_code']);
+      const countryRaw = getHeaderValue(row, ['Country', 'country']) || 'USA';
 
-      // 3. Monthly price
+      let loc = { address: streetRaw, city: cityRaw, state: stateRaw, zip_code: zipRaw, country: countryRaw };
+      if (!cityRaw || !stateRaw || !zipRaw) {
+        const parsed = parseLocation(streetRaw);
+        loc = {
+          address: parsed.address || streetRaw || 'Address pending',
+          city: cityRaw || parsed.city || 'City',
+          state: stateRaw || parsed.state || 'IL',
+          zip_code: zipRaw || parsed.zip_code || '00000',
+          country: countryRaw || parsed.country || 'USA',
+        };
+      }
+
+      // 3. Main Phone Number & Fax Number
+      const mainPhone = getHeaderValue(row, [
+        'Main Phone Number', 'MainPhoneNumber', 'main_phone_number', 'Main Phone no', 'Main Phone No', 'Main Phone', 'Phone',
+      ]);
+      const faxNumber = getHeaderValue(row, ['Fax Number', 'FaxNumber', 'fax_number', 'Fax', 'fax']);
+
+      // 4. Organization Name
+      const mgmtGroup = getHeaderValue(row, [
+        'Organization Name', 'OrganizationName', 'organization_name', 'Management group', 'Management Group', 'ManagementGroup', 'Organization', 'Group',
+      ]);
+
+      // 5. General Manager Contacts
+      const gmName = getHeaderValue(row, [
+        'General Manager Name', 'GeneralManagerName', 'general_manager_name', 'GM Name', 'GMName', 'gm_name',
+      ]);
+      const gmEmail = getHeaderValue(row, [
+        'General Manager Email', 'GeneralManagerEmail', 'general_manager_email', 'GM email', 'GMEmail', 'gm_email',
+      ]);
+      const gmPhone = getHeaderValue(row, [
+        'General Manager Phone', 'GeneralManagerPhone', 'general_manager_phone', 'GM phone', 'GMPhone', 'gm_phone',
+      ]);
+
+      // 6. Monthly Pricing
       const priceRaw = getHeaderValue(row, [
-        'Monthly price',
-        'MonthlyPrice',
-        'monthly_price',
-        'Monthly Price',
-        'Price',
-        'price',
-        'MRR',
+        'Monthly Pricing', 'MonthlyPricing', 'monthly_pricing', 'Monthly price', 'MonthlyPrice', 'monthly_price', 'Price', 'price', 'MRR',
       ]);
       const cleanPrice = priceRaw ? parseFloat(priceRaw.replace(/[^0-9.]/g, '')) : null;
       const monthlyPrice = cleanPrice && !isNaN(cleanPrice) ? cleanPrice : null;
 
-      // 3b. Onboarding Date
+      // 7. Ray Baum and Kari's Law Status (Fix: never couple to E911)
+      const rayBaumRaw = getHeaderValue(row, [
+        "Ray Baum and Kari's Law Status", "Ray Baum and Kari's law", "Ray Baum and Kary's law", "ay Baum and Kary's law", "array bomb and carry loss status", 'Ray Baum', 'ray_baum', 'ray_baum_status',
+      ]).toLowerCase();
+      const isRayBaumActive =
+        (rayBaumRaw.includes('act') || rayBaumRaw.includes('yes') || rayBaumRaw.includes('true') || rayBaumRaw.includes('comp')) &&
+        !rayBaumRaw.includes('inact') &&
+        !rayBaumRaw.includes('non');
+
+      // 8. E911 Status
+      const e911Raw = getHeaderValue(row, ['E911 Status', 'E911Status', 'e911_status', 'E911', 'e911']).toLowerCase();
+      const isE911Verified =
+        e911Raw.includes('verif') || e911Raw.includes('active') || e911Raw.includes('yes') || e911Raw.includes('true');
+
+      // 9. Onboarding Date
       const onboardingDateRaw = getHeaderValue(row, [
-        'Onboarding Date',
-        'OnboardingDate',
-        'onboarding_date',
-        'Onboarding date',
-        'Onboard Date',
-        'Onboarded Date',
-        'Date',
-        'date',
+        'Onboarding Date', 'OnboardingDate', 'onboarding_date', 'Onboarding date', 'Onboard Date', 'Date',
       ]);
       const onboardingDate = parseDateString(onboardingDateRaw);
 
-      // 4. Main Phone no
-      const mainPhone = getHeaderValue(row, [
-        'Main Phone no',
-        'Main Phone No',
-        'MainPhoneNo',
-        'main_phone_no',
-        'Main Phone',
-        'main_phone',
-        'Phone',
-        'phone',
-      ]);
+      // 10. Billing Status & Billing Date
+      const billingStatusRaw = getHeaderValue(row, ['Billing Status', 'BillingStatus', 'billing_status', 'Billing']).toLowerCase();
+      const isBillingDone = billingStatusRaw.includes('done') || billingStatusRaw.includes('billed');
+      const billingDateRaw = getHeaderValue(row, ['Billing Date', 'BillingDate', 'billing_date', 'Billed Date']);
+      const resolvedBilledDate = billingDateRaw ? parseDateString(billingDateRaw) : (isBillingDone ? onboardingDate : null);
 
-      // 5. Management group
-      const mgmtGroup = getHeaderValue(row, [
-        'Management group',
-        'Management Group',
-        'ManagementGroup',
-        'management_group',
-        'Organization',
-        'organization',
-        'Group',
-        'group',
-      ]);
+      // 11. Data Subject Status (Connectivity Mode)
+      const dataSubjectRaw = getHeaderValue(row, [
+        'Data Subject Status', 'DataSubjectStatus', 'data_subject_status', 'Data Circuit Status', 'Connectivity Mode', 'connectivity_type',
+      ]).toUpperCase();
+      let connectivityType: 'PORTED' | 'DATA_CIRCUITED' | 'BOTH' = 'PORTED';
+      if (dataSubjectRaw.includes('BOTH') || (dataSubjectRaw.includes('PORT') && dataSubjectRaw.includes('CIRCUIT'))) {
+        connectivityType = 'BOTH';
+      } else if (dataSubjectRaw.includes('CIRCUIT')) {
+        connectivityType = 'DATA_CIRCUITED';
+      }
 
-      // 6. E911 Status
-      const e911Raw = getHeaderValue(row, [
-        'E911 Status',
-        'E911Status',
-        'e911_status',
-        'E911',
-        'e911',
-      ]).toLowerCase();
-      const isE911Verified =
-        e911Raw.includes('verif') ||
-        e911Raw.includes('active') ||
-        e911Raw.includes('yes') ||
-        e911Raw.includes('true') ||
-        e911Raw.includes('pass');
-
-      // 7. Ray Baum and Kari's law (supports "ay Baum and Kary's law" or "Ray Baum and Kari's law")
-      const rayBaumRaw = getHeaderValue(row, [
-        'Ray Baum and Kari\'s law',
-        'Ray Baum and Kary\'s law',
-        'ay Baum and Kary\'s law',
-        'Ray Baum',
-        'ray_baum',
-        'ray_baum_status',
-        'Karis Law',
-        'kari_law',
-      ]).toLowerCase();
-      const isRayBaumActive =
-        rayBaumRaw.includes('act') ||
-        rayBaumRaw.includes('yes') ||
-        rayBaumRaw.includes('true') ||
-        rayBaumRaw.includes('verif') ||
-        rayBaumRaw.includes('comp') ||
-        isE911Verified;
-
-      // 8. GM Name
-      const gmName = getHeaderValue(row, [
-        'GM Name',
-        'GMName',
-        'gm_name',
-        'General Manager Name',
-        'general_manager_name',
-        'General Manager',
-      ]);
-
-      // 9. GM email
-      const gmEmail = getHeaderValue(row, [
-        'GM email',
-        'GMEmail',
-        'gm_email',
-        'General Manager Email',
-        'general_manager_email',
-        'GM Email',
-      ]);
+      // 12. Server & Vendor lookup by name
+      const serverNameRaw = getHeaderValue(row, ['Server Name', 'ServerName', 'server_name', 'Server', 'server']).trim();
+      const vendorNameRaw = getHeaderValue(row, ['Vendor Name', 'VendorName', 'vendor_name', 'Vendor', 'vendor']).trim();
+      const resolvedServerId = serverNameRaw ? (serversMap.get(serverNameRaw.toLowerCase()) || null) : null;
+      const resolvedVendorId = vendorNameRaw ? (vendorsMap.get(vendorNameRaw.toLowerCase()) || null) : null;
 
       try {
-        // A. Insert property record
-        const { data: newProp, error: insertPropErr } = await dbClient
+        const insertPayload: Record<string, any> = {
+          name: propertyName.trim(),
+          address: loc.address,
+          city: loc.city,
+          state: loc.state,
+          zip_code: loc.zip_code,
+          country: loc.country,
+          main_phone: mainPhone.trim() || null,
+          fax: faxNumber.trim() || null,
+          general_manager_name: gmName.trim() || null,
+          general_manager_email: gmEmail.trim() || null,
+          general_manager_phone: gmPhone.trim() || mainPhone.trim() || null,
+          contact_person_name: gmName.trim() || null,
+          contact_person_email: gmEmail.trim() || null,
+          base_price: monthlyPrice || 0,
+          monthly_price: monthlyPrice,
+          onboarding_date: onboardingDate,
+          ray_baud_and_logs_enabled: isE911Verified,
+          ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
+          billing_status: isBillingDone ? 'BILLING_DONE' : 'BILLING_PENDING',
+          billed_date: resolvedBilledDate,
+          connectivity_type: connectivityType,
+          server_id: resolvedServerId,
+          vendor_id: resolvedVendorId,
+          status: 'ACTIVE',
+        };
+
+        let { data: newProp, error: insertPropErr } = await dbClient
           .from('properties')
-          .insert({
-            name: propertyName.trim(),
-            address: loc.address,
-            city: loc.city,
-            state: loc.state,
-            zip_code: loc.zip_code,
-            country: loc.country,
-            main_phone: mainPhone.trim() || null,
-            general_manager_name: gmName.trim() || null,
-            general_manager_email: gmEmail.trim() || null,
-            contact_person_name: gmName.trim() || null,
-            contact_person_email: gmEmail.trim() || null,
-            base_price: monthlyPrice || 0,
-            monthly_price: monthlyPrice,
-            onboarding_date: onboardingDate,
-            ray_baud_and_logs_enabled: isE911Verified || isRayBaumActive,
-            ray_baum_status: isRayBaumActive ? 'ACTIVE' : 'INACTIVE',
-            status: 'ACTIVE',
-          })
+          .insert(insertPayload)
           .select()
           .single();
+
+        if (insertPropErr && insertPropErr.message && (insertPropErr.message.includes('server_id') || insertPropErr.message.includes('vendor_id'))) {
+          delete insertPayload.server_id;
+          delete insertPayload.vendor_id;
+          const retry = await dbClient.from('properties').insert(insertPayload).select().single();
+          newProp = retry.data;
+          insertPropErr = retry.error;
+        }
 
         if (insertPropErr || !newProp) {
           throw new Error(insertPropErr?.message || 'Failed to insert property record');
         }
 
-        // B. Handle Management Group linking
+        // Link organization
         let orgId: string | null = null;
-        let orgName = mgmtGroup.trim();
+        const orgName = mgmtGroup.trim();
 
         if (orgName) {
           const lowerName = orgName.toLowerCase();
           if (orgsMap.has(lowerName)) {
             orgId = orgsMap.get(lowerName)!;
           } else {
-            // Create organization if it does not already exist
             const { data: createdOrg, error: createOrgErr } = await dbClient
               .from('organizations')
-              .insert({
-                name: orgName,
-                type: 'GROUP',
-                status: 'ACTIVE',
-              })
+              .insert({ name: orgName, type: 'GROUP', status: 'ACTIVE' })
               .select('id, name')
               .single();
 
@@ -428,20 +388,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // C. Link to Organization Properties and set Onboarding status to COMPLETED (Onboarded)
         if (orgId) {
           const { data: newOp, error: opErr } = await dbClient
             .from('organization_properties')
-            .insert({
-              organization_id: orgId,
-              property_id: newProp.id,
-              status: 'ACTIVE',
-            })
+            .insert({ organization_id: orgId, property_id: newProp.id, status: 'ACTIVE' })
             .select('id')
             .single();
 
           if (!opErr && newOp) {
-            // Guarantee status is "Onboarded" via COMPLETED onboarding record
             await dbClient.from('onboardings').insert({
               organization_property_id: newOp.id,
               status: 'COMPLETED',
@@ -449,7 +403,6 @@ export async function POST(request: NextRequest) {
               target_date: onboardingDate,
             });
 
-            // Insert E911 dispatch record
             await dbClient.from('e911_records').insert({
               organization_property_id: newOp.id,
               emergency_address: `${loc.address}, ${loc.city}, ${loc.state} ${loc.zip_code}`,
@@ -485,18 +438,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Central Audit Log
     if (importedProperties.length > 0) {
       await logAuditEvent({
         action: 'PROPERTIES_IMPORTED',
         entity_type: 'PROPERTY',
         entity_id: importedProperties[0].id,
         entity_name: `${importedProperties.length} Properties Batch Import`,
-        changes: {
-          imported_count: importedProperties.length,
-          failed_count: errors.length,
-          total_processed: rawRows.length,
-        },
+        changes: { imported_count: importedProperties.length, failed_count: errors.length, total_processed: rawRows.length },
       });
     }
 

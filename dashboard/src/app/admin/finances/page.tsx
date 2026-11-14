@@ -12,6 +12,7 @@ import {
   Radio,
   Users,
   FileText,
+  PieChart,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -24,6 +25,7 @@ import {
 import FinancesKpisAndCharts from './_components/FinancesKpisAndCharts';
 import FinancesLedgerTable from './_components/FinancesLedgerTable';
 import FinancesModals from './_components/FinancesModals';
+import { RevenueStreamsTab } from './_components/RevenueStreamsTab';
 
 export default function AdminFinancesPage() {
   const router = useRouter();
@@ -34,6 +36,7 @@ export default function AdminFinancesPage() {
   const defaultMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   // State
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'REVENUE_STREAMS'>('OVERVIEW');
   const [invoicesMonth, setInvoicesMonth] = useState(defaultMonthKey);
   const [data, setData] = useState<any>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -57,10 +60,11 @@ export default function AdminFinancesPage() {
     }
   }, [authLoading, isSuperAdmin, router]);
 
-  const fetchFinances = async () => {
+  const fetchFinances = async (monthOverride?: string) => {
     try {
       setDataLoading(true);
-      const res = await fetch(`/api/admin/finances`);
+      const targetMonth = monthOverride || invoicesMonth;
+      const res = await fetch(`/api/admin/finances?month=${targetMonth}`);
       const json = await res.json();
       if (json.success) {
         setData(json);
@@ -225,26 +229,87 @@ export default function AdminFinancesPage() {
         </div>
       </motion.div>
 
-      {/* Row 1-4 & 6: KPIs & Charts */}
-      <FinancesKpisAndCharts
-        monthlyDataMap={monthlyDataMap}
-        defaultMonthData={defaultMonthData}
-        availableMonths={availableMonths}
-        defaultMonthKey={defaultMonthKey}
-        nowYear={now.getFullYear()}
-      />
+      {/* Primary Tab Navigation */}
+      <motion.div variants={itemVariants} className="flex items-center gap-2 border-b border-slate-200 dark:border-[#222430] pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('OVERVIEW')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'OVERVIEW'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white dark:bg-[#15161c] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#222430]'
+          }`}
+        >
+          <DollarSign className="w-4 h-4" />
+          Financial Overview &amp; Partner Ledger
+        </button>
 
-      {/* Row 5: Partner Invoices Table */}
-      <FinancesLedgerTable
-        invoicesMonth={invoicesMonth}
-        setInvoicesMonth={setInvoicesMonth}
-        invoicesDataObj={invoicesDataObj}
-        invoicesItems={invoicesItems}
-        finEmailQueueStates={finEmailQueueStates}
-        finDispatchingIds={finDispatchingIds}
-        handleSendFinInvoiceEmail={handleSendFinInvoiceEmail}
-        availableMonths={availableMonths}
-      />
+        <button
+          type="button"
+          onClick={() => setActiveTab('REVENUE_STREAMS')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'REVENUE_STREAMS'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white dark:bg-[#15161c] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#222430]'
+          }`}
+        >
+          <PieChart className="w-4 h-4" />
+          Revenue Streams (Porting vs. Data Circuits)
+          {data?.revenueStreams && (
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                activeTab === 'REVENUE_STREAMS'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {data.revenueStreams.summary.circuitPercentage}% circuits
+            </span>
+          )}
+        </button>
+      </motion.div>
+
+      {/* Tab 1: Financial Overview & Partner Invoices */}
+      {activeTab === 'OVERVIEW' && (
+        <>
+          {/* Row 1-4 & 6: KPIs & Charts */}
+          <FinancesKpisAndCharts
+            monthlyDataMap={monthlyDataMap}
+            defaultMonthData={defaultMonthData}
+            availableMonths={availableMonths}
+            defaultMonthKey={defaultMonthKey}
+            nowYear={now.getFullYear()}
+          />
+
+          {/* Row 5: Partner Invoices Table */}
+          <FinancesLedgerTable
+            invoicesMonth={invoicesMonth}
+            setInvoicesMonth={(m) => {
+              setInvoicesMonth(m);
+              fetchFinances(m);
+            }}
+            invoicesDataObj={invoicesDataObj}
+            invoicesItems={invoicesItems}
+            finEmailQueueStates={finEmailQueueStates}
+            finDispatchingIds={finDispatchingIds}
+            handleSendFinInvoiceEmail={handleSendFinInvoiceEmail}
+            availableMonths={availableMonths}
+          />
+        </>
+      )}
+
+      {/* Tab 2: Revenue Streams (Porting vs. Data Circuits) */}
+      {activeTab === 'REVENUE_STREAMS' && (
+        <RevenueStreamsTab
+          data={data?.revenueStreams || null}
+          selectedMonth={invoicesMonth}
+          onSelectMonth={(m) => {
+            setInvoicesMonth(m);
+            fetchFinances(m);
+          }}
+          availableMonths={availableMonths}
+        />
+      )}
 
       {/* Back-Order Invoice Modal */}
       <FinancesModals

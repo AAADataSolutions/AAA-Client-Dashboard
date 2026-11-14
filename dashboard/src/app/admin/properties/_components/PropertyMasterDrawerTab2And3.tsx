@@ -3,16 +3,15 @@
 import React from 'react';
 import {
   Plus,
-  ShieldCheck,
   PhoneCall,
   Loader2,
   Check,
   Trash2,
   Copy,
-  ExternalLink,
 } from 'lucide-react';
 import { PropertyRecord } from '@/store/slices/propertiesSlice';
 import { DrawerTabType } from './types';
+import { PropertyMasterDrawerTab3E911 } from './PropertyMasterDrawerTab3E911';
 
 interface PropertyMasterDrawerTab2And3Props {
   drawerTab: DrawerTabType;
@@ -27,6 +26,7 @@ interface PropertyMasterDrawerTab2And3Props {
   handleCopy: (text: string, label: string) => void;
   handleDrawerUnassignService: (serviceId: string, serviceName: string) => void;
   unassigningServiceId: string | null;
+  onDataChanged?: () => void;
 }
 
 export function PropertyMasterDrawerTab2And3({
@@ -42,6 +42,7 @@ export function PropertyMasterDrawerTab2And3({
   handleCopy,
   handleDrawerUnassignService,
   unassigningServiceId,
+  onDataChanged,
 }: PropertyMasterDrawerTab2And3Props) {
   return (
     <>
@@ -189,102 +190,13 @@ export function PropertyMasterDrawerTab2And3({
         </div>
       )}
 
-      {/* TAB 3: E911 STATE */}
-      {drawerTab === 'E911' && (
-        <div className="space-y-4">
-          {/* E911 Big Status Banner */}
-          <div className="p-4 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-black text-slate-900 dark:text-white text-sm">
-                  E911 Routing &amp; PSAP Validation Status
-                </p>
-                <p className="text-xs text-emerald-700 dark:text-emerald-300 font-bold mt-0.5">
-                  Status: {propertyDrawerData?.e911?.property_e911_status || 'VERIFIED'}
-                </p>
-              </div>
-            </div>
-            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
-              PSAP Active
-            </span>
-          </div>
-
-          {/* Registered Emergency Address */}
-          <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-2">
-            <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
-              Registered Emergency Dispatchable Address
-            </span>
-            <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl text-xs space-y-1">
-              <p className="font-bold text-slate-900 dark:text-white text-sm">
-                {propertyDrawerData?.e911?.registered_address ||
-                  `${selectedPropForDrawer.address}, ${selectedPropForDrawer.city}, ${selectedPropForDrawer.state} ${selectedPropForDrawer.zip_code}`}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Matches property street location: <strong className="text-emerald-600">Yes (Geocoded)</strong>
-              </p>
-            </div>
-          </div>
-
-          {/* Ray Baum's Act & Kari's Law Compliance */}
-          <div className="p-4 bg-slate-50/80 dark:bg-[#111217] rounded-xl border border-slate-200/80 dark:border-[#222430] space-y-3">
-            <span className="font-bold text-black dark:text-white text-xs uppercase tracking-wider block pb-2 border-b border-slate-200/60 dark:border-[#222430]">
-              Ray Baum&apos;s Act &amp; Kari&apos;s Law Compliance Audit
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
-                <span className="text-[10px] text-slate-400 block">Dispatchable Location Status</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
-                  <Check className="w-3.5 h-3.5" /> Compliant &amp; Active
-                </span>
-              </div>
-              <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
-                <span className="text-[10px] text-slate-400 block">Direct 911 Dialing (Kari&apos;s Law)</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
-                  <Check className="w-3.5 h-3.5" /> No Prefix Required (911 Active)
-                </span>
-              </div>
-              <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
-                <span className="text-[10px] text-slate-400 block">Automated Notification Logs</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block">
-                  {propertyDrawerData?.e911?.ray_baud_and_logs_enabled ? 'Enabled (Instant SMS/Email)' : 'Disabled'}
-                </span>
-              </div>
-              <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
-                <span className="text-[10px] text-slate-400 block">PSAP Verification Timestamp</span>
-                <span className="font-mono text-slate-800 dark:text-slate-200 mt-0.5 block">
-                  {propertyDrawerData?.e911?.verified_at
-                    ? new Date(propertyDrawerData.e911.verified_at).toLocaleDateString()
-                    : 'System Verified'}
-                </span>
-              </div>
-            </div>
-
-            {propertyDrawerData?.e911?.correction_notes && (
-              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300">
-                <span className="font-bold block text-xs">PSAP Audit Correction Notes:</span>
-                <p className="mt-1 text-[11px]">{propertyDrawerData.e911.correction_notes}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Shortcut to E911 Hub */}
-          <div className="pt-2 flex justify-end">
-            <a
-              href="/admin/e911"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#222430] dark:hover:bg-[#2c2f3e] text-slate-800 dark:text-white rounded-xl font-bold flex items-center gap-1.5 transition"
-            >
-              <span>Open E911 Compliance Center</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-        </div>
-      )}
+      {/* TAB 3: E911 STATE (INLINE EDITING + AUDIT MANAGEMENT) */}
+      <PropertyMasterDrawerTab3E911
+        drawerTab={drawerTab}
+        selectedPropForDrawer={selectedPropForDrawer}
+        propertyDrawerData={propertyDrawerData}
+        onDataChanged={onDataChanged}
+      />
     </>
   );
 }
-

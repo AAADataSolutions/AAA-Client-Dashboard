@@ -23,7 +23,8 @@ export default function FinancesKpisAndCharts({
   nowYear,
 }: FinancesKpisAndChartsProps) {
   const [gmrMonth, setGmrMonth] = useState(defaultMonthKey);
-  const [revAddedMonth, setRevAddedMonth] = useState(defaultMonthKey);
+  const [revAddedVoiceMonth, setRevAddedVoiceMonth] = useState(defaultMonthKey);
+  const [revAddedInternetMonth, setRevAddedInternetMonth] = useState(defaultMonthKey);
   const [partnerOutflowMonth, setPartnerOutflowMonth] = useState(defaultMonthKey);
   const [nrvMonth, setNrvMonth] = useState(defaultMonthKey);
   const [netProfitMonth, setNetProfitMonth] = useState(defaultMonthKey);
@@ -52,7 +53,8 @@ export default function FinancesKpisAndCharts({
 
   // Data resolvers for each card
   const gmrData = monthlyDataMap[gmrMonth] || defaultMonthData || {};
-  const revAddedData = monthlyDataMap[revAddedMonth] || defaultMonthData || {};
+  const revAddedVoiceData = monthlyDataMap[revAddedVoiceMonth] || defaultMonthData || {};
+  const revAddedInternetData = monthlyDataMap[revAddedInternetMonth] || defaultMonthData || {};
   const partnerOutflowData = monthlyDataMap[partnerOutflowMonth] || defaultMonthData || {};
   const nrvData = monthlyDataMap[nrvMonth] || defaultMonthData || {};
   const netProfitData = monthlyDataMap[netProfitMonth] || defaultMonthData || {};
@@ -291,8 +293,10 @@ export default function FinancesKpisAndCharts({
         availableMonths={availableMonths}
         gmrMonth={gmrMonth}
         setGmrMonth={setGmrMonth}
-        revAddedMonth={revAddedMonth}
-        setRevAddedMonth={setRevAddedMonth}
+        revAddedVoiceMonth={revAddedVoiceMonth}
+        setRevAddedVoiceMonth={setRevAddedVoiceMonth}
+        revAddedInternetMonth={revAddedInternetMonth}
+        setRevAddedInternetMonth={setRevAddedInternetMonth}
         partnerOutflowMonth={partnerOutflowMonth}
         setPartnerOutflowMonth={setPartnerOutflowMonth}
         nrvMonth={nrvMonth}
@@ -306,7 +310,8 @@ export default function FinancesKpisAndCharts({
         cumulativeYtd={cumulativeYtd}
         setCumulativeYtd={setCumulativeYtd}
         gmrData={gmrData}
-        revAddedData={revAddedData}
+        revAddedVoiceData={revAddedVoiceData}
+        revAddedInternetData={revAddedInternetData}
         partnerOutflowData={partnerOutflowData}
         nrvData={nrvData}
         netProfitData={netProfitData}
