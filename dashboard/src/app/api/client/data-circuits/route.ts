@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         property_id,
-        property:properties(id, name, address, city, state, zip_code, main_phone)
+        property:properties(id, name, address, city, state, zip_code, main_phone, connectivity_type)
       `)
       .eq('organization_id', member.organization_id);
 
@@ -72,7 +72,6 @@ export async function GET(request: NextRequest) {
         id,
         property_id,
         status,
-        connectivity_type,
         carrier_name,
         bandwidth,
         circuit_monthly_price,
@@ -136,7 +135,7 @@ export async function GET(request: NextRequest) {
         property_name: prop?.name || 'Property',
         property_address: propAddress || '—',
         property_phone: prop?.main_phone || '',
-        connectivity_type: c.connectivity_type || 'DATA_CIRCUITED',
+        connectivity_type: prop?.connectivity_type || 'DATA_CIRCUITED',
         status: c.status || 'STARTED',
         carrier_name: c.carrier_name || 'Carrier Pending',
         bandwidth: c.bandwidth || '1 Gig',

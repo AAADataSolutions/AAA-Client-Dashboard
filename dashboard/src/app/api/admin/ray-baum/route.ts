@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { syncPropertyMonthlyPrice } from '@/lib/properties/pricing';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = createAdminClient() || supabase;
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const propertyId = searchParams.get('propertyId');
     const search = searchParams.get('search')?.trim();
 
-    let query = supabase
+    let query = db
       .from('ray_baum_records')
       .select(`
         *,
@@ -41,6 +52,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = createAdminClient() || supabase;
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const { property_id, phone_number, assigned_to_room, location, price } = body;
@@ -54,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const cleanPrice = price !== undefined && price !== '' && !isNaN(Number(price)) ? Math.max(0, Number(price)) : 0;
 
-    const { data: newRecord, error } = await supabase
+    const { data: newRecord, error } = await db
       .from('ray_baum_records')
       .insert({
         property_id,
@@ -74,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Automatically synchronize the property's total monthly price
-    await syncPropertyMonthlyPrice(supabase, property_id);
+    await syncPropertyMonthlyPrice(db, property_id);
 
     await logAuditEvent({
       action: 'RAY_BAUM_RECORD_CREATED',
@@ -93,6 +114,16 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = createAdminClient() || supabase;
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id, property_id, phone_number, assigned_to_room, location, price } = body;
 
@@ -111,7 +142,7 @@ export async function PATCH(request: NextRequest) {
       updatePayload.price = price === '' || isNaN(Number(price)) ? 0 : Math.max(0, Number(price));
     }
 
-    const { data: updatedRecord, error } = await supabase
+    const { data: updatedRecord, error } = await db
       .from('ray_baum_records')
       .update(updatePayload)
       .eq('id', id)
@@ -124,7 +155,7 @@ export async function PATCH(request: NextRequest) {
 
     // Automatically synchronize the property's total monthly price
     if (updatedRecord?.property_id) {
-      await syncPropertyMonthlyPrice(supabase, updatedRecord.property_id);
+      await syncPropertyMonthlyPrice(db, updatedRecord.property_id);
     }
 
     return NextResponse.json({ success: true, data: updatedRecord });
@@ -136,6 +167,16 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const db = createAdminClient() || supabase;
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -144,13 +185,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Get property_id before deletion to sync price
-    const { data: existingRec } = await supabase
+    const { data: existingRec } = await db
       .from('ray_baum_records')
       .select('property_id')
       .eq('id', id)
       .maybeSingle();
 
-    const { error } = await supabase.from('ray_baum_records').delete().eq('id', id);
+    const { error } = await db.from('ray_baum_records').delete().eq('id', id);
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
@@ -158,7 +199,7 @@ export async function DELETE(request: NextRequest) {
 
     // Automatically synchronize the property's total monthly price
     if (existingRec?.property_id) {
-      await syncPropertyMonthlyPrice(supabase, existingRec.property_id);
+      await syncPropertyMonthlyPrice(db, existingRec.property_id);
     }
 
     return NextResponse.json({ success: true, message: 'Record deleted successfully.' });

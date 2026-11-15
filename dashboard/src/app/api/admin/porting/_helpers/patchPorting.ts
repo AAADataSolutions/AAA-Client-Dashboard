@@ -116,6 +116,12 @@ export async function handlePatchPorting(request: NextRequest) {
       mergedDates[activeStageDateKey] = target_date || mergedDates.target_date || todayStr;
     }
 
+    const effectiveBillingStatus: string | undefined =
+      body.billing_status ??
+      (existingPr as any).billing_status ??
+      parsedMeta.stage_assignments?.billing_status ??
+      (isCompletedOrOnboarded ? 'BILLING_PENDING' : undefined);
+
     // Merge stage assignments into metadata
     const mergedAssignments: Record<string, any> = {
       ...parsedMeta.stage_assignments,
@@ -129,7 +135,7 @@ export async function handlePatchPorting(request: NextRequest) {
       ...(body.stage4_assigned_to_name !== undefined ? { stage4_assigned_to_name: body.stage4_assigned_to_name } : {}),
       ...(body.stage4_notes !== undefined ? { stage4_notes: body.stage4_notes } : {}),
       ...(body.stage_assignments !== undefined ? { all_stages: body.stage_assignments } : {}),
-      ...(body.billing_status !== undefined ? { billing_status: body.billing_status } : {}),
+      ...(effectiveBillingStatus !== undefined ? { billing_status: effectiveBillingStatus } : {}),
     };
 
     // Merge property details into metadata
@@ -242,6 +248,7 @@ export async function handlePatchPorting(request: NextRequest) {
       todayStr,
       mergedDates,
       mergedPropDetails,
+      effectiveBillingStatus,
     });
 
     await logAuditEvent({

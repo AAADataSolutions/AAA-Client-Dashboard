@@ -15,6 +15,7 @@ export async function syncRelatedPortingEntities(params: {
   todayStr: string;
   mergedDates: Record<string, any>;
   mergedPropDetails: Record<string, any>;
+  effectiveBillingStatus?: string;
 }) {
   const {
     db,
@@ -27,6 +28,7 @@ export async function syncRelatedPortingEntities(params: {
     todayStr,
     mergedDates,
     mergedPropDetails,
+    effectiveBillingStatus,
   } = params;
 
   const {
@@ -111,6 +113,11 @@ export async function syncRelatedPortingEntities(params: {
           onboarding_date: isCompletedOrOnboarded
             ? (live_cutover_date || completed_at || updated.completed_at || todayStr).slice(0, 10)
             : null,
+          billing_status: effectiveBillingStatus || 'BILLING_PENDING',
+          billed_date:
+            effectiveBillingStatus === 'BILLING_DONE'
+              ? (live_cutover_date || completed_at || updated.completed_at || todayStr).slice(0, 10)
+              : null,
         })
         .select('id')
         .single();
@@ -200,6 +207,11 @@ export async function syncRelatedPortingEntities(params: {
         onboarding_date: isCompletedOrOnboarded
           ? (live_cutover_date || completed_at || updated.completed_at || todayStr).slice(0, 10)
           : null,
+        billing_status: effectiveBillingStatus || 'BILLING_PENDING',
+        billed_date:
+          effectiveBillingStatus === 'BILLING_DONE'
+            ? (live_cutover_date || completed_at || updated.completed_at || todayStr).slice(0, 10)
+            : null,
       })
       .select('id')
       .single();
@@ -272,13 +284,14 @@ export async function syncRelatedPortingEntities(params: {
       propUpdate.onboarding_date = effectiveOnbDate.slice(0, 10);
     }
 
-    if (body.billing_status !== undefined) {
-      propUpdate.billing_status = body.billing_status;
+    const resolvedBillingStatus = body.billing_status ?? effectiveBillingStatus;
+    if (resolvedBillingStatus !== undefined) {
+      propUpdate.billing_status = resolvedBillingStatus;
       if (body.billed_date !== undefined) {
         propUpdate.billed_date = body.billed_date;
-      } else if (body.billing_status === 'BILLING_DONE') {
+      } else if (resolvedBillingStatus === 'BILLING_DONE') {
         propUpdate.billed_date = (live_cutover_date || completed_at || updated.completed_at || todayStr).slice(0, 10);
-      } else if (body.billing_status === 'BILLING_PENDING') {
+      } else if (resolvedBillingStatus === 'BILLING_PENDING') {
         propUpdate.billed_date = null;
       }
     } else if (body.billed_date !== undefined) {
@@ -288,7 +301,7 @@ export async function syncRelatedPortingEntities(params: {
 
     const { error: propUpdErr } = await db.from('properties').update(propUpdate).eq('id', propId);
     if (propUpdErr) {
-      // Fallback update with guaranteed core columns
+      // Fallback update with guaranteed core columns (preserving billing_status)
       const corePropUpdate: Record<string, any> = { updated_at: new Date().toISOString() };
       if (propUpdate.name !== undefined) corePropUpdate.name = propUpdate.name;
       if (propUpdate.address !== undefined) corePropUpdate.address = propUpdate.address;
@@ -300,7 +313,13 @@ export async function syncRelatedPortingEntities(params: {
       if (propUpdate.monthly_price !== undefined) corePropUpdate.monthly_price = propUpdate.monthly_price;
       if (propUpdate.status !== undefined) corePropUpdate.status = propUpdate.status;
       if (propUpdate.onboarding_date !== undefined) corePropUpdate.onboarding_date = propUpdate.onboarding_date;
-      await db.from('properties').update(corePropUpdate).eq('id', propId);
+      if (propUpdate.billing_status !== undefined) corePropUpdate.billing_status = propUpdate.billing_status;
+      if (propUpdate.billed_date !== undefined) corePropUpdate.billed_date = propUpdate.billed_date;
+      const { error: coreErr } = await db.from('properties').update(corePropUpdate).eq('id', propId);
+      if (coreErr && corePropUpdate.billed_date !== undefined) {
+        const { billed_date: _omitBilledDate, ...withoutBilledDate } = corePropUpdate;
+        await db.from('properties').update(withoutBilledDate).eq('id', propId);
+      }
     }
 
     // Sync e911_records if orgPropId exists
@@ -359,7 +378,9 @@ export async function syncRelatedPortingEntities(params: {
     if (body.stage4_notes !== undefined) obUpdate.stage4_notes = body.stage4_notes;
     if (attachments !== undefined) obUpdate.attachments = attachments;
     if (body.stage_assignments !== undefined) obUpdate.stage_assignments = body.stage_assignments;
-    if (body.billing_status !== undefined) obUpdate.billing_status = body.billing_status;
+    if ((body.billing_status ?? effectiveBillingStatus) !== undefined) {
+      obUpdate.billing_status = body.billing_status ?? effectiveBillingStatus;
+    }
     if (isCompletedOrOnboarded) obUpdate.completed_at = new Date().toISOString();
 
     const { data: existingOb } = await db

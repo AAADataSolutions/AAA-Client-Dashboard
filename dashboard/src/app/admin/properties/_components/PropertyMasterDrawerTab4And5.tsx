@@ -303,6 +303,13 @@ export function PropertyMasterDrawerTab4And5({
                     </div>
                   )}
 
+                  {currentCircuit.foc_pending_actions_notes && (
+                    <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg">
+                      <span className="text-[10px] text-slate-400 block mb-0.5">Pending Action Notes:</span>
+                      <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{currentCircuit.foc_pending_actions_notes}</p>
+                    </div>
+                  )}
+
                   <div className="p-2.5 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-lg flex items-center justify-between">
                     <span>Firm Order Commitment (FOC) Status:</span>
                     <span

@@ -86,6 +86,11 @@ export async function handlePostPorting(request: NextRequest) {
       general_manager_email: general_manager_email ? general_manager_email.trim() : null,
       ray_baud_and_logs_enabled: isE911,
       status: requestedStatus === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
+      billing_status: body.billing_status || 'BILLING_PENDING',
+      billed_date:
+        body.billing_status === 'BILLING_DONE'
+          ? (body.live_cutover_date || todayStr).slice(0, 10)
+          : null,
     };
 
     const { data: propData, error: propErr } = await db
@@ -116,6 +121,7 @@ export async function handlePostPorting(request: NextRequest) {
           general_manager_email: general_manager_email ? general_manager_email.trim() : null,
           ray_baud_and_logs_enabled: isE911,
           status: requestedStatus === 'COMPLETED' ? 'ACTIVE' : 'ONBOARDING',
+          billing_status: body.billing_status || 'BILLING_PENDING',
         })
         .select()
         .single();
@@ -197,6 +203,7 @@ export async function handlePostPorting(request: NextRequest) {
       },
       stage_assignments: {
         effective_stage: requestedStatus,
+        billing_status: body.billing_status || 'BILLING_PENDING',
         ...(body.assigned_to ? { assigned_to: body.assigned_to } : {}),
         ...(body.assigned_to_name ? { assigned_to_name: body.assigned_to_name } : {}),
         ...(body.stage_assignments ? { all_stages: body.stage_assignments } : {}),

@@ -183,10 +183,9 @@ export default function DataCircuitsAdminPage({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          circuit_id: circuit.id,
-          period_month: selectedMonth,
-          received: !currentReceived,
-          expected_amount: (Number(circuit.circuit_monthly_price || 0) * Number(circuit.revenue_share_percentage || 0)) / 100,
+          data_circuit_id: circuit.id,
+          month_key: selectedMonth,
+          revenue_received: !currentReceived,
         }),
       });
       const json = await res.json();

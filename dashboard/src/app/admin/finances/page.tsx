@@ -244,7 +244,7 @@ export default function AdminFinancesPage() {
           Financial Overview &amp; Partner Ledger
         </button>
 
-        <button
+        {/* <button
           type="button"
           onClick={() => setActiveTab('REVENUE_STREAMS')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -266,7 +266,7 @@ export default function AdminFinancesPage() {
               {data.revenueStreams.summary.circuitPercentage}% circuits
             </span>
           )}
-        </button>
+        </button> */}
       </motion.div>
 
       {/* Tab 1: Financial Overview & Partner Invoices */}
@@ -282,7 +282,7 @@ export default function AdminFinancesPage() {
           />
 
           {/* Row 5: Partner Invoices Table */}
-          <FinancesLedgerTable
+          {/* <FinancesLedgerTable
             invoicesMonth={invoicesMonth}
             setInvoicesMonth={(m) => {
               setInvoicesMonth(m);
@@ -294,7 +294,7 @@ export default function AdminFinancesPage() {
             finDispatchingIds={finDispatchingIds}
             handleSendFinInvoiceEmail={handleSendFinInvoiceEmail}
             availableMonths={availableMonths}
-          />
+          /> */}
         </>
       )}
 
