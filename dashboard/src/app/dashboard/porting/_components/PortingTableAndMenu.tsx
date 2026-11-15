@@ -102,7 +102,7 @@ export function PortingTableAndMenu({
                     item.status === 'IN_PROGRESS' ? 'PORTING_SUBMITTED' :
                     (item as any).stage || item.status || 'DRAFT'
                   );
-                  const badge = {
+                  const stageBadges: Record<string, { label: string; bg: string; text: string; border: string }> = {
                     DRAFT: { label: 'Draft initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' },
                     CONTRACT_SENT: { label: 'Contract sent', bg: 'bg-indigo-50 dark:bg-indigo-950/50', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-200 dark:border-indigo-800/50' },
                     SIGNED: { label: 'Contract signed', bg: 'bg-blue-50 dark:bg-blue-950/50', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800/50' },
@@ -111,7 +111,8 @@ export function PortingTableAndMenu({
                     PORTING_SUBMITTED: { label: 'Porting submitted', bg: 'bg-amber-50 dark:bg-amber-950/50', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800/50' },
                     FOC_RECEIVED: { label: 'FOC Confirm', bg: 'bg-sky-50 dark:bg-sky-950/50', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-200 dark:border-sky-800/50' },
                     COMPLETED: { label: 'Onboarding', bg: 'bg-emerald-50 dark:bg-emerald-950/50', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800/50' },
-                  }[normalizedStage] || { label: 'Draft initialized', bg: 'bg-slate-100 dark:bg-[#1a1c24]', text: 'text-slate-800 dark:text-slate-200', border: 'border-slate-200 dark:border-[#2a2c3a]' };
+                  };
+                  const badge = stageBadges[String(normalizedStage)] || stageBadges.DRAFT;
 
                   const locationStr = item.city
                     ? `${item.city}${item.state ? `, ${item.state}` : ''}`

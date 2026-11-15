@@ -351,7 +351,7 @@ export function PropertyMasterDrawerTab4And5({
                 circuit={currentCircuit}
                 propertyId={selectedPropForDrawer.id}
                 propertyName={selectedPropForDrawer.name}
-                connectivityType={selectedPropForDrawer.connectivity_type || 'BOTH'}
+                connectivityType={(selectedPropForDrawer.connectivity_type as 'PORTED' | 'DATA_CIRCUITED' | 'BOTH') || 'BOTH'}
                 onDataChanged={onDataChanged}
               />
 

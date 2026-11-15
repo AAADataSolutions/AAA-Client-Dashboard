@@ -175,7 +175,10 @@ interface PropertiesPaginationAndMenuProps {
     left: number;
     prop: PropertyRecord;
   } | null>>;
-  handleOpenPropertyDetails: (prop: PropertyRecord, tab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'ONBOARDING' | 'TICKETS') => void;
+  handleOpenPropertyDetails: (
+    prop: PropertyRecord,
+    tab?: 'OVERVIEW' | 'SERVICES' | 'E911' | 'TICKETS' | 'DATA_CIRCUIT' | 'PORTING_DOCS'
+  ) => void;
   handleOpenEditGM: (prop: PropertyRecord) => void;
 }
 

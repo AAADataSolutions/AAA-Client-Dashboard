@@ -172,10 +172,18 @@ export async function DELETE(
 
     // Also remove from porting_attachments table if it exists there
     if (attachmentId) {
-      await db.from('porting_attachments').delete().eq('id', attachmentId).catch(() => null);
+      try {
+        await db.from('porting_attachments').delete().eq('id', attachmentId);
+      } catch {
+        // ignore if table doesn't exist
+      }
     }
     if (storagePath) {
-      await db.from('porting_attachments').delete().eq('storage_path', storagePath).catch(() => null);
+      try {
+        await db.from('porting_attachments').delete().eq('storage_path', storagePath);
+      } catch {
+        // ignore if table doesn't exist
+      }
       // Attempt storage deletion
       await db.storage.from(BUCKET_NAME).remove([storagePath]).catch(() => null);
     }
