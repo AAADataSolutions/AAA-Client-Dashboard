@@ -190,7 +190,7 @@ export async function handleGetPortings(request: NextRequest) {
         ...(Array.isArray(ob?.attachments) ? ob.attachments : []),
         ...(Array.isArray(prop?.attachments) ? prop.attachments : []),
         ...(Array.isArray(metaAtts) ? metaAtts : []),
-      ];
+      ].flat(Infinity);
       const mergedAtts: any[] = [];
       rawAtts.forEach((att: any) => {
         if (!att || (!att.storage_path && !att.file_name)) return;

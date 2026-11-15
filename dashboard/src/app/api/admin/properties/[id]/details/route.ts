@@ -240,6 +240,10 @@ export async function GET(
     const portingDocsList: any[] = [];
     const seenStoragePaths = new Set<string>();
     const pushAttachment = (att: any) => {
+      if (Array.isArray(att)) {
+        att.forEach(pushAttachment);
+        return;
+      }
       if (!att || !att.storage_path) return;
       if (seenStoragePaths.has(att.storage_path)) return;
       seenStoragePaths.add(att.storage_path);

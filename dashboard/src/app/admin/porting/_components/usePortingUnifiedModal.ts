@@ -248,7 +248,11 @@ export function usePortingUnifiedModal({ loadData, showToast }: UsePortingUnifie
           const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
           const upJson = await upRes.json();
           if (upRes.ok && upJson.success && upJson.data) {
-            newlyUploadedAttachments.push(upJson.data);
+            if (Array.isArray(upJson.data)) {
+              newlyUploadedAttachments.push(...upJson.data);
+            } else {
+              newlyUploadedAttachments.push(upJson.data);
+            }
           } else {
             throw new Error(upJson.error || `Failed to upload ${file.name}`);
           }
@@ -301,7 +305,11 @@ export function usePortingUnifiedModal({ loadData, showToast }: UsePortingUnifie
           const upRes = await fetch('/api/admin/porting/attachment', { method: 'POST', body: fd });
           const upJson = await upRes.json();
           if (upRes.ok && upJson.success && upJson.data) {
-            newlyUploadedAttachments.push(upJson.data);
+            if (Array.isArray(upJson.data)) {
+              newlyUploadedAttachments.push(...upJson.data);
+            } else {
+              newlyUploadedAttachments.push(upJson.data);
+            }
           } else {
             throw new Error(upJson.error || `Failed to upload ${file.name}`);
           }
