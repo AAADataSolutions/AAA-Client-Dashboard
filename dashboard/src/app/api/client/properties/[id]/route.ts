@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   request: NextRequest,
@@ -86,6 +87,72 @@ export async function GET(
       prop.ray_baum_status && String(prop.ray_baum_status).trim().toUpperCase() === 'ACTIVE'
     );
 
+    // Collect deduplicated porting attachments from properties, onboardings, and porting_requests
+    const portingDocsList: any[] = [];
+    const seenStoragePaths = new Set<string>();
+    const pushAttachment = (att: any) => {
+      if (!att || !att.storage_path) return;
+      if (seenStoragePaths.has(att.storage_path)) return;
+      seenStoragePaths.add(att.storage_path);
+      portingDocsList.push({
+        id: att.id || att.storage_path,
+        file_name: att.file_name || att.storage_path.split('/').pop() || 'Document',
+        file_size: Number(att.file_size || 0),
+        mime_type: att.mime_type || 'application/octet-stream',
+        storage_path: att.storage_path,
+        created_at: att.created_at || prop.created_at,
+      });
+    };
+
+    if (Array.isArray(prop.attachments)) {
+      prop.attachments.forEach(pushAttachment);
+    }
+    if (Array.isArray(onboardingRecord?.attachments)) {
+      onboardingRecord.attachments.forEach(pushAttachment);
+    }
+
+    const dbClient = createAdminClient() || supabase;
+    const { data: orgPortingReqs } = await dbClient
+      .from('porting_requests')
+      .select(`
+        id,
+        property_id,
+        organization_property_id,
+        property_name,
+        notes,
+        attachments,
+        porting_attachments(id, file_name, file_size, mime_type, storage_path, created_at)
+      `)
+      .eq('organization_id', member.organization_id);
+
+    const propNameClean = (prop.name || '').trim().toLowerCase();
+    (orgPortingReqs || []).forEach((pr: any) => {
+      const isMatchByPropId = pr.property_id && pr.property_id === id;
+      const isMatchByOpId = pr.organization_property_id && pr.organization_property_id === orgProp.id;
+      const isMatchByName = pr.property_name && pr.property_name.trim().toLowerCase() === propNameClean;
+      if (isMatchByPropId || isMatchByOpId || isMatchByName) {
+        if (Array.isArray(pr.porting_attachments)) {
+          pr.porting_attachments.forEach(pushAttachment);
+        }
+        if (Array.isArray(pr.attachments)) {
+          pr.attachments.forEach(pushAttachment);
+        }
+        if (typeof pr.notes === 'string') {
+          const metaMatch = pr.notes.match(/<!--METADATA:([\s\S]*?)-->/);
+          if (metaMatch) {
+            try {
+              const meta = JSON.parse(metaMatch[1]);
+              if (Array.isArray(meta?.attachments)) {
+                meta.attachments.forEach(pushAttachment);
+              }
+            } catch {
+              // ignore invalid metadata JSON
+            }
+          }
+        }
+      }
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -100,7 +167,7 @@ export async function GET(
         data_circuits: dcList || [],
         ray_baum_status: isRayBaumActive ? 'Active' : 'Inactive',
         is_ray_baum_active: isRayBaumActive,
-        porting_attachments: Array.isArray(prop.attachments) ? prop.attachments : [],
+        porting_attachments: portingDocsList,
       },
     });
   } catch (err: any) {

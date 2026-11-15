@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
 
-const BUCKET_CANDIDATES = ['onboarding-attachments', 'porting-attachments', 'attachments'];
+const BUCKET_CANDIDATES = ['data-circuit-agreements', 'porting-attachments', 'onboarding-attachments', 'attachments'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     let uploadedBucket: string | null = null;
 
-    // Ensure at least one bucket works (create 'onboarding-attachments' if needed)
+    // Ensure at least one bucket works (create 'data-circuit-agreements' if needed)
     for (const bucket of BUCKET_CANDIDATES) {
       const { error: upErr } = await db.storage.from(bucket).upload(storagePath, fileBuffer, {
         contentType: file.type || 'application/pdf',
@@ -91,16 +91,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!uploadedBucket) {
-      // Attempt to create 'onboarding-attachments' bucket via adminClient and retry
-      await db.storage.createBucket('onboarding-attachments', { public: false }).catch(() => null);
+      // Attempt to create 'data-circuit-agreements' bucket via adminClient and retry
+      await db.storage.createBucket('data-circuit-agreements', { public: false }).catch(() => null);
       const { error: retryErr } = await db.storage
-        .from('onboarding-attachments')
+        .from('data-circuit-agreements')
         .upload(storagePath, fileBuffer, {
           contentType: file.type || 'application/pdf',
           upsert: true,
         });
       if (!retryErr) {
-        uploadedBucket = 'onboarding-attachments';
+        uploadedBucket = 'data-circuit-agreements';
       }
     }
 

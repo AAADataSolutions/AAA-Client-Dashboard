@@ -268,6 +268,7 @@ export async function GET(
         property_id,
         organization_property_id,
         property_name,
+        notes,
         attachments,
         porting_attachments(id, file_name, file_size, mime_type, storage_path, created_at)
       `);
@@ -283,6 +284,19 @@ export async function GET(
         }
         if (Array.isArray(pr.attachments)) {
           pr.attachments.forEach(pushAttachment);
+        }
+        if (typeof pr.notes === 'string') {
+          const metaMatch = pr.notes.match(/<!--METADATA:([\s\S]*?)-->/);
+          if (metaMatch) {
+            try {
+              const meta = JSON.parse(metaMatch[1]);
+              if (Array.isArray(meta?.attachments)) {
+                meta.attachments.forEach(pushAttachment);
+              }
+            } catch {
+              // ignore invalid metadata JSON
+            }
+          }
         }
       }
     });
