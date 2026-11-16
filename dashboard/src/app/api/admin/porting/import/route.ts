@@ -92,11 +92,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Fetch existing organizations and partners for lookup
-    const [{ data: orgs }, { data: partners }] = await Promise.all([
+    // 1. Fetch existing organizations, partners, and porting requests for lookup
+    const [{ data: orgs }, { data: partners }, { data: existingPortings }] = await Promise.all([
       db.from('organizations').select('id, name, type'),
       db.from('partners').select('id, name, company_name, default_commission_rate'),
+      db.from('porting_requests').select('*'),
     ]);
+
+    const existingPortingMap = new Map<string, any>();
+    (existingPortings || []).forEach((pr: any) => {
+      if (pr.property_name) existingPortingMap.set(pr.property_name.trim().toLowerCase(), pr);
+    });
 
     const orgMap = new Map<string, { id: string; name: string; type: string }>();
     (orgs || []).forEach((o) => {
@@ -277,6 +283,62 @@ export async function POST(request: NextRequest) {
         rayBaumRaw === 'TRUE';
 
       try {
+        const existingPr = existingPortingMap.get(propertyName.toLowerCase());
+        if (existingPr) {
+          const isBlank = (v: any, placeholders: string[] = []) => {
+            if (v === null || v === undefined) return true;
+            const s = String(v).trim();
+            return s === '' || placeholders.includes(s);
+          };
+
+          const prUpdate: Record<string, any> = {};
+          const formattedAddr = `${fullAddress}${finalCity !== 'Pending' ? `, ${finalCity}, ${finalState} ${finalZip}` : ''}`;
+          if (isBlank(existingPr.property_address, ['Address pending']) && !isBlank(formattedAddr, ['Address pending'])) {
+            prUpdate.property_address = formattedAddr;
+          }
+          if (isBlank(existingPr.property_phone) && propertyPhone) prUpdate.property_phone = propertyPhone;
+          if (isBlank(existingPr.fax) && fax) prUpdate.fax = fax;
+          if (isBlank(existingPr.carrier_details) && carrierDetails) prUpdate.carrier_details = carrierDetails;
+          if (isBlank(existingPr.target_date) && targetDate) prUpdate.target_date = targetDate;
+          if (!existingPr.organization_id && matchedOrg) prUpdate.organization_id = matchedOrg.id;
+
+          if (Object.keys(prUpdate).length > 0) {
+            prUpdate.updated_at = new Date().toISOString();
+            await db.from('porting_requests').update(prUpdate).eq('id', existingPr.id);
+          }
+
+          if (existingPr.property_id) {
+            const { data: existingProp } = await db
+              .from('properties')
+              .select('*')
+              .eq('id', existingPr.property_id)
+              .maybeSingle();
+
+            if (existingProp) {
+              const propUpdate: Record<string, any> = {};
+              if (isBlank(existingProp.address, ['Address pending']) && !isBlank(fullAddress, ['Address pending'])) propUpdate.address = fullAddress;
+              if (isBlank(existingProp.city, ['City', 'Pending']) && !isBlank(finalCity, ['City', 'Pending'])) propUpdate.city = finalCity;
+              if (isBlank(existingProp.state) && finalState) propUpdate.state = finalState;
+              if (isBlank(existingProp.zip_code, ['00000']) && !isBlank(finalZip, ['00000'])) propUpdate.zip_code = finalZip;
+              if (isBlank(existingProp.main_phone) && propertyPhone) propUpdate.main_phone = propertyPhone;
+              if (isBlank(existingProp.fax) && fax) propUpdate.fax = fax;
+              if ((!existingProp.monthly_price || Number(existingProp.monthly_price) === 0) && monthlyPrice) propUpdate.monthly_price = monthlyPrice;
+              if (!existingProp.partner_id && matchedPartner) propUpdate.partner_id = matchedPartner.id;
+              if (isBlank(existingProp.general_manager_name) && gmName) propUpdate.general_manager_name = gmName;
+              if (isBlank(existingProp.general_manager_phone) && gmPhone) propUpdate.general_manager_phone = gmPhone;
+              if (isBlank(existingProp.general_manager_email) && gmEmail) propUpdate.general_manager_email = gmEmail;
+
+              if (Object.keys(propUpdate).length > 0) {
+                propUpdate.updated_at = new Date().toISOString();
+                await db.from('properties').update(propUpdate).eq('id', existingProp.id);
+              }
+            }
+          }
+
+          results.imported++;
+          continue;
+        }
+
         let createdOpId: string | null = null;
 
         if (matchedOrg) {

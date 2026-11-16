@@ -68,21 +68,23 @@ export default function DataCircuitsTable({
               <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Client Price</th>
               <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Revenue Share</th>
               <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Stage</th>
-              <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Monthly revenue</th>
+              {activeViewTab === 'INSTALLED' && (
+                <th className="py-3.5 px-4 text-black dark:text-white font-black whitespace-nowrap">Monthly revenue</th>
+              )}
               <th className="py-3.5 px-4 text-black dark:text-white font-black text-right whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-[#222430] text-sm">
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-slate-400">
+                <td colSpan={activeViewTab === 'INSTALLED' ? 8 : 7} className="py-16 text-center text-slate-400">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
                   Loading Data Circuits...
                 </td>
               </tr>
             ) : displayedCircuits.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-slate-500">
+                <td colSpan={activeViewTab === 'INSTALLED' ? 8 : 7} className="py-16 text-center text-slate-500">
                   <Network className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
                   <p className="font-bold text-slate-700 dark:text-slate-200">
                     {activeViewTab === 'INSTALLED'
@@ -166,43 +168,45 @@ export default function DataCircuitsTable({
                       </span>
                     </td>
 
-                    {/* Monthly revenue */}
-                    <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          disabled={togglingCircuitId === c.id}
-                          onClick={() => onToggleMonthlyRevenue(c.id, true)}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                            isRec
-                              ? 'bg-emerald-600 text-white shadow-xs'
-                              : 'bg-slate-100 dark:bg-[#1e202b] text-slate-600 dark:text-slate-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
-                          }`}
-                        >
-                          Yes
-                        </button>
-                        <button
-                          disabled={togglingCircuitId === c.id}
-                          onClick={() => onToggleMonthlyRevenue(c.id, false)}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                            !isRec
-                              ? 'bg-rose-600 text-white shadow-xs'
-                              : 'bg-slate-100 dark:bg-[#1e202b] text-slate-600 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
-                          }`}
-                        >
-                          No
-                        </button>
-                      </div>
-                      <span className="text-xs text-slate-400 block mt-1">
-                        {isRec
-                          ? `Added ${formatCurrency(c.monthly_revenue_share_amount)}`
-                          : `Pending (${selectedMonth})`}
-                      </span>
-                      {Number(c.times_paid_count || 0) > 0 && (
-                        <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
-                          Paid {c.times_paid_count}x ({formatCurrency(c.total_revenue_paid)} total)
+                    {/* Monthly revenue (Installed only) */}
+                    {activeViewTab === 'INSTALLED' && (
+                      <td className="py-3.5 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            disabled={togglingCircuitId === c.id}
+                            onClick={() => onToggleMonthlyRevenue(c.id, true)}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                              isRec
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-100 dark:bg-[#1e202b] text-slate-600 dark:text-slate-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                            }`}
+                          >
+                            Yes
+                          </button>
+                          <button
+                            disabled={togglingCircuitId === c.id}
+                            onClick={() => onToggleMonthlyRevenue(c.id, false)}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                              !isRec
+                                ? 'bg-rose-600 text-white shadow-xs'
+                                : 'bg-slate-100 dark:bg-[#1e202b] text-slate-600 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                            }`}
+                          >
+                            No
+                          </button>
+                        </div>
+                        <span className="text-xs text-slate-400 block mt-1">
+                          {isRec
+                            ? `Added ${formatCurrency(c.monthly_revenue_share_amount)}`
+                            : `Pending (${selectedMonth})`}
                         </span>
-                      )}
-                    </td>
+                        {Number(c.times_paid_count || 0) > 0 && (
+                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                            Paid {c.times_paid_count}x ({formatCurrency(c.total_revenue_paid)} total)
+                          </span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>

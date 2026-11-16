@@ -293,7 +293,8 @@ export default function DataCircuitsAdminPage({
           onExportCsv={() => {
             exportDataCircuitsToCsv(
               displayedCircuits,
-              activeViewTab === 'INSTALLED' ? 'data-circuits-installed' : 'data-circuits-pipeline'
+              activeViewTab === 'INSTALLED' ? 'data-circuits-installed' : 'data-circuits-pipeline',
+              activeViewTab
             );
             showToast(
               'Exported CSV',
@@ -366,6 +367,7 @@ export default function DataCircuitsAdminPage({
       <ImportDataCircuitsModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
+        activeViewTab={activeViewTab}
         existingCircuitPropertyNames={circuits.map((c) => c.property_name).filter(Boolean)}
         onSuccess={() => {
           fetchCircuitsData();

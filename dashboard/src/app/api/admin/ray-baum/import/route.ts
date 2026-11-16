@@ -84,28 +84,39 @@ export async function POST(request: NextRequest) {
         // Upsert record: check if phone_number already exists for this property
         const { data: existing } = await db
           .from('ray_baum_records')
-          .select('id')
+          .select('id, assigned_to_room, location, price')
           .eq('property_id', property_id)
           .eq('phone_number', phone)
           .maybeSingle();
 
         if (existing) {
-          const { data: updated, error: uErr } = await db
-            .from('ray_baum_records')
-            .update({
-              assigned_to_room: room || null,
-              location: location || null,
-              price,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id)
-            .select()
-            .single();
+          const blankUpdate: Record<string, any> = {};
+          if ((!existing.assigned_to_room || String(existing.assigned_to_room).trim() === '') && room) {
+            blankUpdate.assigned_to_room = room;
+          }
+          if ((!existing.location || String(existing.location).trim() === '') && location) {
+            blankUpdate.location = location;
+          }
+          if ((existing.price === null || existing.price === undefined || Number(existing.price) === 0) && price > 0) {
+            blankUpdate.price = price;
+          }
 
-          if (uErr) {
-            failedRows.push({ row: rowNumber, phone, reason: uErr.message });
+          if (Object.keys(blankUpdate).length > 0) {
+            blankUpdate.updated_at = new Date().toISOString();
+            const { data: updated, error: uErr } = await db
+              .from('ray_baum_records')
+              .update(blankUpdate)
+              .eq('id', existing.id)
+              .select()
+              .single();
+
+            if (uErr) {
+              failedRows.push({ row: rowNumber, phone, reason: uErr.message });
+            } else {
+              successfulRows.push(updated);
+            }
           } else {
-            successfulRows.push(updated);
+            successfulRows.push(existing);
           }
         } else {
           const { data: inserted, error: iErr } = await db

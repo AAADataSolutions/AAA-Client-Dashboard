@@ -49,7 +49,7 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
                 PROPERTY
               </th>
               <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                MONTHLY PRICE
+                VOICE MONTHLY PRICE
               </th>
               <th className="py-3 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 MAIN PHONE NO.
@@ -112,7 +112,7 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
                             if (connType === 'BOTH') {
                               return (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
-                                  Ported &amp; Data Circuited
+                                  Voice Services &amp; Data Circuited
                                 </span>
                               );
                             }
@@ -125,7 +125,7 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
                             }
                             return (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                Ported
+                                Voice Services
                               </span>
                             );
                           })()}
@@ -300,7 +300,7 @@ export const PropertiesTableView: React.FC<PropertiesTableViewProps> = ({
                       </div>
                     ) : (
                       <span className="text-slate-400 text-[11px] italic">
-                        Ported Only
+                        No data circuit services
                       </span>
                     )}
                   </td>

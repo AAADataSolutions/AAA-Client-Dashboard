@@ -64,7 +64,7 @@ export function PortingTable({
             <thead>
               <tr className="border-b border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-900 dark:text-white font-extrabold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY</th>
-                {isSuperAdmin && <th className="py-3 px-4 whitespace-nowrap">MONTHLY PRICE</th>}
+                {isSuperAdmin && <th className="py-3 px-4 whitespace-nowrap">VOICE MONTHLY PRICE</th>}
                 <th className="py-3 px-4 whitespace-nowrap">PROPERTY STATUS</th>
                 <th className="py-3 px-4 whitespace-nowrap">MAIN PHONE NO.</th>
                 <th className="py-3 px-4 whitespace-nowrap">CLIENT</th>

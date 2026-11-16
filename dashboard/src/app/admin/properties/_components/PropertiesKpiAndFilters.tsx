@@ -119,7 +119,29 @@ export function PropertiesKpiAndFilters({
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => {
+            onClick={async () => {
+              let exportList: PropertyRecord[] = properties;
+              try {
+                const params = new URLSearchParams({
+                  page: '1',
+                  limit: '5000',
+                  search: filters?.searchQuery || '',
+                  orgId: filters?.selectedOrg || filters?.orgId || 'ALL',
+                  status: filters?.selectedStatus || 'ALL',
+                  e911: filters?.selectedE911 || 'ALL',
+                  rayBaum: filters?.rayBaum || 'ALL',
+                  billingStatus: filters?.billingStatus || 'ALL',
+                  sortBy: filters?.sortBy || 'NAME_ASC',
+                });
+                const res = await fetch(`/api/admin/properties?${params.toString()}`);
+                const json = await res.json();
+                if (json.success && Array.isArray(json.data)) {
+                  exportList = json.data;
+                }
+              } catch {
+                // fallback to loaded properties if network request fails
+              }
+
               const headers = [
                 'Property Name',
                 'Street Address',
@@ -148,7 +170,7 @@ export function PropertiesKpiAndFilters({
                 const str = String(val).replace(/"/g, '""');
                 return `"${str}"`;
               };
-              const rows = properties.map((p: PropertyRecord) => {
+              const rows = exportList.map((p: PropertyRecord) => {
                 const orgName =
                   p.organization_name && p.organization_name !== 'Unassigned'
                     ? p.organization_name

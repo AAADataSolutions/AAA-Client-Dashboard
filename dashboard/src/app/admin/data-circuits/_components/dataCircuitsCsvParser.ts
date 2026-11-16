@@ -19,7 +19,7 @@ export interface ParsedDataCircuitRow {
   rawObj: Record<string, string>;
 }
 
-export const DATA_CIRCUIT_CSV_HEADERS = [
+export const DATA_CIRCUIT_PIPELINE_CSV_HEADERS = [
   'Property Name',
   'Property Address',
   'City',
@@ -32,33 +32,57 @@ export const DATA_CIRCUIT_CSV_HEADERS = [
   'Client Price',
   'Revenue Share',
   'Stage',
+];
+
+export const DATA_CIRCUIT_INSTALLED_CSV_HEADERS = [
+  ...DATA_CIRCUIT_PIPELINE_CSV_HEADERS,
   'Number of Times Monthly Revenue Paid',
 ];
 
-export function downloadDataCircuitsTemplate() {
+export const DATA_CIRCUIT_CSV_HEADERS = DATA_CIRCUIT_INSTALLED_CSV_HEADERS;
+
+export function downloadDataCircuitsTemplate(mode: 'PIPELINE' | 'INSTALLED' = 'INSTALLED') {
+  const headers =
+    mode === 'PIPELINE' ? DATA_CIRCUIT_PIPELINE_CSV_HEADERS : DATA_CIRCUIT_INSTALLED_CSV_HEADERS;
+
   const csvContent =
-    `${DATA_CIRCUIT_CSV_HEADERS.join(',')}\n` +
-    `"Grand Hyatt Downtown","123 Michigan Ave","Chicago","60601","USA","+1 (312) 555-0190","Wholesaler A","AT&T","1 Gig",400.00,"10%","Installed",5\n` +
-    `"Hilton Garden Inn Airport","456 Airport Way","Miami","33142","USA","+1 (305) 555-0180","Wholesaler B","Spectrum","500 Mbps",350.00,"12%","Quotation Sent",0\n` +
-    `"Marriott Resort & Spa","789 Ocean Blvd","San Diego","92109","USA","+1 (619) 555-0170","Wholesaler A","Verizon","1 Gig",600.00,"15%","Site Survey",2`;
+    mode === 'PIPELINE'
+      ? `${headers.join(',')}\n` +
+        `"Hilton Garden Inn Airport","456 Airport Way","Miami","33142","USA","+1 (305) 555-0180","Wholesaler B","Spectrum","500 Mbps",350.00,"12%","Quotation Sent"\n` +
+        `"Marriott Resort & Spa","789 Ocean Blvd","San Diego","92109","USA","+1 (619) 555-0170","Wholesaler A","Verizon","1 Gig",600.00,"15%","Site Survey"`
+      : `${headers.join(',')}\n` +
+        `"Grand Hyatt Downtown","123 Michigan Ave","Chicago","60601","USA","+1 (312) 555-0190","Wholesaler A","AT&T","1 Gig",400.00,"10%","Installed",5\n` +
+        `"Marriott Resort & Spa","789 Ocean Blvd","San Diego","92109","USA","+1 (619) 555-0170","Wholesaler A","Verizon","1 Gig",600.00,"15%","Installed",2`;
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', 'data_circuits_sample_template.csv');
+  link.setAttribute(
+    'download',
+    mode === 'PIPELINE'
+      ? 'data_circuits_pipeline_sample_template.csv'
+      : 'data_circuits_installed_sample_template.csv'
+  );
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-export function exportDataCircuitsToCsv(circuits: any[], filenamePrefix = 'data-circuits-export') {
+export function exportDataCircuitsToCsv(
+  circuits: any[],
+  filenamePrefix = 'data-circuits-export',
+  mode: 'PIPELINE' | 'INSTALLED' = 'INSTALLED'
+) {
   const escapeCsv = (val: any) => {
     if (val === null || val === undefined) return '""';
     const str = String(val).replace(/"/g, '""');
     return `"${str}"`;
   };
+
+  const headers =
+    mode === 'PIPELINE' ? DATA_CIRCUIT_PIPELINE_CSV_HEADERS : DATA_CIRCUIT_INSTALLED_CSV_HEADERS;
 
   const rows = circuits.map((c) => {
     const prop = c.property || {};
@@ -75,7 +99,7 @@ export function exportDataCircuitsToCsv(circuits: any[], filenamePrefix = 'data-
     const stage = c.status || 'STARTED';
     const timesPaid = Number(c.times_paid_count ?? (c.current_month_revenue?.revenue_received ? 1 : 0));
 
-    return [
+    const cols = [
       escapeCsv(c.property_name || prop.name || ''),
       escapeCsv(streetAddress),
       escapeCsv(city),
@@ -88,11 +112,16 @@ export function exportDataCircuitsToCsv(circuits: any[], filenamePrefix = 'data-
       escapeCsv(clientPrice),
       escapeCsv(revShare),
       escapeCsv(stage),
-      escapeCsv(timesPaid),
-    ].join(',');
+    ];
+
+    if (mode === 'INSTALLED') {
+      cols.push(escapeCsv(timesPaid));
+    }
+
+    return cols.join(',');
   });
 
-  const csvContent = `${DATA_CIRCUIT_CSV_HEADERS.join(',')}\n${rows.join('\n')}`;
+  const csvContent = `${headers.join(',')}\n${rows.join('\n')}`;
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

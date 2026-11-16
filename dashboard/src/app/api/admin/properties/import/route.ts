@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
       dbClient.from('organizations').select('id, name'),
       dbClient.from('servers').select('id, name'),
       dbClient.from('vendors').select('id, name'),
-      dbClient.from('properties').select('id, name'),
+      dbClient.from('properties').select('*'),
     ]);
     const orgsMap = new Map<string, string>();
     (allOrgs || []).forEach((o: any) => {
@@ -210,10 +210,11 @@ export async function POST(request: NextRequest) {
     (allVendors || []).forEach((v: any) => {
       if (v.name) vendorsMap.set(v.name.trim().toLowerCase(), v.id);
     });
-    const existingPropNames = new Set<string>();
+    const existingPropsMap = new Map<string, any>();
     (existingPropsData || []).forEach((p: any) => {
-      if (p.name) existingPropNames.add(p.name.trim().toLowerCase());
+      if (p.name) existingPropsMap.set(p.name.trim().toLowerCase(), p);
     });
+    const batchPropNames = new Set<string>();
 
     const importedProperties: any[] = [];
     const errors: { row: number; propertyName: string; reason: string }[] = [];
@@ -233,11 +234,12 @@ export async function POST(request: NextRequest) {
       }
 
       const normPropName = propertyName.trim().toLowerCase();
-      if (existingPropNames.has(normPropName)) {
-        errors.push({ row: rowNum, propertyName: propertyName.trim(), reason: 'Duplicate property name already exists' });
+      if (batchPropNames.has(normPropName)) {
+        errors.push({ row: rowNum, propertyName: propertyName.trim(), reason: 'Duplicate property name within CSV' });
         continue;
       }
-      existingPropNames.add(normPropName);
+      batchPropNames.add(normPropName);
+      const existingProp = existingPropsMap.get(normPropName);
 
       // 2. Street Address, City, State, Zip, Country
       const streetRaw = getHeaderValue(row, [
@@ -333,6 +335,102 @@ export async function POST(request: NextRequest) {
       const resolvedVendorId = vendorNameRaw ? (vendorsMap.get(vendorNameRaw.toLowerCase()) || null) : null;
 
       try {
+        if (existingProp) {
+          const isBlank = (v: any, placeholders: string[] = []) => {
+            if (v === null || v === undefined) return true;
+            const s = String(v).trim();
+            return s === '' || placeholders.includes(s);
+          };
+
+          const blankUpdate: Record<string, any> = {};
+          if (isBlank(existingProp.address, ['Address pending']) && !isBlank(loc.address, ['Address pending'])) blankUpdate.address = loc.address;
+          if (isBlank(existingProp.city, ['City']) && !isBlank(loc.city, ['City'])) blankUpdate.city = loc.city;
+          if (isBlank(existingProp.state) && !isBlank(loc.state)) blankUpdate.state = loc.state;
+          if (isBlank(existingProp.zip_code, ['00000']) && !isBlank(loc.zip_code, ['00000'])) blankUpdate.zip_code = loc.zip_code;
+          if (isBlank(existingProp.country) && !isBlank(loc.country)) blankUpdate.country = loc.country;
+          if (isBlank(existingProp.main_phone) && mainPhone.trim()) blankUpdate.main_phone = mainPhone.trim();
+          if (isBlank(existingProp.fax) && faxNumber.trim()) blankUpdate.fax = faxNumber.trim();
+          if (isBlank(existingProp.general_manager_name) && gmName.trim()) blankUpdate.general_manager_name = gmName.trim();
+          if (isBlank(existingProp.general_manager_email) && gmEmail.trim()) blankUpdate.general_manager_email = gmEmail.trim();
+          if (isBlank(existingProp.general_manager_phone) && (gmPhone.trim() || mainPhone.trim())) blankUpdate.general_manager_phone = gmPhone.trim() || mainPhone.trim();
+          if (isBlank(existingProp.contact_person_name) && gmName.trim()) blankUpdate.contact_person_name = gmName.trim();
+          if (isBlank(existingProp.contact_person_email) && gmEmail.trim()) blankUpdate.contact_person_email = gmEmail.trim();
+          if ((existingProp.monthly_price === null || existingProp.monthly_price === undefined || Number(existingProp.monthly_price) === 0) && monthlyPrice !== null) {
+            blankUpdate.monthly_price = monthlyPrice;
+            if (!existingProp.base_price) blankUpdate.base_price = monthlyPrice;
+          }
+          if (isBlank(existingProp.onboarding_date) && onboardingDate) blankUpdate.onboarding_date = onboardingDate;
+          if (isBlank(existingProp.billing_status)) blankUpdate.billing_status = isBillingDone ? 'BILLING_DONE' : 'BILLING_PENDING';
+          if (isBlank(existingProp.billed_date) && resolvedBilledDate) blankUpdate.billed_date = resolvedBilledDate;
+          if (isBlank(existingProp.connectivity_type)) blankUpdate.connectivity_type = connectivityType;
+          if (!existingProp.server_id && resolvedServerId) blankUpdate.server_id = resolvedServerId;
+          if (!existingProp.vendor_id && resolvedVendorId) blankUpdate.vendor_id = resolvedVendorId;
+
+          let updatedProp = existingProp;
+          if (Object.keys(blankUpdate).length > 0) {
+            blankUpdate.updated_at = new Date().toISOString();
+            const { data: upd, error: updErr } = await dbClient
+              .from('properties')
+              .update(blankUpdate)
+              .eq('id', existingProp.id)
+              .select()
+              .single();
+            if (!updErr && upd) {
+              updatedProp = upd;
+            }
+          }
+
+          // Link organization only if not already linked to any organization
+          if (mgmtGroup.trim()) {
+            const { data: existingOps } = await dbClient
+              .from('organization_properties')
+              .select('id')
+              .eq('property_id', existingProp.id)
+              .limit(1);
+
+            if (!existingOps || existingOps.length === 0) {
+              const lowerName = mgmtGroup.trim().toLowerCase();
+              let orgId = orgsMap.get(lowerName) || null;
+              if (!orgId) {
+                const { data: createdOrg } = await dbClient
+                  .from('organizations')
+                  .insert({ name: mgmtGroup.trim(), type: 'GROUP', status: 'ACTIVE' })
+                  .select('id, name')
+                  .single();
+                if (createdOrg) {
+                  orgId = createdOrg.id;
+                  orgsMap.set(lowerName, createdOrg.id);
+                }
+              }
+              if (orgId) {
+                await dbClient.from('organization_properties').insert({
+                  organization_id: orgId,
+                  property_id: existingProp.id,
+                  status: 'ACTIVE',
+                });
+              }
+            }
+          }
+
+          importedProperties.push({
+            id: updatedProp.id,
+            name: updatedProp.name,
+            address: updatedProp.address,
+            city: updatedProp.city,
+            state: updatedProp.state,
+            zip_code: updatedProp.zip_code,
+            monthly_price: updatedProp.monthly_price,
+            onboarding_date: updatedProp.onboarding_date || onboardingDate,
+            main_phone: updatedProp.main_phone,
+            organization_name: mgmtGroup.trim() || 'Unassigned',
+            onboarding_stage: 'Onboarded',
+            status: updatedProp.status || 'ACTIVE',
+            e911_status: updatedProp.ray_baud_and_logs_enabled ? 'VERIFIED' : 'AUDIT_REQUIRED',
+            ray_baum_status: updatedProp.ray_baum_status === 'ACTIVE' ? 'Active' : 'Inactive',
+          });
+          continue;
+        }
+
         const insertPayload: Record<string, any> = {
           name: propertyName.trim(),
           address: loc.address,

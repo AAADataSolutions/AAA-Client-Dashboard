@@ -167,7 +167,14 @@ export function usePortingData() {
   const handleExportCSV = async () => {
     try {
       setExportingCSV(true);
-      const res = await fetch('/api/admin/porting?limit=1000');
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '5000',
+        search: filters.searchQuery || '',
+        status: filters.selectedStatus || 'ALL',
+        sortBy: filters.sortBy || 'NEWEST',
+      });
+      const res = await fetch(`/api/admin/porting?${params.toString()}`);
       const json = await res.json();
       const list: PortingItem[] = json.success && json.data ? json.data : portings;
 

@@ -183,7 +183,7 @@ export function PropertyDrawerDataCircuitManager({
         <Wifi className="w-8 h-8 mx-auto text-slate-400" />
         <div>
           <p className="font-bold text-slate-900 dark:text-white text-sm">
-            Ported Only — No Data Circuit Attached
+            No Data Circuit Services
           </p>
           <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
             This property currently has Voice/DID services without an active dedicated Data Circuit pipeline.

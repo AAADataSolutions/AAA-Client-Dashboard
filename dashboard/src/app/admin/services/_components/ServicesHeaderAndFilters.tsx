@@ -60,9 +60,28 @@ export default function ServicesHeaderAndFilters({
   onOpenProvision,
   onToast,
 }: ServicesHeaderAndFiltersProps) {
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
+    let exportList: ServiceRecord[] = services;
+    try {
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '5000',
+        search: filters.searchQuery || '',
+        type: filters.selectedType || 'ALL',
+        status: filters.selectedStatus || 'ALL',
+        sortBy: filters.sortBy || 'NEWEST',
+      });
+      const res = await fetch(`/api/admin/services?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        exportList = json.data;
+      }
+    } catch {
+      // fallback to loaded services
+    }
+
     const headers = ['Service ID,Name,Number,Type,Organization,Property,Status\n'];
-    const rows = services.map(
+    const rows = exportList.map(
       (s: ServiceRecord) =>
         `"${s.custom_service_id}","${s.service_name}","${s.phone_number}","${s.service_type}","${s.attached_organization_name}","${s.attached_property_name}","${s.status}"`
     );
@@ -72,7 +91,7 @@ export default function ServicesHeaderAndFilters({
     a.href = url;
     a.download = `telecom-services-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
-    onToast('Exported', 'Services list exported as CSV.', 'info');
+    onToast('Exported', `Exported ${exportList.length} services as CSV.`, 'info');
   };
 
   return (

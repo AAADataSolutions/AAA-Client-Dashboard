@@ -155,7 +155,7 @@ export function PropertiesTable({
                 <tr>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY</th>
                   {isSuperAdmin && (
-                    <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MONTHLY PRICE</th>
+                    <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">VOICE MONTHLY PRICE</th>
                   )}
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">MAIN PHONE NO.</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">CLIENT</th>
@@ -166,7 +166,6 @@ export function PropertiesTable({
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM NAME</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">GM EMAIL</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">PROPERTY STATUS</th>
-                  <th className="py-3.5 px-4 text-black dark:text-white font-bold whitespace-nowrap">BILLING STATUS</th>
                   <th className="py-3.5 px-4 text-black dark:text-white font-bold text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>

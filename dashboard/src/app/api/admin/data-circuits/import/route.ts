@@ -137,18 +137,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cache existing properties, existing data circuit property IDs, and wholesalers
+    // Cache existing properties, existing data circuits, and wholesalers
     const [{ data: existingProps }, { data: existingCircuits }] = await Promise.all([
       dbClient.from('properties').select('id, name, address, city, state, zip_code, country, fax, connectivity_type'),
-      dbClient.from('data_circuits').select('property_id').neq('status', 'CANCELLED'),
+      dbClient.from('data_circuits').select('*').neq('status', 'CANCELLED'),
     ]);
     const propsMap = new Map<string, any>();
     (existingProps || []).forEach((p: any) => {
       if (p.name) propsMap.set(p.name.trim().toLowerCase(), p);
     });
-    const existingCircuitPropIds = new Set<string>(
-      (existingCircuits || []).map((c: any) => c.property_id).filter(Boolean)
-    );
+    const existingCircuitsByPropId = new Map<string, any>();
+    (existingCircuits || []).forEach((c: any) => {
+      if (c.property_id && !existingCircuitsByPropId.has(c.property_id)) {
+        existingCircuitsByPropId.set(c.property_id, c);
+      }
+    });
     const batchPropNames = new Set<string>();
 
     const wholesalersSet = new Set<string>();
@@ -177,11 +180,12 @@ export async function POST(request: NextRequest) {
 
       const normPropName = propertyName.toLowerCase();
       const matchedProp = propsMap.get(normPropName);
-      if (batchPropNames.has(normPropName) || (matchedProp && existingCircuitPropIds.has(matchedProp.id))) {
-        errors.push({ row: rowNum, propertyName, reason: 'Duplicate data circuit for this property already exists' });
+      if (batchPropNames.has(normPropName)) {
+        errors.push({ row: rowNum, propertyName, reason: 'Duplicate property name within CSV' });
         continue;
       }
       batchPropNames.add(normPropName);
+      const existingCircuit = matchedProp ? existingCircuitsByPropId.get(matchedProp.id) : null;
 
       const propertyAddress = getHeaderValue(row, ['Property Address', 'PropertyAddress', 'property_address', 'Street Address', 'Address']).trim();
       const city = getHeaderValue(row, ['City', 'city']).trim();
@@ -256,34 +260,69 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // 3. Insert Data Circuit
+        // 3. Insert or Update Blank Columns on Data Circuit
         const nowIso = new Date().toISOString();
-        const { data: newCircuit, error: circuitErr } = await dbClient
-          .from('data_circuits')
-          .insert({
-            property_id: propRecord.id,
-            status: mappedStage,
-            wholesaler_name: wholesalerName || null,
-            carrier_name: carrier || null,
-            bandwidth,
-            circuit_monthly_price: clientPrice,
-            revenue_share_percentage: revSharePct,
-            monthly_revenue_share_amount: monthlyRevShareAmt,
-            installed_at: mappedStage === 'INSTALLED' ? nowIso : null,
-            created_by: user.id,
-          })
-          .select('*')
-          .single();
+        let targetCircuit: any = existingCircuit;
 
-        if (circuitErr || !newCircuit) {
-          throw new Error(circuitErr?.message || 'Failed to insert data circuit');
+        if (existingCircuit) {
+          const isBlankStr = (v: any) => v === null || v === undefined || String(v).trim() === '';
+          const circuitUpdate: Record<string, any> = {};
+          if (isBlankStr(existingCircuit.wholesaler_name) && wholesalerName) circuitUpdate.wholesaler_name = wholesalerName;
+          if (isBlankStr(existingCircuit.carrier_name) && carrier) circuitUpdate.carrier_name = carrier;
+          if (isBlankStr(existingCircuit.bandwidth) && bandwidth) circuitUpdate.bandwidth = bandwidth;
+          if ((!existingCircuit.circuit_monthly_price || Number(existingCircuit.circuit_monthly_price) === 0) && clientPrice > 0) {
+            circuitUpdate.circuit_monthly_price = clientPrice;
+          }
+          if ((!existingCircuit.revenue_share_percentage || Number(existingCircuit.revenue_share_percentage) === 0) && revSharePct > 0) {
+            circuitUpdate.revenue_share_percentage = revSharePct;
+          }
+          if (isBlankStr(existingCircuit.status) && mappedStage) {
+            circuitUpdate.status = mappedStage;
+            if (mappedStage === 'INSTALLED' && !existingCircuit.installed_at) circuitUpdate.installed_at = nowIso;
+          }
+
+          if (Object.keys(circuitUpdate).length > 0) {
+            const effPrice = Number(circuitUpdate.circuit_monthly_price ?? existingCircuit.circuit_monthly_price ?? 0);
+            const effPct = Number(circuitUpdate.revenue_share_percentage ?? existingCircuit.revenue_share_percentage ?? 0);
+            circuitUpdate.monthly_revenue_share_amount = Math.round(effPrice * (effPct / 100) * 100) / 100;
+            circuitUpdate.updated_at = nowIso;
+            const { data: updCircuit } = await dbClient
+              .from('data_circuits')
+              .update(circuitUpdate)
+              .eq('id', existingCircuit.id)
+              .select('*')
+              .single();
+            if (updCircuit) targetCircuit = updCircuit;
+          }
+        } else {
+          const { data: newCircuit, error: circuitErr } = await dbClient
+            .from('data_circuits')
+            .insert({
+              property_id: propRecord.id,
+              status: mappedStage,
+              wholesaler_name: wholesalerName || null,
+              carrier_name: carrier || null,
+              bandwidth,
+              circuit_monthly_price: clientPrice,
+              revenue_share_percentage: revSharePct,
+              monthly_revenue_share_amount: monthlyRevShareAmt,
+              installed_at: mappedStage === 'INSTALLED' ? nowIso : null,
+              created_by: user.id,
+            })
+            .select('*')
+            .single();
+
+          if (circuitErr || !newCircuit) {
+            throw new Error(circuitErr?.message || 'Failed to insert data circuit');
+          }
+          targetCircuit = newCircuit;
         }
 
-        // 4. Insert selected quote if pricing/wholesaler provided
-        if ((wholesalerName || carrier) && clientPrice > 0) {
+        // 4. Insert selected quote if newly created and pricing/wholesaler provided
+        if (!existingCircuit && (wholesalerName || carrier) && clientPrice > 0) {
           try {
             await dbClient.from('data_circuit_quotes').insert({
-              data_circuit_id: newCircuit.id,
+              data_circuit_id: targetCircuit.id,
               wholesaler_name: wholesalerName || 'Wholesaler',
               carrier_name: carrier || 'Carrier',
               bandwidth,
@@ -298,36 +337,37 @@ export async function POST(request: NextRequest) {
 
         // 5. Record "Number of Times Monthly Revenue Paid" into data_circuit_monthly_revenues
         let circuitPaidTotal = 0;
-        if (timesPaid > 0 && monthlyRevShareAmt > 0) {
+        const effShareAmt = Number(targetCircuit.monthly_revenue_share_amount || monthlyRevShareAmt || 0);
+        if (timesPaid > 0 && effShareAmt > 0) {
           const monthKeys = getConsecutivePastMonthKeys(timesPaid);
           const revRows = monthKeys.map((mKey) => ({
-            data_circuit_id: newCircuit.id,
+            data_circuit_id: targetCircuit.id,
             property_id: propRecord.id,
             month_key: mKey,
-            wholesaler_name: wholesalerName || null,
-            carrier_name: carrier || null,
-            circuit_monthly_price: clientPrice,
-            revenue_share_percentage: revSharePct,
-            revenue_share_amount: monthlyRevShareAmt,
+            wholesaler_name: targetCircuit.wholesaler_name || wholesalerName || null,
+            carrier_name: targetCircuit.carrier_name || carrier || null,
+            circuit_monthly_price: Number(targetCircuit.circuit_monthly_price || clientPrice || 0),
+            revenue_share_percentage: Number(targetCircuit.revenue_share_percentage || revSharePct || 0),
+            revenue_share_amount: effShareAmt,
             revenue_received: true,
             received_at: nowIso,
             updated_by: user.id,
-            notes: `Imported via CSV (${timesPaid} months paid = $${(timesPaid * monthlyRevShareAmt).toFixed(2)})`,
+            notes: `Imported via CSV (${timesPaid} months paid = $${(timesPaid * effShareAmt).toFixed(2)})`,
             updated_at: nowIso,
           }));
 
           const { error: revErr } = await dbClient
             .from('data_circuit_monthly_revenues')
-            .upsert(revRows, { onConflict: 'data_circuit_id,month_key' });
+            .upsert(revRows, { onConflict: 'data_circuit_id,month_key', ignoreDuplicates: Boolean(existingCircuit) });
 
           if (!revErr) {
-            circuitPaidTotal = Math.round(timesPaid * monthlyRevShareAmt * 100) / 100;
+            circuitPaidTotal = Math.round(timesPaid * effShareAmt * 100) / 100;
             totalRevenueAdded = Math.round((totalRevenueAdded + circuitPaidTotal) * 100) / 100;
           }
         }
 
         importedCircuits.push({
-          ...newCircuit,
+          ...targetCircuit,
           property_name: propRecord.name,
           times_paid: timesPaid,
           total_revenue_added: circuitPaidTotal,

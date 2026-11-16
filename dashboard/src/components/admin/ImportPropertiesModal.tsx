@@ -74,13 +74,13 @@ export const ImportPropertiesModal: React.FC<ImportPropertiesModalProps> = ({
       const k = r.name.trim().toLowerCase();
       const existsInDb = Boolean(k && existingPropertyNames.has(k));
       const dupInCsv = Boolean(k && (csvCounts.get(k) || 0) > 1);
-      const isDuplicate = existsInDb || dupInCsv;
-      const duplicateReason = existsInDb
-        ? 'Already exists in Properties'
-        : dupInCsv
+      const isDuplicate = dupInCsv;
+      const duplicateReason = dupInCsv
         ? 'Duplicate in CSV'
+        : existsInDb
+        ? 'Exists — blank columns will be updated'
         : undefined;
-      return { ...r, isDuplicate, duplicateReason };
+      return { ...r, existsInDb, isDuplicate, duplicateReason };
     });
   }, [parsedRows, existingPropertyNames]);
 

@@ -81,7 +81,7 @@ export const PropertiesGridView: React.FC<PropertiesGridViewProps> = ({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[11px]">Monthly Price:</span>
+                <span className="text-slate-400 text-[11px]">Voice Monthly Price:</span>
                 <span className="font-semibold text-slate-900 dark:text-white">
                   {prop.monthly_price !== null && prop.monthly_price !== undefined
                     ? `$${Number(prop.monthly_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -93,9 +93,9 @@ export const PropertiesGridView: React.FC<PropertiesGridViewProps> = ({
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400">
                   {(() => {
                     const ct = (prop as any).connectivity_type || ((prop as any).data_circuit ? 'BOTH' : 'PORTED');
-                    if (ct === 'BOTH') return 'Ported & Data Circuited';
+                    if (ct === 'BOTH') return 'Voice Services & Data Circuited';
                     if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
-                    return 'Ported';
+                    return 'Voice Services';
                   })()}
                 </span>
               </div>

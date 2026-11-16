@@ -168,6 +168,7 @@ export async function POST(
         id: invite.id,
         email: invite.email,
         token: rawToken,
+        invite_url: inviteUrl,
         inviteUrl,
         status: 'PENDING',
         expires_at: expiresAt,

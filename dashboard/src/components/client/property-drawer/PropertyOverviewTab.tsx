@@ -173,7 +173,7 @@ export function PropertyOverviewTab({ property, onPropertyUpdated }: PropertyOve
 
           <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-slate-100 dark:border-[#222430]">
             <div>
-              <span className="text-[10px] text-slate-400 block">Monthly Price</span>
+              <span className="text-[10px] text-slate-400 block">Voice Monthly Price</span>
               <span className="text-slate-900 dark:text-white font-bold text-xs">
                 {property.monthly_price !== null && property.monthly_price !== undefined
                   ? `$${Number(property.monthly_price).toLocaleString('en-US', {
@@ -188,9 +188,9 @@ export function PropertyOverviewTab({ property, onPropertyUpdated }: PropertyOve
               <span className="text-indigo-600 dark:text-indigo-400 font-bold text-xs">
                 {(() => {
                   const ct = property.connectivity_type || (property.data_circuit ? 'BOTH' : 'PORTED');
-                  if (ct === 'BOTH') return 'Ported & Data Circuited';
+                  if (ct === 'BOTH') return 'Voice Services & Data Circuited';
                   if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
-                  return 'Ported';
+                  return 'Voice Services';
                 })()}
               </span>
             </div>

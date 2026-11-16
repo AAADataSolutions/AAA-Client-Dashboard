@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import {
   ParsedDataCircuitRow,
-  DATA_CIRCUIT_CSV_HEADERS,
+  DATA_CIRCUIT_PIPELINE_CSV_HEADERS,
+  DATA_CIRCUIT_INSTALLED_CSV_HEADERS,
   downloadDataCircuitsTemplate,
   parseDataCircuitsCsv,
 } from './dataCircuitsCsvParser';
@@ -26,6 +27,7 @@ interface ImportDataCircuitsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  activeViewTab?: 'PIPELINE' | 'INSTALLED';
   existingCircuitPropertyNames?: string[];
 }
 
@@ -33,8 +35,13 @@ export function ImportDataCircuitsModal({
   isOpen,
   onClose,
   onSuccess,
+  activeViewTab = 'INSTALLED',
   existingCircuitPropertyNames = [],
 }: ImportDataCircuitsModalProps) {
+  const activeHeaders =
+    activeViewTab === 'PIPELINE'
+      ? DATA_CIRCUIT_PIPELINE_CSV_HEADERS
+      : DATA_CIRCUIT_INSTALLED_CSV_HEADERS;
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<ParsedDataCircuitRow[]>([]);
@@ -67,18 +74,23 @@ export function ImportDataCircuitsModal({
       const k = r.propertyName.trim().toLowerCase();
       const existsInDb = Boolean(k && existingNamesSet.has(k));
       const dupInCsv = Boolean(k && (csvCounts.get(k) || 0) > 1);
-      const isDuplicate = existsInDb || dupInCsv;
-      const duplicateReason = existsInDb
-        ? 'Already exists in Data Circuits'
-        : dupInCsv
+      const isDuplicate = dupInCsv;
+      const duplicateReason = dupInCsv
         ? 'Duplicate in CSV'
+        : existsInDb
+        ? 'Exists — blank fields will be updated'
         : undefined;
-      return { ...r, isDuplicate, duplicateReason };
+      return { ...r, existsInDb, isDuplicate, duplicateReason };
     });
   }, [parsedRows, existingNamesSet]);
 
   const duplicateCount = useMemo(
     () => rowsWithDuplicateFlags.filter((r) => r.isDuplicate).length,
+    [rowsWithDuplicateFlags]
+  );
+
+  const existingMatchCount = useMemo(
+    () => rowsWithDuplicateFlags.filter((r) => r.existsInDb && !r.isDuplicate).length,
     [rowsWithDuplicateFlags]
   );
 
@@ -189,11 +201,11 @@ export function ImportDataCircuitsModal({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={downloadDataCircuitsTemplate}
+                  onClick={() => downloadDataCircuitsTemplate(activeViewTab)}
                   className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#1e202b] hover:bg-slate-200 dark:hover:bg-[#262938] text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  Download Sample CSV
+                  Download {activeViewTab === 'PIPELINE' ? 'Pipeline' : 'Installed'} Sample CSV
                 </button>
                 <button
                   type="button"
@@ -242,10 +254,10 @@ export function ImportDataCircuitsModal({
                   {/* Required Columns Banner */}
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#111217] border border-slate-200 dark:border-[#222430]">
                     <p className="font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      CSV Columns ({DATA_CIRCUIT_CSV_HEADERS.length}):
+                      {activeViewTab === 'PIPELINE' ? 'Pipeline' : 'Installed'} CSV Columns ({activeHeaders.length}):
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {DATA_CIRCUIT_CSV_HEADERS.map((h) => (
+                      {activeHeaders.map((h) => (
                         <span
                           key={h}
                           className="px-2 py-0.5 rounded bg-white dark:bg-[#1a1c24] border border-slate-200 dark:border-[#282a36] text-[10px] font-semibold text-slate-700 dark:text-slate-300"
@@ -299,7 +311,15 @@ export function ImportDataCircuitsModal({
                         <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-semibold">
                           <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                           <span>
-                            {duplicateCount} duplicate property row{duplicateCount === 1 ? '' : 's'} detected. Remove all duplicate rows from the preview table below to enable import.
+                            {duplicateCount} duplicate row{duplicateCount === 1 ? '' : 's'} within this CSV file. Remove duplicate rows from the preview table below to enable import.
+                          </span>
+                        </div>
+                      )}
+                      {existingMatchCount > 0 && (
+                        <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs flex items-center gap-2 font-semibold">
+                          <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span>
+                            {existingMatchCount} row{existingMatchCount === 1 ? '' : 's'} already exist — only blank fields will be updated; filled fields will stay unchanged.
                           </span>
                         </div>
                       )}
@@ -309,9 +329,11 @@ export function ImportDataCircuitsModal({
                           <TableIcon className="w-4 h-4 text-blue-600" />
                           Preview ({validCount} valid of {rowsWithDuplicateFlags.length} rows)
                         </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
-                          Total Revenue to Add: {formatCurrency(totalRevenuePreview)}
-                        </span>
+                        {activeViewTab === 'INSTALLED' && (
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-bold">
+                            Total Revenue to Add: {formatCurrency(totalRevenuePreview)}
+                          </span>
+                        )}
                       </div>
 
                       <div className="border border-slate-200 dark:border-[#222430] rounded-xl overflow-x-auto max-h-64">
@@ -325,8 +347,12 @@ export function ImportDataCircuitsModal({
                               <th className="py-2 px-3 font-bold">Client Price</th>
                               <th className="py-2 px-3 font-bold">Rev Share</th>
                               <th className="py-2 px-3 font-bold">Stage</th>
-                              <th className="py-2 px-3 font-bold">Times Paid</th>
-                              <th className="py-2 px-3 font-bold text-right">Revenue Added</th>
+                              {activeViewTab === 'INSTALLED' && (
+                                <>
+                                  <th className="py-2 px-3 font-bold">Times Paid</th>
+                                  <th className="py-2 px-3 font-bold text-right">Revenue Added</th>
+                                </>
+                              )}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-[#222430]">
@@ -354,17 +380,30 @@ export function ImportDataCircuitsModal({
                                 <td className="py-2 px-3 font-semibold">
                                   <div className="flex items-center gap-1.5">
                                     <span>{row.propertyName || <span className="text-rose-500">Missing</span>}</span>
-                                    {row.isDuplicate && (
+                                    {row.isDuplicate ? (
                                       <span
                                         className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9.5px] font-bold uppercase tracking-wide"
                                         title={row.duplicateReason}
                                       >
                                         Duplicate
                                       </span>
-                                    )}
+                                    ) : row.existsInDb ? (
+                                      <span
+                                        className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9.5px] font-bold uppercase tracking-wide"
+                                        title={row.duplicateReason}
+                                      >
+                                        Fill Blanks
+                                      </span>
+                                    ) : null}
                                   </div>
-                                  {row.isDuplicate && row.duplicateReason && (
-                                    <span className="block text-[10px] text-rose-600 dark:text-rose-400 font-normal">
+                                  {(row.isDuplicate || row.existsInDb) && row.duplicateReason && (
+                                    <span
+                                      className={`block text-[10px] font-normal ${
+                                        row.isDuplicate
+                                          ? 'text-rose-600 dark:text-rose-400'
+                                          : 'text-blue-600 dark:text-blue-400'
+                                      }`}
+                                    >
                                       {row.duplicateReason}
                                     </span>
                                   )}
@@ -380,10 +419,14 @@ export function ImportDataCircuitsModal({
                                   {row.revenueSharePct}% ({formatCurrency(row.monthlyRevShareAmt)}/mo)
                                 </td>
                                 <td className="py-2 px-3 font-semibold">{row.stage}</td>
-                                <td className="py-2 px-3 font-mono">{row.timesPaid}x</td>
-                                <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                                  {formatCurrency(row.totalRevenueAdded)}
-                                </td>
+                                {activeViewTab === 'INSTALLED' && (
+                                  <>
+                                    <td className="py-2 px-3 font-mono">{row.timesPaid}x</td>
+                                    <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                      {formatCurrency(row.totalRevenueAdded)}
+                                    </td>
+                                  </>
+                                )}
                               </tr>
                             ))}
                           </tbody>

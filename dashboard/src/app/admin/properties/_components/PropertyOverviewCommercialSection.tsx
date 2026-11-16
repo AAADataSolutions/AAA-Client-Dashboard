@@ -76,7 +76,7 @@ export function PropertyOverviewCommercialSection({
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="p-3 bg-white dark:bg-[#181a24] border border-slate-200 dark:border-[#222430] rounded-xl">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Monthly Price ($)</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Voice Monthly Price ($)</span>
             {isEditing ? (
               <input
                 type="number"

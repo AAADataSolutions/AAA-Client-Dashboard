@@ -52,7 +52,7 @@ export function PropertyTableRow({
           <span className="font-bold text-black dark:text-white text-sm">{prop.name}</span>
           {connType === 'BOTH' ? (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-sans">
-              Ported &amp; Data Circuited
+              Voice Services &amp; Data Circuited
             </span>
           ) : connType === 'DATA_CIRCUITED' ? (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60 font-sans">
@@ -60,7 +60,7 @@ export function PropertyTableRow({
             </span>
           ) : (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700 font-sans">
-              Ported
+              Voice Services
             </span>
           )}
         </div>

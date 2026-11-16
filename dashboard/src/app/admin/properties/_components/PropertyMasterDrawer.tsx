@@ -136,9 +136,9 @@ export function PropertyMasterDrawer({
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/40">
                         {(() => {
                           const ct = selectedPropForDrawer.connectivity_type || (selectedPropForDrawer.data_circuit ? 'BOTH' : 'PORTED');
-                          if (ct === 'BOTH') return 'Ported & Data Circuited';
+                          if (ct === 'BOTH') return 'Voice Services & Data Circuited';
                           if (ct === 'DATA_CIRCUITED') return 'Data Circuited';
-                          return 'Ported';
+                          return 'Voice Services';
                         })()}
                       </span>
                     </div>

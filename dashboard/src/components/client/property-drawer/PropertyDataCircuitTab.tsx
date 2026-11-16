@@ -18,7 +18,7 @@ export function PropertyDataCircuitTab({ dataCircuit }: PropertyDataCircuitTabPr
           </div>
           <div>
             <h4 className="font-bold text-slate-800 dark:text-white text-xs">
-              Ported Voice Only — No Enterprise Data Circuit
+              Voice Services Only — No Data Circuit Services
             </h4>
             <p className="text-slate-400 text-[11px] max-w-sm mx-auto mt-1 leading-relaxed">
               This property location operates on standard ported voice trunks. An enterprise dedicated internet circuit has not been requested or provisioned for this site.

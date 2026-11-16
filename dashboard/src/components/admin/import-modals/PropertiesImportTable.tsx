@@ -5,6 +5,7 @@ import { FileText, Download, Upload, RefreshCw, Trash2, AlertTriangle } from 'lu
 import { ParsedPropertyRow } from './propertiesCsvParser';
 
 export interface AnnotatedPropertyRow extends ParsedPropertyRow {
+  existsInDb?: boolean;
   isDuplicate?: boolean;
   duplicateReason?: string;
 }
@@ -89,7 +90,15 @@ export const PropertiesImportTable: React.FC<PropertiesImportTableProps> = ({
         <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-semibold">
           <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
           <span>
-            {duplicateCount} duplicate property row{duplicateCount === 1 ? '' : 's'} detected. Remove all duplicate rows from the preview table below to enable import.
+            {duplicateCount} duplicate row{duplicateCount === 1 ? '' : 's'} within this CSV file. Remove duplicate rows from the preview table below to enable import.
+          </span>
+        </div>
+      )}
+      {parsedRows.some((r) => r.existsInDb && !r.isDuplicate) && (
+        <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs flex items-center gap-2 font-semibold">
+          <AlertTriangle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span>
+            Existing properties will only have their blank columns updated; already filled columns will remain untouched.
           </span>
         </div>
       )}
@@ -160,17 +169,30 @@ export const PropertiesImportTable: React.FC<PropertiesImportTableProps> = ({
                         <span className="text-rose-500 font-normal italic">Missing Name</span>
                       )}
                     </span>
-                    {row.isDuplicate && (
+                    {row.isDuplicate ? (
                       <span
                         className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9.5px] font-bold uppercase tracking-wide"
                         title={row.duplicateReason}
                       >
                         Duplicate
                       </span>
-                    )}
+                    ) : row.existsInDb ? (
+                      <span
+                        className="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9.5px] font-bold uppercase tracking-wide"
+                        title={row.duplicateReason}
+                      >
+                        Fill Blanks
+                      </span>
+                    ) : null}
                   </div>
-                  {row.isDuplicate && row.duplicateReason && (
-                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-normal block">
+                  {(row.isDuplicate || row.existsInDb) && row.duplicateReason && (
+                    <span
+                      className={`text-[10px] font-normal block ${
+                        row.isDuplicate
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-blue-600 dark:text-blue-400'
+                      }`}
+                    >
                       {row.duplicateReason}
                     </span>
                   )}

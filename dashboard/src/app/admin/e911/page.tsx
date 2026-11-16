@@ -353,9 +353,26 @@ export default function AdminE911Page() {
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => {
+            onClick={async () => {
+              let exportList: E911Item[] = records;
+              try {
+                const params = new URLSearchParams({
+                  page: '1',
+                  limit: '5000',
+                  search: filters.searchQuery || '',
+                  status: filters.selectedStatus || 'ALL',
+                  sortBy: filters.sortBy || 'NEWEST',
+                });
+                const res = await fetch(`/api/admin/e911?${params.toString()}`);
+                const json = await res.json();
+                if (json.success && Array.isArray(json.data)) {
+                  exportList = json.data;
+                }
+              } catch {
+                // fallback to loaded records
+              }
               const headers = ['Property,Property Address,Organization,Emergency Dispatch Address,Status,Ray Baum\n'];
-              const rows = records.map((r: E911Item) =>
+              const rows = exportList.map((r: E911Item) =>
                 `"${r.property_name}","${r.emergency_address}","${r.organization_name}","${r.emergency_address}","${r.status}","${r.ray_baum_compliant ? 'Verified' : 'Non-Verified'}"`
               );
               const blob = new Blob([headers.concat(rows.join('\n')).join('')], { type: 'text/csv' });
@@ -364,7 +381,7 @@ export default function AdminE911Page() {
               a.href = url;
               a.download = `e911-records-${new Date().toISOString().slice(0, 10)}.csv`;
               a.click();
-              showToast('Exported', 'E911 records exported as CSV.', 'info');
+              showToast('Exported', `Exported ${exportList.length} E911 records as CSV.`, 'info');
             }}
             className="px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-[#222430] bg-white dark:bg-[#15161c] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1c1e27] transition flex items-center gap-2 cursor-pointer"
           >
