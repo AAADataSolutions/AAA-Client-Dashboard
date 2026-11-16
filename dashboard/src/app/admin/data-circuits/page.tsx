@@ -97,7 +97,7 @@ export default function DataCircuitsAdminPage({
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedCircuit, setSelectedCircuit] = useState<any | null>(null);
   const [showManageModal, setShowManageModal] = useState(false);
-  const [modalTab, setModalTab] = useState<'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW'>('PRICING');
+  const [modalTab, setModalTab] = useState<'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR'>('PRICING');
 
   // Toggling Monthly Revenue Received Yes/No
   const [togglingCircuitId, setTogglingCircuitId] = useState<string | null>(null);
@@ -169,7 +169,7 @@ export default function DataCircuitsAdminPage({
 
   const handleOpenManageModal = (
     circuit: any,
-    tab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' = 'PRICING'
+    tab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR' = 'PRICING'
   ) => {
     setSelectedCircuit(circuit);
     setModalTab(tab);

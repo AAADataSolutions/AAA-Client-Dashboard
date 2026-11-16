@@ -157,8 +157,11 @@ export async function GET(request: NextRequest) {
         prop.connectivity_type && ['PORTED', 'DATA_CIRCUITED', 'BOTH'].includes(prop.connectivity_type)
           ? prop.connectivity_type
           : 'PORTED';
-      if (primaryCircuit && dynamicServiceCount > 0 && !prop.connectivity_type) resolvedConnectivityType = 'BOTH';
-      else if (primaryCircuit && !prop.connectivity_type) resolvedConnectivityType = 'DATA_CIRCUITED';
+      if (!primaryCircuit) {
+        resolvedConnectivityType = 'PORTED';
+      } else if (dynamicServiceCount > 0 && resolvedConnectivityType === 'PORTED') {
+        resolvedConnectivityType = 'BOTH';
+      }
 
       return {
         id: prop.id,

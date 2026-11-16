@@ -92,9 +92,36 @@ export async function DELETE(
     const adminClient = createAdminClient();
     const db = adminClient || supabase;
 
+    // Fetch existing circuit to get property_id before deleting
+    const { data: existing } = await db
+      .from('data_circuits')
+      .select('id, property_id')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await db.from('data_circuits').delete().eq('id', id);
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+
+    // Reset property's connectivity_type back to PORTED if no active circuits remain
+    if (existing?.property_id) {
+      const { data: remaining } = await db
+        .from('data_circuits')
+        .select('id')
+        .eq('property_id', existing.property_id)
+        .neq('status', 'CANCELLED')
+        .limit(1);
+
+      if (!remaining || remaining.length === 0) {
+        await db
+          .from('properties')
+          .update({
+            connectivity_type: 'PORTED',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.property_id);
+      }
     }
 
     return NextResponse.json({ success: true });

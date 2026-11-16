@@ -12,13 +12,14 @@ import {
 } from './types';
 import ManagePricingTab from './ManagePricingTab';
 import ManageStagesTab from './ManageStagesTab';
+import RevenueCalendarTab from './RevenueCalendarTab';
 
 interface ManageDataCircuitModalProps {
   showManageModal: boolean;
   onClose: () => void;
   selectedCircuit: any;
-  modalTab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW';
-  setModalTab: (tab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW') => void;
+  modalTab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR';
+  setModalTab: (tab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR') => void;
   wholesalers: WholesalerItem[];
   onReload: () => void;
   onToast: (title: string, message?: string, type?: 'success' | 'error' | 'info') => void;
@@ -309,6 +310,9 @@ export default function ManageDataCircuitModal({
                 { key: 'STAGES', label: '2. Lifecycle Stages & Agreement PDF' },
                 { key: 'TECHNICAL', label: '3. Technical Details (Client Textbox)' },
                 { key: 'QUOTATION_PREVIEW', label: '4. Client Quotation Preview (No Wholesaler)' },
+                ...(selectedCircuit.status === 'INSTALLED'
+                  ? [{ key: 'REVENUE_CALENDAR', label: '5. Revenue Calendar' }]
+                  : []),
               ].map((tb) => (
                 <button
                   key={tb.key}
@@ -450,6 +454,15 @@ export default function ManageDataCircuitModal({
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* TAB 5: REVENUE CALENDAR (INSTALLED ONLY) */}
+              {modalTab === 'REVENUE_CALENDAR' && (
+                <RevenueCalendarTab
+                  selectedCircuit={selectedCircuit}
+                  onReload={onReload}
+                  onToast={onToast}
+                />
               )}
             </div>
           </motion.div>

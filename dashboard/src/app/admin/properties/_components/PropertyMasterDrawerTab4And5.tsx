@@ -36,7 +36,7 @@ export function PropertyMasterDrawerTab4And5({
   onDataChanged,
 }: PropertyMasterDrawerTab4And5Props) {
   const [showManageModal, setShowManageModal] = useState(false);
-  const [modalTab, setModalTab] = useState<'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW'>('PRICING');
+  const [modalTab, setModalTab] = useState<'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR'>('PRICING');
   const [wholesalers, setWholesalers] = useState<WholesalerItem[]>([]);
   const [localCircuit, setLocalCircuit] = useState<any | null>(null);
   const [creatingCircuit, setCreatingCircuit] = useState(false);
@@ -80,7 +80,7 @@ export function PropertyMasterDrawerTab4And5({
   }, [onDataChanged, selectedPropForDrawer?.id]);
 
   const handleOpenCircuitModal = async (
-    targetTab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' = 'PRICING'
+    targetTab: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR' = 'PRICING'
   ) => {
     setModalTab(targetTab);
     if (currentCircuit) {
@@ -373,7 +373,7 @@ export function PropertyMasterDrawerTab4And5({
               <Wifi className="w-8 h-8 mx-auto text-slate-400" />
               <div>
                 <p className="font-bold text-slate-900 dark:text-white text-sm">
-                  Ported Only — No Data Circuit Attached
+                  No Data Circuit Services
                 </p>
                 <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
                   This property currently has Voice/DID services without an active dedicated Data Circuit pipeline.

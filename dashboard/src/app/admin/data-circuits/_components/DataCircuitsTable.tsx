@@ -10,6 +10,7 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
+  Calendar,
 } from 'lucide-react';
 import {
   itemVariants,
@@ -28,7 +29,7 @@ interface DataCircuitsTableProps {
   activeViewTab: 'PIPELINE' | 'INSTALLED';
   selectedMonth: string;
   togglingCircuitId: string | null;
-  onOpenManageModal: (circuit: any, initialTab?: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW') => void;
+  onOpenManageModal: (circuit: any, initialTab?: 'PRICING' | 'STAGES' | 'TECHNICAL' | 'QUOTATION_PREVIEW' | 'REVENUE_CALENDAR') => void;
   onToggleMonthlyRevenue: (circuitId: string, receiveYes: boolean) => void;
   onDeleteCircuit: (circuit: any) => void;
   onOpenCreate: () => void;
@@ -211,6 +212,16 @@ export default function DataCircuitsTable({
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex items-center gap-2">
+                        {activeViewTab === 'INSTALLED' && (
+                          <button
+                            onClick={() => onOpenManageModal(c, 'REVENUE_CALENDAR')}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                            title="Open Revenue Calendar & Payment History"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>Calendar</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => onOpenManageModal(c, 'PRICING')}
                           className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer shadow-2xs"
